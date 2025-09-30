@@ -9,7 +9,8 @@ import sys
 from typing import Optional
 from loguru import logger
 
-from ..config import get_config
+# 移除 config 依賴，直接使用環境變數
+import os
 
 
 def setup_logging(
@@ -25,12 +26,13 @@ def setup_logging(
         log_file: Optional file path for log output
         format_string: Custom log format string
     """
-    config = get_config()
-
-    # Use provided values or fall back to config
-    log_level = level or config.log_level
-    log_format = format_string or config.log_format
-    log_path = log_file or config.log_file
+    # Use provided values or fall back to environment variables
+    log_level = level or os.getenv("MARKET_MCP_LOG_LEVEL", "INFO")
+    log_format = format_string or os.getenv(
+        "MARKET_MCP_LOG_FORMAT",
+        "<green>{time}</green> | <level>{level}</level> | <cyan>{name}</cyan> | {message}",
+    )
+    log_path = log_file or os.getenv("MARKET_MCP_LOG_FILE")
 
     # Remove default handler
     logger.remove()

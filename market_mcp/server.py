@@ -6,6 +6,7 @@ Model Context Protocol communication and tool registration.
 """
 
 import asyncio
+import os
 from typing import Any, Dict, List
 from contextlib import asynccontextmanager
 
@@ -13,7 +14,7 @@ from mcp.server import Server
 from mcp.server.stdio import stdio_server
 from mcp.types import Resource, Tool
 
-from .config import get_config
+# 移除 config 依賴，直接使用環境變數
 from .utils.logging import setup_logging, get_logger
 
 
@@ -27,7 +28,7 @@ class MCPServer:
 
     def __init__(self):
         """Initialize the MCP Server."""
-        self.config = get_config()
+        # 移除 config 物件，直接使用環境變數
         self.server = Server("market-mcp-server")
         self.logger = get_logger(__name__)
 
@@ -114,7 +115,8 @@ class MCPServer:
     async def run(self) -> None:
         """Run the MCP server."""
         self.logger.info("Starting Market MCP Server")
-        self.logger.info(f"Server version: {self.config.server_version}")
+        server_version = os.getenv("MARKET_MCP_SERVER_VERSION", "1.0.0")
+        self.logger.info(f"Server version: {server_version}")
 
         async with stdio_server() as (read_stream, write_stream):
             await self.server.run(

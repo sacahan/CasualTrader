@@ -3,6 +3,7 @@
         {
             "name": "Python 偵錯工具: 目前檔案",
             "type": "debugpy",
+            "module": "market",
             "request": "launch",
             "program": "${file}",
             "console": "integratedTerminal"

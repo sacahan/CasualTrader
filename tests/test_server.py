@@ -8,35 +8,37 @@ and configuration management.
 import pytest
 from unittest.mock import AsyncMock, patch
 
-from market_mcp.config import Config, get_config, reload_config
+# from market_mcp.config import Config, get_config, reload_config  # Config 已被移除
 from market_mcp.server import MCPServer
 
 
-class TestConfig:
-    """Test configuration management."""
-
-    def test_default_config(self):
-        """Test default configuration values."""
-        config = Config()
-
-        assert config.server_name == "market-mcp-server"
-        assert config.server_version == "0.1.0"
-        assert config.api_timeout == 5
-        assert config.rate_limit_per_symbol == 30
-        assert config.cache_ttl == 30
-        assert config.log_level == "INFO"
-        assert config.debug is False
-
-    def test_get_config(self):
-        """Test global config instance."""
-        config = get_config()
-        assert isinstance(config, Config)
-        assert config.server_name == "market-mcp-server"
-
-    def test_reload_config(self):
-        """Test configuration reload."""
-        config = reload_config()
-        assert isinstance(config, Config)
+# class TestConfig:
+#     """Test configuration management."""
+#
+#     # 註釋：Config 類別已被移除，直接使用環境變數
+#
+#     def test_config_defaults(self):
+#         """Test default configuration values."""
+#         config = Config()
+#         assert config.server_name == "market-mcp-server"
+#         assert config.server_version == "1.0.0"
+#         assert config.max_concurrent_requests == 100
+#         assert config.rate_limit_per_second == 10
+#         assert config.rate_limit_per_symbol == 30
+#         assert config.cache_ttl == 30
+#         assert config.log_level == "INFO"
+#         assert config.debug is False
+#
+#     def test_get_config(self):
+#         """Test global config instance."""
+#         config = get_config()
+#         assert isinstance(config, Config)
+#         assert config.server_name == "market-mcp-server"
+#
+#     def test_reload_config(self):
+#         """Test configuration reload."""
+#         config = reload_config()
+#         assert isinstance(config, Config)
 
 
 class TestMCPServer:

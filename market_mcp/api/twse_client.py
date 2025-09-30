@@ -32,9 +32,13 @@ class TWStockAPIClient:
 
     def __init__(self):
         """初始化 API 客戶端。"""
-        self.base_url = "https://mis.twse.com.tw/stock/api/getStockInfo.jsp"
-        self.timeout = 5.0
-        self.max_retries = 3
+        # 從環境變數讀取配置，如果沒有則使用默認值
+        self.base_url = os.getenv(
+            "MARKET_MCP_TWSE_API_URL",
+            "https://mis.twse.com.tw/stock/api/getStockInfo.jsp",
+        )
+        self.timeout = float(os.getenv("MARKET_MCP_API_TIMEOUT", "5.0"))
+        self.max_retries = int(os.getenv("MARKET_MCP_API_RETRIES", "3"))
         self.parser = create_parser()
 
         # 設定 HTTP 客戶端標頭
@@ -268,6 +272,25 @@ if __name__ == "__main__":
     import asyncio
     import os
     import sys
+
+    # 直接讀取 .env 文件中的環境變數
+    project_root = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
+    env_path = os.path.join(project_root, ".env")
+
+    # 手動讀取 .env 文件
+    if os.path.exists(env_path):
+        print(f"讀取環境變數從: {env_path}")
+        with open(env_path, "r", encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if line and not line.startswith("#") and "=" in line:
+                    key, value = line.split("=", 1)
+                    key = key.strip()
+                    value = value.strip().strip('"').strip("'")
+                    os.environ[key] = value
+                    print(f"設定環境變數: {key}={value}")
+    else:
+        print(f"未找到 .env 文件: {env_path}")
 
     # 將專案根目錄加入 Python 路徑，讓相對引入可以正常運作
     sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(__file__))))

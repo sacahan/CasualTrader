@@ -16,6 +16,6 @@ __author__ = "Market MCP"
 __email__ = "market@example.com"
 
 from .server import MCPServer
-from .config import Config
+# 移除 Config 依賴
 
 __all__ = ["MCPServer", "Config"]
