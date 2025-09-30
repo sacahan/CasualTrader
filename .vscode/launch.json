@@ -1,12 +1,17 @@
 {
     "configurations": [
         {
-            "name": "Python 偵錯工具: 目前檔案",
+            "name": "執行 TWSE Client",
             "type": "debugpy",
-            "module": "market",
             "request": "launch",
-            "program": "${file}",
-            "console": "integratedTerminal"
+            "module": "market_mcp.api.twse_client",
+            "cwd": "${workspaceFolder}",
+            "console": "integratedTerminal",
+            "python": "${workspaceFolder}/.venv/bin/python3",
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}"
+            },
+            "justMyCode": false
         }
     ]
 }
