@@ -3,6 +3,10 @@
 # Manages Milestones and Issues based on Epic and Task files
 # Usage: ./github-manager.sh <operation> [options...]
 
+# Set locale for UTF-8 support
+export LC_ALL=en_US.UTF-8
+export LANG=en_US.UTF-8
+
 set -e
 
 SCRIPT_DIR="$(dirname "$0")"

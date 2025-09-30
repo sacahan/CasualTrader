@@ -3,6 +3,10 @@
 # Master script for AI agents to execute git/github operations
 # Usage: ./specpilot-workflow.sh <operation> <task-id> [additional-args...]
 
+# Set locale for UTF-8 support
+export LC_ALL=en_US.UTF-8
+export LANG=en_US.UTF-8
+
 # =============================================================================
 # AI AGENT EXECUTION GUIDE
 # =============================================================================
