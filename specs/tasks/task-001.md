@@ -1,7 +1,7 @@
 ---
 id: task-001
 type: development
-status: in_progress
+status: review
 priority: MEDIUM
 epic: epic-001
 created: 2025-09-30T08:45:00.000Z
