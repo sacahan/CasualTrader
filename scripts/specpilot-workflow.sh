@@ -39,8 +39,8 @@ set -e
 OPERATION="$1"
 TASK_ID="$2"
 # Get the script's directory first, then derive PROJECT_ROOT from it
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
+PROJECT_ROOT="$(git rev-parse --show-toplevel)"
+SCRIPT_DIR="$PROJECT_ROOT/scripts"
 BASE_BRANCH="main"
 
 # Source logging utilities
@@ -580,6 +580,8 @@ handle_uncommitted_changes "$OPERATION"
 # Individual operations can be used for granular control when needed.
 # =============================================================================
 
+cd $PROJECT_ROOT
+
 case "$OPERATION" in
 "create-worktree")
   if [ -z "$TASK_ID" ]; then
@@ -677,10 +679,23 @@ case "$OPERATION" in
 
 - Task $TASK_ID status: new → in_progress
 - Related epic status updated if needed
-- Ready for development in worktree
+- Ready for development in Worktree
 
 🤖 Generated with SpecPilot workflow automation"
     green "✅ Committed status updates to main branch"
+
+    # Push committed spec files to Github
+    if git pull origin "$BASE_BRANCH" --rebase; then
+      if git push origin "$BASE_BRANCH"; then
+        green "✅ Pushed updated specs to remote"
+      else
+        red "❌  Failed to push updated specs, please check manually"
+        exit 1
+      fi
+    else
+      red "❌ Rebase failed - conflicts need to be resolved"
+      exit 1
+    fi
   fi
 
   # Step 4: Create worktree environment
@@ -765,6 +780,19 @@ case "$OPERATION" in
 
 🤖 Generated with SpecPilot workflow automation"
     green "✅ Committed status updates to main branch"
+
+    # Push committed spec files to Github
+    if git pull origin "$BASE_BRANCH" --rebase; then
+      if git push origin "$BASE_BRANCH"; then
+        green "✅ Pushed updated specs to remote"
+      else
+        red "❌  Failed to push updated specs, please check manually"
+        exit 1
+      fi
+    else
+      red "❌ Rebase failed - conflicts need to be resolved"
+      exit 1
+    fi
   fi
 
   # Step 5: Generate PR content automatically
@@ -907,6 +935,19 @@ case "$OPERATION" in
 
 🤖 Generated with SpecPilot workflow automation"
     green "✅ Committed final status updates to main branch"
+
+    # Push committed spec files to Github
+    if git pull origin "$BASE_BRANCH" --rebase; then
+      if git push origin "$BASE_BRANCH"; then
+        green "✅ Pushed updated specs to remote"
+      else
+        red "❌  Failed to push updated specs, please check manually"
+        exit 1
+      fi
+    else
+      red "❌ Rebase failed - conflicts need to be resolved"
+      exit 1
+    fi
   fi
 
   # Step 4: Commit all feature branch changes then pull remote feature branch changes
