@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "casualtrader": {
+      "command": "uvx",
+      "args": ["--from", "/path/to/CasualTrader", "market-mcp-server"],
+      "env": {
+        "MARKET_MCP_SERVER_VERSION": "1.0.0",
+        "LOG_LEVEL": "INFO"
+      }
+    }
+  }
+}
