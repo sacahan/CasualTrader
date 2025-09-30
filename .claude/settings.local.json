@@ -1,0 +1,6 @@
+{
+  "enabledMcpjsonServers": [
+    "specpilot"
+  ],
+  "enableAllProjectMcpServers": true
+}

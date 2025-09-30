@@ -411,7 +411,8 @@ $TASK_DESCRIPTION
 *This issue is automatically managed by SpecPilot.*"
 
   # Set up labels based on task metadata
-  local labels="type:task,status:$TASK_STATUS,priority:$TASK_PRIORITY"
+  local priority_lower=$(echo "$TASK_PRIORITY" | tr '[:upper:]' '[:lower:]')
+  local labels="type:task,status:$TASK_STATUS,priority:$priority_lower"
 
   # Add complexity label if available
   if [ -n "$TASK_COMPLEXITY" ]; then
@@ -521,7 +522,8 @@ $TASK_DESCRIPTION
 
   # Update labels based on task metadata
   local github_status=$(echo "$TASK_STATUS" | sed 's/-/_/g')
-  local labels="type:task,status:$github_status,priority:$TASK_PRIORITY"
+  local priority_lower=$(echo "$TASK_PRIORITY" | tr '[:upper:]' '[:lower:]')
+  local labels="type:task,status:$github_status,priority:$priority_lower"
 
   # Add complexity label if available
   if [ -n "$TASK_COMPLEXITY" ]; then
