@@ -49,10 +49,10 @@ complexity: medium
 
 ### 主要開發檔案
 
-- **casualtrader_mcp/cache/rate_limiter.py**: 頻率限制器實作
-- **casualtrader_mcp/cache/cache_manager.py**: 快取管理器
-- **casualtrader_mcp/cache/request_tracker.py**: API 使用統計
-- **casualtrader_mcp/utils/config_manager.py**: 動態配置管理
+- **market_mcp/cache/rate_limiter.py**: 頻率限制器實作
+- **market_mcp/cache/cache_manager.py**: 快取管理器
+- **market_mcp/cache/request_tracker.py**: API 使用統計
+- **market_mcp/utils/config_manager.py**: 動態配置管理
 - **tests/test_rate_limiting.py**: 頻率限制測試
 
 ### 核心類別設計

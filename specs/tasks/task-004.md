@@ -49,10 +49,10 @@ complexity: medium
 
 ### 主要開發檔案
 
-- **casualtrader_mcp/tools/stock_price_tool.py**: 主要工具實作
-- **casualtrader_mcp/models/mcp_responses.py**: MCP 回應模型
-- **casualtrader_mcp/validators/input_validator.py**: 輸入驗證
-- **casualtrader_mcp/handlers/error_handler.py**: 錯誤處理
+- **market_mcp/tools/stock_price_tool.py**: 主要工具實作
+- **market_mcp/models/mcp_responses.py**: MCP 回應模型
+- **market_mcp/validators/input_validator.py**: 輸入驗證
+- **market_mcp/handlers/error_handler.py**: 錯誤處理
 - **docs/mcp_integration_guide.md**: 整合指南
 - **examples/claude_desktop_config.json**: 客戶端設定範例
 

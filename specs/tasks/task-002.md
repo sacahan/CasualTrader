@@ -55,10 +55,10 @@ complexity: high
 
 ### 主要開發檔案
 
-- **casualtrader_mcp/api/twse_client.py**: 證交所 API 客戶端
-- **casualtrader_mcp/models/stock_data.py**: 股票資料 Pydantic 模型
-- **casualtrader_mcp/parsers/twse_parser.py**: 證交所資料解析器
-- **casualtrader_mcp/utils/validators.py**: 輸入驗證工具
+- **market_mcp/api/twse_client.py**: 證交所 API 客戶端
+- **market_mcp/models/stock_data.py**: 股票資料 Pydantic 模型
+- **market_mcp/parsers/twse_parser.py**: 證交所資料解析器
+- **market_mcp/utils/validators.py**: 輸入驗證工具
 - **tests/test_twse_integration.py**: API 整合測試
 
 ### 資料模型設計

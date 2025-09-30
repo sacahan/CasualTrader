@@ -36,7 +36,7 @@ complexity: medium
 - 使用 Python 3.11+ 和 uv 套件管理工具
 - 整合官方 MCP Python SDK 進行協議處理
 - 實作模組化架構：協議層、業務邏輯層、配置層
-- 支持 `uvx --from . casualtrader-mcp-server` 命令啟動
+- 支持 `uvx --from . market_mcp-server` 命令啟動
 
 ### 效能需求
 
