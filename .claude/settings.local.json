@@ -1,6 +1,12 @@
 {
+  "permissions": {
+    "allow": [
+      "mcp__market__get_taiwan_stock_price",
+      "WebFetch(domain:isin.twse.com.tw)"
+    ]
+  },
+  "enableAllProjectMcpServers": true,
   "enabledMcpjsonServers": [
     "specpilot"
-  ],
-  "enableAllProjectMcpServers": true
+  ]
 }
