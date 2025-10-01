@@ -26,39 +26,37 @@ class StockSymbolValidator(BaseModel):
         """
         驗證股票/ETF代號格式。
 
-        台灣股票/ETF代號規則：
-        - 股票：4 位數字 (例如: 2330)
-        - ETF：4-6 位數字 + 可選字母 (例如: 0050, 00648R, 00670L)
+        基於 TWSE 證券資料庫的實際格式：
+        - 4位數字：如 2330 (一般股票)、0050 (ETF)
+        - 5位數字：如 00636 (某些ETF)
+        - 6位數字：如 006204 (某些ETF)
+        - 4-6位數字 + 字母：如 00625K、00632R (特殊ETF)
         """
+        from ..data.securities_db import get_securities_database
+
         if not isinstance(v, str):
             raise ValueError("股票/ETF代號必須是字串類型")
 
-        # 移除空白字符
-        v = v.strip()
+        # 移除空白字符並轉大寫
+        v = v.strip().upper()
 
         if not v:
             raise ValueError("股票/ETF代號不能為空")
 
-        # 檢查格式：4-6位數字 + 可選字母
+        # 檢查基本格式：4-6位數字 + 可選字母
         if not re.match(r"^[0-9]{4,6}[A-Z]*$", v):
-            raise ValueError(
-                "代號格式錯誤 (股票: 4位數字如2330, ETF: 4-6位數字+字母如00648R)"
-            )
+            raise ValueError("代號格式錯誤 (範例: 2330、0050、00625K、006204)")
 
-        # 提取數字部分進行範圍檢查
-        number_part = re.match(r"^(\d+)", v).group(1)
-        symbol_num = int(number_part)
-
-        # 對於一般股票（4位數字且大於等於1000），檢查範圍
-        if (
-            len(number_part) == 4
-            and symbol_num >= 1000
-            and not (1000 <= symbol_num <= 9999)
-        ):
-            raise ValueError("股票代號範圍必須在 1000-9999 之間")
-        # 對於ETF（0開頭的4位數字或更長），允許更寬鬆的範圍
-        elif len(number_part) >= 4 and not (0 <= symbol_num <= 999999):
-            raise ValueError("ETF代號範圍必須在 0000-999999 之間")
+        # 如果有資料庫，驗證代號是否存在
+        securities_db = get_securities_database()
+        if securities_db:
+            try:
+                record = securities_db.find_by_stock_code(v)
+                if not record:
+                    raise ValueError(f"股票/ETF代號 '{v}' 不存在於證券資料庫中")
+            except Exception:
+                # 如果資料庫查詢失敗，僅進行格式驗證
+                pass
 
         return v
 
@@ -77,15 +75,19 @@ class MCPToolInputValidator:
         """
         驗證 get_taiwan_stock_price 工具的輸入參數。
 
+        支援股票代碼或公司名稱查詢。
+
         Args:
             arguments: 工具參數字典
 
         Returns:
-            驗證後的參數字典
+            驗證後的參數字典，包含標準化的股票代碼
 
         Raises:
             ValidationError: 當參數驗證失敗時
         """
+        from ..data.securities_db import resolve_stock_symbol
+
         errors = []
         validated_args = {}
 
@@ -94,7 +96,7 @@ class MCPToolInputValidator:
             errors.append(
                 {
                     "field": "symbol",
-                    "message": "缺少必要參數 'symbol'",
+                    "message": "缺少必要參數 'symbol' (支援股票代碼或公司名稱)",
                     "code": MCPErrorCodes.INVALID_PARAMETERS,
                 }
             )
@@ -104,11 +106,61 @@ class MCPToolInputValidator:
                 error_code=MCPErrorCodes.INVALID_PARAMETERS,
             )
 
-        # 驗證股票代號
+        # 取得原始查詢
+        query = arguments["symbol"]
+        if not isinstance(query, str):
+            errors.append(
+                {
+                    "field": "symbol",
+                    "message": "參數 'symbol' 必須是字串類型",
+                    "code": MCPErrorCodes.INVALID_PARAMETERS,
+                }
+            )
+            raise MCPValidationError(
+                message="參數類型錯誤",
+                errors=errors,
+                error_code=MCPErrorCodes.INVALID_PARAMETERS,
+            )
+
+        query = query.strip()
+        if not query:
+            errors.append(
+                {
+                    "field": "symbol",
+                    "message": "參數 'symbol' 不能為空",
+                    "code": MCPErrorCodes.INVALID_PARAMETERS,
+                }
+            )
+            raise MCPValidationError(
+                message="參數值無效",
+                errors=errors,
+                error_code=MCPErrorCodes.INVALID_PARAMETERS,
+            )
+
+        # 嘗試解析股票代碼或公司名稱
         try:
-            validator = StockSymbolValidator(symbol=arguments["symbol"])
+            stock_code = resolve_stock_symbol(query)
+            if not stock_code:
+                errors.append(
+                    {
+                        "field": "symbol",
+                        "message": f"找不到股票/ETF: '{query}' (請檢查代碼或公司名稱是否正確)",
+                        "code": MCPErrorCodes.INVALID_SYMBOL,
+                    }
+                )
+                raise MCPValidationError(
+                    message="股票/ETF 不存在",
+                    errors=errors,
+                    error_code=MCPErrorCodes.INVALID_SYMBOL,
+                )
+
+            # 如果解析成功，進一步驗證股票代碼格式
+            validator = StockSymbolValidator(symbol=stock_code)
             validated_args["symbol"] = validator.symbol
+            validated_args["original_query"] = query  # 保留原始查詢以供日誌記錄
+
         except ValueError as e:
+            # 如果是格式驗證錯誤
             errors.append(
                 {
                     "field": "symbol",
@@ -117,7 +169,7 @@ class MCPToolInputValidator:
                 }
             )
             raise MCPValidationError(
-                message="股票代號格式錯誤",
+                message="股票代號格式錯誤或不存在",
                 errors=errors,
                 error_code=MCPErrorCodes.INVALID_SYMBOL,
             ) from e

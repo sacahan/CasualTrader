@@ -7,7 +7,7 @@
 from typing import Any
 
 from ..api.twse_client import TWStockAPIClient
-from ..handlers.error_handler import MCPErrorHandler, safe_execute
+from ..handlers.error_handler import MCPErrorHandler
 from ..models.mcp_responses import StockPriceToolResponse
 from ..utils.logging import get_logger
 from ..validators.input_validator import MCPToolInputValidator
@@ -35,17 +35,23 @@ class StockPriceTool:
         取得台灣股票即時價格資訊。
 
         這是主要的 MCP 工具方法，提供完整的股票價格查詢功能。
+        支援股票代碼和公司名稱兩種查詢方式。
 
         Args:
             arguments: 工具參數，應包含:
-                - symbol: 台灣股票代號 (4位數字，例如: 2330)
+                - symbol: 台灣股票代號或公司名稱
+                  * 股票代號: 4-6位數字 + 可選字母 (例如: 2330, 0050, 00648R)
+                  * 公司名稱: 完整或部分公司名稱 (例如: "台積電", "鴻海")
 
         Returns:
             MCP 格式的回應列表，包含股票價格資訊或錯誤訊息
 
         Examples:
             >>> tool = StockPriceTool()
+            >>> # 使用股票代碼查詢
             >>> result = await tool.get_taiwan_stock_price({"symbol": "2330"})
+            >>> # 使用公司名稱查詢
+            >>> result = await tool.get_taiwan_stock_price({"symbol": "台積電"})
             >>> print(result[0]["text"])  # 顯示格式化的股票資訊
         """
         context = f"get_taiwan_stock_price with args: {arguments}"
@@ -58,7 +64,12 @@ class StockPriceTool:
                 arguments
             )
             symbol = validated_args["symbol"]
-            logger.info(f"參數驗證成功，股票代號: {symbol}")
+            original_query = validated_args.get("original_query", symbol)
+
+            if original_query != symbol:
+                logger.info(f"查詢解析成功: '{original_query}' -> {symbol}")
+            else:
+                logger.info(f"參數驗證成功，股票代號: {symbol}")
 
             # 2. 呼叫 API 取得股票資料
             logger.debug(f"開始查詢股票 {symbol} 的價格資料")
@@ -84,23 +95,25 @@ class StockPriceTool:
         """
         return {
             "name": "get_taiwan_stock_price",
-            "description": "取得台灣股票即時價格資訊",
+            "description": "取得台灣股票即時價格資訊，支援股票代碼或公司名稱查詢",
             "inputSchema": {
                 "type": "object",
                 "properties": {
                     "symbol": {
                         "type": "string",
-                        "description": "台灣股票代號 (4位數字,例如: 2330) 或 ETF代號 (4-6位數字+字母,例如: 00648R)",
-                        "pattern": r"^[0-9]{4,6}[A-Z]*$",
-                        "minLength": 4,
-                        "maxLength": 8,
+                        "description": "台灣股票代號或公司名稱。支援格式：股票代號(4-6位數字+可選字母,例如:2330,00648R)或公司名稱(例如:台積電,鴻海)",
+                        "minLength": 1,
+                        "maxLength": 50,
                         "examples": [
                             "2330",
+                            "台積電",
                             "2317",
-                            "2454",
-                            "1301",
+                            "鴻海",
+                            "0050",
+                            "元大台灣50",
                             "00648R",
-                            "00670L",
+                            "聯發科",
+                            "2454",
                         ],
                     }
                 },
@@ -117,27 +130,36 @@ class StockPriceTool:
             工具使用說明文字
         """
         return """
-🔍 **台灣股票價格查詢工具**
+🔍 **台灣股票價格查詢工具 (支援公司名稱查詢)**
 
 📋 **功能說明:**
 - 查詢台灣股票及ETF即時價格資訊
 - 支援上市、上櫃股票及ETF
 - 提供完整的價格、成交量、五檔資訊
+- **新增**: 支援公司名稱和股票代碼兩種查詢方式
 
 📝 **使用方法:**
 ```
-get_taiwan_stock_price({"symbol": "2330"})    # 股票
-get_taiwan_stock_price({"symbol": "00648R"})  # ETF
+# 使用股票代碼查詢
+get_taiwan_stock_price({"symbol": "2330"})      # 台積電
+get_taiwan_stock_price({"symbol": "00648R"})    # ETF
+
+# 使用公司名稱查詢 (新功能)
+get_taiwan_stock_price({"symbol": "台積電"})      # 台積電
+get_taiwan_stock_price({"symbol": "鴻海"})        # 鴻海精密
+get_taiwan_stock_price({"symbol": "元大台灣50"})   # ETF
 ```
 
 ✅ **參數說明:**
-- symbol: 台灣股票代號(4位數字) 或 ETF代號(4-6位數字+字母)
+- symbol: 支援兩種格式
+  * 股票代號: 4-6位數字 + 可選字母 (例如: 2330, 0050, 00648R)
+  * 公司名稱: 完整或部分公司名稱 (例如: "台積電", "鴻海")
 
-💡 **常用代號:**
-- 台積電: 2330
-- 鴻海: 2317
-- 聯發科: 2454
-- 台塑: 1301
+💡 **查詢範例:**
+- 台積電: "2330" 或 "台積電"
+- 鴻海: "2317" 或 "鴻海"
+- 聯發科: "2454" 或 "聯發科"
+- 元大台灣50: "0050" 或 "元大台灣50"
 - 元大S&P500反1: 00648R
 - 富邦NASDAQ正2: 00670L
 - 中華電信: 2412
