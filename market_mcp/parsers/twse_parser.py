@@ -125,8 +125,16 @@ class TWStockDataParser:
             # 解析基本欄位
             symbol = self._extract_symbol_from_dict(msg_data)
             company_name = self._extract_company_name_from_dict(msg_data)
-            current_price = self._extract_price_from_dict(msg_data, "current_price")
+
+            # 特殊處理成交價 - 如果沒有成交價，使用昨收價
+            raw_current_price = self._extract_price_from_dict(msg_data, "current_price")
             previous_close = self._extract_price_from_dict(msg_data, "previous_close")
+
+            # 如果成交價為0（即原始資料為"-"），使用昨收價
+            current_price = (
+                raw_current_price if raw_current_price > 0 else previous_close
+            )
+
             change = (
                 current_price - previous_close
                 if current_price is not None and previous_close is not None

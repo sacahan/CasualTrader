@@ -13,6 +13,14 @@
                 "SPECPILOT_SERVER_PATH": "/Users/sacahan/Documents/workspace/CasualTrader",
                 "SPECPILOT_DEBUG": "true"
             }
+        },
+        "market": {
+            "command": "uvx",
+            "args": [
+                "--from",
+                "/Users/sacahan/Documents/workspace/CasualTrader",
+                "market-mcp-server"
+            ]
         }
     }
 }

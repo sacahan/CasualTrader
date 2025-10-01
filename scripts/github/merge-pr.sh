@@ -34,27 +34,63 @@ echo "Branch: $BRANCH_NAME"
 echo "Merge method: $MERGE_METHOD"
 echo "=================================="
 
-# Check if PR exists and is ready to merge
-PR_JSON=$(gh pr view "$BRANCH_NAME" --json state,mergeable 2>/dev/null || echo "")
+# Function to check PR status with retry mechanism
+check_pr_status() {
+	local max_attempts=3
+	local attempt=1
 
-if [ -z "$PR_JSON" ]; then
-	echo "Error: No pull request found for branch $BRANCH_NAME"
+	while [ $attempt -le $max_attempts ]; do
+		echo "🔍 Checking PR status (attempt $attempt/$max_attempts)..."
+
+		PR_JSON=$(gh pr view "$BRANCH_NAME" --json state,mergeable 2>/dev/null || echo "")
+
+		if [ -z "$PR_JSON" ]; then
+			echo "Error: No pull request found for branch $BRANCH_NAME"
+			return 1
+		fi
+
+		STATE=$(echo "$PR_JSON" | jq -r '.state')
+		MERGEABLE=$(echo "$PR_JSON" | jq -r '.mergeable // "UNKNOWN"')
+
+		echo "   State: $STATE, Mergeable: $MERGEABLE"
+
+		# If mergeable status is UNKNOWN, wait and retry (except on last attempt)
+		if [ "$MERGEABLE" = "UNKNOWN" ] && [ $attempt -lt $max_attempts ]; then
+			echo "   ⏳ Mergeable status is UNKNOWN, waiting 3 seconds before retry..."
+			sleep 3
+			attempt=$((attempt + 1))
+		else
+			break
+		fi
+	done
+
+	return 0
+}
+
+# Check if PR exists and is ready to merge with retry
+if ! check_pr_status; then
 	exit 1
 fi
-
-# Extract state and mergeable status separately to handle different data types
-STATE=$(echo "$PR_JSON" | jq -r '.state')
-MERGEABLE=$(echo "$PR_JSON" | jq -r '.mergeable // "UNKNOWN"')
 
 if [ "$STATE" != "OPEN" ]; then
 	echo "Error: Pull request is not open (current state: $STATE)"
 	exit 1
 fi
 
-if [ "$MERGEABLE" != "MERGEABLE" ]; then
-	echo "Error: Pull request is not mergeable (status: $MERGEABLE)"
-	echo "Please resolve conflicts and ensure all checks pass"
+# Handle mergeable status
+if [ "$MERGEABLE" = "MERGEABLE" ]; then
+	echo "✅ PR is ready to merge"
+elif [ "$MERGEABLE" = "UNKNOWN" ]; then
+	echo "⚠️  Mergeable status is still UNKNOWN after retries"
+	echo "This might be a temporary GitHub API issue. Attempting to merge anyway..."
+	echo "If merge fails, please check for conflicts manually and retry."
+elif [ "$MERGEABLE" = "CONFLICTING" ]; then
+	echo "❌ Pull request has conflicts that need to be resolved"
+	echo "Please resolve conflicts and push changes before merging"
 	exit 1
+else
+	echo "⚠️  Unknown mergeable status: $MERGEABLE"
+	echo "Proceeding with caution - merge may fail if there are actual issues"
 fi
 
 # Merge the PR

@@ -299,13 +299,17 @@ if __name__ == "__main__":
     async def main():
         client = create_client()
         try:
-            quote = await client.get_stock_quote("3231")
+            quote = await client.get_stock_quote("1101")  # 台泥
             print("成功取得股票資料:")
             print(f"公司名稱: {quote.company_name}")
             print(f"股票代號: {quote.symbol}")
             print(f"目前價格: ${quote.current_price}")
             print(f"漲跌幅: {quote.change:+.2f} ({quote.change_percent * 100:+.2f}%)")
             print(f"成交量: {quote.volume:,}")
+            print(f"開盤價: ${quote.open_price}")
+            print(f"最高價: ${quote.high_price}")
+            print(f"最低價: ${quote.low_price}")
+            print(f"昨收價: ${quote.previous_close}")
         except Exception as e:
             print(f"錯誤: {e}")
         finally:
