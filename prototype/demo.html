@@ -1,0 +1,849 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>AI 股票交易模擬器</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Sans+TC:wght@400;500;700&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      body {
+        font-family: "Inter", "Noto Sans TC", sans-serif;
+        background-color: #111827;
+        color: #d1d5db;
+      }
+      .custom-scrollbar::-webkit-scrollbar {
+        width: 6px;
+      }
+      .custom-scrollbar::-webkit-scrollbar-track {
+        background: #1f2937;
+      }
+      .custom-scrollbar::-webkit-scrollbar-thumb {
+        background-color: #4b5563;
+        border-radius: 10px;
+      }
+      .text-gain {
+        color: #4ade80; /* green-400 */
+      }
+      .text-loss {
+        color: #f87171; /* red-400 */
+      }
+      .blinking {
+        animation: blink 1.5s linear infinite;
+      }
+      @keyframes blink {
+        50% {
+          opacity: 0.4;
+        }
+      }
+      .status-dot {
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        display: inline-block;
+      }
+      .status-running {
+        background-color: #22c55e;
+        box-shadow: 0 0 8px #22c55e;
+      }
+      .status-stopped {
+        background-color: #ef4444;
+        box-shadow: 0 0 8px #ef4444;
+      }
+    </style>
+  </head>
+  <body class="p-4 sm:p-6 lg:p-8">
+    <div class="max-w-7xl mx-auto">
+      <!-- 標題 -->
+      <header class="mb-6 text-center">
+        <h1 class="text-3xl sm:text-4xl font-bold text-white">
+          AI 股票交易模擬器
+        </h1>
+        <p class="text-gray-400 mt-2">觀察不同 AI 交易策略的績效表現</p>
+      </header>
+
+      <!-- 控制面板 -->
+      <div
+        class="bg-gray-800 p-6 rounded-2xl shadow-lg mb-8 flex justify-between items-center"
+      >
+        <p class="text-gray-300">
+          點擊卡片查看詳細資訊，或透過設定按鈕管理 Agents。
+        </p>
+        <button
+          id="open-settings-btn"
+          class="bg-blue-600 text-white font-bold py-2 px-5 rounded-lg hover:bg-blue-700 transition duration-300"
+        >
+          設定
+        </button>
+      </div>
+
+      <!-- AI Agent 儀表板 -->
+      <div
+        id="agents-dashboard"
+        class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-2 gap-8"
+      >
+        <!-- AI Agent 卡片將由 JS 動態生成 -->
+      </div>
+    </div>
+
+    <!-- Agent 詳細資訊 Modal -->
+    <div
+      id="agent-modal"
+      class="fixed inset-0 bg-black bg-opacity-75 backdrop-blur-sm flex items-center justify-center p-4 hidden z-50 transition-opacity duration-300"
+    >
+      <div
+        id="modal-content"
+        class="bg-gray-900 w-full max-w-5xl max-h-[90vh] rounded-2xl shadow-xl flex flex-col border border-gray-700"
+      >
+        <!-- Modal Header -->
+        <div
+          class="flex justify-between items-center p-4 border-b border-gray-700"
+        >
+          <h2 id="modal-agent-name" class="text-2xl font-bold"></h2>
+          <button id="modal-close-btn" class="text-gray-400 hover:text-white">
+            &times;
+          </button>
+        </div>
+
+        <!-- Modal Body -->
+        <div class="p-6 flex-grow overflow-y-auto custom-scrollbar">
+          <div class="grid grid-cols-1 lg:grid-cols-5 gap-6">
+            <!-- 左側: 圖表與數據 -->
+            <div class="lg:col-span-3 flex flex-col">
+              <div class="grid grid-cols-3 gap-4 mb-4 text-center">
+                <div>
+                  <div class="text-sm text-gray-400">總資產</div>
+                  <div
+                    id="modal-agent-value"
+                    class="text-2xl font-semibold text-white"
+                  ></div>
+                </div>
+                <div>
+                  <div class="text-sm text-gray-400">總損益</div>
+                  <div
+                    id="modal-agent-pnl"
+                    class="text-2xl font-semibold"
+                  ></div>
+                </div>
+                <div>
+                  <div class="text-sm text-gray-400">持有現金</div>
+                  <div
+                    id="modal-agent-cash"
+                    class="text-2xl font-semibold text-white"
+                  ></div>
+                </div>
+              </div>
+              <div class="flex-grow min-h-[300px]">
+                <canvas id="modal-agent-chart"></canvas>
+              </div>
+            </div>
+            <!-- 右側: 持股與歷史 -->
+            <div class="lg:col-span-2 space-y-6">
+              <div>
+                <h4 class="text-lg font-semibold text-gray-300 mb-2">
+                  持有股數
+                </h4>
+                <div
+                  id="modal-agent-holdings"
+                  class="space-y-2 max-h-48 overflow-y-auto custom-scrollbar pr-2"
+                ></div>
+              </div>
+              <div>
+                <h4 class="text-lg font-semibold text-gray-300 mb-2">
+                  交易歷史
+                </h4>
+                <div
+                  id="modal-agent-history"
+                  class="space-y-2 max-h-[calc(90vh-450px)] overflow-y-auto custom-scrollbar pr-2"
+                ></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 設定 Modal -->
+    <div
+      id="settings-modal"
+      class="fixed inset-0 bg-black bg-opacity-75 backdrop-blur-sm flex items-center justify-center p-4 hidden z-50"
+    >
+      <div
+        class="bg-gray-900 w-full max-w-2xl max-h-[90vh] rounded-2xl shadow-xl flex flex-col border border-gray-700"
+      >
+        <div
+          class="flex justify-between items-center p-4 border-b border-gray-700"
+        >
+          <h2 class="text-2xl font-bold text-white">管理 AI Agents</h2>
+          <button
+            id="settings-close-btn"
+            class="text-gray-400 hover:text-white text-3xl"
+          >
+            &times;
+          </button>
+        </div>
+        <div
+          id="settings-agent-list"
+          class="p-6 flex-grow overflow-y-auto custom-scrollbar space-y-3"
+        >
+          <!-- Agent list will be populated here -->
+        </div>
+        <div class="p-4 border-t border-gray-700">
+          <button
+            id="add-new-agent-btn"
+            class="w-full bg-green-600 text-white font-bold py-3 rounded-lg hover:bg-green-700 transition duration-300"
+          >
+            新增 AI Agent
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Agent 新增/編輯表單 Modal -->
+    <div
+      id="agent-form-modal"
+      class="fixed inset-0 bg-black bg-opacity-75 backdrop-blur-sm flex items-center justify-center p-4 hidden z-50"
+    >
+      <form
+        id="agent-form"
+        class="bg-gray-900 w-full max-w-lg rounded-2xl shadow-xl flex flex-col border border-gray-700"
+      >
+        <div
+          class="flex justify-between items-center p-4 border-b border-gray-700"
+        >
+          <h2 id="form-title" class="text-2xl font-bold text-white"></h2>
+          <button
+            type="button"
+            id="form-close-btn"
+            class="text-gray-400 hover:text-white text-3xl"
+          >
+            &times;
+          </button>
+        </div>
+        <div class="p-6 space-y-4">
+          <input type="hidden" id="agent-id" />
+          <div>
+            <label
+              for="agent-name"
+              class="block text-sm font-medium text-gray-300 mb-1"
+              >Agent 名稱</label
+            >
+            <input
+              type="text"
+              id="agent-name"
+              required
+              class="w-full bg-gray-700 border border-gray-600 text-white rounded-lg p-2 focus:ring-2 focus:ring-blue-500 focus:outline-none"
+            />
+          </div>
+          <div>
+            <label
+              for="agent-strategy"
+              class="block text-sm font-medium text-gray-300 mb-1"
+              >策略類型</label
+            >
+            <input
+              type="text"
+              id="agent-strategy"
+              placeholder="例如：穩健型"
+              required
+              class="w-full bg-gray-700 border border-gray-600 text-white rounded-lg p-2 focus:ring-2 focus:ring-blue-500 focus:outline-none"
+            />
+          </div>
+          <div>
+            <label
+              for="agent-color"
+              class="block text-sm font-medium text-gray-300 mb-1"
+              >策略顏色 (R, G, B)</label
+            >
+            <input
+              type="text"
+              id="agent-color"
+              placeholder="例如：34, 197, 94"
+              required
+              class="w-full bg-gray-700 border border-gray-600 text-white rounded-lg p-2 focus:ring-2 focus:ring-blue-500 focus:outline-none"
+            />
+          </div>
+        </div>
+        <div class="p-4 mt-2 border-t border-gray-700">
+          <button
+            type="submit"
+            class="w-full bg-blue-600 text-white font-bold py-3 rounded-lg hover:bg-blue-700 transition duration-300"
+          >
+            儲存變更
+          </button>
+        </div>
+      </form>
+    </div>
+
+    <script>
+      document.addEventListener("DOMContentLoaded", () => {
+        // DOM Elements
+        const agentsDashboard = document.getElementById("agents-dashboard");
+        const modal = document.getElementById("agent-modal");
+        const closeModalBtn = document.getElementById("modal-close-btn");
+        const openSettingsBtn = document.getElementById("open-settings-btn");
+        const settingsModal = document.getElementById("settings-modal");
+        const settingsCloseBtn = document.getElementById("settings-close-btn");
+        const settingsAgentList = document.getElementById(
+          "settings-agent-list"
+        );
+        const addNewAgentBtn = document.getElementById("add-new-agent-btn");
+        const agentFormModal = document.getElementById("agent-form-modal");
+        const agentForm = document.getElementById("agent-form");
+        const formCloseBtn = document.getElementById("form-close-btn");
+        const formTitle = document.getElementById("form-title");
+
+        // State
+        let cardChartInstances = {};
+        let modalChartInstance = null;
+        let agentsData = [];
+
+        const DEFAULT_AGENTS_DATA = [
+          {
+            id: 0,
+            name: "AI Agent #1 (穩健型)",
+            strategy: { name: "穩健型", color: "34, 197, 94" }, // green
+            cash: 345020.5,
+            portfolioValue: 1258320.5,
+            pnl: 258320.5,
+            holdings: {
+              "2330.TW": { name: "台積電", shares: 500, avgPrice: 945.5 },
+              "2317.TW": { name: "鴻海", shares: 1500, avgPrice: 198.0 },
+              "2881.TW": { name: "富邦金", shares: 2000, avgPrice: 76.2 },
+            },
+            history: Array.from({ length: 31 }, (_, i) => ({
+              day: i,
+              value: 1000000 + (Math.random() - 0.3) * i * 9000,
+            })),
+            transactionHistory: [
+              {
+                day: 28,
+                type: "SELL",
+                ticker: "2317.TW",
+                shares: 500,
+                price: 205.0,
+              },
+              {
+                day: 25,
+                type: "BUY",
+                ticker: "2330.TW",
+                shares: 200,
+                price: 980.1,
+              },
+              {
+                day: 22,
+                type: "BUY",
+                ticker: "2881.TW",
+                shares: 1000,
+                price: 78.5,
+              },
+              {
+                day: 15,
+                type: "BUY",
+                ticker: "2317.TW",
+                shares: 2000,
+                price: 195.0,
+              },
+              {
+                day: 10,
+                type: "BUY",
+                ticker: "2330.TW",
+                shares: 300,
+                price: 930.8,
+              },
+              {
+                day: 5,
+                type: "BUY",
+                ticker: "2881.TW",
+                shares: 1000,
+                price: 75.5,
+              },
+            ],
+          },
+          {
+            id: 1,
+            name: "AI Agent #2 (積極型)",
+            strategy: { name: "積極型", color: "249, 115, 22" }, // orange
+            cash: 110400.0,
+            portfolioValue: 885400.0,
+            pnl: -114600.0,
+            holdings: {
+              "2454.TW": { name: "聯發科", shares: 300, avgPrice: 1450.0 },
+              "2603.TW": { name: "長榮", shares: 1500, avgPrice: 220.8 },
+            },
+            history: Array.from({ length: 31 }, (_, i) => ({
+              day: i,
+              value: 1000000 + (Math.random() - 0.55) * i * 11000,
+            })),
+            transactionHistory: [
+              {
+                day: 30,
+                type: "BUY",
+                ticker: "2603.TW",
+                shares: 500,
+                price: 210.0,
+              },
+              {
+                day: 20,
+                type: "SELL",
+                ticker: "2330.TW",
+                shares: 200,
+                price: 990.0,
+              },
+              {
+                day: 18,
+                type: "BUY",
+                ticker: "2454.TW",
+                shares: 300,
+                price: 1450.0,
+              },
+              {
+                day: 12,
+                type: "BUY",
+                ticker: "2603.TW",
+                shares: 1000,
+                price: 225.0,
+              },
+              {
+                day: 5,
+                type: "BUY",
+                ticker: "2330.TW",
+                shares: 200,
+                price: 950.0,
+              },
+            ],
+          },
+        ];
+
+        // --- Data Persistence ---
+        function loadAgentsFromLocalStorage() {
+          try {
+            const data = localStorage.getItem("aiAgentsData");
+            return data
+              ? JSON.parse(data)
+              : JSON.parse(JSON.stringify(DEFAULT_AGENTS_DATA));
+          } catch (e) {
+            console.error("Failed to load data from localStorage", e);
+            return JSON.parse(JSON.stringify(DEFAULT_AGENTS_DATA));
+          }
+        }
+
+        function saveAgentsToLocalStorage() {
+          try {
+            localStorage.setItem("aiAgentsData", JSON.stringify(agentsData));
+          } catch (e) {
+            console.error("Failed to save data to localStorage", e);
+          }
+        }
+
+        // --- Utility Functions ---
+        const formatCurrency = (num) =>
+          `TWD ${num.toLocaleString("en-US", {
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 2,
+          })}`;
+        const getPnlClass = (pnl) => (pnl >= 0 ? "text-gain" : "text-loss");
+        const getPnlSign = (pnl) => (pnl > 0 ? "+" : "");
+
+        // --- UI Rendering ---
+
+        function renderStaticDashboard() {
+          agentsDashboard.innerHTML = "";
+          Object.values(cardChartInstances).forEach((chart) => chart.destroy());
+          cardChartInstances = {};
+          agentsData.forEach((agent) => {
+            createAgentCard(agent);
+          });
+        }
+
+        function createAgentCard(agent) {
+          // ... (same as previous version, no changes here)
+          const card = document.createElement("div");
+          card.id = `agent-card-${agent.id}`;
+          card.className =
+            "bg-gray-800 p-5 rounded-2xl shadow-lg flex flex-col cursor-pointer hover:ring-2 hover:ring-blue-500 transition-all duration-200";
+          card.addEventListener("click", () => showModal(agent));
+
+          let holdingsHtml = '<div class="space-y-2">';
+          for (const ticker in agent.holdings) {
+            const stock = agent.holdings[ticker];
+            holdingsHtml += `
+                <div class="flex justify-between items-center text-sm bg-gray-700/50 p-2 rounded-md">
+                    <div>
+                        <div class="font-bold text-white">${ticker}</div>
+                        <div class="text-xs text-gray-400">${stock.name}</div>
+                    </div>
+                    <div class="text-right">
+                       <div class="font-mono">${stock.shares.toLocaleString()} 股</div>
+                       <div class="text-xs text-gray-400">@ ${stock.avgPrice.toFixed(
+                         2
+                       )}</div>
+                    </div>
+                </div>
+            `;
+          }
+          holdingsHtml += "</div>";
+
+          card.innerHTML = `
+            <h3 class="text-xl font-bold mb-4" style="color: rgb(${
+              agent.strategy.color
+            });">${agent.name}</h3>
+            <div class="grid grid-cols-2 gap-x-4 gap-y-2 mb-4 text-sm">
+                <div>
+                    <div class="text-gray-400">總資產</div>
+                    <div class="text-2xl font-semibold text-white">${formatCurrency(
+                      agent.portfolioValue
+                    )}</div>
+                </div>
+                <div>
+                    <div class="text-gray-400">總損益</div>
+                    <div class="text-2xl font-semibold ${getPnlClass(
+                      agent.pnl
+                    )}">
+                        ${getPnlSign(agent.pnl)}${formatCurrency(
+            Math.abs(agent.pnl)
+          )}
+                    </div>
+                </div>
+                 <div>
+                    <div class="text-gray-400">持有現金</div>
+                    <div class="font-mono text-white">${formatCurrency(
+                      agent.cash
+                    )}</div>
+                </div>
+            </div>
+            <div class="flex-grow min-h-[200px] mb-4">
+                <canvas id="agent-chart-${agent.id}"></canvas>
+            </div>
+            <div>
+                 <h4 class="text-md font-semibold text-gray-300 mb-2">持有股數</h4>
+                 <div class="max-h-32 overflow-y-auto custom-scrollbar pr-2">${holdingsHtml}</div>
+            </div>
+        `;
+          agentsDashboard.appendChild(card);
+          createCardChart(agent);
+        }
+
+        function createCardChart(agent) {
+          // ... (same as previous version, no changes here)
+          const ctx = document
+            .getElementById(`agent-chart-${agent.id}`)
+            .getContext("2d");
+          const strategyColor = agent.strategy.color;
+
+          const gradient = ctx.createLinearGradient(0, 0, 0, 200);
+          gradient.addColorStop(0, `rgba(${strategyColor}, 0.5)`);
+          gradient.addColorStop(1, `rgba(${strategyColor}, 0)`);
+
+          cardChartInstances[agent.id] = new Chart(ctx, {
+            type: "line",
+            data: {
+              labels: agent.history.map((h) => `第 ${h.day} 天`),
+              datasets: [
+                {
+                  label: "資產價值",
+                  data: agent.history.map((h) => h.value),
+                  borderColor: `rgb(${strategyColor})`,
+                  backgroundColor: gradient,
+                  borderWidth: 2,
+                  pointRadius: 0,
+                  pointHoverRadius: 5,
+                  pointHoverBackgroundColor: `rgb(${strategyColor})`,
+                  tension: 0.4,
+                  fill: true,
+                },
+              ],
+            },
+            options: {
+              responsive: true,
+              maintainAspectRatio: false,
+              plugins: {
+                legend: { display: false },
+                tooltip: {
+                  enabled: true,
+                  mode: "index",
+                  intersect: false,
+                  callbacks: {
+                    title: (tooltipItems) => tooltipItems[0].label,
+                    label: (context) =>
+                      `${context.dataset.label || ""}: ${formatCurrency(
+                        context.parsed.y
+                      )}`,
+                  },
+                },
+              },
+              scales: { x: { display: false }, y: { display: false } },
+            },
+          });
+        }
+
+        // --- Modal Logic ---
+
+        function showModal(agent) {
+          // ... (same as previous version, no changes here, just one small fix)
+          document.getElementById("modal-agent-name").textContent = agent.name;
+          document.getElementById(
+            "modal-agent-name"
+          ).style.color = `rgb(${agent.strategy.color})`;
+          document.getElementById("modal-agent-value").textContent =
+            formatCurrency(agent.portfolioValue);
+          const pnlEl = document.getElementById("modal-agent-pnl");
+          pnlEl.textContent = `${getPnlSign(agent.pnl)}${formatCurrency(
+            Math.abs(agent.pnl)
+          )}`;
+          pnlEl.className = `text-2xl font-semibold ${getPnlClass(agent.pnl)}`;
+          document.getElementById("modal-agent-cash").textContent =
+            formatCurrency(agent.cash);
+
+          const holdingsEl = document.getElementById("modal-agent-holdings");
+          holdingsEl.innerHTML = "";
+          if (agent.holdings && Object.keys(agent.holdings).length > 0) {
+            for (const ticker in agent.holdings) {
+              const stock = agent.holdings[ticker];
+              const div = document.createElement("div");
+              div.className =
+                "flex justify-between items-center text-sm bg-gray-800 p-2 rounded-md";
+              div.innerHTML = `<div><div class="font-bold text-white">${ticker}</div><div class="text-xs text-gray-400">${
+                stock.name
+              }</div></div><div class="text-right"><div class="font-mono">${stock.shares.toLocaleString()} 股</div><div class="text-xs text-gray-400">成本 @ ${stock.avgPrice.toFixed(
+                2
+              )}</div></div>`;
+              holdingsEl.appendChild(div);
+            }
+          } else {
+            holdingsEl.innerHTML = `<p class="text-gray-500 text-center">無持股</p>`;
+          }
+
+          const historyEl = document.getElementById("modal-agent-history");
+          historyEl.innerHTML = "";
+          if (agent.transactionHistory && agent.transactionHistory.length > 0) {
+            agent.transactionHistory.forEach((tx) => {
+              const div = document.createElement("div");
+              const typeClass = tx.type === "BUY" ? "text-gain" : "text-loss";
+              div.className =
+                "flex justify-between items-center text-sm bg-gray-800 p-2 rounded-md";
+              div.innerHTML = `<div><div class="font-bold ${typeClass}">${
+                tx.type
+              } ${tx.ticker}</div><div class="text-xs text-gray-400">第 ${
+                tx.day
+              } 天</div></div><div class="text-right"><div class="font-mono">${tx.shares.toLocaleString()} 股</div><div class="text-xs text-gray-400">@ ${tx.price.toFixed(
+                2
+              )}</div></div>`;
+              historyEl.appendChild(div);
+            });
+          } else {
+            historyEl.innerHTML = `<p class="text-gray-500 text-center">無交易紀錄</p>`;
+          }
+
+          createModalChart(agent);
+          modal.classList.remove("hidden");
+        }
+
+        function hideModal() {
+          // ... (same as previous version, no changes here)
+          modal.classList.add("hidden");
+          if (modalChartInstance) {
+            modalChartInstance.destroy();
+            modalChartInstance = null;
+          }
+        }
+
+        function createModalChart(agent) {
+          // ... (same as previous version, no changes here)
+          if (modalChartInstance) modalChartInstance.destroy();
+          const ctx = document
+            .getElementById("modal-agent-chart")
+            .getContext("2d");
+          const strategyColor = agent.strategy.color;
+          const gradient = ctx.createLinearGradient(0, 0, 0, 300);
+          gradient.addColorStop(0, `rgba(${strategyColor}, 0.5)`);
+          gradient.addColorStop(1, `rgba(${strategyColor}, 0)`);
+          modalChartInstance = new Chart(ctx, {
+            type: "line",
+            data: {
+              labels: agent.history.map((h) => `第 ${h.day} 天`),
+              datasets: [
+                {
+                  label: "資產價值",
+                  data: agent.history.map((h) => h.value),
+                  borderColor: `rgb(${strategyColor})`,
+                  backgroundColor: gradient,
+                  borderWidth: 2,
+                  pointRadius: 0,
+                  pointHoverRadius: 5,
+                  pointHoverBackgroundColor: `rgb(${strategyColor})`,
+                  tension: 0.4,
+                  fill: true,
+                },
+              ],
+            },
+            options: {
+              responsive: true,
+              maintainAspectRatio: false,
+              plugins: {
+                legend: { display: false },
+                tooltip: {
+                  enabled: true,
+                  mode: "index",
+                  intersect: false,
+                  callbacks: {
+                    title: (tooltipItems) => tooltipItems[0].label,
+                    label: (context) =>
+                      `${context.dataset.label || ""}: ${formatCurrency(
+                        context.parsed.y
+                      )}`,
+                  },
+                },
+              },
+              scales: {
+                x: {
+                  grid: { color: "rgba(255, 255, 255, 0.1)" },
+                  ticks: { color: "#9ca3af" },
+                },
+                y: {
+                  grid: { color: "rgba(255, 255, 255, 0.1)" },
+                  ticks: {
+                    callback: (value) => (value / 1000000).toFixed(2) + "M",
+                    color: "#9ca3af",
+                  },
+                },
+              },
+            },
+          });
+        }
+
+        // --- Settings Logic ---
+        function openSettingsModal() {
+          renderSettingsList();
+          settingsModal.classList.remove("hidden");
+        }
+
+        function closeSettingsModal() {
+          settingsModal.classList.add("hidden");
+        }
+
+        function renderSettingsList() {
+          settingsAgentList.innerHTML = "";
+          agentsData.forEach((agent) => {
+            const agentEl = document.createElement("div");
+            agentEl.className =
+              "bg-gray-800 p-3 rounded-lg flex justify-between items-center";
+            agentEl.innerHTML = `
+                <div class="flex items-center">
+                    <span class="w-4 h-4 rounded-full mr-3" style="background-color: rgb(${agent.strategy.color})"></span>
+                    <span class="font-semibold text-white">${agent.name}</span>
+                </div>
+                <div class="space-x-2">
+                    <button data-id="${agent.id}" class="edit-btn bg-gray-600 text-white py-1 px-3 rounded hover:bg-gray-500">編輯</button>
+                    <button data-id="${agent.id}" class="delete-btn bg-red-600 text-white py-1 px-3 rounded hover:bg-red-500">刪除</button>
+                </div>
+            `;
+            settingsAgentList.appendChild(agentEl);
+          });
+        }
+
+        function openAgentForm(agent = null) {
+          agentForm.reset();
+          if (agent) {
+            formTitle.textContent = "編輯 AI Agent";
+            document.getElementById("agent-id").value = agent.id;
+            document.getElementById("agent-name").value =
+              agent.name.split(" (")[0];
+            document.getElementById("agent-strategy").value =
+              agent.strategy.name;
+            document.getElementById("agent-color").value = agent.strategy.color;
+          } else {
+            formTitle.textContent = "新增 AI Agent";
+            document.getElementById("agent-id").value = "";
+          }
+          agentFormModal.classList.remove("hidden");
+        }
+
+        function closeAgentForm() {
+          agentFormModal.classList.add("hidden");
+        }
+
+        function handleFormSubmit(e) {
+          e.preventDefault();
+          const id = document.getElementById("agent-id").value;
+          const name = document.getElementById("agent-name").value;
+          const strategyName = document.getElementById("agent-strategy").value;
+          const color = document.getElementById("agent-color").value;
+
+          const fullName = `${name} (${strategyName})`;
+
+          if (id) {
+            // Editing existing
+            const agent = agentsData.find((a) => a.id == id);
+            if (agent) {
+              agent.name = fullName;
+              agent.strategy.name = strategyName;
+              agent.strategy.color = color;
+            }
+          } else {
+            // Adding new
+            const newAgent = {
+              id: Date.now(),
+              name: fullName,
+              strategy: { name: strategyName, color: color },
+              cash: 1000000,
+              portfolioValue: 1000000,
+              pnl: 0,
+              holdings: {},
+              history: [{ day: 0, value: 1000000 }],
+              transactionHistory: [],
+            };
+            agentsData.push(newAgent);
+          }
+
+          saveAgentsToLocalStorage();
+          renderStaticDashboard();
+          renderSettingsList();
+          closeAgentForm();
+        }
+
+        // --- Event Listeners ---
+        closeModalBtn.addEventListener("click", hideModal);
+        modal.addEventListener("click", (e) => {
+          if (e.target === modal) hideModal();
+        });
+
+        openSettingsBtn.addEventListener("click", openSettingsModal);
+        settingsCloseBtn.addEventListener("click", closeSettingsModal);
+        addNewAgentBtn.addEventListener("click", () => openAgentForm());
+        formCloseBtn.addEventListener("click", closeAgentForm);
+        agentForm.addEventListener("submit", handleFormSubmit);
+
+        settingsAgentList.addEventListener("click", (e) => {
+          const id = e.target.dataset.id;
+          if (!id) return;
+
+          if (e.target.classList.contains("edit-btn")) {
+            const agent = agentsData.find((a) => a.id == id);
+            openAgentForm(agent);
+          }
+          if (e.target.classList.contains("delete-btn")) {
+            if (confirm(`確定要刪除這個 AI Agent 嗎？此操作無法復原。`)) {
+              agentsData = agentsData.filter((a) => a.id != id);
+              saveAgentsToLocalStorage();
+              renderStaticDashboard();
+              renderSettingsList();
+            }
+          }
+        });
+
+        // --- Initial Render ---
+        function initialize() {
+          agentsData = loadAgentsFromLocalStorage();
+          renderStaticDashboard();
+        }
+
+        initialize();
+      });
+    </script>
+  </body>
+</html>
