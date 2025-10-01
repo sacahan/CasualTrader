@@ -90,11 +90,18 @@ class StockPriceTool:
                 "properties": {
                     "symbol": {
                         "type": "string",
-                        "description": "台灣股票代號 (4位數字，例如: 2330)",
-                        "pattern": r"^[0-9]{4}$",
+                        "description": "台灣股票代號 (4位數字,例如: 2330) 或 ETF代號 (4-6位數字+字母,例如: 00648R)",
+                        "pattern": r"^[0-9]{4,6}[A-Z]*$",
                         "minLength": 4,
-                        "maxLength": 4,
-                        "examples": ["2330", "2317", "2454", "1301"],
+                        "maxLength": 8,
+                        "examples": [
+                            "2330",
+                            "2317",
+                            "2454",
+                            "1301",
+                            "00648R",
+                            "00670L",
+                        ],
                     }
                 },
                 "required": ["symbol"],
@@ -113,23 +120,26 @@ class StockPriceTool:
 🔍 **台灣股票價格查詢工具**
 
 📋 **功能說明:**
-- 查詢台灣股票即時價格資訊
-- 支援上市、上櫃股票
+- 查詢台灣股票及ETF即時價格資訊
+- 支援上市、上櫃股票及ETF
 - 提供完整的價格、成交量、五檔資訊
 
 📝 **使用方法:**
 ```
-get_taiwan_stock_price({"symbol": "2330"})
+get_taiwan_stock_price({"symbol": "2330"})    # 股票
+get_taiwan_stock_price({"symbol": "00648R"})  # ETF
 ```
 
 ✅ **參數說明:**
-- symbol: 4位數字的台灣股票代號
+- symbol: 台灣股票代號(4位數字) 或 ETF代號(4-6位數字+字母)
 
-💡 **常用股票代號:**
+💡 **常用代號:**
 - 台積電: 2330
-- 鴻海: 2317  
+- 鴻海: 2317
 - 聯發科: 2454
 - 台塑: 1301
+- 元大S&P500反1: 00648R
+- 富邦NASDAQ正2: 00670L
 - 中華電信: 2412
 
 📊 **回傳資訊包含:**

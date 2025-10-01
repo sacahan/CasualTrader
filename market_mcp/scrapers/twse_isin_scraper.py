@@ -51,7 +51,7 @@ class TWSeISINScraper:
 
     def _get_default_db_path(self) -> str:
         """Get default database path."""
-        project_root = Path(__file__).parent.parent.parent
+        project_root = Path(__file__).parent.parent
         data_dir = project_root / "data"
         data_dir.mkdir(exist_ok=True)
         return str(data_dir / "twse_securities.db")
@@ -86,13 +86,13 @@ class TWSeISINScraper:
 
     def parse_isin_data(self, html_content: str) -> List[Dict[str, str]]:
         """
-        Parse ISIN data from HTML content.
+        Parse ISIN data from HTML content, filtering for regular stocks only.
 
         Args:
             html_content: Raw HTML content from TWSE ISIN page
 
         Returns:
-            List of dictionaries containing stock information
+            List of dictionaries containing stock information (regular stocks only)
         """
         self.logger.info("Parsing ISIN data from HTML content")
 
@@ -113,6 +113,7 @@ class TWSeISINScraper:
 
         securities = []
         rows = data_table.find_all("tr")
+        current_section = None
 
         for row in rows[1:]:  # Skip header row
             cells = row.find_all("td")
@@ -120,8 +121,12 @@ class TWSeISINScraper:
             if len(cells) < 6:
                 continue
 
-            # Skip category header rows
+            # Check for section header rows
             if cells[0].get("colspan"):
+                # This is a section header
+                header_text = cells[0].get_text(strip=True)
+                current_section = header_text
+                self.logger.debug(f"Found section header: {header_text}")
                 continue
 
             try:
@@ -129,19 +134,34 @@ class TWSeISINScraper:
                 first_cell_text = cells[0].get_text(strip=True)
 
                 # Use regex to separate stock code and company name
-                match = re.match(r"(\d{4})\s*(.+)", first_cell_text)
+                # Handle both regular 4-digit codes and ETF codes with letters (e.g., 00648R, 00670L)
+                match = re.match(r"(\d{4,6}[A-Z]*)\s*(.+)", first_cell_text)
                 if not match:
                     continue
 
                 stock_code = match.group(1)
-                company_name = match.group(2)
+                raw_company_name = match.group(2)
 
-                # Extract other fields
+                # Extract other fields first
                 isin_code = cells[1].get_text(strip=True)
                 listing_date = cells[2].get_text(strip=True)
                 market_type = cells[3].get_text(strip=True)
                 industry = cells[4].get_text(strip=True)
                 cfi_code = cells[5].get_text(strip=True)
+
+                # Check if this is a valid security (stock or ETF)
+                is_valid, security_type = self._is_valid_security(
+                    stock_code, raw_company_name, cfi_code
+                )
+                if not is_valid:
+                    continue
+
+                # Clean the company name
+                company_name = self._clean_company_name(raw_company_name)
+
+                # For stocks, require industry. For ETFs, industry can be empty
+                if security_type == "stock" and not industry.strip():
+                    continue
 
                 security_info = {
                     "stock_code": stock_code,
@@ -151,6 +171,7 @@ class TWSeISINScraper:
                     "market_type": market_type,
                     "industry": industry,
                     "cfi_code": cfi_code,
+                    "security_type": security_type,
                     "scraped_at": datetime.now().isoformat(),
                 }
 
@@ -160,8 +181,144 @@ class TWSeISINScraper:
                 self.logger.warning(f"Failed to parse row: {e}")
                 continue
 
-        self.logger.info(f"Successfully parsed {len(securities)} securities")
+        self.logger.info(
+            f"Successfully parsed {len(securities)} securities (stocks and ETFs)"
+        )
         return securities
+
+    def _is_valid_security(
+        self, stock_code: str, company_name: str, cfi_code: str
+    ) -> tuple[bool, str]:
+        """
+        Check if this is a valid security (stock or ETF) to include.
+
+        Args:
+            stock_code: 4-digit stock code
+            company_name: Company name from the first cell
+            cfi_code: CFI code for the security
+
+        Returns:
+            Tuple of (is_valid, security_type) where security_type is 'stock' or 'etf'
+        """
+        # Check if it's an ETF
+        if self._is_etf(stock_code, cfi_code):
+            return True, "etf"
+
+        # Check if it's a regular stock
+        if self._is_regular_stock(stock_code, company_name, cfi_code):
+            return True, "stock"
+
+        return False, ""
+
+    def _is_etf(self, stock_code: str, cfi_code: str) -> bool:
+        """
+        Check if this is an ETF.
+
+        Args:
+            stock_code: 4-digit or 6-digit stock code
+            cfi_code: CFI code for the security
+
+        Returns:
+            True if this is an ETF, False otherwise
+        """
+        # ETFs typically have CFI code starting with 'CEOG'
+        if cfi_code.startswith("CEOG"):
+            return True
+
+        # ETFs typically have codes starting with 00 or 006
+        if stock_code.startswith("00"):
+            return True
+
+        return False
+
+    def _is_regular_stock(
+        self, stock_code: str, company_name: str, cfi_code: str
+    ) -> bool:
+        """
+        Check if this is a regular stock (not warrant, option, or special stock).
+
+        Args:
+            stock_code: 4-digit stock code
+            company_name: Company name from the first cell
+            cfi_code: CFI code for the security
+
+        Returns:
+            True if this is a regular stock, False otherwise
+        """
+        # ETFs are handled separately
+        if self._is_etf(stock_code, cfi_code):
+            return False
+
+        # Filter out warrants and options (codes starting with 0 but not ETFs)
+        if stock_code.startswith("0") and not stock_code.startswith("00"):
+            return False
+
+        # Filter out entries with special prefixes
+        prefixes_to_exclude = [
+            "A　",
+            "B　",
+            "C　",
+            "D　",
+            "E　",
+            "F　",
+            "G　",
+            "H　",
+            "9U　",
+            "9V　",
+            "9W　",
+            "9X　",
+            "9Y　",
+            "9Z　",
+            "01　",
+            "02　",
+            "03　",
+            "04　",
+            "05　",
+            "特　",
+            "乙　",
+            "甲　",
+        ]
+
+        for prefix in prefixes_to_exclude:
+            if company_name.startswith(prefix):
+                return False
+
+        # Regular stocks typically have codes 1000-9999
+        try:
+            code_num = int(stock_code)
+            if code_num < 1000:
+                return False
+        except ValueError:
+            return False
+
+        # Regular stocks should have CFI code 'ESVUFR'
+        if cfi_code == "ESVUFR":
+            return True
+
+        return False
+
+    def _clean_company_name(self, raw_name: str) -> str:
+        """
+        Clean the company name by removing unwanted prefixes and suffixes.
+
+        Args:
+            raw_name: Raw company name from HTML
+
+        Returns:
+            Cleaned company name
+        """
+        # Remove common prefixes that might have been missed
+        prefixes_to_remove = ["　", "\u3000", " "]  # Various space characters
+
+        cleaned = raw_name
+        for prefix in prefixes_to_remove:
+            if cleaned.startswith(prefix):
+                cleaned = cleaned[len(prefix) :]
+
+        # Remove trailing spaces and special characters
+        cleaned = cleaned.strip()
+
+        return cleaned
 
     def init_database(self) -> None:
         """Initialize SQLite database with required tables."""
@@ -182,12 +339,23 @@ class TWSeISINScraper:
                     market_type TEXT,
                     industry TEXT,
                     cfi_code TEXT,
+                    security_type TEXT DEFAULT 'stock',
                     scraped_at TEXT NOT NULL,
                     updated_at TEXT,
                     UNIQUE(stock_code, isin_code)
                 )
             """
             )
+
+            # Add security_type column if it doesn't exist (for existing databases)
+            try:
+                cursor.execute(
+                    "ALTER TABLE securities ADD COLUMN security_type TEXT DEFAULT 'stock'"
+                )
+                self.logger.info("Added security_type column to existing table")
+            except sqlite3.OperationalError:
+                # Column already exists
+                pass
 
             # Create index for faster lookups
             cursor.execute(
@@ -244,8 +412,8 @@ class TWSeISINScraper:
                         """
                         INSERT INTO securities (
                             stock_code, company_name, isin_code, listing_date,
-                            market_type, industry, cfi_code, scraped_at
-                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                            market_type, industry, cfi_code, security_type, scraped_at
+                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """,
                         (
                             security["stock_code"],
@@ -255,6 +423,7 @@ class TWSeISINScraper:
                             security["market_type"],
                             security["industry"],
                             security["cfi_code"],
+                            security["security_type"],
                             security["scraped_at"],
                         ),
                     )
@@ -270,6 +439,7 @@ class TWSeISINScraper:
                             market_type = ?,
                             industry = ?,
                             cfi_code = ?,
+                            security_type = ?,
                             updated_at = ?
                         WHERE stock_code = ? OR isin_code = ?
                     """,
@@ -279,6 +449,7 @@ class TWSeISINScraper:
                             security["market_type"],
                             security["industry"],
                             security["cfi_code"],
+                            security["security_type"],
                             datetime.now().isoformat(),
                             security["stock_code"],
                             security["isin_code"],
@@ -309,7 +480,7 @@ class TWSeISINScraper:
             cursor.execute(
                 """
                 SELECT stock_code, company_name, isin_code, listing_date,
-                       market_type, industry, cfi_code
+                       market_type, industry, cfi_code, security_type
                 FROM securities
                 WHERE stock_code = ?
             """,
@@ -326,6 +497,7 @@ class TWSeISINScraper:
                     "market_type": row[4],
                     "industry": row[5],
                     "cfi_code": row[6],
+                    "security_type": row[7] if len(row) > 7 else "stock",
                 }
 
         return None
@@ -346,7 +518,7 @@ class TWSeISINScraper:
             cursor.execute(
                 """
                 SELECT stock_code, company_name, isin_code, listing_date,
-                       market_type, industry, cfi_code
+                       market_type, industry, cfi_code, security_type
                 FROM securities
                 WHERE stock_code LIKE ? OR company_name LIKE ?
                 ORDER BY stock_code
@@ -365,6 +537,7 @@ class TWSeISINScraper:
                     "market_type": row[4],
                     "industry": row[5],
                     "cfi_code": row[6],
+                    "security_type": row[7] if len(row) > 7 else "stock",
                 }
                 for row in rows
             ]
