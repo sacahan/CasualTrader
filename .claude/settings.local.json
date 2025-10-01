@@ -2,7 +2,9 @@
   "permissions": {
     "allow": [
       "mcp__market__get_taiwan_stock_price",
-      "WebFetch(domain:isin.twse.com.tw)"
+      "WebFetch(domain:isin.twse.com.tw)",
+      "mcp__market__buy_taiwan_stock",
+      "mcp__market__sell_taiwan_stock"
     ]
   },
   "enableAllProjectMcpServers": true,

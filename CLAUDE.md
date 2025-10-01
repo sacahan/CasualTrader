@@ -248,3 +248,4 @@ Current implementation focuses on Task-001 through Task-004:
 - 🔧 **Task-004**: MCP 工具介面標準化 (In Progress)
 
 Use SpecPilot workflow commands to check current status and get next recommended actions.
+- 測試相關的 py 檔都收納到 test/ 內

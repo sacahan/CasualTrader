@@ -15,7 +15,6 @@ __version__ = "0.1.0"
 __author__ = "Market MCP"
 __email__ = "market@example.com"
 
-from .server import MCPServer
-# 移除 Config 依賴
+# FastMCP 簡化架構 - 不需要導出特定類別
 
-__all__ = ["MCPServer", "Config"]
+__all__ = []

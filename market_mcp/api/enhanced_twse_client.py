@@ -3,15 +3,15 @@ Enhanced Taiwan Stock Exchange API client with rate limiting and caching.
 Integrates the rate limiting and caching system with the existing TWSE API client.
 """
 
-import time
 import asyncio
+import time
 from typing import Any
 
-from .twse_client import TWStockAPIClient
-from ..models.stock_data import TWStockResponse, APIError, ValidationError
 from ..cache.rate_limited_cache_service import RateLimitedCacheService
+from ..models.stock_data import APIError, TWStockResponse, ValidationError
 from ..utils.config_manager import ConfigManager
 from ..utils.logging import logger
+from .twse_client import TWStockAPIClient
 
 
 class EnhancedTWStockAPIClient:
