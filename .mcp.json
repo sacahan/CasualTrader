@@ -15,10 +15,14 @@
         "SPECPILOT_DEBUG": "true"
       }
     },
-    "market": {
+    "casual-market": {
       "type": "stdio",
       "command": "uvx",
-      "args": ["--from", ".", "market-mcp-server"]
+      "args": [
+        "--from",
+        "/Users/sacahan/Documents/workspace/CasualMarket",
+        "casual-market-mcp"
+      ]
     }
   }
 }

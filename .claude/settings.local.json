@@ -1,15 +1,12 @@
 {
   "permissions": {
     "allow": [
-      "mcp__market__get_taiwan_stock_price",
-      "WebFetch(domain:isin.twse.com.tw)",
-      "mcp__market__buy_taiwan_stock",
-      "mcp__market__sell_taiwan_stock",
-      "WebFetch(domain:openai.github.io)"
+      "mcp__market",
+      "WebFetch(domain:*)",
+      "mcp__ide",
+      "Read(//Users/sacahan/Documents/workspace/**)"
     ]
   },
   "enableAllProjectMcpServers": true,
-  "enabledMcpjsonServers": [
-    "specpilot"
-  ]
+  "enabledMcpjsonServers": ["specpilot"]
 }
