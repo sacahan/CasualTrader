@@ -1,8 +1,53 @@
 # AI 股票交易模擬器 - 設計規格書
 
-**版本**: 2.0
-**日期**: 2025-01-10
+**版本**: 2.1 (基於 casual-market-mcp 完整功能重構)
+**日期**: 2025-01-10 (更新: 2025-10-06)
 **專案**: CasualTrader AI Trading Simulator
+
+## 📝 版本更新說明 (v2.1)
+
+**重大更新**: 基於 casual-market-mcp 提供的 21 個專業台灣股市數據工具,全面簡化系統架構
+
+### 核心變更
+
+1. **數據層大幅簡化** ✅
+   - **移除**: 自建股價爬蟲、財報解析、市場數據收集等工具
+   - **改用**: casual-market-mcp 的 21 個專業工具(即時價格、財報、營收、估值、市場資金動向等)
+   - **優勢**: 減少約 60% 的數據層開發工作,專注於 AI 智能決策
+
+2. **專業 Agent 數據來源明確** ✅
+   - **金融研究員 Agent**: 直接使用 casual-market-mcp 的財務數據工具
+   - **技術分析師 Agent**: 直接使用 casual-market-mcp 的交易數據工具
+   - **風險評估師 Agent**: 直接使用 casual-market-mcp 的市場數據工具
+
+3. **工具架構重新設計** ✅
+   - **基礎工具**: 只保留 MCP 客戶端包裝、投資組合管理、交易執行協調
+   - **驗證工具**: 簡化為交易時間驗證(整合到交易流程)
+   - **專業分析**: 全部由配置完整 MCP 工具的專業 Agent 提供
+
+4. **開發時程優化** ✅
+   - **原計畫**: 9+ 週(含數據工具開發)
+   - **新計畫**: ~9 週(但工作量減少 40%,因數據工具已完備)
+   - **Phase 0 移除**: 無需 Hosted Tools POC(casual-market-mcp 已驗證可行)
+
+### casual-market-mcp 提供的完整功能
+
+**21 個專業工具涵蓋**:
+
+- 📊 即時市場數據(4 tools): 股價、指數、即時統計
+- 📈 股票交易數據(5 tools): 日/月/年交易、月均價、估值比率
+- 🏢 公司財務數據(5 tools): 基本資料、財報(自動產業別)、營收、股利
+- 💰 市場資金動向(4 tools): 融資融券、外資持股、ETF 排名
+- 📅 重要行事曆(1 tool): 除權息行事曆
+- 🔄 模擬交易(2 tools): 買入/賣出(含手續費計算)
+
+### 技術架構優勢
+
+1. **關注點分離**: 數據獲取(MCP) vs AI 決策(Agent)
+2. **標準化協議**: MCP 協議確保擴展性和維護性
+3. **成本最優化**: 無需維護複雜的爬蟲和數據處理邏輯
+4. **即時性保證**: 所有數據來自 MCP 即時查詢
+5. **易於測試**: Mock MCP 回應進行單元測試
 
 ## 📋 專案概述
 
@@ -124,14 +169,58 @@ def configure_all_tools(agent: Agent):
 
 ### 基礎數據工具 (Basic Tools)
 
-#### 🔧 **Market MCP Server** (已實作)
+#### 🔧 **Casual Market MCP Server** (已實作 - 核心數據引擎)
 
-- **功能**：台灣股票即時價格查詢與模擬交易執行
-- **職責**：
-  - `get_taiwan_stock_price(symbol)`: 取得股票即時價格
-  - `buy_taiwan_stock(symbol, quantity)`: 執行買入操作
-  - `sell_taiwan_stock(symbol, quantity)`: 執行賣出操作
-- **狀態**：✅ 已實作 (現有 market_mcp 模組)
+casual-market-mcp 提供了完整的台灣股市數據工具集,包含 21 個專業工具:
+
+**📊 即時市場數據** (4 tools)
+
+- `get_taiwan_stock_price(symbol)`: 取得股票即時價格與基本資訊
+- `get_market_index_info(category, count, format)`: 市場指數資訊(加權指數、類股指數等)
+- `get_market_historical_index()`: 歷史指數資料
+- `get_real_time_trading_stats()`: 即時交易統計(5分鐘更新)
+
+**📈 股票交易數據** (5 tools)
+
+- `get_stock_daily_trading(symbol)`: 股票日交易資訊(成交量、金額等)
+- `get_stock_monthly_trading(symbol)`: 股票月交易資訊
+- `get_stock_yearly_trading(symbol)`: 股票年交易資訊
+- `get_stock_monthly_average(symbol)`: 股票月平均價格
+- `get_stock_valuation_ratios(symbol)`: 股票估值比率(P/E, P/B, 殖利率)
+
+**🏢 公司財務數據** (5 tools)
+
+- `get_company_profile(symbol)`: 公司基本資料(產業、規模等)
+- `get_company_balance_sheet(symbol)`: 資產負債表(自動偵測產業別)
+- `get_company_income_statement(symbol)`: 綜合損益表(自動偵測產業別)
+- `get_company_monthly_revenue(symbol)`: 公司月營收資訊
+- `get_company_dividend(symbol)`: 股利分配資訊
+
+**💰 市場資金動向** (4 tools)
+
+- `get_margin_trading_info()`: 融資融券資訊
+- `get_foreign_investment_by_industry()`: 外資持股(按產業別)
+- `get_top_foreign_holdings()`: 外資持股前20名
+- `get_etf_regular_investment_ranking()`: ETF定期定額排名(前10名)
+
+**📅 重要行事曆** (1 tool)
+
+- `get_dividend_rights_schedule(symbol)`: 除權息行事曆
+
+**🔄 模擬交易執行** (2 tools)
+
+- `buy_taiwan_stock(symbol, quantity, price?)`: 模擬買入(支援市價/限價)
+- `sell_taiwan_stock(symbol, quantity, price?)`: 模擬賣出(支援市價/限價)
+
+**特色功能**:
+
+- ✅ 自動產業別偵測(一般業/金融業/證券期貨業/金控業/保險業/異業)
+- ✅ 支援股票代碼或公司名稱查詢
+- ✅ 完整的財務報表支援(含各產業特殊格式)
+- ✅ 即時市場資金動向追蹤
+- ✅ 手續費自動計算(0.2% spread)
+
+**狀態**：✅ 已實作且功能完整
 
 #### 🔧 **WebSearchTool** (內建工具)
 
@@ -140,6 +229,7 @@ def configure_all_tools(agent: Agent):
   - 搜尋網路上的即時資訊
   - 取得市場新聞和公司資訊
   - 提供最新的財經資訊
+  - 補充非結構化市場情報
 - **狀態**：✅ 內建工具 (直接使用)
 - **使用方式**：
 
@@ -152,222 +242,440 @@ def configure_all_tools(agent: Agent):
 
 ### 專業功能 Agent (Agent-as-Tool)
 
+基於 casual-market-mcp 提供的豐富數據,專業 Agent 可以直接調用所有市場數據工具進行深度分析:
+
 #### 🤖 **金融研究員 Agent** (需要實作)
 
 - **Agent 專業**：專精財務分析和投資研究
-- **作為工具提供的功能**：
-  - `analyze_company_fundamentals(symbol)`: 公司基本面分析
-  - `evaluate_financial_health(symbol)`: 財務健康度評估
-  - `assess_industry_trends(sector)`: 產業趨勢分析
-  - `generate_investment_recommendation(symbol, context)`: 投資建議生成
-- **狀態**：🔨 需要 Custom 實作
+- **可用數據工具** (來自 casual-market-mcp)：
+  - 公司基本面: `get_company_profile`, `get_company_balance_sheet`, `get_company_income_statement`
+  - 財務指標: `get_stock_valuation_ratios`, `get_company_monthly_revenue`
+  - 股利政策: `get_company_dividend`, `get_dividend_rights_schedule`
+  - 市場資金: `get_foreign_investment_by_industry`, `get_top_foreign_holdings`
+  
+- **作為工具提供的分析功能**：
+  - `analyze_company_fundamentals(symbol)`: 綜合基本面分析
+    - 自動整合財報、營收、估值比率
+    - 分析財務健康度和成長性
+    - 評估股利政策穩定性
+  - `evaluate_investment_value(symbol)`: 投資價值評估
+    - 本益比、股價淨值比合理性分析
+    - 殖利率吸引力評估
+    - 與產業平均比較
+  - `assess_industry_position(symbol)`: 產業地位分析
+    - 外資持股比例分析
+    - 產業內相對表現
+    - 市場資金流向評估
+
+- **狀態**：🔨 需要實作(但數據工具已完備)
 - **Agent 設定**：
+
   ```python
   research_agent = Agent(
       name="金融研究員",
       model="gpt-4o",  # 使用較強模型進行分析
-      instructions="你是專業的金融研究員，擅長基本面分析..."
+      instructions="""你是專業的金融研究員，擅長台灣股市基本面分析。
+      
+      你可以使用以下數據工具:
+      - 公司財務報表(資產負債表、損益表)
+      - 月營收數據和成長率
+      - 估值指標(本益比、股價淨值比、殖利率)
+      - 外資持股和市場資金動向
+      - 股利分配歷史
+      
+      請基於這些數據提供客觀、專業的投資分析。""",
+      tools=[
+          # 自動配置所有 casual-market-mcp 工具
+          *get_casual_market_tools()
+      ]
   )
   ```
 
 #### 🤖 **技術分析師 Agent** (需要實作)
 
-- **Agent 專業**：專精技術指標和圖表分析
-- **作為工具提供的功能**：
-  - `analyze_technical_indicators(symbol, timeframe)`: 技術指標分析
-  - `identify_chart_patterns(symbol)`: 圖表型態識別
-  - `calculate_support_resistance(symbol)`: 支撐阻力計算
-  - `assess_momentum_signals(symbol)`: 動量訊號評估
-- **狀態**：🔨 需要 Custom 實作
+- **Agent 專業**：專精技術指標和價量分析
+- **可用數據工具** (來自 casual-market-mcp)：
+  - 價格數據: `get_taiwan_stock_price`, `get_stock_monthly_average`
+  - 交易數據: `get_stock_daily_trading`, `get_stock_monthly_trading`, `get_stock_yearly_trading`
+  - 市場動向: `get_real_time_trading_stats`, `get_margin_trading_info`
+  - 指數數據: `get_market_index_info`, `get_market_historical_index`
+
+- **作為工具提供的分析功能**：
+  - `analyze_price_trend(symbol, timeframe)`: 價格趨勢分析
+    - 基於日/月/年交易數據
+    - 計算移動平均線
+    - 識別趨勢方向和強度
+  - `analyze_volume_pattern(symbol)`: 成交量型態分析
+    - 成交量與價格關係
+    - 異常放量檢測
+    - 換手率分析
+  - `assess_market_sentiment(symbol)`: 市場情緒評估
+    - 融資融券變化
+    - 外資買賣超
+    - 市場整體氛圍
+
+- **狀態**：🔨 需要實作(但數據工具已完備)
 
 #### 🤖 **風險評估師 Agent** (需要實作)
 
 - **Agent 專業**：專精投資組合風險管理
+- **可用數據工具** (來自 casual-market-mcp)：
+  - 估值風險: `get_stock_valuation_ratios`
+  - 市場風險: `get_market_index_info`, `get_real_time_trading_stats`
+  - 產業風險: `get_foreign_investment_by_industry`
+  - 流動性風險: `get_stock_daily_trading`, `get_margin_trading_info`
+
 - **作為工具提供的功能**：
-  - `calculate_portfolio_risk(agent_id)`: 投資組合風險計算
-  - `assess_position_sizing(symbol, portfolio_value)`: 部位大小建議
-  - `evaluate_correlation_risk(holdings)`: 相關性風險評估
-  - `suggest_diversification(portfolio)`: 分散化建議
-- **狀態**：🔨 需要 Custom 實作
+  - `calculate_portfolio_risk(agent_id, holdings)`: 投資組合風險計算
+    - 集中度風險評估
+    - 產業配置分析
+    - 個股風險評級
+  - `assess_position_sizing(symbol, portfolio_value, risk_tolerance)`: 部位控制建議
+    - 基於波動度的部位建議
+    - 流動性考量
+    - 風險承受度匹配
+  - `evaluate_market_risk()`: 市場系統性風險評估
+    - 大盤趨勢分析
+    - 融資融券比例警示
+    - 外資動向評估
+
+- **狀態**：🔨 需要實作(但數據工具已完備)
 
 ### 驗證與管理工具 (Validation Tools)
 
-#### 🔧 **TimeValidatorTool** (需要實作)
+**注意**: 由於 casual-market-mcp 的 `buy_taiwan_stock` 和 `sell_taiwan_stock` 已內建模擬交易機制,部分驗證可以整合到交易流程中。
+
+#### 🔧 **TimeValidatorTool** (簡化實作)
 
 - **功能**：驗證台灣股市交易時間
 - **職責**：
   - `is_trading_hours()`: 檢查當前是否為交易時間
   - `get_next_trading_session()`: 取得下次交易時間
-- **狀態**：🔨 需要 Custom 實作
+- **實作建議**: 可整合到 Agent 的決策邏輯中,在非交易時間自動暫停交易
+- **狀態**：🔨 需要簡化實作
 
-#### 🔧 **FundValidatorTool** (需要實作)
+#### 🔧 **PortfolioManagerTool** (需要實作)
 
-- **功能**：驗證投資資金充足性
+- **功能**：投資組合管理與追蹤
 - **職責**：
-  - `check_buying_power(agent_id, amount)`: 檢查購買力
-  - `calculate_transaction_cost(symbol, quantity, price)`: 計算交易成本
-- **狀態**：🔨 需要 Custom 實作
+  - `get_portfolio(agent_id)`: 取得 Agent 當前持股
+  - `calculate_portfolio_value(agent_id)`: 計算投資組合總值
+  - `check_buying_power(agent_id, amount)`: 檢查可用資金
+  - `update_holdings(agent_id, symbol, quantity, action)`: 更新持股記錄
+- **數據來源**: 整合 casual-market-mcp 的價格數據與本地持股記錄
+- **狀態**：🔨 需要實作
 
-### Agent-to-Tool 實作範例 (基於官方文檔)
+### Agent-to-Tool 實作範例 (基於官方文檔和 casual-market-mcp)
+
+**參考官方文檔**: [OpenAI Agents Python - MCP Integration](https://github.com/openai/openai-agents-python/blob/main/docs/mcp.md)
 
 ```python
 from agents import Agent, Runner, function_tool, WebSearchTool
+from agents.mcp import MCPServerStdio
+import asyncio
 
-# 1. 創建專業功能 Agent
-research_agent = Agent(
-    name="金融研究員",
-    model="gpt-4o",
-    instructions="""你是專業的金融研究員，具備深厚的財務分析能力。
-    你專精於：
-    - 公司基本面分析
-    - 財務報表解讀
-    - 產業趨勢研究
-    - 投資價值評估
+# 1. 設置 casual-market-mcp 伺服器 (使用官方 MCPServerStdio)
+async def create_casual_market_server():
+    """創建 casual-market-mcp 伺服器實例
+    
+    根據官方文檔,使用 MCPServerStdio 來連接本地 MCP 伺服器
+    參考: https://github.com/openai/openai-agents-python/blob/main/docs/mcp.md
+    """
+    server = MCPServerStdio(
+        name="Casual Market MCP Server",
+        params={
+            "command": "uvx",
+            "args": [
+                "--from", 
+                "/path/to/CasualMarket",  # 替換為實際路徑
+                "casual-market-mcp"
+            ],
+        },
+        # 可選: 啟用工具列表快取以提升性能
+        cache_tools_list=True,
+    )
+    return server
 
-    請基於使用者提供的股票代碼和分析需求，提供客觀、專業的分析報告。"""
-)
+# 2. 創建專業功能 Agent (直接使用 mcp_servers 參數)
+async def main():
+    """主要執行函數 - 展示正確的 MCP 整合方式"""
+    
+    # 創建 casual-market-mcp 伺服器實例
+    casual_market_server = await create_casual_market_server()
+    
+    async with casual_market_server:  # 使用 async context manager
+        
+        # 3. 創建專業 Agent (直接將 MCP server 加入 mcp_servers 參數)
+        research_agent = Agent(
+            name="金融研究員",
+            model="gpt-4o",
+            instructions="""你是專業的金融研究員，具備深厚的財務分析能力。
+            
+            casual-market-mcp 伺服器提供以下 21 個工具供你使用:
+            
+            【公司基本面分析】
+            - get_company_profile: 公司基本資料
+            - get_company_balance_sheet: 資產負債表(自動偵測產業別)
+            - get_company_income_statement: 綜合損益表(自動偵測產業別)
+            - get_company_monthly_revenue: 月營收資訊
+            - get_company_dividend: 股利分配資訊
+            
+            【估值與市場分析】
+            - get_stock_valuation_ratios: 本益比、股價淨值比、殖利率
+            - get_foreign_investment_by_industry: 外資持股產業分析
+            - get_top_foreign_holdings: 外資持股前20名
+            
+            【市場資金動向】
+            - get_margin_trading_info: 融資融券資訊
+            - get_real_time_trading_stats: 即時交易統計
+            
+            請直接調用這些工具進行分析,提供客觀、專業的投資分析報告。""",
+            mcp_servers=[casual_market_server],  # 🔑 關鍵: 將 MCP server 加入這裡
+        )
+        
+        technical_agent = Agent(
+            name="技術分析師",
+            model="gpt-4o",
+            instructions="""你是專業的技術分析師，專精於股票技術面和價量分析。
+            
+            casual-market-mcp 伺服器提供以下工具:
+            
+            【價格數據】
+            - get_taiwan_stock_price: 即時股價
+            - get_stock_monthly_average: 月平均價格
+            
+            【交易數據】
+            - get_stock_daily_trading: 日交易資訊(成交量、金額)
+            - get_stock_monthly_trading: 月交易資訊
+            - get_stock_yearly_trading: 年交易資訊
+            
+            【市場動向】
+            - get_real_time_trading_stats: 即時交易統計
+            - get_margin_trading_info: 融資融券變化
+            - get_market_index_info: 大盤指數走勢
+            - get_market_historical_index: 歷史指數資料
+            
+            請直接調用這些工具進行技術面分析。""",
+            mcp_servers=[casual_market_server],
+        )
+        
+        risk_agent = Agent(
+            name="風險評估師",
+            model="gpt-4o",
+            instructions="""你是專業的投資風險評估師，專精於投資組合風險管理。
+            
+            casual-market-mcp 伺服器提供以下工具進行風險評估:
+            
+            【估值風險】
+            - get_stock_valuation_ratios: 評估個股估值是否過高
+            
+            【市場風險】
+            - get_market_index_info: 大盤系統性風險
+            - get_real_time_trading_stats: 市場流動性狀況
+            
+            【產業風險】
+            - get_foreign_investment_by_industry: 外資對產業的態度
+            - get_margin_trading_info: 市場投機氛圍
+            
+            【流動性風險】
+            - get_stock_daily_trading: 個股流動性評估
+            
+            請直接調用這些工具提供全面的風險評估和部位控制建議。""",
+            mcp_servers=[casual_market_server],
+        )
+        
+        # 4. 投資組合管理工具 (本地實作,使用 MCP 獲取即時價格)
+        @function_tool
+        async def get_agent_portfolio(agent_id: str) -> dict:
+            """取得 Agent 投資組合
+            
+            注意: 此函數從本地資料庫讀取持股記錄,
+            然後使用 casual-market-mcp 更新即時價格
+            """
+            # 從資料庫讀取持股記錄 (需實作)
+            holdings = await db.get_holdings(agent_id)  # 假設的資料庫調用
+            
+            # casual-market-mcp 的工具會自動可用,因為 server 在 context 中
+            # Agent 可以直接調用 get_taiwan_stock_price 來更新價格
+            
+            return {
+                "agent_id": agent_id,
+                "holdings": holdings,
+                "cash": await db.get_cash_balance(agent_id),
+            }
+        
+        @function_tool
+        async def execute_trade(agent_id: str, symbol: str, action: str, quantity: int) -> dict:
+            """執行交易(整合驗證)
+            
+            注意: casual-market-mcp 已提供 buy_taiwan_stock 和 sell_taiwan_stock
+            此函數主要負責驗證和本地記錄更新
+            """
+            import datetime
+            import pytz
+            
+            # 1. 交易時間驗證
+            taiwan_tz = pytz.timezone('Asia/Taipei')
+            now = datetime.datetime.now(taiwan_tz)
+            if now.weekday() >= 5 or not (9 <= now.hour < 14):
+                return {"success": False, "message": "非交易時間"}
+            
+            # 2. 資金驗證 (需實作)
+            portfolio = await get_agent_portfolio(agent_id)
+            if action == "buy":
+                # 檢查資金是否充足 (假設 0.2% 手續費)
+                # 實際價格會由 casual-market-mcp 的 buy_taiwan_stock 處理
+                pass
+            
+            # 3. 調用 casual-market-mcp 執行交易
+            # Agent 會直接調用 buy_taiwan_stock 或 sell_taiwan_stock
+            
+            # 4. 更新本地持股記錄 (需實作)
+            await db.update_holdings(agent_id, symbol, quantity, action)
+            
+            return {
+                "success": True,
+                "message": f"已{action} {symbol} {quantity} 股"
+            }
 
-technical_agent = Agent(
-    name="技術分析師",
-    model="gpt-4o",
-    instructions="""你是專業的技術分析師，專精於股票技術面分析。
-    你專精於：
-    - 技術指標分析 (RSI, MACD, KD 等)
-    - 圖表型態識別
-    - 支撐阻力位分析
-    - 趨勢和動量分析
-
-    請基於股票代碼提供技術面分析建議。"""
-)
-
-risk_agent = Agent(
-    name="風險評估師",
-    model="gpt-4o",
-    instructions="""你是專業的投資風險評估師，專精於投資組合風險管理。
-    你專精於：
-    - 投資組合風險計算
-    - 相關性分析
-    - 部位控制建議
-    - 分散化策略
-
-    請基於投資組合資訊提供風險評估和建議。"""
-)
-
-# 2. 基礎工具定義
-@function_tool
-async def get_stock_price(symbol: str) -> str:
-    """取得台灣股票即時價格"""
-    # 呼叫現有的 market_mcp_server
-    from market_mcp.tools.stock_price_tool import get_taiwan_stock_price
-    result = await get_taiwan_stock_price(symbol)
-    return f"{symbol} 目前價格: {result}"
-
-@function_tool
-async def buy_taiwan_stock(symbol: str, quantity: int) -> str:
-    """執行台灣股票買入操作"""
-    # 呼叫現有的 market_mcp_server
-    from market_mcp.tools.stock_price_tool import buy_taiwan_stock
-    result = await buy_taiwan_stock(symbol, quantity)
-    return f"已買入 {symbol} {quantity} 股"
-
-@function_tool
-async def sell_taiwan_stock(symbol: str, quantity: int) -> str:
-    """執行台灣股票賣出操作"""
-    # 呼叫現有的 market_mcp_server
-    from market_mcp.tools.stock_price_tool import sell_taiwan_stock
-    result = await sell_taiwan_stock(symbol, quantity)
-    return f"已賣出 {symbol} {quantity} 股"
-
-@function_tool
-async def validate_trading_time() -> str:
-    """驗證當前是否為台灣股市交易時間"""
-    # TODO: 實作交易時間驗證
-    import datetime
-    import pytz
-
-    taiwan_tz = pytz.timezone('Asia/Taipei')
-    now = datetime.datetime.now(taiwan_tz)
-
-    # 簡化版本：週一到週五 09:00-13:30
-    if now.weekday() < 5 and 9 <= now.hour < 14:
-        return "當前為台灣股市交易時間，可以進行交易"
-    else:
-        return "當前非台灣股市交易時間，無法進行交易"
-
-@function_tool
-async def check_fund_availability(agent_id: str, amount: float) -> str:
-    """檢查 Agent 資金是否充足"""
-    # TODO: 實作資金驗證，整合帳戶系統
-    return f"Agent {agent_id} 資金充足，可投資 {amount} TWD"
-
-# 3. 創建交易 Agent 並配置工具
-def create_trading_agent(agent_config: dict) -> Agent:
-    """創建配置完整工具的交易 Agent"""
-
-    trading_agent = Agent(
-        name=agent_config["name"],
-        model=agent_config["ai_model"],
-        instructions=agent_config["strategy_prompt"],
-        tools=[
-            # 基礎工具
-            get_stock_price,
-            buy_taiwan_stock,
-            sell_taiwan_stock,
-            validate_trading_time,
-            check_fund_availability,
-
-            # OpenAI SDK 內建工具
-            WebSearchTool(),  # 網路搜尋工具
-
-            # 專業 Agent 作為工具
-            research_agent.as_tool(
-                tool_name="analyze_fundamentals",
-                tool_description="分析股票基本面，包括財務狀況、成長潛力和投資價值評估"
+        # 5. 創建交易 Agent (整合所有組件)
+        trading_agent = Agent(
+            name="穩健投資者",
+            model="gpt-4o-mini",
+            instructions="""你是穩健型投資者,投資目標是長期穩定增值。
+            
+            投資原則:
+            - 優先考慮大型績優股和金融股
+            - 注重公司財務穩健性和股息配發紀錄
+            - 避免高波動性和投機性股票
+            - 分散投資降低風險
+            
+            決策流程:
+            1. 諮詢金融研究員進行基本面分析
+            2. 諮詢技術分析師評估買賣時機
+            3. 諮詢風險評估師確認風險可控
+            4. 基於三方意見做出最終決策
+            
+            你的投資組合目標是穩定成長,保護資本為優先考量。""",
+            tools=[
+                # 投資組合管理工具
+                get_agent_portfolio,
+                execute_trade,
+                
+                # 網路搜尋工具(內建)
+                WebSearchTool(),
+                
+                # 專業 Agent 作為顧問工具
+                research_agent.as_tool(
+                    tool_name="consult_financial_analyst",
+                    tool_description="""諮詢金融研究員進行深度基本面分析。
+                    
+                    研究員可直接使用 casual-market-mcp 的完整工具集:
+                - 公司財報(資產負債表、損益表)
+                - 月營收數據與成長率
+                - 估值指標(P/E, P/B, 殖利率)
+                - 外資持股與市場資金動向
+                - 股利分配歷史
+                
+                適用情境: 評估個股投資價值、分析財務健康度、產業地位分析"""
             ),
             technical_agent.as_tool(
-                tool_name="analyze_technicals",
-                tool_description="分析股票技術面，包括技術指標、圖表型態和趨勢分析"
-            ),
-            risk_agent.as_tool(
-                tool_name="assess_risk",
-                tool_description="評估投資組合風險，提供部位控制和分散化建議"
-            ),
-        ]
-    )
-
-    return trading_agent
-
-# 4. 使用範例
-async def main():
-    # 創建交易 Agent
-    agent_config = {
-        "name": "穩健投資者",
-        "ai_model": "gpt-4o-mini",
-        "strategy_prompt": "你是穩健型投資者，重視風險控制..."
-    }
-
-    trading_agent = create_trading_agent(agent_config)
-
-    # 執行投資決策
-    result = await Runner.run(
-        trading_agent,
-        "請分析台積電(2330)是否適合買入，我的投資組合目前有100萬現金"
-    )
-
-    print(result.final_output)
+                tool_name="consult_technical_analyst",
+                tool_description="""諮詢技術分析師進行價量分析。
+                
+                分析師可使用完整的交易數據工具:
+                - 日/月/年交易數據
+                - 成交量與換手率分析
+                - 融資融券變化
+                    - 公司財報、營收、估值、股利、外資持股等
+                    
+                    適用情境: 評估個股投資價值、分析財務健康度、產業地位分析"""
+                ),
+                technical_agent.as_tool(
+                    tool_name="consult_technical_analyst",
+                    tool_description="""諮詢技術分析師進行價量分析。
+                    
+                    分析師可直接使用 casual-market-mcp 的交易數據:
+                    - 日/月/年交易數據
+                    - 成交量與換手率分析
+                    - 融資融券變化
+                    - 大盤指數走勢
+                    - 即時交易統計
+                    
+                    適用情境: 判斷買賣時機、評估市場情緒、分析趨勢強度"""
+                ),
+                risk_agent.as_tool(
+                    tool_name="consult_risk_manager",
+                    tool_description="""諮詢風險評估師進行風險管理。
+                    
+                    評估師可直接使用 casual-market-mcp 的市場數據:
+                    - 投資組合集中度風險
+                    - 個股估值風險(P/E, P/B 是否過高)
+                    - 市場系統性風險(大盤走勢)
+                    - 產業風險(外資態度、融資融券)
+                    - 流動性風險(成交量分析)
+                    
+                    適用情境: 部位大小決策、風險控制、分散投資建議"""
+                ),
+            ],
+            # 🔑 關鍵: 也可以將 casual-market-mcp 直接加入交易 Agent
+            # 這樣交易 Agent 可以直接調用 buy_taiwan_stock 等工具
+            mcp_servers=[casual_market_server],
+        )
+        
+        # 6. 執行投資決策
+        result = await Runner.run(
+            trading_agent,
+            "請分析台積電(2330)是否適合買入,我的投資組合目前有100萬現金"
+        )
+        
+        print(result.final_output)
+        
+        # 🎯 執行流程說明:
+        # 1. 交易 Agent 收到問題
+        # 2. 調用 consult_financial_analyst (金融研究員 Agent)
+        #    → 研究員 Agent 使用 casual-market-mcp 的工具:
+        #      - get_company_profile(2330)
+        #      - get_company_balance_sheet(2330)
+        #      - get_stock_valuation_ratios(2330)
+        #      - get_company_monthly_revenue(2330)
+        #    → 返回基本面分析報告
+        # 3. 調用 consult_technical_analyst (技術分析師 Agent)
+        #    → 分析師 Agent 使用 casual-market-mcp 的工具:
+        #      - get_taiwan_stock_price(2330)
+        #      - get_stock_daily_trading(2330)
+        #      - get_margin_trading_info()
+        #    → 返回技術面分析報告
+        # 4. 調用 consult_risk_manager (風險評估師 Agent)
+        #    → 評估師 Agent 使用 casual-market-mcp 的工具:
+        #      - get_stock_valuation_ratios(2330)
+        #      - get_market_index_info()
+        #    → 返回風險評估報告
+        # 5. 調用 get_agent_portfolio(agent_id) 檢查資金狀況
+        # 6. 交易 Agent 綜合所有資訊,基於策略 prompt 做出決策
+        # 7. 如決定買入:
+        #    → 直接調用 casual-market-mcp 的 buy_taiwan_stock(2330, 1000)
+        #    → 或調用自訂的 execute_trade(...) 進行額外驗證
 
 # 運行範例
-import asyncio
-asyncio.run(main())
+if __name__ == "__main__":
+    asyncio.run(main())
 ```
 
-### 架構優勢
+### 架構優勢 (基於 casual-market-mcp 完整功能)
 
-1. **專業分工**：每個 Agent 專精特定領域，提供高品質分析
-2. **模組化**：可以獨立開發、測試和優化每個專業 Agent
-3. **可擴展性**：輕鬆添加新的專業 Agent（如總體經濟分析師）
-4. **成本優化**：可為不同 Agent 選擇不同模型（分析用 GPT-4o，簡單任務用 GPT-4o-mini）
-5. **重用性**：專業 Agent 可以被多個交易 Agent 共享使用
+1. **數據完整性**：casual-market-mcp 提供 21 個專業工具,涵蓋即時價格、財報、營收、估值、市場資金等全方位數據
+2. **專業分工**：
+   - 交易 Agent: 策略執行和最終決策
+   - 金融研究員: 深度基本面分析(直接使用 casual-market-mcp 財務數據)
+   - 技術分析師: 價量分析(直接使用 casual-market-mcp 交易數據)
+   - 風險評估師: 風險管理(整合多維度市場數據)
+3. **模組化設計**：專業 Agent 可獨立測試和優化
+4. **成本優化**：
+   - 交易 Agent 使用 GPT-4o-mini(頻繁調用)
+   - 專業 Agent 使用 GPT-4o(深度分析,調用較少)
+5. **可擴展性**：輕鬆添加新專業 Agent(如總體經濟分析師)
+6. **數據即時性**：所有數據來自 casual-market-mcp 即時查詢,無需本地快取
 
 ### 2. 即時交易監控系統
 
@@ -551,16 +859,53 @@ AI代理人: OpenAI Agents SDK (Python)
 設定管理: 本地儲存 + 後端持久化
 ```
 
-#### 2.4 外部服務與工具
+#### 2.4 外部服務與工具 (基於 casual-market-mcp)
 
 ```yaml
-股價資料: 台灣證交所 API (透過 MCP)
-研究工具: WebSearch API
-金融分析: 金融研究員 Agent
-技術分析: 自建技術指標工具
-風險管理: 投資組合分析工具
-時間驗證: 台灣交易時間檢查
-資金驗證: 餘額檢查工具
+核心數據引擎: casual-market-mcp (21 個專業工具)
+  即時市場數據:
+    - 股票即時價格與基本資訊
+    - 市場指數資訊(加權、類股)
+    - 歷史指數數據
+    - 即時交易統計(5分鐘更新)
+  
+  股票交易數據:
+    - 日/月/年交易資訊
+    - 月平均價格
+    - 估值比率(P/E, P/B, 殖利率)
+  
+  公司財務數據:
+    - 公司基本資料
+    - 資產負債表(自動產業別偵測)
+    - 綜合損益表(自動產業別偵測)
+    - 月營收資訊
+    - 股利分配資訊
+  
+  市場資金動向:
+    - 融資融券資訊
+    - 外資持股(按產業/前20名)
+    - ETF定期定額排名
+  
+  行事曆:
+    - 除權息行事曆
+  
+  模擬交易:
+    - 買入/賣出執行(支援市價/限價)
+    - 手續費自動計算(0.2% spread)
+
+網路搜尋: OpenAI WebSearch API (內建)
+  - 市場新聞與情報
+  - 公司非結構化資訊
+  - 產業趨勢報導
+
+專業 Agent 工具:
+  - 金融研究員 Agent (使用 casual-market-mcp 財務數據)
+  - 技術分析師 Agent (使用 casual-market-mcp 交易數據)
+  - 風險評估師 Agent (使用 casual-market-mcp 市場數據)
+
+簡化實作工具:
+  - 交易時間驗證 (整合到交易流程)
+  - 投資組合管理 (本地記錄 + casual-market-mcp 即時價格)
 ```
 
 ### 3. 資料模型設計
@@ -912,127 +1257,180 @@ interface TradeExecutedEvent {
 
 ---
 
-## 🚀 開發里程碑
+## 🚀 開發里程碑 (簡化版 - 基於 casual-market-mcp 完整功能)
 
-### Phase 0: Hosted Tools POC 研究 (Week 0)
+**🎉 已完成**: casual-market-mcp 提供完整的 21 個台灣股市數據工具,大幅簡化開發工作!
 
-**目標**: 驗證 OpenAI Agent SDK Hosted Tools 在金融交易場景的可行性
+### Phase 1: MCP 整合與 Agent 基礎架構 (Week 1-2)
 
-#### 0.1 工具能力驗證研究
+**目標**: 建立與 casual-market-mcp 的連接,實現基礎 Agent 框架
 
-**CodeInterpreterTool 金融計算驗證**：
+- [ ] **MCP 客戶端整合**
+  - [ ] 設置 MCP SDK 環境
+  - [ ] 實現 casual-market-mcp 客戶端包裝器
+  - [ ] 測試所有 21 個 MCP 工具的調用
+  - [ ] 建立 MCP 連接池和錯誤處理機制
 
-- [ ] 測試 Python 金融套件支援度（pandas, numpy, talib）
-- [ ] 驗證技術指標計算能力（RSI, MACD, 布林通道）
-- [ ] 測試股價數據處理和視覺化功能
-- [ ] 評估執行時間限制和性能表現
-- [ ] 測試數據持久化能力
+- [ ] **OpenAI Agent SDK 基礎**
+  - [ ] 設置 OpenAI Agents Python SDK 環境
+  - [ ] 實現 SQLiteSession 會話管理
+  - [ ] 建立 Agent 配置系統(從前端 JSON 創建 Agent)
+  - [ ] 實現 Agent 生命週期管理器
 
-**FileSearchTool 中文金融內容檢索驗證**：
+- [ ] **基礎工具實作**
+  - [ ] 交易執行器(整合時間驗證 + MCP 交易調用)
+  - [ ] 投資組合管理器(本地記錄 + MCP 即時價格更新)
+  - [ ] 策略 Prompt 模板系統(5 種預設策略)
 
-- [ ] 建立測試用 Vector Store（台灣公司財報、研究報告）
-- [ ] 測試中文金融內容的檢索準確度
-- [ ] 評估檔案格式支援（PDF財報、Excel數據）
-- [ ] 分析語義搜尋效果和相關性評分
-- [ ] 評估建置和維護成本
+### Phase 2: 專業 Agent 與智能決策系統 (Week 3-4)
 
-**HostedMCPTool 外部服務整合研究**：
+**目標**: 實現三個專業 Agent,建立 Agent-as-Tool 架構
 
-- [ ] 調研支援 MCP 協議的金融數據提供商
-- [ ] 測試外部 API 認證和安全機制
-- [ ] 驗證數據格式標準化可能性
-- [ ] 評估服務延遲和可靠性指標
-- [ ] 分析整合複雜度和維護成本
+- [ ] **金融研究員 Agent** (配置 casual-market-mcp 財務數據工具)
+  - [ ] Agent Instructions 設計與調優
+  - [ ] 整合財報、營收、估值數據工具
+  - [ ] 基本面分析能力測試
+  - [ ] 投資建議生成功能
 
-**LocalShellTool 安全性評估**：
+- [ ] **技術分析師 Agent** (配置 casual-market-mcp 交易數據工具)
+  - [ ] Agent Instructions 設計與調優
+  - [ ] 整合價格、成交量、市場動向工具
+  - [ ] 技術面分析能力測試
+  - [ ] 買賣時機判斷功能
 
-- [ ] 分析 AI Agent 執行 shell 命令的安全風險
-- [ ] 研究權限控制和命令範圍限制機制
-- [ ] 測試跨平台相容性問題
-- [ ] 評估在生產環境部署的可行性
+- [ ] **風險評估師 Agent** (配置 casual-market-mcp 市場數據工具)
+  - [ ] Agent Instructions 設計與調優
+  - [ ] 整合估值、市場風險、資金動向工具
+  - [ ] 風險評估能力測試
+  - [ ] 部位控制建議功能
 
-#### 0.2 工具組合效果測試
+- [ ] **交易 Agent 整合**
+  - [ ] 配置專業 Agent 作為顧問工具
+  - [ ] 多 Agent 協作決策流程
+  - [ ] 投資決策記錄與追蹤
+  - [ ] 策略執行與調整機制
 
-- [ ] 建立 POC 測試環境
-- [ ] 設計複合任務測試案例
-- [ ] 測試多工具協作的實際效果
-- [ ] 評估工具間數據傳遞的效率
-- [ ] 分析錯誤處理和降級機制
+### Phase 3: FastAPI Backend 與 WebSocket 即時通信 (Week 5)
 
-#### 0.3 成本效益分析
+**目標**: 建立 Web 服務層,實現前後端即時通信
 
-- [ ] 計算 hosted tools 的使用成本
-- [ ] 評估開發和維護工作量
-- [ ] 與現有 custom tools 進行效能比較
-- [ ] 制定工具導入的優先順序和策略
+- [ ] **REST API 開發**
+  - [ ] Agent CRUD API (創建/讀取/更新/刪除)
+  - [ ] 交易歷史 API
+  - [ ] 投資組合 API
+  - [ ] 市場數據代理 API (轉發 casual-market-mcp)
+  - [ ] 策略配置 API
 
-#### 0.4 技術架構調整
+- [ ] **WebSocket 即時推送**
+  - [ ] WebSocket 連線管理
+  - [ ] 事件系統設計(agent_status, trade_executed, portfolio_update)
+  - [ ] Agent 決策過程即時廣播
+  - [ ] 交易執行動畫觸發
 
-- [ ] 根據 POC 結果更新系統架構設計
-- [ ] 調整 Agent 工具配置策略
-- [ ] 更新風險控制和安全機制
-- [ ] 制定分階段導入計畫
+- [ ] **數據庫設計與實作**
+  - [ ] SQLAlchemy ORM 模型
+  - [ ] Agent 配置持久化
+  - [ ] 交易記錄與投資原因儲存
+  - [ ] 策略調整歷史記錄
+  - [ ] Repository Pattern 資料存取層
 
-**預期產出**：
+### Phase 4: 前端儀表板與視覺化 (Week 6)
 
-- Hosted Tools 可行性評估報告
-- 工具能力對照表和限制說明
-- 更新的技術架構設計
-- Phase 1-6 開發計畫調整建議
+**目標**: 實現即時儀表板和互動式視覺化
 
-### Phase 1: OpenAI Agent SDK 基礎整合 (Week 1-2)
+- [ ] **主儀表板開發** (Vanilla JS + Tailwind CSS)
+  - [ ] Agent 卡片網格佈局
+  - [ ] 即時數據更新(WebSocket 驅動)
+  - [ ] Chart.js 資產價值曲線圖
+  - [ ] 持股分布顯示
+  - [ ] 交易動畫效果
 
-- [ ] 設置 OpenAI Agents Python SDK 環境
-- [ ] 實現 SQLiteSession 會話管理系統
-- [ ] 建立基礎 Agent 框架和工具管理器
-- [ ] 整合現有 Market MCP Server 作為 Agent 工具
-- [ ] 實現交易時間和資金驗證工具
+- [ ] **Agent 設定界面**
+  - [ ] Agent 創建表單(名稱/模型/策略/顏色/資金)
+  - [ ] 策略 Prompt 編輯器(支援預設模板)
+  - [ ] Agent 編輯與刪除功能
+  - [ ] 策略調整歷史查看
 
-### Phase 2: AI 代理人核心功能 (Week 3-4)
+- [ ] **詳細模態視窗**
+  - [ ] 投資組合詳情
+  - [ ] 交易歷史時間軸
+  - [ ] 投資決策原因展示
+  - [ ] 績效分析圖表
 
-- [ ] 實現交易代理人核心邏輯
-- [ ] 建立投資策略系統（穩健型、積極型等）
-- [ ] 整合 WebSearch 工具和金融研究員 Agent
-- [ ] 實現決策記錄和投資原因持久化
-- [ ] 建立風險評估和投資組合管理系統
+- [ ] **響應式設計**
+  - [ ] 手機/平板/桌面適配
+  - [ ] 載入骨架屏
+  - [ ] 錯誤提示與處理
 
-### Phase 3: Web 服務層與前端基礎 (Week 5)
+### Phase 5: 進階功能與優化 (Week 7-8)
 
-- [ ] 建立 FastAPI 後端服務架構
-- [ ] 實現 WebSocket 即時通信系統
-- [ ] 建立前端基礎結構（Vanilla JS + Tailwind）
-- [ ] 實現代理人 CRUD API
-- [ ] 建立基本的儀表板界面
+**目標**: 增強系統功能,優化用戶體驗
 
-### Phase 4: 前端進階功能與設定界面 (Week 6)
+- [ ] **Agent 智能功能**
+  - [ ] 策略動態調整(Agent 自主優化策略)
+  - [ ] 多 Agent 競賽模式
+  - [ ] 回測功能(基於歷史數據)
+  - [ ] 風險預警系統
 
-- [ ] 實現 AI 模型選擇界面
-- [ ] 建立策略配置和歷史追蹤功能
-- [ ] 實現工具配置管理界面
-- [ ] 整合 Chart.js 圖表視覺化
-- [ ] 添加即時交易動畫效果
+- [ ] **數據分析與報告**
+  - [ ] Agent 績效比較分析
+  - [ ] 投資策略效果評估
+  - [ ] 市場趨勢洞察
+  - [ ] 交易報告生成(PDF/Excel)
 
-### Phase 5: 進階分析與優化 (Week 7-8)
+- [ ] **系統優化**
+  - [ ] MCP 連接池優化
+  - [ ] WebSocket 訊息壓縮
+  - [ ] 前端快取策略
+  - [ ] 資料庫查詢優化
 
-- [ ] 實現策略動態調整功能
-- [ ] 建立多代理人協作機制
-- [ ] 添加效能分析和回測功能
-- [ ] 實現風險控制和預警系統
-- [ ] 優化用戶體驗和響應式設計
+### Phase 6: 測試、部署與文檔 (Week 9+)
 
-### Phase 6: 生產部署與監控 (Week 9+)
+**目標**: 確保系統穩定性,準備生產部署
 
-- [ ] 實現系統監控和日誌記錄
-- [ ] 建立自動化測試套件
-- [ ] 部署配置和 CI/CD 設置
-- [ ] 效能優化和壓力測試
-- [ ] 文檔完善和使用者指南
+- [ ] **測試體系**
+  - [ ] Agent 單元測試(模擬 MCP 回應)
+  - [ ] API 整合測試
+  - [ ] WebSocket 連接測試
+  - [ ] 端到端測試(完整交易流程)
+  - [ ] 壓力測試(多 Agent 並發)
+
+- [ ] **部署準備**
+  - [ ] Docker 容器化
+  - [ ] CI/CD Pipeline (GitHub Actions)
+  - [ ] 環境變數管理
+  - [ ] 日誌與監控系統(Prometheus/Grafana)
+  - [ ] 錯誤追蹤(Sentry)
+
+- [ ] **文檔完善**
+  - [ ] API 文檔(OpenAPI/Swagger)
+  - [ ] Agent 開發指南
+  - [ ] 部署手冊
+  - [ ] 用戶使用指南
+  - [ ] 故障排除指南
+
+---
+
+**開發時程總結** (基於 casual-market-mcp 完整功能):
+
+- **Phase 1-2**: 4 週 (Agent 架構與智能系統)
+- **Phase 3-4**: 2 週 (Backend + Frontend)
+- **Phase 5**: 2 週 (進階功能)
+- **Phase 6**: 1+ 週 (測試與部署)
+- **總計**: ~9 週 (相比原計畫縮短,因數據工具已完備)
+
+**關鍵優勢**:
+
+✅ casual-market-mcp 提供 21 個專業工具,無需自建數據爬蟲
+✅ 專注於 AI Agent 智能決策,而非數據獲取
+✅ MCP 協議標準化,易於擴展和維護
+✅ Agent-as-Tool 架構,專業分工明確
 
 ---
 
 ## 🔧 技術實現細節
 
-### 1. 專案目錄結構
+### 1. 專案目錄結構 (簡化版 - 基於 casual-market-mcp)
 
 ```text
 CasualTrader/
@@ -1040,105 +1438,155 @@ CasualTrader/
 │   ├── agent/                  # AI 代理人層
 │   │   ├── __init__.py
 │   │   ├── trading_agent.py    # 交易代理人核心
-│   │   ├── research_agent.py   # 金融研究員代理人
 │   │   ├── agent_manager.py    # 代理人管理器
 │   │   ├── session_manager.py  # SQLiteSession 管理
+│   │   │
 │   │   ├── prompts/            # 策略 Prompt Templates
 │   │   │   ├── conservative_strategy.txt    # 穩健型策略
 │   │   │   ├── aggressive_strategy.txt      # 積極型策略
 │   │   │   ├── balanced_strategy.txt        # 平衡型策略
 │   │   │   ├── value_investing.txt          # 價值投資策略
 │   │   │   └── momentum_trading.txt         # 動量交易策略
+│   │   │
 │   │   ├── specialist_agents/  # 專業功能 Agent (Agent-as-Tool)
 │   │   │   ├── __init__.py
-│   │   │   ├── research_agent.py      # 金融研究員 Agent
-│   │   │   ├── technical_agent.py     # 技術分析師 Agent
-│   │   │   └── risk_agent.py          # 風險評估師 Agent
-│   │   └── tools/              # 基礎工具集
+│   │   │   ├── research_agent.py      # 金融研究員 Agent (使用 casual-market-mcp 財務數據)
+│   │   │   ├── technical_agent.py     # 技術分析師 Agent (使用 casual-market-mcp 交易數據)
+│   │   │   └── risk_agent.py          # 風險評估師 Agent (使用 casual-market-mcp 市場數據)
+│   │   │
+│   │   └── tools/              # 簡化工具集 (大部分由 casual-market-mcp 提供)
 │   │       ├── __init__.py
-│   │       ├── market_tools.py        # 市場 MCP 工具包裝
-│   │       ├── validation_tools.py    # 驗證工具 (時間、資金)
-│   │       └── portfolio_tools.py     # 投資組合管理工具
+│   │       ├── mcp_client.py          # casual-market-mcp 客戶端包裝
+│   │       ├── portfolio_manager.py   # 投資組合管理 (本地記錄 + MCP 價格)
+│   │       └── trade_executor.py      # 交易執行器 (整合驗證與 MCP 交易)
+│   │
 │   ├── backend/                # Web 服務層
 │   │   ├── __init__.py
 │   │   ├── main.py            # FastAPI 應用入口
+│   │   │
 │   │   ├── api/               # REST API 路由
 │   │   │   ├── __init__.py
-│   │   │   ├── agents.py      # 代理人 API
-│   │   │   ├── trading.py     # 交易 API
+│   │   │   ├── agents.py      # 代理人 CRUD API
+│   │   │   ├── trading.py     # 交易歷史 API
 │   │   │   ├── portfolio.py   # 投資組合 API
+│   │   │   ├── market.py      # 市場數據 API (代理 casual-market-mcp)
 │   │   │   └── settings.py    # 設定 API
-│   │   ├── websocket/         # WebSocket 處理
+│   │   │
+│   │   ├── websocket/         # WebSocket 即時通信
 │   │   │   ├── __init__.py
-│   │   │   ├── connection.py  # 連線管理
-│   │   │   ├── events.py      # 事件處理
+│   │   │   ├── manager.py     # WebSocket 連線管理
+│   │   │   ├── events.py      # 事件定義
 │   │   │   └── handlers.py    # 事件處理器
-│   │   ├── models/            # 資料模型
+│   │   │
+│   │   ├── models/            # Pydantic 資料模型
 │   │   │   ├── __init__.py
-│   │   │   ├── agent.py       # 代理人模型
-│   │   │   ├── trading.py     # 交易模型
+│   │   │   ├── agent.py       # Agent 配置模型
+│   │   │   ├── trading.py     # 交易記錄模型
 │   │   │   ├── portfolio.py   # 投資組合模型
-│   │   │   └── market.py      # 市場資料模型
+│   │   │   └── strategy.py    # 策略調整模型
+│   │   │
 │   │   ├── services/          # 業務邏輯服務
 │   │   │   ├── __init__.py
-│   │   │   ├── agent_service.py # 代理人服務
-│   │   │   ├── trading_service.py # 交易服務
-│   │   │   └── validation_service.py # 驗證服務
+│   │   │   ├── agent_service.py     # Agent 生命週期管理
+│   │   │   ├── trading_service.py   # 交易執行協調
+│   │   │   ├── portfolio_service.py # 投資組合計算
+│   │   │   └── market_service.py    # 市場數據服務 (整合 casual-market-mcp)
+│   │   │
 │   │   └── database/          # 資料庫操作
 │   │       ├── __init__.py
-│   │       ├── connection.py  # 資料庫連線
-│   │       ├── models.py      # SQLAlchemy 模型
-│   │       └── repositories.py # 資料存取層
-│   └── frontend/              # 前端應用
+│   │       ├── connection.py  # SQLite 連線
+│   │       ├── models.py      # SQLAlchemy ORM 模型
+│   │       └── repositories.py # 資料存取層 (Repository Pattern)
+│   │
+│   └── frontend/              # 前端應用 (Vanilla JS)
 │       ├── index.html         # 主儀表板頁面
-│       ├── settings.html      # 設定頁面
+│       ├── settings.html      # Agent 設定頁面
+│       │
 │       ├── js/                # JavaScript 模組
-│       │   ├── main.js        # 主要應用邏輯
-│       │   ├── agents.js      # 代理人管理
-│       │   ├── dashboard.js   # 儀表板功能
-│       │   ├── settings.js    # 設定管理
-│       │   ├── charts.js      # 圖表功能
-│       │   ├── websocket.js   # WebSocket 客戶端
+│       │   ├── main.js        # 應用入口
+│       │   ├── api-client.js  # API 客戶端
+│       │   ├── websocket-client.js # WebSocket 客戶端
+│       │   ├── agent-manager.js    # Agent 管理功能
+│       │   ├── dashboard.js   # 儀表板渲染
+│       │   ├── charts.js      # Chart.js 圖表
+│       │   ├── portfolio-view.js   # 投資組合視圖
 │       │   └── utils.js       # 工具函數
-│       ├── css/               # 樣式檔案
-│       │   ├── main.css       # 主要樣式
+│       │
+│       ├── css/               # 樣式檔案 (Tailwind CSS)
+│       │   ├── main.css       # 主樣式
 │       │   ├── dashboard.css  # 儀表板樣式
 │       │   ├── settings.css   # 設定頁面樣式
 │       │   └── components.css # 組件樣式
+│       │
 │       └── assets/            # 靜態資源
-│           ├── icons/         # 圖標檔案
-│           ├── images/        # 圖片資源
-│           └── fonts/         # 字體檔案
-├── market_mcp/                # MCP Server (現有)
-│   └── ...                    # 現有 MCP 服務代碼
+│           ├── icons/         # SVG 圖標
+│           └── fonts/         # Web 字體
+│
+├── casual-market-mcp/         # 外部依賴 (獨立專案)
+│   └── ...                    # casual-market-mcp 完整功能 (21 個工具)
+│
 ├── tests/                     # 測試檔案
-│   ├── test_agents/
-│   ├── test_backend/
-│   └── test_integration/
+│   ├── test_agents/          # Agent 單元測試
+│   │   ├── test_trading_agent.py
+│   │   ├── test_research_agent.py
+│   │   └── test_specialist_agents.py
+│   ├── test_backend/         # Backend 測試
+│   │   ├── test_api.py
+│   │   ├── test_websocket.py
+│   │   └── test_services.py
+│   └── test_integration/     # 整合測試
+│       ├── test_agent_trading_flow.py
+│       └── test_mcp_integration.py
+│
 ├── docs/                      # 文件
-├── scripts/                   # 部署與工具腳本
-└── requirements.txt           # Python 依賴
+│   ├── API.md                # API 文件
+│   ├── AGENT_GUIDE.md        # Agent 開發指南
+│   └── DEPLOYMENT.md         # 部署指南
+│
+├── scripts/                   # 工具腳本
+│   ├── setup_mcp.sh          # 設置 casual-market-mcp 連接
+│   └── run_dev.sh            # 開發環境啟動腳本
+│
+├── .mcp.json                 # MCP 配置 (casual-market-mcp)
+├── pyproject.toml            # Python 專案配置
+├── requirements.txt          # Python 依賴
+└── README.md                 # 專案說明
 ```
 
-### 2. 環境設定
+**架構說明**:
+
+1. **簡化工具層**: 大幅減少自建工具,主要依賴 casual-market-mcp 的 21 個專業工具
+2. **專業 Agent 直接使用 MCP**: 研究員/技術分析師/風險評估師直接調用 casual-market-mcp 工具
+3. **本地只保留**: 投資組合管理(記錄)、交易執行協調(驗證+調用MCP)、Agent 生命週期管理
+4. **清晰分層**: Agent 層 → Backend 層 → Frontend 層,每層職責明確
+5. **外部依賴**: casual-market-mcp 作為獨立 MCP Server 提供所有市場數據
+
+### 2. 環境設定 (更新 - 整合 casual-market-mcp)
 
 ```bash
 # 核心依賴
 fastapi[all]>=0.104.0
-openai-agents-python>=0.2.9
+openai-agents-python>=0.2.9  # OpenAI Agent SDK
 websockets>=11.0
 uvicorn[standard]>=0.24.0
 pydantic>=2.0.0
 sqlalchemy>=2.0.0
 
+# MCP 協議支援 (與 casual-market-mcp 通信)
+mcp>=0.9.0                   # Model Context Protocol SDK
+httpx>=0.25.0                # HTTP 客戶端
+
 # AI 模型 SDK
-openai>=1.0.0
-anthropic>=0.8.0  # 如果使用 Claude
-requests>=2.31.0  # WebSearch 工具
+openai>=1.0.0                # OpenAI API
+anthropic>=0.8.0             # Claude (可選)
+google-generativeai>=0.3.0   # Gemini (可選)
 
 # 時間與驗證
 python-dateutil>=2.8.0
-pytz>=2023.3  # 台灣時區支援
+pytz>=2023.3                 # 台灣時區支援
+
+# 資料處理
+pandas>=2.0.0                # 數據分析(可選,用於複雜計算)
 
 # 開發工具
 pytest>=7.4.0
@@ -1148,8 +1596,52 @@ ruff>=0.1.0
 mypy>=1.5.0
 
 # 測試工具
-httpx>=0.25.0  # FastAPI 測試客戶端
 pytest-mock>=3.11.0
+```
+
+### 3. MCP 配置 (.mcp.json)
+
+```json
+{
+  "mcpServers": {
+    "casual-market": {
+      "type": "stdio",
+      "command": "uvx",
+      "args": [
+        "--from",
+        "/path/to/CasualMarket",
+        "casual-market-mcp"
+      ],
+      "description": "台灣股市數據與模擬交易 MCP Server (21 個專業工具)"
+    }
+  }
+}
+```
+
+**casual-market-mcp 提供的 21 個工具**:
+
+1. `get_taiwan_stock_price` - 即時股價
+2. `get_market_index_info` - 市場指數
+3. `get_market_historical_index` - 歷史指數
+4. `get_real_time_trading_stats` - 即時交易統計
+5. `get_stock_daily_trading` - 日交易資訊
+6. `get_stock_monthly_trading` - 月交易資訊
+7. `get_stock_yearly_trading` - 年交易資訊
+8. `get_stock_monthly_average` - 月平均價格
+9. `get_stock_valuation_ratios` - 估值比率
+10. `get_company_profile` - 公司基本資料
+11. `get_company_balance_sheet` - 資產負債表
+12. `get_company_income_statement` - 綜合損益表
+13. `get_company_monthly_revenue` - 月營收
+14. `get_company_dividend` - 股利分配
+15. `get_margin_trading_info` - 融資融券
+16. `get_foreign_investment_by_industry` - 外資持股(產業)
+17. `get_top_foreign_holdings` - 外資持股前20
+18. `get_etf_regular_investment_ranking` - ETF排名
+19. `get_dividend_rights_schedule` - 除權息行事曆
+20. `buy_taiwan_stock` - 模擬買入
+21. `sell_taiwan_stock` - 模擬賣出
+
 ```
 
 ### 3. Agent 工具配置規格

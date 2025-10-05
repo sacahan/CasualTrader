@@ -14,12 +14,12 @@
                 "SPECPILOT_DEBUG": "true"
             }
         },
-        "market": {
+        "casual-market": {
             "command": "uvx",
             "args": [
                 "--from",
-                ".",
-                "market-mcp-server"
+                "/Users/sacahan/Documents/workspace/CasualMarket",
+                "casual-market-mcp"
             ]
         }
     }
