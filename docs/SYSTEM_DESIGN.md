@@ -331,6 +331,11 @@
 - Agent 核心類別和資料模型
 - Phase 1 測試套件
 
+**📚 參考文檔**:
+
+- `AGENT_IMPLEMENTATION.md` - Agent 基礎架構與資料模型
+- `API_DEPENDENCIES.md` - 套件依賴與環境配置
+
 ---
 
 ### Phase 2: 智能決策系統 (Week 3-4)
@@ -365,6 +370,11 @@
 - 模式切換控制器
 - 追蹤系統和查詢介面
 - Phase 2 整合測試
+
+**📚 參考文檔**:
+
+- `AGENT_IMPLEMENTATION.md` - Agent 決策機制與模式切換詳細規格
+- `API_DEPENDENCIES.md` - OpenAI Agent SDK 配置指南
 
 ---
 
@@ -401,6 +411,12 @@
 - API 文檔和測試集合
 - 安全性測試報告
 
+**📚 參考文檔**:
+
+- `API_IMPLEMENTATION.md` - 後端 API 完整實作規格
+- `AGENT_IMPLEMENTATION.md` - Agent 與 API 整合介面
+- `API_DEPENDENCIES.md` - FastAPI 與 WebSocket 套件配置
+
 ---
 
 ### Phase 4: 前端儀表板 (Week 6)
@@ -435,6 +451,11 @@
 - 響應式 UI 組件庫
 - WebSocket 客戶端整合
 - 跨瀏覽器相容性測試報告
+
+**📚 參考文檔**:
+
+- `FRONTEND_IMPLEMENTATION.md` - 前端介面完整實作規格
+- `API_IMPLEMENTATION.md` - API 端點與 WebSocket 協議
 
 ---
 
@@ -471,6 +492,12 @@
 - 穩定性測試結果
 - 系統監控和告警機制
 
+**📚 參考文檔**:
+
+- `AGENT_IMPLEMENTATION.md` - Agent 系統整合與測試策略
+- `API_IMPLEMENTATION.md` - API 測試與效能優化
+- `FRONTEND_IMPLEMENTATION.md` - 前端測試與性能監控
+
 ---
 
 ### Phase 6: 部署上線 (Week 9+)
@@ -505,6 +532,12 @@
 - 監控和告警系統配置
 - 運維手冊和故障排除指南
 - 用戶文檔和 API 參考
+
+**📚 參考文檔**:
+
+- `DEPLOYMENT_GUIDE.md` - 完整部署與配置指南
+- `API_DEPENDENCIES.md` - 生產環境套件與依賴管理
+- `API_IMPLEMENTATION.md` - API 監控與日誌配置
 
 ---
 
