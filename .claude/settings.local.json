@@ -1,10 +1,10 @@
 {
   "permissions": {
     "allow": [
-      "mcp__market",
       "WebFetch(domain:*)",
       "mcp__ide",
-      "Read(//Users/sacahan/Documents/workspace/**)"
+      "Read(//Users/sacahan/Documents/workspace/**)",
+      "mcp__casual-market"
     ]
   },
   "enableAllProjectMcpServers": true,
