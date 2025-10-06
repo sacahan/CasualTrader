@@ -26,6 +26,7 @@
 - **策略演化追蹤**: 完整記錄和展示 Agent 策略變更歷史
 - **透明度優先**: 所有策略調整都有詳細的觸發原因、績效背景和 Agent 說明
 - **簡潔直觀**: 避免複雜的參數配置，專注於投資意圖的表達
+- **⚠️ 執行時鎖定**: Agent 啟動後自動鎖定配置，防止執行期間被修改影響策略一致性
 
 ---
 
@@ -174,6 +175,10 @@ frontend/
     dispatch('settings', { agentId: agent.id });
   }
 
+  // 檢查 Agent 是否正在執行（鎖定設定）
+  $: isRunning = agent.status === 'running' || agent.status === 'active';
+  $: isConfigLocked = isRunning; // 執行中時鎖定配置
+
   // 模式顯示名稱
   const modeDisplayNames = {
     trading: '交易',
@@ -206,7 +211,14 @@ frontend/
       <Button size="sm" variant="ghost" on:click={stopAgent} title="停止">
         ⏹
       </Button>
-      <Button size="sm" variant="ghost" on:click={openSettings} title="設定">
+      <Button 
+        size="sm" 
+        variant="ghost" 
+        on:click={openSettings} 
+        disabled={isConfigLocked}
+        title={isConfigLocked ? "Agent 執行中，無法修改設定" : "設定"}
+        class={isConfigLocked ? "opacity-50 cursor-not-allowed" : ""}
+      >
         ⚙
       </Button>
     </div>
@@ -510,7 +522,249 @@ ${data.additional_instructions ? `\nADDITIONAL INSTRUCTIONS:\n${data.additional_
 </style>
 ```
 
-### 5. 策略變更歷史查看組件 (StrategyHistoryView.svelte)
+### 5. Agent 配置編輯器組件 (AgentConfigEditor.svelte)
+
+> ⚠️ **重要**: 此組件實作配置鎖定機制，防止執行中的 Agent 被修改
+
+此組件用於編輯已創建的 Agent 配置，並強制執行配置鎖定規則。
+
+```svelte
+<script>
+  import { createEventDispatcher } from 'svelte';
+  import { agentsStore } from '../../stores/agents.js';
+  import Button from '../UI/Button.svelte';
+  import Modal from '../UI/Modal.svelte';
+
+  export let agent;
+  export let show = false;
+
+  const dispatch = createEventDispatcher();
+
+  // 檢查配置是否被鎖定
+  $: isRunning = agent.status === 'running' || agent.status === 'active';
+  $: isConfigLocked = isRunning || agent.config_locked;
+
+  // 編輯表單資料
+  let editFormData = { ...agent };
+
+  // 當 agent 變更時更新表單
+  $: if (agent) {
+    editFormData = { ...agent };
+  }
+
+  async function handleSave() {
+    // 雙重檢查鎖定狀態
+    if (isConfigLocked) {
+      alert('⚠️ 無法儲存：Agent 正在執行中，配置已鎖定。請先停止 Agent。');
+      return;
+    }
+
+    try {
+      await agentsStore.updateAgent(agent.id, editFormData);
+      dispatch('saved');
+      dispatch('close');
+    } catch (error) {
+      alert(`儲存失敗：${error.message}`);
+    }
+  }
+
+  function handleCancel() {
+    dispatch('close');
+  }
+
+  async function handleStopAgent() {
+    if (confirm('確定要停止 Agent 執行嗎？停止後才能修改配置。')) {
+      try {
+        await agentsStore.stopAgent(agent.id);
+        // Agent 停止後會自動解鎖，可以繼續編輯
+      } catch (error) {
+        alert(`停止失敗：${error.message}`);
+      }
+    }
+  }
+</script>
+
+{#if show}
+  <Modal on:close={handleCancel}>
+    <div class="agent-config-editor">
+      <div class="header mb-6">
+        <h2 class="text-2xl font-bold text-gray-900">編輯 Agent 配置</h2>
+        <p class="text-sm text-gray-600 mt-1">{agent.name}</p>
+      </div>
+
+      <!-- 配置鎖定警告橫幅 -->
+      {#if isConfigLocked}
+        <div class="config-lock-banner bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-6">
+          <div class="flex items-start gap-3">
+            <span class="text-yellow-600 text-2xl">🔒</span>
+            <div class="flex-1">
+              <h4 class="text-sm font-semibold text-yellow-800 mb-2">配置已鎖定</h4>
+              <p class="text-sm text-yellow-700 mb-3">
+                Agent 目前正在執行交易策略，為確保策略一致性，所有配置已被鎖定。
+                若需修改配置，請先停止 Agent 執行。
+              </p>
+              <Button 
+                variant="warning" 
+                size="sm" 
+                on:click={handleStopAgent}
+              >
+                停止 Agent 並解鎖配置
+              </Button>
+            </div>
+          </div>
+        </div>
+      {/if}
+
+      <!-- 配置表單 -->
+      <form class="config-form space-y-6" on:submit|preventDefault={handleSave}>
+        
+        <!-- 基本資訊 -->
+        <div class="section">
+          <h3 class="text-lg font-semibold text-gray-800 mb-4">基本資訊</h3>
+          
+          <div class="input-group mb-4">
+            <label class="block text-sm font-medium text-gray-700 mb-2">Agent 名稱</label>
+            <input
+              type="text"
+              bind:value={editFormData.name}
+              disabled={isConfigLocked}
+              class="form-input w-full px-4 py-2 border border-gray-300 rounded-lg"
+              class:opacity-50={isConfigLocked}
+              class:cursor-not-allowed={isConfigLocked}
+            />
+          </div>
+
+          <div class="input-group mb-4">
+            <label class="block text-sm font-medium text-gray-700 mb-2">描述</label>
+            <textarea
+              bind:value={editFormData.description}
+              disabled={isConfigLocked}
+              class="form-textarea w-full px-4 py-2 border border-gray-300 rounded-lg"
+              class:opacity-50={isConfigLocked}
+              class:cursor-not-allowed={isConfigLocked}
+              rows="3"
+            />
+          </div>
+        </div>
+
+        <!-- 投資策略配置 -->
+        <div class="section">
+          <h3 class="text-lg font-semibold text-gray-800 mb-4">投資策略配置</h3>
+          
+          <div class="input-group mb-4">
+            <label class="block text-sm font-medium text-gray-700 mb-2">投資偏好</label>
+            <textarea
+              bind:value={editFormData.investment_preferences}
+              disabled={isConfigLocked}
+              class="form-textarea w-full px-4 py-2 border border-gray-300 rounded-lg"
+              class:opacity-50={isConfigLocked}
+              class:cursor-not-allowed={isConfigLocked}
+              rows="6"
+            />
+          </div>
+
+          <div class="input-group mb-4">
+            <label class="block text-sm font-medium text-gray-700 mb-2">策略調整依據</label>
+            <textarea
+              bind:value={editFormData.strategy_adjustment_criteria}
+              disabled={isConfigLocked}
+              class="form-textarea w-full px-4 py-2 border border-gray-300 rounded-lg"
+              class:opacity-50={isConfigLocked}
+              class:cursor-not-allowed={isConfigLocked}
+              rows="6"
+            />
+          </div>
+        </div>
+
+        <!-- 風險控制 -->
+        <div class="section">
+          <h3 class="text-lg font-semibold text-gray-800 mb-4">風險控制</h3>
+          
+          <div class="input-group mb-4">
+            <label class="block text-sm font-medium text-gray-700 mb-2">
+              單股最大部位 (%)
+            </label>
+            <input
+              type="number"
+              bind:value={editFormData.max_position_size}
+              disabled={isConfigLocked}
+              min="1"
+              max="20"
+              step="0.5"
+              class="form-input w-full px-4 py-2 border border-gray-300 rounded-lg"
+              class:opacity-50={isConfigLocked}
+              class:cursor-not-allowed={isConfigLocked}
+            />
+          </div>
+
+          <div class="input-group mb-4">
+            <label class="block text-sm font-medium text-gray-700 mb-2">
+              排除股票代碼
+            </label>
+            <input
+              type="text"
+              bind:value={editFormData.excluded_symbols}
+              disabled={isConfigLocked}
+              placeholder="例如: 2498,2328"
+              class="form-input w-full px-4 py-2 border border-gray-300 rounded-lg"
+              class:opacity-50={isConfigLocked}
+              class:cursor-not-allowed={isConfigLocked}
+            />
+          </div>
+        </div>
+
+        <!-- 操作按鈕 -->
+        <div class="form-actions flex justify-end gap-3 pt-6 border-t border-gray-200">
+          <Button variant="secondary" on:click={handleCancel}>
+            取消
+          </Button>
+          <Button 
+            type="submit" 
+            variant="primary"
+            disabled={isConfigLocked}
+            title={isConfigLocked ? "配置已鎖定，無法儲存" : "儲存變更"}
+          >
+            {isConfigLocked ? '🔒 配置已鎖定' : '儲存變更'}
+          </Button>
+        </div>
+      </form>
+
+      <!-- 只讀模式提示 -->
+      {#if isConfigLocked}
+        <div class="readonly-notice mt-4 text-center">
+          <p class="text-xs text-gray-500">
+            💡 提示：您可以查看所有配置內容，但無法修改。
+          </p>
+        </div>
+      {/if}
+    </div>
+  </Modal>
+{/if}
+
+<style>
+  .config-lock-banner {
+    animation: slideDown 0.3s ease-out;
+  }
+
+  @keyframes slideDown {
+    from {
+      opacity: 0;
+      transform: translateY(-10px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  .form-input:disabled,
+  .form-textarea:disabled {
+    background-color: #f9fafb;
+  }
+</style>
+```
+
+### 6. 策略變更歷史查看組件 (StrategyHistoryView.svelte)
 
 > 參考: AGENT_IMPLEMENTATION.md - 策略變更記錄系統
 
@@ -825,6 +1079,125 @@ Agent 管理介面採用 **Prompt 驅動** 的設計理念，讓用戶透過自�
 - **即時反饋**: 表單驗證和預覽更新
 - **視覺層次**: 清晰的資訊架構和視覺層次
 - **響應式設計**: 適配各種螢幕尺寸
+
+### ⚠️ Agent 執行時配置鎖定機制
+
+**設計目的**：防止 Agent 執行交易策略期間被修改配置，確保策略一致性和執行完整性。
+
+#### 鎖定規則
+
+1. **啟動時自動鎖定**
+   - Agent 狀態變更為 `running` 或 `active` 時，自動鎖定所有配置
+   - 前端介面禁用所有編輯按鈕和表單輸入
+
+2. **鎖定範圍**
+   - 投資偏好設定（investment_preferences）
+   - 策略調整依據（strategy_adjustment_criteria）
+   - 初始資金設定（initial_funds）
+   - 最大部位設定（max_position_size）
+   - 排除股票列表（excluded_symbols）
+   - 其他所有核心配置
+
+3. **允許的操作**
+   - ✅ 查看 Agent 配置和狀態
+   - ✅ 監控 Agent 執行歷史和績效
+   - ✅ 查看策略變更記錄
+   - ✅ 停止 Agent 執行
+   - ❌ 修改任何配置參數
+   - ❌ 更新投資策略內容
+
+4. **解鎖條件**
+   - Agent 狀態變更為 `stopped` 或 `idle`
+   - 用戶主動停止 Agent 執行
+   - Agent 執行完成或發生錯誤
+
+#### 前端實作要點
+
+```svelte
+<script>
+  // 檢查 Agent 執行狀態
+  $: isRunning = agent.status === 'running' || agent.status === 'active';
+  $: isConfigLocked = isRunning;
+
+  // 顯示鎖定提示
+  $: lockMessage = isConfigLocked 
+    ? "⚠️ Agent 執行中，配置已鎖定。請先停止 Agent 才能修改設定。"
+    : null;
+
+  function handleConfigEdit() {
+    if (isConfigLocked) {
+      alert("Agent 執行中無法修改配置，請先停止 Agent。");
+      return;
+    }
+    // 開啟編輯介面
+  }
+</script>
+
+<!-- 配置編輯按鈕 -->
+<Button 
+  on:click={handleConfigEdit}
+  disabled={isConfigLocked}
+  title={isConfigLocked ? "Agent 執行中，無法修改" : "編輯配置"}
+>
+  編輯配置
+</Button>
+
+<!-- 鎖定狀態提示 -->
+{#if isConfigLocked}
+  <div class="config-lock-banner bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-4">
+    <div class="flex items-start gap-3">
+      <span class="text-yellow-600 text-xl">🔒</span>
+      <div>
+        <h4 class="text-sm font-semibold text-yellow-800 mb-1">配置已鎖定</h4>
+        <p class="text-sm text-yellow-700">
+          {lockMessage}
+        </p>
+      </div>
+    </div>
+  </div>
+{/if}
+
+<!-- 表單輸入禁用 -->
+<input 
+  type="text" 
+  bind:value={config.investment_preferences}
+  disabled={isConfigLocked}
+  class:opacity-50={isConfigLocked}
+  class:cursor-not-allowed={isConfigLocked}
+/>
+```
+
+#### 使用者提示設計
+
+1. **視覺提示**
+   - 鎖定時顯示 🔒 圖標
+   - 禁用的按鈕和輸入框半透明顯示
+   - 使用黃色警告橫幅提示鎖定狀態
+
+2. **互動提示**
+   - 滑鼠懸停時顯示 tooltip 說明鎖定原因
+   - 嘗試編輯時彈出提示對話框
+   - 提供「停止 Agent」快捷操作按鈕
+
+3. **狀態指示**
+   - Agent 卡片上顯示執行狀態徽章
+   - 配置頁面頂部顯示鎖定橫幅
+   - 編輯按鈕旁顯示鎖定圖標
+
+#### 例外情況處理
+
+1. **緊急停止**
+   - 即使在鎖定狀態，仍可執行「停止 Agent」操作
+   - 停止後立即解鎖配置
+
+2. **只讀查看**
+   - 鎖定期間可以查看所有配置內容
+   - 支援複製配置內容用於參考
+
+3. **策略自主調整**
+   - Agent 自主策略調整不受鎖定影響
+   - Agent 透過 `record_strategy_change` 工具更新策略
+   - 前端實時同步顯示策略變更記錄
 
 ---
 
@@ -1323,6 +1696,12 @@ function createAgentsStore() {
 
     async updateAgent(agentId, updates) {
       try {
+        // 檢查 Agent 是否正在執行（配置鎖定檢查）
+        const currentAgent = await this.getAgent(agentId);
+        if (currentAgent && (currentAgent.status === 'running' || currentAgent.status === 'active')) {
+          throw new Error('無法更新配置：Agent 正在執行中。請先停止 Agent 才能修改配置。');
+        }
+
         const updatedAgent = await apiClient.updateAgent(agentId, updates);
         update((agents) =>
           agents.map((agent) => (agent.id === agentId ? updatedAgent : agent)),
@@ -1331,6 +1710,20 @@ function createAgentsStore() {
       } catch (error) {
         console.error("Failed to update agent:", error);
         throw error;
+      }
+    },
+
+    async getAgent(agentId) {
+      try {
+        let targetAgent = null;
+        update((agents) => {
+          targetAgent = agents.find(agent => agent.id === agentId);
+          return agents;
+        });
+        return targetAgent;
+      } catch (error) {
+        console.error("Failed to get agent:", error);
+        return null;
       }
     },
 
@@ -1349,7 +1742,14 @@ function createAgentsStore() {
         await apiClient.startAgent(agentId);
         update((agents) =>
           agents.map((agent) =>
-            agent.id === agentId ? { ...agent, status: "running" } : agent,
+            agent.id === agentId 
+              ? { 
+                  ...agent, 
+                  status: "running",
+                  config_locked: true, // 標記配置已鎖定
+                  started_at: new Date().toISOString()
+                } 
+              : agent,
           ),
         );
       } catch (error) {
@@ -1363,13 +1763,35 @@ function createAgentsStore() {
         await apiClient.stopAgent(agentId);
         update((agents) =>
           agents.map((agent) =>
-            agent.id === agentId ? { ...agent, status: "stopped" } : agent,
+            agent.id === agentId 
+              ? { 
+                  ...agent, 
+                  status: "stopped",
+                  config_locked: false, // 解鎖配置
+                  stopped_at: new Date().toISOString()
+                } 
+              : agent,
           ),
         );
       } catch (error) {
         console.error("Failed to stop agent:", error);
         throw error;
       }
+    },
+
+    // 檢查 Agent 配置是否被鎖定
+    isConfigLocked(agentId) {
+      let locked = false;
+      update((agents) => {
+        const agent = agents.find(a => a.id === agentId);
+        if (agent) {
+          locked = agent.config_locked || 
+                   agent.status === 'running' || 
+                   agent.status === 'active';
+        }
+        return agents;
+      });
+      return locked;
     },
   };
 }
@@ -1718,7 +2140,16 @@ describe('Agent 創建與策略追蹤工作流程', () => {
 - [ ] 實作主應用程式組件 (App.svelte)
 - [ ] 實作導航欄組件 (Navbar.svelte)
 - [ ] 實作 Agent 卡片組件 (AgentCard.svelte)
+  - [ ] 實作執行狀態檢測邏輯 (isRunning)
+  - [ ] 實作配置鎖定狀態顯示 (isConfigLocked)
+  - [ ] 禁用執行中 Agent 的設定按鈕
 - [ ] 實作 Agent 創建表單組件 (AgentCreationForm.svelte) - Prompt 驅動設計
+- [ ] 實作 Agent 配置編輯器組件 (AgentConfigEditor.svelte)
+  - [ ] 實作配置鎖定檢查邏輯
+  - [ ] 實作鎖定狀態警告橫幅
+  - [ ] 禁用執行中 Agent 的所有輸入欄位
+  - [ ] 實作「停止 Agent 並解鎖配置」功能
+  - [ ] 實作雙重確認機制防止誤修改
 - [ ] 實作策略變更歷史查看組件 (StrategyHistoryView.svelte)
 - [ ] 實作策略變更詳情彈窗組件 (StrategyChangeModal.svelte)
 - [ ] 實作績效圖表組件 (PerformanceChart.svelte)
@@ -1726,7 +2157,14 @@ describe('Agent 創建與策略追蹤工作流程', () => {
 ### 狀態管理與工具函數
 
 - [ ] 實作 Agents Store
+  - [ ] 實作 `updateAgent` 配置鎖定檢查
+  - [ ] 實作 `startAgent` 自動鎖定配置邏輯
+  - [ ] 實作 `stopAgent` 自動解鎖配置邏輯
+  - [ ] 實作 `isConfigLocked` 輔助方法
+  - [ ] 在狀態中追蹤 `config_locked` 標記
 - [ ] 實作 WebSocket Store
+  - [ ] 監聽 Agent 狀態變更事件
+  - [ ] 即時更新配置鎖定狀態
 - [ ] 實作市場數據 Store
 - [ ] 實作工具函數庫 (格式化、時間處理等)
 - [ ] 整合即時數據更新
@@ -1746,6 +2184,12 @@ describe('Agent 創建與策略追蹤工作流程', () => {
 - [ ] 實作動畫和轉場效果
 - [ ] Agent 創建表單的輸入驗證和即時預覽
 - [ ] 策略變更歷史的時間軸視圖
+- [ ] **配置鎖定使用者體驗**
+  - [ ] 鎖定狀態視覺提示 (🔒 圖標、半透明等)
+  - [ ] 滑鼠懸停 tooltip 說明鎖定原因
+  - [ ] 嘗試編輯時的友善錯誤提示
+  - [ ] 提供「停止 Agent」快捷操作
+  - [ ] 配置鎖定警告橫幅動畫效果
 - [ ] 跨瀏覽器測試
 
 ### 性能優化

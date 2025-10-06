@@ -104,34 +104,46 @@ def create_trading_agent(agent_config: AgentConfig) -> Agent:
 
 def generate_trading_instructions(config: AgentConfig) -> str:
     """根據用戶配置生成Agent指令"""
-    return f"""
-You are {config.name}, an intelligent Taiwan stock trading agent.
+  # embed structured auto-adjust settings into the prompt so the Agent
+  # can reason about when and how to propose/apply strategy changes.
+  # auto_adjust is required and defaults to autonomous behavior.
+  # Expect config.auto_adjust to be provided (from frontend). If missing,
+  # fall back to safe defaults that enable fully-autonomous adjustments.
+  auto_adjust = getattr(config, "auto_adjust", None) or {
+    "triggers": "連續三天虧損超過2% ; 單日跌幅超過3% ; 最大回撤超過10%",
+    "auto_apply": True,
+  }
 
-CORE MISSION:
+  # Provide a short, clear template that includes both human-readable
+  # guidance and a machine-friendly settings summary the Agent can refer to.
+  return f"""
+你是 {config.name}，一個智能台灣股票交易代理人。
+
+核心任務：
 {config.description}
 
-INVESTMENT PREFERENCES:
+投資偏好：
 {config.investment_preferences}
 
-STRATEGY ADJUSTMENT CRITERIA:
+策略調整標準（使用者提供）：
 {config.strategy_adjustment_criteria}
 
-AVAILABLE TRADING MODES (adapt based on conditions):
-- TRADING: Execute buy/sell decisions when opportunities arise
-- REBALANCING: Optimize portfolio allocation and manage risk
-- OBSERVATION: Monitor market and identify potential opportunities
-- STRATEGY_REVIEW: Analyze performance and adjust approach
+自動調整設定（結構化 - 代理人自主）：
+- 觸發條件（自由文字範例/優先順序）：{auto_adjust.get('triggers')}
+- 自動套用：{bool(auto_adjust.get('auto_apply', True))} 
 
-TRADING CONSTRAINTS:
-- Available capital: NT${config.initial_funds:,}
-- Max position size: {config.max_position_size or 5}% per stock
-- Taiwan stock market hours: 09:00-13:30 (Mon-Fri)
-- Minimum trade unit: 1000 shares
+交易限制：
+- 可用資金：NT${config.initial_funds:,}
+- 最大單筆部位：每檔股票 {config.max_position_size or 5}%
+- 台灣股市交易時間：09:00-13:30（週一至週五）
+- 最小交易單位：1000 股
 
-STRATEGY EVOLUTION:
-When your performance or market conditions suggest strategy adjustments,
-use the record_strategy_change tool to document the change with clear reasoning.
-Always align changes with your core investment preferences.
+策略演化：
+當你的績效或市場條件建議進行策略調整時，你應該：
+1. 評估觸發條件是否符合上述使用者配置的觸發條件。
+2. 生成清晰的變更提案和簡要說明。
+
+始終使變更與你的核心投資偏好保持一致。
 
 {config.additional_instructions or ""}
 """
@@ -173,29 +185,7 @@ Agent 採用 **基於 Prompt 的策略演化**,透過自主學習和用戶設定
  每週檢討一次績效,若月報酬率低於大盤2%以上,考慮調整選股邏輯。"
 ```
 
-#### 2. Agent 自主策略調整流程
-
-```python
-# Agent 使用策略變更工具的流程
-async def autonomous_strategy_adjustment(self):
-    # 1. 評估當前績效
-    performance = await self.evaluate_current_performance()
-
-    # 2. 檢查是否符合調整條件
-    if self.should_adjust_strategy(performance):
-        # 3. 生成策略調整內容
-        new_strategy = self.generate_strategy_adjustment(performance)
-
-        # 4. 記錄策略變更
-        await self.record_strategy_change(
-            trigger_reason="符合用戶設定的調整條件",
-            new_strategy_addition=new_strategy,
-            change_summary="基於績效表現調整投資策略",
-            agent_explanation="詳細說明調整原因和預期效果"
-        )
-```
-
-#### 3. 策略演化實際範例
+#### 2. 策略演化實際範例
 
 **觸發條件**: 連續三天虧損超過2%
 
@@ -360,6 +350,12 @@ interface AgentCreationForm {
   investment_preferences: string;        // 基本投資偏好
   strategy_adjustment_criteria: string;  // 投資策略調整依據
 
+  // 自動調整設定（前端表單可讓使用者設定）
+  auto_adjust?: {
+    enabled?: boolean;              // 是否啟用自動調整（預設 true）
+    triggers?: string;              // 自由文字描述的觸發規則（可多條用分號分隔）
+  };
+
   // 可選的進階設定
   max_position_size?: number;
   excluded_symbols?: string[];
@@ -413,6 +409,22 @@ const AgentCreationForm = () => {
 '當連續三天虧損超過2%時，轉為保守觀察模式；當發現技術突破信號且基本面支撐時，可以增加部位；每週檢討一次績效，若月報酬率低於大盤2%以上，考慮調整選股邏輯。'"
             className="form-textarea strategy-input"
             rows={6}
+          />
+        </div>
+
+        <div className="input-group">
+          <label>自動調整設定 (選填)</label>
+          <div className="form-row">
+            <label>
+              <input type="checkbox" name="auto_adjust.enabled" defaultChecked /> 啟用自動調整
+            </label>
+          </div>
+
+          <textarea
+            name="auto_adjust.triggers"
+            placeholder="輸入觸發規則，使用分號(;)分隔，例如：連續3天虧損>2%; 單日跌幅>3%"
+            className="form-textarea"
+            rows={3}
           />
         </div>
       </div>
