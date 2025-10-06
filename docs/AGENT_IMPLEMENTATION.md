@@ -1,21 +1,39 @@
 # Agent 系統實作規格
 
-**版本**: 2.0
+**版本**: 3.0
 **日期**: 2025-10-06
 **相關設計**: SYSTEM_DESIGN.md
-**基於**: OpenAI Agents SDK
+**基於**: OpenAI Agents SDK + Prompt-Based Strategy Management
 
 ---
 
 ## 📋 概述
 
-本文檔定義 CasualTrader AI 股票交易模擬器中 Agent 系統的實作規格，採用 OpenAI Agents SDK 的 **Agent as Tool** 架構：
+本文檔定義 CasualTrader AI 股票交易模擬器中 Agent 系統的完整實作規格，採用 **Prompt 驅動** 的 Agent 架構：
 
-1. **TradingAgent 主體** - 協調所有交易決策的中央Agent
-2. **專門化 Agent Tools** - 基本面分析、技術分析、風險評估等子Agent作為tool
-3. **OpenAI Hosted Tools** - WebSearchTool、CodeInterpreterTool等內建工具
-4. **交易驗證 Function Tools** - 開盤時間、持倉查詢、現金查詢等獨立工具
-5. **前端管理介面** - Agent創建、配置和監控的Web界面
+1. **TradingAgent 主體** - 基於 prompt 指令的智能交易Agent
+2. **動態策略架構** - 四種自主交易模式與策略演化系統
+3. **豐富分析工具** - 基本面分析、技術分析、風險評估等專門化工具
+4. **OpenAI Hosted Tools** - WebSearchTool、CodeInterpreterTool等內建工具
+5. **CasualMarket MCP 整合** - 台股即時數據和交易模擬
+6. **策略變更記錄系統** - 追蹤Agent策略演進歷史
+7. **前端配置介面** - 簡潔的Agent創建和監控界面
+
+### 核心設計理念
+
+- **Prompt 驅動**: 透過自然語言描述投資偏好和策略調整依據
+- **自主模式選擇**: Agent 根據市場條件自主選擇適當的交易模式
+- **工具豐富**: 提供全面的市場分析和交易執行工具
+- **策略自主演化**: 基於績效表現和設定條件自動調整策略
+- **完整記錄追蹤**: 記錄所有策略變更的時點、原因和效果
+- **用戶完全控制**: 用戶透過前端介面設定投資個性和調整依據
+
+### 台股交易時間考量
+
+- **交易時間**: 週一至週五 09:00-13:30
+- **模式選擇**: Agent 根據交易時間、市場條件和策略需求自主選擇
+- **交易限制**: 僅在開盤時間執行實際買賣操作
+- **非交易時間**: 進行觀察分析和策略檢討
 
 ---
 
@@ -23,377 +41,557 @@
 
 ### 設計理念
 
-TradingAgent 作為中央協調者，透過 OpenAI Agents SDK 的 `as_tool()` 功能整合多個專門化Agent和工具，形成完整的交易決策系統。
+TradingAgent 採用 **Prompt 驅動** 的設計，通過豐富的分析工具和明確的投資指令來做出交易決策。Agent 的行為模式完全由用戶透過自然語言設定的投資偏好和策略調整依據控制。
 
-### Agent as Tool 架構
+### 簡化的 Agent 架構
 
 ```python
-from agents import Agent, Runner, WebSearchTool, CodeInterpreterTool
+from agents import Agent, WebSearchTool, CodeInterpreterTool
 
-# 主要TradingAgent
-trading_agent = Agent(
-    name="Trading Agent",
-    instructions="You are a sophisticated trading agent...",
-    tools=[
-        # 專門化 Agent Tools
-        fundamental_agent.as_tool(
-            tool_name="fundamental_analysis",
-            tool_description="Analyze company fundamentals and financial health"
-        ),
-        technical_agent.as_tool(
-            tool_name="technical_analysis",
-            tool_description="Perform technical analysis and chart patterns"
-        ),
-        risk_agent.as_tool(
-            tool_name="risk_assessment",
-            tool_description="Evaluate portfolio risk and position sizing"
-        ),
+def create_trading_agent(agent_config: AgentConfig) -> Agent:
+    """創建基於用戶配置的交易Agent"""
 
-        # OpenAI Hosted Tools
-        WebSearchTool(),
-        CodeInterpreterTool(),
+    # 根據用戶輸入生成完整的投資指令
+    instructions = generate_trading_instructions(agent_config)
 
-        # CasualMarket MCP Tools (透過外部MCP服務整合)
-        get_taiwan_stock_price,
-        buy_taiwan_stock,
-        sell_taiwan_stock,
+    trading_agent = Agent(
+        name=agent_config.name,
+        instructions=instructions,
+        tools=[
+            # 專門化分析工具
+            fundamental_agent.as_tool(
+                tool_name="fundamental_analysis",
+                tool_description="Analyze company fundamentals and financial health"
+            ),
+            technical_agent.as_tool(
+                tool_name="technical_analysis",
+                tool_description="Perform technical analysis and chart patterns"
+            ),
+            risk_agent.as_tool(
+                tool_name="risk_assessment",
+                tool_description="Evaluate portfolio risk and position sizing"
+            ),
+            sentiment_agent.as_tool(
+                tool_name="market_sentiment",
+                tool_description="Analyze market sentiment and news impact"
+            ),
 
-        # 交易驗證 Function Tools
-        check_trading_hours,
-        get_current_holdings,
-        get_available_cash,
-        validate_trade_parameters,
-    ],
-    model="gpt-4",
-    max_turns=50
-)
+            # OpenAI Hosted Tools
+            WebSearchTool(),
+            CodeInterpreterTool(),
+
+            # CasualMarket MCP Tools
+            get_taiwan_stock_price,
+            buy_taiwan_stock,
+            sell_taiwan_stock,
+            get_company_fundamentals,
+            get_stock_valuation_ratios,
+
+            # 交易驗證工具
+            check_trading_hours,
+            get_current_holdings,
+            get_available_cash,
+            validate_trade_parameters,
+
+            # 策略變更記錄工具
+            record_strategy_change,
+        ],
+        model="gpt-4",
+        max_turns=30
+    )
+
+    return trading_agent
+
+def generate_trading_instructions(config: AgentConfig) -> str:
+    """根據用戶配置生成Agent指令"""
+    return f"""
+You are {config.name}, an intelligent Taiwan stock trading agent.
+
+CORE MISSION:
+{config.description}
+
+INVESTMENT PREFERENCES:
+{config.investment_preferences}
+
+STRATEGY ADJUSTMENT CRITERIA:
+{config.strategy_adjustment_criteria}
+
+AVAILABLE TRADING MODES (adapt based on conditions):
+- TRADING: Execute buy/sell decisions when opportunities arise
+- REBALANCING: Optimize portfolio allocation and manage risk
+- OBSERVATION: Monitor market and identify potential opportunities
+- STRATEGY_REVIEW: Analyze performance and adjust approach
+
+TRADING CONSTRAINTS:
+- Available capital: NT${config.initial_funds:,}
+- Max position size: {config.max_position_size or 5}% per stock
+- Taiwan stock market hours: 09:00-13:30 (Mon-Fri)
+- Minimum trade unit: 1000 shares
+
+STRATEGY EVOLUTION:
+When your performance or market conditions suggest strategy adjustments,
+use the record_strategy_change tool to document the change with clear reasoning.
+Always align changes with your core investment preferences.
+
+{config.additional_instructions or ""}
+"""
 ```
 
-### 台股交易時間限定的四種執行模式系統
+### 模式選擇邏輯
 
-TradingAgent 嚴格遵循台股交易時間，採用四種智能模式在交易時段循環運作：
+Agent 會根據以下因素自主選擇適當的模式：
 
-#### 台股交易時間模式架構
+- 台股交易時間（09:00-13:30）
+- 當前市場條件和機會
+- 投資組合狀況和風險水平
+- 設定的策略調整依據
+- 近期績效表現
 
-**核心設計理念**：
+---
 
-- 模式切換完全配合台股交易時間（週一至週五 09:00-13:30）
-- 交易時間外進行深度分析和策略優化
-- 非交易日執行週度策略檢討
+## 🔄 策略演化與自主調整系統
 
-**交易日時間分配**：
+### 策略演化設計理念
 
-- **08:30-09:00 (30分鐘)**: 開盤前準備 (OBSERVATION)
-- **09:00-11:00 (120分鐘)**: 早盤交易 (TRADING)
-- **11:00-11:30 (30分鐘)**: 中場調整 (REBALANCING)
-- **11:30-13:00 (90分鐘)**: 午盤交易 (TRADING)
-- **13:00-13:30 (30分鐘)**: 收盤檢討 (STRATEGY_REVIEW)
+Agent 採用 **基於 Prompt 的策略演化**,透過自主學習和用戶設定的調整依據來優化投資策略:
 
-#### 台股交易時間狀態機架構
+1. **用戶定義調整依據**: 創建 Agent 時設定策略調整的觸發條件
+2. **Agent 自主判斷**: 根據績效和市場條件自主決定是否調整
+3. **完整變更記錄**: 記錄所有策略變更的原因、內容和效果
+4. **透明可追溯**: 用戶可查看完整的策略演進歷史
 
-```python
-from enum import Enum
-from datetime import datetime, timedelta, time
-import pytz
+### 策略調整機制詳解
 
-class AgentMode(Enum):
-    # 交易時間模式
-    OBSERVATION = "OBSERVATION"           # 開盤前準備
-    TRADING = "TRADING"                   # 主動交易
-    REBALANCING = "REBALANCING"           # 中場調整
-    STRATEGY_REVIEW = "STRATEGY_REVIEW"   # 收盤檢討
+#### 1. 用戶定義的調整依據
 
-    # 非交易時間模式
-    DEEP_OBSERVATION = "DEEP_OBSERVATION"  # 深度分析
-    WEEKLY_REVIEW = "WEEKLY_REVIEW"        # 週末檢討
-    STANDBY = "STANDBY"                    # 待機模式
+用戶在創建 Agent 時設定策略調整的觸發條件:
 
-class TaiwanStockTradingTimeManager:
-    """台股交易時間管理器"""
-
-    def __init__(self):
-        self.taiwan_tz = pytz.timezone('Asia/Taipei')
-        self.trading_schedule = {
-            'pre_market': {
-                'start': time(8, 30),
-                'end': time(9, 0),
-                'mode': AgentMode.OBSERVATION,
-                'duration': timedelta(minutes=30)
-            },
-            'morning_trading': {
-                'start': time(9, 0),
-                'end': time(11, 0),
-                'mode': AgentMode.TRADING,
-                'duration': timedelta(minutes=120)
-            },
-            'mid_session': {
-                'start': time(11, 0),
-                'end': time(11, 30),
-                'mode': AgentMode.REBALANCING,
-                'duration': timedelta(minutes=30)
-            },
-            'afternoon_trading': {
-                'start': time(11, 30),
-                'end': time(13, 0),
-                'mode': AgentMode.TRADING,
-                'duration': timedelta(minutes=90)
-            },
-            'closing_review': {
-                'start': time(13, 0),
-                'end': time(13, 30),
-                'mode': AgentMode.STRATEGY_REVIEW,
-                'duration': timedelta(minutes=30)
-            }
-        }
-
-    def is_trading_day(self, dt: datetime = None) -> bool:
-        """檢查是否為交易日（週一到週五）"""
-        if dt is None:
-            dt = datetime.now(self.taiwan_tz)
-        return dt.weekday() < 5
-
-    def get_current_mode(self, dt: datetime = None) -> AgentMode:
-        """根據當前時間決定應該執行的模式"""
-        if dt is None:
-            dt = datetime.now(self.taiwan_tz)
-
-        # 週末執行週度檢討
-        if dt.weekday() >= 5:
-            return AgentMode.WEEKLY_REVIEW
-
-        # 交易日檢查交易時間
-        if self.is_trading_day(dt):
-            current_time = dt.time()
-            for phase, schedule in self.trading_schedule.items():
-                if schedule['start'] <= current_time < schedule['end']:
-                    return schedule['mode']
-
-        # 非交易時間執行深度觀察
-        return AgentMode.DEEP_OBSERVATION
-
-class AgentState:
-    def __init__(self):
-        self.current_mode: AgentMode = AgentMode.STANDBY
-        self.mode_start_time: datetime = datetime.now()
-        self.trading_time_manager = TaiwanStockTradingTimeManager()
-        self.performance_metrics: Dict[str, float] = {}
-        self.strategy_evolution_history: List[Dict] = []
-
-    def update_mode(self) -> bool:
-        """更新當前模式，返回是否發生模式切換"""
-        new_mode = self.trading_time_manager.get_current_mode()
-        if new_mode != self.current_mode:
-            self.current_mode = new_mode
-            self.mode_start_time = datetime.now()
-            return True
-        return False
+```text
+範例調整依據:
+"當連續三天虧損超過2%時,轉為保守觀察模式;
+ 當發現技術突破信號且基本面支撐時,可以增加部位;
+ 每週檢討一次績效,若月報酬率低於大盤2%以上,考慮調整選股邏輯。"
 ```
 
-#### 台股交易時間限定的四種模式詳細說明
-
-**OBSERVATION 模式** - 開盤前準備 (08:30-09:00)
-
-- **時間窗口**: 30分鐘的開盤前準備時間
-- **核心任務**: 檢視隔夜重要資訊、分析美股收盤影響、確認今日交易計畫
-- **工具使用**: WebSearchTool搜尋盤前新聞、基本面工具檢查重要公告
-- **目標**: 為開盤後交易做好充分準備
-- **觸發條件**: 交易日08:30自動啟動、重大突發事件
-
-**TRADING 模式** - 主動交易決策 (09:00-11:00 + 11:30-13:00)
-
-- **時間窗口**: 早盤120分鐘 + 午盤90分鐘，總計210分鐘
-- **早盤重點**: 開盤動能捕捉、主要部位建立、趨勢確認
-- **午盤重點**: 機會補強、部位優化、收盤準備
-- **目標**: 每日1-3筆主要交易，單日超額報酬0.5%
-- **觸發條件**: 定時調度、技術突破、成交量異常
-
-**REBALANCING 模式** - 中場組合調整 (11:00-11:30)
-
-- **時間窗口**: 30分鐘的中場調整時間
-- **核心任務**: 早盤效果評估、風險檢視、午盤策略調整
-- **快速執行**: 必要的風險控制調整和部位優化
-- **目標**: 確保風險可控、為午盤做好準備
-- **觸發條件**: 11:00固定啟動、早盤虧損>3%、集中度警示
-
-**STRATEGY_REVIEW 模式** - 收盤檢討 (13:00-13:30)
-
-- **時間窗口**: 30分鐘的收盤前檢討時間
-- **核心任務**: 當日總結、部位檢查、隔夜風險評估、明日準備
-- **重要產出**: 當日學習點記錄、明日策略調整
-- **目標**: 經驗累積和持續改進
-- **觸發條件**: 13:00固定啟動、異常績效、重大消息
-
-**非交易時間模式**:
-
-**DEEP_OBSERVATION 模式** - 深度分析 (13:30-次日08:30)
-
-- **收盤後分析**: 市場深度檢討、個股研究、策略全面評估
-- **隔夜監控**: 國際市場追蹤、新聞事件監控、模型優化
-- **策略優化**: 基於當日結果進行深度策略調整
-
-**WEEKLY_REVIEW 模式** - 週末檢討 (週六、週日)
-
-- **週度績效**: 完整的一週交易表現分析
-- **策略演化**: 決定是否需要重大策略調整
-- **下週準備**: 制定下週交易計畫和重點
-
-#### 模式專用提示詞策略
+#### 2. Agent 自主策略調整流程
 
 ```python
-class ModePromptStrategy:
-    @staticmethod
-    def get_mode_instructions(mode: AgentMode, trader_name: str, context: Dict) -> str:
-        mode_instructions = {
-            AgentMode.TRADING: f"""
-You are {trader_name} in ACTIVE TRADING mode.
+# Agent 使用策略變更工具的流程
+async def autonomous_strategy_adjustment(self):
+    # 1. 評估當前績效
+    performance = await self.evaluate_current_performance()
 
-TRADING FOCUS:
-- Identify immediate trading opportunities
-- Execute trades based on technical and fundamental analysis
-- Monitor market momentum and volatility
-- Risk management: max 5% position size per trade
-- Target: 2-4 trades within this session
+    # 2. 檢查是否符合調整條件
+    if self.should_adjust_strategy(performance):
+        # 3. 生成策略調整內容
+        new_strategy = self.generate_strategy_adjustment(performance)
 
-PERFORMANCE TARGET: Beat benchmark by 1.5% this session
-""",
-
-            AgentMode.STRATEGY_REVIEW: f"""
-You are {trader_name} in STRATEGY REVIEW mode.
-
-REVIEW FOCUS:
-- Analyze recent performance vs benchmark
-- Identify strategy strengths and weaknesses
-- Review market regime changes
-- Consider strategy modifications or pivots
-- Update risk parameters if needed
-
-DECISION FRAMEWORK: Evidence-based strategy evolution
-""",
-            # ... 其他模式
-        }
-        return mode_instructions[mode]
-```
-
-#### 動態策略演化系統
-
-**策略管理器**
-
-```python
-class StrategyManager:
-    def __init__(self, trader_name: str):
-        self.trader_name = trader_name
-        self.base_strategy = self._load_base_strategy()
-        self.strategy_variants: List[StrategyVariant] = []
-        self.performance_tracker = StrategyPerformanceTracker()
-
-    def create_strategy_variant(self, performance_feedback: Dict) -> StrategyVariant:
-        """基於性能回饋創建策略變體"""
-        variant = StrategyVariant(
-            base_strategy=self.base_strategy,
-            modifications=self._generate_modifications(performance_feedback),
-            creation_time=datetime.now(),
-            expected_improvement=self._estimate_improvement(performance_feedback)
+        # 4. 記錄策略變更
+        await self.record_strategy_change(
+            trigger_reason="符合用戶設定的調整條件",
+            new_strategy_addition=new_strategy,
+            change_summary="基於績效表現調整投資策略",
+            agent_explanation="詳細說明調整原因和預期效果"
         )
-        return variant
-
-    def _generate_modifications(self, performance_feedback: Dict) -> Dict:
-        """根據表現生成策略修改建議"""
-        modifications = {}
-
-        if performance_feedback.get('sharpe_ratio', 0) < 0.5:
-            modifications['risk_reduction'] = {
-                'max_position_size': 0.03,  # 降低至3%
-                'stop_loss_tighter': True,
-                'volatility_filter': True
-            }
-
-        if performance_feedback.get('win_rate', 0) < 0.4:
-            modifications['entry_criteria'] = {
-                'technical_confirmation': True,
-                'volume_confirmation': True,
-                'trend_alignment': True
-            }
-
-        return modifications
 ```
 
-**性能評估和模式切換**
+#### 3. 策略演化實際範例
 
-```python
-class AgentModeController:
-    def __init__(self, trader: EnhancedTrader):
-        self.trader = trader
-        self.mode_transition_rules = self._define_transition_rules()
+**觸發條件**: 連續三天虧損超過2%
 
-    async def check_mode_transition(self):
-        """檢查是否需要切換Agent模式"""
-        current_mode = self.trader.agent_state.current_mode
-        mode_duration = datetime.now() - self.trader.agent_state.mode_start_time
+**策略調整內容**:
 
-        # 時間驅動的切換
-        if mode_duration >= self.trader.agent_state.mode_duration_config[current_mode]:
-            next_mode = self._get_next_scheduled_mode(current_mode)
-            await self._transition_to_mode(next_mode, "scheduled_transition")
-            return
-
-        # 性能驅動的切換
-        performance_metrics = await self.trader.performance_evaluator.get_current_metrics()
-
-        # 緊急停止條件
-        if performance_metrics.get('max_drawdown', 0) > 0.10:  # 10%回撤
-            await self._transition_to_mode(AgentMode.STRATEGY_REVIEW, "emergency_stop")
-            return
-
-        # 優異表現觸發策略檢討
-        if (performance_metrics.get('daily_return', 0) > 0.05 and
-            current_mode == AgentMode.TRADING):
-            await self._transition_to_mode(AgentMode.STRATEGY_REVIEW, "high_performance")
+```text
+DEFENSIVE ADJUSTMENT ACTIVATED:
+- 降低新增部位的風險暴露
+- 優先選擇低波動率、高股息的防禦性股票
+- 增加現金部位至15-20%
+- 暫停成長股投資,專注價值股
+- 加強停損執行,單股最大虧損限制在5%
+- 每日檢討持股表現,及時汰弱留強
 ```
 
-**增強的TradingAgent架構**
+**Agent 說明**:
+
+```text
+"基於近期連續虧損的情況,我判斷當前市場環境不利於積極投資策略。
+根據您設定的調整依據,我啟動防禦模式來保護資本。
+主要調整包括:降低風險暴露、增加現金部位、專注防禦性標的。
+預期這些調整能減少波動、保護本金,待市場回穩後再恢復積極策略。"
+```
+
+### 策略演化的優勢
+
+1. **高度個人化**: 每個 Agent 的策略調整依據完全由用戶定義
+2. **自主性**: Agent 可以根據市場變化和績效表現自主調整
+3. **透明性**: 所有策略變更都有詳細記錄和說明
+4. **可追溯性**: 用戶可以查看策略演進歷史和效果分析
+5. **靈活性**: 策略調整不受複雜的程式邏輯限制
+
+---
+
+## 📊 策略變更記錄系統
+
+### 資料模型設計
+
+所有策略變更都會被詳細記錄,包括變更原因、時點、內容和績效影響,確保投資決策的可追溯性和透明度。
+
+### 策略變更資料模型
 
 ```python
-class EnhancedTradingAgent(Agent):
-    def __init__(self, name: str, **kwargs):
-        super().__init__(name=name, **kwargs)
-        self.agent_state = AgentState()
-        self.strategy_manager = StrategyManager(name)
-        self.performance_evaluator = PerformanceEvaluator(name)
-        self.mode_controller = AgentModeController(self)
+from pydantic import BaseModel
+from datetime import datetime
+from typing import Optional, Dict
 
-    async def run_mode_cycle(self):
-        """執行完整的Agent模式循環"""
-        while True:
-            current_mode = self.agent_state.current_mode
+class StrategyChange(BaseModel):
+    id: str
+    agent_id: str
+    timestamp: datetime
 
-            # 根據當前模式執行對應邏輯
-            match current_mode:
-                case AgentMode.TRADING:
-                    await self._execute_trading_mode()
-                case AgentMode.REBALANCING:
-                    await self._execute_rebalancing_mode()
-                case AgentMode.STRATEGY_REVIEW:
-                    await self._execute_strategy_review_mode()
-                case AgentMode.OBSERVATION:
-                    await self._execute_observation_mode()
+    # 變更觸發資訊
+    trigger_reason: str  # 觸發策略變更的具體原因
+    change_type: str     # 'auto' | 'manual' | 'performance_driven'
 
-            # 檢查是否需要切換模式
-            await self.mode_controller.check_mode_transition()
+    # 策略內容變更
+    old_strategy: Optional[str] = None  # 變更前的完整策略
+    new_strategy: str                   # 變更後的完整策略
+    change_summary: str                 # 變更重點摘要
 
-    async def _execute_strategy_review_mode(self):
-        """執行策略檢討模式"""
-        # 獲取性能指標
-        performance = await self.performance_evaluator.get_comprehensive_metrics()
+    # 績效背景資料
+    performance_at_change: Optional[Dict] = None  # 觸發變更時的績效狀況
 
-        # 如需演化策略，創建新變體
-        if performance['needs_evolution']:
-            variant = self.strategy_manager.create_strategy_variant(performance)
+    # Agent 自主說明
+    agent_explanation: Optional[str] = None  # Agent 對變更的解釋
+```
 
-            # 更新Agent指令以包含新策略
-            self.instructions = self._build_strategy_review_instructions(variant)
+### 自動策略變更機制
 
-            # 執行策略檢討任務
-            await self._run_agent_with_mode_prompt(AgentMode.STRATEGY_REVIEW)
+```python
+@function_tool
+async def record_strategy_change(
+    agent_id: str,
+    trigger_reason: str,
+    new_strategy_addition: str,
+    change_summary: str,
+    agent_explanation: str
+) -> dict:
+    """Agent 記錄策略變更的工具"""
+
+    # 獲取當前策略和績效
+    current_agent = await get_agent(agent_id)
+    current_performance = await get_current_performance(agent_id)
+
+    # 創建策略變更記錄
+    change = StrategyChange(
+        id=str(uuid.uuid4()),
+        agent_id=agent_id,
+        timestamp=datetime.now(),
+        trigger_reason=trigger_reason,
+        change_type="auto",
+        old_strategy=current_agent.instructions,
+        new_strategy=current_agent.instructions + "\n\n" + new_strategy_addition,
+        change_summary=change_summary,
+        performance_at_change=current_performance,
+        agent_explanation=agent_explanation
+    )
+
+    # 儲存變更記錄
+    await strategy_change_service.save(change)
+
+    # 更新 Agent 指令
+    current_agent.instructions = change.new_strategy
+    await update_agent(current_agent)
+
+    return {
+        "success": True,
+        "change_id": change.id,
+        "message": "Strategy change recorded successfully"
+    }
+
+# Agent 使用範例
+async def agent_strategy_adjustment_example():
+    """Agent 如何使用策略變更工具的範例"""
+
+    # 當Agent發現需要調整策略時
+    trigger_reason = "連續三天虧損超過2%，市場波動加劇"
+    new_strategy = """
+RISK ADJUSTMENT - DEFENSIVE MODE ACTIVATED:
+- 降低單筆最大投資比例至3%
+- 優先選擇低波動率股票
+- 增加現金部位至20%
+- 暫停成長股投資，專注價值股
+- 每日檢討風險暴露，適時減倉
+"""
+
+    change_summary = "啟動防禦模式：降低風險暴露，增加現金部位"
+    explanation = """
+基於近期績效表現和市場環境變化，我決定調整為更保守的投資策略。
+主要考量：
+1. 連續虧損顯示當前策略與市場環境不匹配
+2. 市場波動加劇，需要降低風險暴露
+3. 保護資本是當前首要任務
+4. 待市場穩定後再恢復積極策略
+"""
+
+    # 記錄策略變更
+    result = await record_strategy_change(
+        agent_id="agent_123",
+        trigger_reason=trigger_reason,
+        new_strategy_addition=new_strategy,
+        change_summary=change_summary,
+        agent_explanation=explanation
+    )
+```
+
+---
+
+## 🎨 前端 Agent 配置介面
+
+### Agent 創建表單設計
+
+```typescript
+interface AgentCreationForm {
+  // 基本資訊
+  name: string;
+  description: string;
+  initial_funds: number;
+
+  // 核心投資設定（開放式文字輸入）
+  investment_preferences: string;        // 基本投資偏好
+  strategy_adjustment_criteria: string;  // 投資策略調整依據
+
+  // 可選的進階設定
+  max_position_size?: number;
+  excluded_symbols?: string[];
+  additional_instructions?: string;
+}
+
+const AgentCreationForm = () => {
+  return (
+    <form className="agent-creation-form">
+      {/* 基本資訊區塊 */}
+      <div className="basic-info-section">
+        <h3>基本資訊</h3>
+        <input
+          placeholder="Agent 名稱"
+          className="form-input"
+        />
+        <textarea
+          placeholder="簡短描述這個Agent的投資目標"
+          className="form-textarea"
+          rows={2}
+        />
+        <input
+          type="number"
+          placeholder="初始資金 (TWD)"
+          className="form-input"
+        />
+      </div>
+
+      {/* 投資策略設定區塊 */}
+      <div className="strategy-section">
+        <h3>投資策略設定</h3>
+
+        <div className="input-group">
+          <label>基本投資偏好</label>
+          <textarea
+            placeholder="請詳細描述您的投資風格、偏好的股票類型、風險承受度等。
+
+範例：
+'我偏好穩健成長的大型股，主要關注半導體和金融股，風險承受度中等，希望長期持有優質企業，避免過度頻繁交易。'"
+            className="form-textarea strategy-input"
+            rows={6}
+          />
+        </div>
+
+        <div className="input-group">
+          <label>投資策略調整依據</label>
+          <textarea
+            placeholder="說明何時以及如何調整投資策略。
+
+範例：
+'當連續三天虧損超過2%時，轉為保守觀察模式；當發現技術突破信號且基本面支撐時，可以增加部位；每週檢討一次績效，若月報酬率低於大盤2%以上，考慮調整選股邏輯。'"
+            className="form-textarea strategy-input"
+            rows={6}
+          />
+        </div>
+      </div>
+
+      {/* 進階設定區塊 */}
+      <div className="advanced-settings">
+        <h3>進階設定（可選）</h3>
+        <input
+          type="number"
+          placeholder="最大單筆投資比例 (%, 預設5%)"
+          className="form-input"
+        />
+        <input
+          placeholder="排除股票代碼 (逗號分隔，如: 2498,2328)"
+          className="form-input"
+        />
+        <textarea
+          placeholder="其他特殊指令或限制"
+          className="form-textarea"
+          rows={3}
+        />
+      </div>
+
+      {/* 預覽區塊 */}
+      <div className="preview-section">
+        <h3>Agent 指令預覽</h3>
+        <div className="instruction-preview">
+          <pre>{generateInstructionPreview(formData)}</pre>
+        </div>
+      </div>
+
+      <button type="submit" className="create-agent-btn">
+        創建 Trading Agent
+      </button>
+    </form>
+  );
+};
+```
+
+### 策略變更歷史查看介面
+
+```typescript
+interface StrategyChange {
+  id: string;
+  timestamp: string;
+  trigger_reason: string;
+  change_type: 'auto' | 'manual' | 'performance_driven';
+  change_summary: string;
+  performance_at_change?: {
+    total_return: number;
+    win_rate: number;
+    drawdown: number;
+  };
+  agent_explanation?: string;
+}
+
+const StrategyHistoryView = ({ agentId }: { agentId: string }) => {
+  const [changes, setChanges] = useState<StrategyChange[]>([]);
+  const [selectedChange, setSelectedChange] = useState<StrategyChange | null>(null);
+
+  return (
+    <div className="strategy-history-container">
+      <div className="history-header">
+        <h3>策略變更歷史</h3>
+        <div className="filter-controls">
+          <select>
+            <option value="all">所有變更</option>
+            <option value="auto">自動調整</option>
+            <option value="manual">手動變更</option>
+            <option value="performance_driven">績效驅動</option>
+          </select>
+        </div>
+      </div>
+
+      {/* 時間線視圖 */}
+      <div className="timeline-container">
+        {changes.map((change, index) => (
+          <div key={change.id} className="timeline-item">
+            <div className="timeline-marker">
+              <span className={`change-type-badge ${change.change_type}`}>
+                {change.change_type === 'auto' ? '自動' :
+                 change.change_type === 'manual' ? '手動' : '績效'}
+              </span>
+            </div>
+
+            <div className="timeline-content">
+              <div className="change-header">
+                <span className="timestamp">
+                  {new Date(change.timestamp).toLocaleString('zh-TW')}
+                </span>
+                <button
+                  onClick={() => setSelectedChange(change)}
+                  className="view-details-btn"
+                >
+                  查看詳情
+                </button>
+              </div>
+
+              <h4 className="trigger-reason">{change.trigger_reason}</h4>
+              <p className="change-summary">{change.change_summary}</p>
+
+              {change.performance_at_change && (
+                <div className="performance-snapshot">
+                  <div className="metric">
+                    <span className="label">總報酬:</span>
+                    <span className={`value ${change.performance_at_change.total_return >= 0 ? 'positive' : 'negative'}`}>
+                      {change.performance_at_change.total_return.toFixed(2)}%
+                    </span>
+                  </div>
+                  <div className="metric">
+                    <span className="label">勝率:</span>
+                    <span className="value">{change.performance_at_change.win_rate.toFixed(1)}%</span>
+                  </div>
+                  <div className="metric">
+                    <span className="label">回撤:</span>
+                    <span className="value negative">{change.performance_at_change.drawdown.toFixed(2)}%</span>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* 策略變更詳情彈窗 */}
+      {selectedChange && (
+        <StrategyChangeModal
+          change={selectedChange}
+          onClose={() => setSelectedChange(null)}
+        />
+      )}
+    </div>
+  );
+};
+```
+
+---
+
+## 📊 API 端點設計
+
+### 策略變更 API
+
+```python
+from fastapi import APIRouter, HTTPException
+from typing import List, Optional
+
+router = APIRouter(prefix="/api/agents", tags=["strategy"])
+
+@router.post("/{agent_id}/strategy-changes")
+async def record_strategy_change(
+    agent_id: str,
+    change_data: StrategyChangeRequest
+) -> StrategyChange:
+    """記錄Agent策略變更"""
+    try:
+        change = await strategy_service.record_change(agent_id, change_data)
+        return change
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.get("/{agent_id}/strategy-changes")
+async def get_strategy_changes(
+    agent_id: str,
+    limit: int = 50,
+    offset: int = 0,
+    change_type: Optional[str] = None
+) -> List[StrategyChange]:
+    """獲取Agent策略變更歷史"""
+    return await strategy_service.get_changes(
+        agent_id, limit, offset, change_type
+    )
+
+@router.get("/{agent_id}/strategy-changes/latest")
+async def get_latest_strategy(agent_id: str) -> StrategyChange:
+    """獲取最新策略配置"""
+    change = await strategy_service.get_latest_change(agent_id)
+    if not change:
+        raise HTTPException(status_code=404, detail="No strategy found")
+    return change
 ```
 
 ---
@@ -1104,148 +1302,124 @@ class AgentNotificationService {
 
 ---
 
-## 🔄 實作架構
+## 🔄 簡化實作架構
 
 ### 核心工作流程
 
-1. **載入配置** - 從 SQLite 讀取 Agent 設定
-2. **檢查模式切換** - 根據自動條件或手動請求
-3. **創建 Agent 實例** - 使用 OpenAI Agent SDK
-4. **執行交易決策** - 根據當前模式執行對應策略
-5. **記錄追蹤資料** - 儲存執行結果到 SQLite
-6. **更新狀態** - 同步投資組合和模式狀態
+1. **Agent 創建** - 用戶透過前端表單設定投資偏好和策略條件
+2. **指令生成** - 後端根據用戶輸入生成完整的 Agent instructions
+3. **Agent 執行** - OpenAI Agent 根據指令和工具自主進行交易決策
+4. **策略調整** - Agent 根據績效和市場條件自主調整策略
+5. **變更記錄** - 所有策略變更自動記錄到資料庫
+6. **前端監控** - 用戶可即時查看 Agent 狀態和策略演進歷史
+
+### 簡化設計優勢
+
+- **實作簡單**: 移除複雜的狀態機和時間管理
+- **用戶友好**: 直觀的自然語言配置介面
+- **高度靈活**: Agent 可自主適應市場變化
+- **完全透明**: 所有決策和變更都有完整記錄
+- **易於維護**: 主要邏輯集中在 prompt 設計
 
 ---
 
 ## 📁 檔案結構
 
+> **注意**: 完整的專案結構定義請參閱 [PROJECT_STRUCTURE.md](PROJECT_STRUCTURE.md)  
+> 本節僅列出與 Agent 系統直接相關的檔案。
+
+### Agent 系統相關檔案
+
 ```
-src/
-├── agents/                    # Agent 系統模塊
-│   ├── core/                  # 核心 Agent 實作
-│   │   ├── trading_agent.py   # 主TradingAgent實作
-│   │   ├── config_manager.py  # SQLite 配置管理
-│   │   ├── trace_logger.py    # 執行追蹤記錄
-│   │   └── models.py          # Agent 資料模型定義
-│   ├── tools/                 # 專門化Agent Tools
-│   │   ├── fundamental_agent.py   # 基本面分析Agent Tool
-│   │   ├── technical_agent.py     # 技術分析Agent Tool
-│   │   ├── risk_agent.py         # 風險評估Agent Tool
-│   │   └── sentiment_agent.py     # 市場情緒分析Agent Tool
-│   ├── functions/             # 交易驗證Function Tools
-│   │   ├── trading_validation.py  # 交易參數驗證
-│   │   ├── market_status.py       # 市場狀態檢查
-│   │   └── portfolio_queries.py   # 投資組合查詢
-│   └── integrations/          # 外部服務整合
-│       ├── mcp_client.py          # CasualMarket MCP客戶端
-│       └── mcp_function_wrappers.py # MCP工具Function包裝
-├── api/                       # FastAPI 應用 (Agent管理API整合在此)
-│   ├── routers/
-│   │   ├── agents.py          # Agent CRUD操作路由
-│   │   └── agent_monitoring.py # Agent狀態監控路由
-│   ├── services/
-│   │   ├── agent_service.py   # Agent 業務邏輯
-│   │   └── websocket_service.py # 即時通知服務
-│   └── models/
-│       └── agent_models.py    # Agent API 模型
-└── shared/                    # 共享組件
-    ├── database/              # 資料庫相關
-    │   ├── models.py          # 共享資料模型
-    │   └── connection.py      # 資料庫連接
-    ├── utils/                 # 共享工具
-    │   ├── logging.py         # 統一日誌
-    │   └── config.py          # 配置管理
-    └── types/                 # 共享類型定義
-        └── agent_types.py     # Agent類型定義
+backend/src/agents/           # Agent 系統模塊
+├── core/                     # 核心 Agent 實作
+│   ├── trading_agent.py      # 簡化的TradingAgent實作
+│   ├── instruction_generator.py  # Agent指令生成器
+│   ├── strategy_tracker.py       # 策略變更追蹤
+│   └── models.py             # Agent 資料模型定義
+├── tools/                    # 專門化分析工具
+│   ├── fundamental_agent.py  # 基本面分析工具
+│   ├── technical_agent.py    # 技術分析工具
+│   ├── risk_agent.py         # 風險評估工具
+│   └── sentiment_agent.py    # 市場情緒分析工具
+├── functions/                # 交易驗證功能
+│   ├── trading_validation.py # 交易參數驗證
+│   ├── market_status.py      # 市場狀態檢查
+│   └── portfolio_queries.py  # 投資組合查詢
+└── integrations/             # 外部服務整合
+    ├── mcp_client.py         # CasualMarket MCP客戶端
+    └── mcp_function_wrappers.py  # MCP工具Function包裝
 
-frontend/src/
-├── components/
-│   └── Agent/                 # Agent管理組件
-│       ├── AgentCreationForm.svelte  # Agent創建表單
-│       ├── AgentDashboard.svelte     # Agent監控儀表板
-│       ├── AgentConfigEditor.svelte  # Agent配置編輯器
-│       ├── AgentCard.svelte          # Agent基礎卡片
-│       ├── AgentGrid.svelte          # Agent網格布局
-│       ├── AgentModal.svelte         # Agent彈窗組件
-│       ├── AgentToolsSelector.svelte # Agent Tools選擇器
-│       └── AgentPerformancePanel.svelte # Agent績效面板
-├── stores/
-│   ├── agents.js             # Agent狀態管理
-│   └── websocket.js          # WebSocket連線狀態
-├── lib/
-│   ├── api.js                # API客戶端 (包含Agent API)
-│   └── websocket.js          # WebSocket管理
-└── types/
-    └── agent.ts              # Agent相關TypeScript類型定義
+backend/src/api/              # Agent 相關 API 端點
+├── routers/
+│   ├── agents.py             # Agent CRUD操作路由
+│   ├── strategy_changes.py   # 策略變更API路由
+│   └── traces.py             # Agent執行追蹤路由
+└── services/
+    ├── agent_service.py      # Agent 業務邏輯
+    ├── strategy_service.py   # 策略變更服務
+    └── websocket_service.py  # 即時通知服務
 
-tests/
-├── agents/                   # Agent系統測試
-│   ├── core/
-│   │   ├── test_trading_agent.py
-│   │   ├── test_config_manager.py
-│   │   └── test_trace_logger.py
-│   ├── tools/
-│   │   ├── test_fundamental_agent.py
-│   │   ├── test_technical_agent.py
-│   │   ├── test_risk_agent.py
-│   │   └── test_sentiment_agent.py
-│   ├── functions/
-│   │   ├── test_trading_validation.py
-│   │   └── test_market_status.py
-│   └── integrations/
-│       └── test_mcp_integration.py
-├── api/
-│   ├── routers/
-│   │   └── test_agents.py    # Agent路由測試
-│   └── services/
-│       └── test_agent_service.py # Agent服務測試
-└── frontend/
-    ├── unit/
-    │   └── components/
-    │       └── Agent/
-    │           ├── AgentCard.test.js
-    │           └── AgentDashboard.test.js
-    └── integration/
-        └── agent-api.test.js
+frontend/src/components/Agent/  # Agent 前端組件
+├── AgentCreationForm.svelte    # 簡化的Agent創建表單
+├── AgentDashboard.svelte       # Agent監控儀表板
+├── StrategyHistoryView.svelte  # 策略變更歷史查看
+├── StrategyChangeModal.svelte  # 策略變更詳情彈窗
+├── AgentCard.svelte            # Agent基礎卡片
+├── AgentGrid.svelte            # Agent網格布局
+└── AgentPerformancePanel.svelte # Agent績效面板
+
+frontend/src/stores/
+├── agents.js                 # Agent 狀態管理
+└── websocket.js              # WebSocket 連線狀態
+
+tests/backend/agents/         # Agent 系統測試
+├── core/
+│   ├── test_trading_agent.py
+│   ├── test_instruction_generator.py
+│   ├── test_strategy_tracker.py
+│   └── test_models.py
+├── tools/
+│   ├── test_fundamental_agent.py
+│   ├── test_technical_agent.py
+│   ├── test_risk_agent.py
+│   └── test_sentiment_agent.py
+├── functions/
+│   ├── test_trading_validation.py
+│   ├── test_market_status.py
+│   └── test_portfolio_queries.py
+└── integrations/
+    ├── test_mcp_client.py
+    └── test_mcp_integration.py
+
+tests/frontend/unit/components/Agent/  # Agent 組件測試
+├── AgentCard.test.js
+├── AgentDashboard.test.js
+├── AgentCreationForm.test.js
+├── StrategyHistoryView.test.js
+└── AgentConfigEditor.test.js
 ```
 
 ---
 
-## ✅ 實作檢查清單
+## ✅ 簡化實作檢查清單
 
-### 主 TradingAgent 架構
+### 核心 TradingAgent 架構
 
-- [ ] EnhancedTradingAgent 基礎架構實作
-- [ ] 四種執行模式 (TRADING/REBALANCING/STRATEGY_REVIEW/OBSERVATION)
-- [ ] 動態策略演化系統整合
-- [ ] Agent模式狀態機實作
-- [ ] 模式切換控制器 (AgentModeController)
-- [ ] 策略管理器 (StrategyManager)
-- [ ] 性能評估器 (PerformanceEvaluator)
+- [ ] 基於 Prompt 的 TradingAgent 實作
+- [ ] Agent 指令生成器 (`instruction_generator.py`)
+- [ ] 四種交易模式提示詞設計 (TRADING/REBALANCING/STRATEGY_REVIEW/OBSERVATION)
 - [ ] Agent Tool 整合機制
 - [ ] OpenAI Agents SDK 整合
-- [ ] SQLite 配置管理和持久化
+- [ ] 基本配置管理
 
-### 動態策略演化系統
+### 策略變更記錄系統
 
-- [ ] 策略變體生成機制 (`StrategyVariant`)
-- [ ] 性能回饋分析系統
-- [ ] 策略修改建議生成
-- [ ] 模式專用提示詞策略 (`ModePromptStrategy`)
-- [ ] 自動策略參數調整
-- [ ] 策略演化歷史追蹤
-- [ ] 緊急切換機制實作
-- [ ] 時間和性能雙重驅動切換
-
-### 模式切換和控制系統
-
-- [ ] AgentState 狀態管理
-- [ ] 模式持續時間配置
-- [ ] 觸發條件檢測系統
-- [ ] 緊急停止機制 (10%回撤觸發)
-- [ ] 優異表現檢測 (5%日報酬觸發)
-- [ ] 模式切換日誌記錄
-- [ ] 切換原因追蹤
+- [ ] 策略變更資料模型 (`StrategyChange`)
+- [ ] 策略變更記錄工具 (`record_strategy_change`)
+- [ ] 策略變更追蹤服務 (`strategy_tracker.py`)
+- [ ] 策略變更 API 端點
+- [ ] 策略變更歷史查詢功能
 
 ### 專門化 Agent Tools
 
@@ -1290,20 +1464,20 @@ tests/
 
 ### 前端 Agent 管理介面
 
-- [ ] Agent 創建表單 (`AgentCreationForm.tsx`)
-- [ ] Agent 監控儀表板 (`AgentDashboard.tsx`)
-- [ ] Agent 配置編輯器 (`AgentConfigEditor.tsx`)
-- [ ] Agent 管理 API (`AgentAPI.ts`)
+- [ ] 簡化的 Agent 創建表單 (`AgentCreationForm.svelte`)
+- [ ] Agent 監控儀表板 (`AgentDashboard.svelte`)
+- [ ] 策略變更歷史查看 (`StrategyHistoryView.svelte`)
+- [ ] 策略變更詳情彈窗 (`StrategyChangeModal.svelte`)
+- [ ] Agent 管理 API
 - [ ] WebSocket 即時通知服務
 
-### 進階功能
+### 基礎功能
 
-- [ ] 即時狀態監控和通知
-- [ ] 決策結果可解釋性
+- [ ] Agent 基本執行和監控
 - [ ] 投資組合績效追蹤
-- [ ] 風險管理和停損機制
-- [ ] Agent 執行歷史和審計
-- [ ] 多Agent並行執行和資源管理
+- [ ] 基本風險管理機制
+- [ ] Agent 執行歷史記錄
+- [ ] 策略變更透明度和可追溯性
 
 ---
 

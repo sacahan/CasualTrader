@@ -617,7 +617,7 @@ async def websocket_endpoint(websocket: WebSocket, client_id: str = "default"):
 
 **外部依賴專案**:
 
-- **GitHub**: https://github.com/sacahan/CasualMarket
+- **GitHub**: <https://github.com/sacahan/CasualMarket>
 - **功能**: 台灣股票市場數據 MCP 服務
 - **安裝**: `uvx --from git+https://github.com/sacahan/CasualMarket.git market-mcp-server`
 
@@ -657,97 +657,86 @@ class CasualMarketMCPClient:
 
 ## 📁 檔案結構
 
-```
-src/
-├── api/                           # FastAPI 應用模塊
-│   ├── main.py                    # FastAPI 應用主檔案
-│   ├── routers/                   # API 路由定義
-│   │   ├── agents.py              # Agent 管理路由
-│   │   ├── portfolio.py           # 投資組合路由
-│   │   ├── traces.py              # 追蹤系統路由
-│   │   ├── market.py              # 市場數據路由
-│   │   └── system.py              # 系統管理路由
-│   ├── models/                    # API 資料模型
-│   │   ├── requests.py            # API 請求模型
-│   │   ├── responses.py           # API 回應模型
-│   │   └── websocket_events.py    # WebSocket 事件模型
-│   ├── services/                  # 業務邏輯服務層
-│   │   ├── agent_service.py       # Agent 業務邏輯
-│   │   ├── portfolio_service.py   # 投資組合服務
-│   │   ├── trace_service.py       # 追蹤服務
-│   │   └── mcp_client_wrapper.py  # MCP 客戶端包裝
-│   ├── middleware/                # FastAPI 中間件
-│   │   ├── auth.py                # 認證中間件
-│   │   ├── rate_limit.py          # 頻率限制
-│   │   └── logging.py             # 請求日誌
-│   └── utils/                     # API 工具函數
-│       ├── exceptions.py          # 自定義異常
-│       ├── validators.py          # 資料驗證
-│       └── websocket_manager.py   # WebSocket 管理
-├── agents/                        # Agent 系統 (與 API 整合)
-│   ├── core/                      # Agent 核心實作
-│   │   ├── trading_agent.py       # 主 TradingAgent
-│   │   ├── config_manager.py      # 配置管理
-│   │   └── trace_logger.py        # 追蹤記錄
-│   ├── tools/                     # Agent Tools
-│   │   ├── fundamental_agent.py   # 基本面分析
-│   │   ├── technical_agent.py     # 技術分析
-│   │   └── risk_agent.py         # 風險評估
-│   └── integrations/              # 外部服務整合
-│       ├── mcp_client.py          # MCP 客戶端 (整合 CasualMarket)
-│       └── mcp_function_wrappers.py # MCP 工具包裝器
-└── shared/                        # 共享組件
-    ├── database/                  # 資料庫相關
-    │   ├── models.py              # 資料模型
-    │   ├── connection.py          # 資料庫連接
-    │   └── migrations/            # 資料庫遷移
-    ├── utils/                     # 共享工具
-    │   ├── logging.py             # 統一日誌
-    │   ├── config.py              # 配置管理
-    │   └── constants.py           # 常數定義
-    └── types/                     # 共享類型定義
-        ├── api_types.py           # API 類型
-        ├── agent_types.py         # Agent 類型
-        └── market_types.py        # 市場資料類型
+> **注意**: 完整的專案結構定義請參閱 [PROJECT_STRUCTURE.md](PROJECT_STRUCTURE.md)  
+> 本節僅列出與 API 系統直接相關的檔案。
 
-tests/
-├── api/                           # API 測試
-│   ├── test_main.py               # FastAPI 主應用測試
-│   ├── routers/                   # 路由測試
-│   │   ├── test_agents.py         # Agent 路由測試
-│   │   ├── test_portfolio.py      # 投資組合路由測試
-│   │   ├── test_traces.py         # 追蹤路由測試
-│   │   ├── test_market.py         # 市場數據路由測試
-│   │   └── test_system.py         # 系統路由測試
-│   ├── services/                  # 服務層測試
-│   │   ├── test_agent_service.py  # Agent 服務測試
-│   │   ├── test_portfolio_service.py # 投資組合服務測試
-│   │   └── test_trace_service.py  # 追蹤服務測試
-│   ├── middleware/                # 中間件測試
-│   │   ├── test_auth.py           # 認證測試
-│   │   └── test_rate_limit.py     # 頻率限制測試
-│   └── utils/                     # 工具測試
-│       ├── test_exceptions.py     # 異常處理測試
-│       ├── test_validators.py     # 驗證器測試
-│       └── test_websocket_manager.py # WebSocket 管理測試
-├── agents/                        # Agent 系統測試
-│   ├── core/
-│   │   ├── test_trading_agent.py
-│   │   └── test_config_manager.py
-│   ├── tools/
-│   │   ├── test_fundamental_agent.py
-│   │   └── test_technical_agent.py
-│   └── integrations/
-│       ├── test_mcp_client.py     # MCP 客戶端測試
-│       └── test_mcp_integration.py # CasualMarket 整合測試
-├── shared/                        # 共享組件測試
-│   ├── database/
-│   │   └── test_models.py
-│   └── utils/
-│       ├── test_config.py
-│       └── test_logging.py
-├── integration/                   # 整合測試
-│   ├── test_api_agent_integration.py # API-Agent 整合測試
+### API 系統相關檔案
+
+```
+backend/src/api/                   # FastAPI 應用模塊
+├── main.py                        # FastAPI 應用主檔案
+├── routers/                       # API 路由定義
+│   ├── agents.py                  # Agent 管理路由
+│   ├── portfolio.py               # 投資組合路由
+│   ├── strategy_changes.py        # 策略變更路由
+│   ├── traces.py                  # 追蹤系統路由
+│   ├── market.py                  # 市場數據路由
+│   └── system.py                  # 系統管理路由
+├── models/                        # API 資料模型
+│   ├── requests.py                # API 請求模型
+│   ├── responses.py               # API 回應模型
+│   └── websocket_events.py        # WebSocket 事件模型
+├── services/                      # 業務邏輯服務層
+│   ├── agent_service.py           # Agent 業務邏輯
+│   ├── portfolio_service.py       # 投資組合服務
+│   ├── strategy_service.py        # 策略變更服務
+│   ├── trace_service.py           # 追蹤服務
+│   ├── websocket_service.py       # 即時通知服務
+│   └── mcp_client_wrapper.py      # MCP 客戶端包裝
+├── middleware/                    # FastAPI 中間件
+│   ├── auth.py                    # 認證中間件
+│   ├── rate_limit.py              # 頻率限制
+│   └── logging.py                 # 請求日誌
+└── utils/                         # API 工具函數
+    ├── exceptions.py              # 自定義異常
+    ├── validators.py              # 資料驗證
+    └── websocket_manager.py       # WebSocket 管理
+
+backend/src/shared/                # 共享組件
+├── database/                      # 資料庫相關
+│   ├── models.py                  # 資料模型
+│   ├── connection.py              # 資料庫連接
+│   └── migrations/                # 資料庫遷移
+├── utils/                         # 共享工具
+│   ├── logging.py                 # 統一日誌
+│   ├── config.py                  # 配置管理
+│   └── constants.py               # 常數定義
+└── types/                         # 共享類型定義
+    ├── api_types.py               # API 類型
+    ├── agent_types.py             # Agent 類型
+    └── market_types.py            # 市場資料類型
+
+tests/backend/api/                 # API 測試
+├── test_main.py                   # FastAPI 主應用測試
+├── routers/                       # 路由測試
+│   ├── test_agents.py             # Agent 路由測試
+│   ├── test_portfolio.py          # 投資組合路由測試
+│   ├── test_strategy_changes.py   # 策略變更路由測試
+│   ├── test_traces.py             # 追蹤路由測試
+│   ├── test_market.py             # 市場數據路由測試
+│   └── test_system.py             # 系統路由測試
+├── services/                      # 服務層測試
+│   ├── test_agent_service.py      # Agent 服務測試
+│   ├── test_portfolio_service.py  # 投資組合服務測試
+│   ├── test_strategy_service.py   # 策略變更服務測試
+│   └── test_trace_service.py      # 追蹤服務測試
+├── middleware/                    # 中間件測試
+│   ├── test_auth.py               # 認證測試
+│   └── test_rate_limit.py         # 頻率限制測試
+└── utils/                         # 工具測試
+    ├── test_exceptions.py         # 異常處理測試
+    ├── test_validators.py         # 驗證器測試
+    └── test_websocket_manager.py  # WebSocket 管理測試
+
+tests/backend/shared/              # 共享組件測試
+├── database/
+│   └── test_models.py
+└── utils/
+    ├── test_config.py
+    └── test_logging.py
+
+tests/integration/                 # 跨模塊整合測試
+├── test_api_agent_integration.py  # API-Agent 整合測試
 │   ├── test_websocket_flow.py     # WebSocket 流程測試
 │   └── test_mcp_integration.py    # MCP 整合測試
 └── fixtures/                      # 測試用固定數據

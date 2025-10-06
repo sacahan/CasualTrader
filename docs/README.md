@@ -1,7 +1,7 @@
 # CasualTrader 文檔結構
 
 **重構日期**: 2025-10-06
-**版本**: 3.0
+**版本**: 4.0
 
 ---
 
@@ -15,33 +15,62 @@
 
 ### **詳細實作規格** (4 份)
 
-- `AGENT_IMPLEMENTATION.md` - Agent 系統詳細實作規格
+- **`AGENT_IMPLEMENTATION.md`** ⭐ **核心文檔** - Agent 系統完整實作規格 (50KB | 1702行 | 84章節)
 - `API_IMPLEMENTATION.md` - 後端 API 詳細實作規格
 - `FRONTEND_IMPLEMENTATION.md` - 前端介面詳細實作規格
 - `DEPLOYMENT_GUIDE.md` - 部署和配置詳細指南
 
-### **補充文檔** (1 份)
+### **補充文檔** (2 份)
 
 - `API_DEPENDENCIES.md` - API 套件依賴清單和配置指南
+- **`AGENT_DOCS_CHANGELOG.md`** - Agent 文檔整合變更說明 (新增)
 
 ---
 
-## 🔄 重構說明
+## 🔄 最新重構 (2025-10-06)
+
+### **Agent 文檔整合**
+
+**整合目的**: 避免維護兩份相似內容的 Agent 文檔
+
+**整合前**:
+
+- ❌ `AGENT_IMPLEMENTATION.md` - Agent 實作規格
+- ❌ `AGENT_DYNAMIC_STRATEGY_ARCHITECTURE.md` - 策略架構設計
+
+**整合後**:
+
+- ✅ **`AGENT_IMPLEMENTATION.md`** - 完整的 Agent 系統實作規格 (已整合所有內容)
+- 📦 `AGENT_DYNAMIC_STRATEGY_ARCHITECTURE.md.backup` - 備份文件
+
+**新增內容** (整合自 AGENT_DYNAMIC_STRATEGY_ARCHITECTURE.md):
+
+- ✨ **交易模式詳細設計** - 四種模式 (TRADING/REBALANCING/OBSERVATION/STRATEGY_REVIEW) 的完整說明
+- ✨ **策略演化詳細說明** - 用戶定義調整依據、自主調整流程、實際範例
+- ✨ **更豐富的 Prompt 範例** - 每個模式的詳細 Prompt 指令範例
+
+詳細變更請參考: **[AGENT_DOCS_CHANGELOG.md](./AGENT_DOCS_CHANGELOG.md)**
+
+---
+
+## 🔍 重構歷史
 
 ### **解決的問題**
 
-✅ **消除重複** - 移除了原本 3 個文檔間的內容重複
+✅ **消除重複** - 移除了文檔間的內容重複和維護負擔
 ✅ **職責分離** - 每個文檔有明確的範圍和職責
 ✅ **易於維護** - 更新時不需要同步多個文檔
 ✅ **便於查找** - 根據需求直接找到對應文檔
+✅ **內容完整** - 整合後的文檔提供更完整的視角
 
-### **原始文檔狀態**
+### **已移除的文檔**
 
 以下文檔已移除（內容已整合到新的文檔結構中）：
 
 - `AGENT_CONTROL_FEATURES.md` - 內容已整合到 `AGENT_IMPLEMENTATION.md`
 - `AGENT_CONTROL_QUICK_REF.md` - 內容已整合到 `AGENT_IMPLEMENTATION.md`
 - `DESIGN_SPECIFICATION.md` - 內容已重構分散到各實作規格文檔
+- **`AGENT_DYNAMIC_STRATEGY_ARCHITECTURE.md`** - 內容已整合到 `AGENT_IMPLEMENTATION.md` (備份保留)
 
 ---
 
