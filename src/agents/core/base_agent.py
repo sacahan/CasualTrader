@@ -15,7 +15,6 @@ from typing import Any
 # 實際實作時需要替換為正確的 SDK 導入
 try:
     from openai_agents import Agent  # type: ignore[import-untyped]
-    from openai_agents.tools import Tool  # type: ignore[import-untyped]
 
     OPENAI_AGENTS_AVAILABLE = True
 except ImportError:
@@ -61,7 +60,6 @@ from .models import (
     SessionStatus,
     generate_session_id,
 )
-
 
 # ==========================================
 # Agent 基礎抽象類別
@@ -324,7 +322,7 @@ class CasualTradingAgent(ABC):
             execution_result.calculate_execution_time()
             return execution_result
 
-        except asyncio.TimeoutError:
+        except TimeoutError:
             end_time = datetime.now()
             execution_result = AgentExecutionResult(
                 session_id=context.session_id,
@@ -429,7 +427,6 @@ class CasualTradingAgent(ABC):
 
     async def update_config(self, new_config: AgentConfig) -> None:
         """更新 Agent 配置"""
-        old_config = self.config
         self.config = new_config
         self.state.config = new_config
         self.state.update_activity()

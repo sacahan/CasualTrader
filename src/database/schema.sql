@@ -107,6 +107,7 @@ CREATE TABLE IF NOT EXISTS transactions (
 
     -- 決策背景
     decision_reason TEXT,                   -- 交易決策原因
+    ai_model TEXT,                          -- 執行交易時使用的 AI 模型
     market_data JSON,                       -- 交易時的市場數據
 
     -- 時間戳記
@@ -139,6 +140,7 @@ CREATE TABLE IF NOT EXISTS strategy_changes (
 
     -- Agent 說明
     agent_explanation TEXT,                 -- Agent 對變更的解釋
+    ai_model TEXT,                          -- 進行策略變更時使用的 AI 模型
 
     -- 時間戳記
     timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,

@@ -198,8 +198,10 @@ async def test_database_migration_integration() -> bool:
     try:
         # 測試與現有遷移系統的整合
         from src.database.migrations import (
-            DatabaseMigrationManager,
             DatabaseConfig as MigrationConfig,
+        )
+        from src.database.migrations import (
+            DatabaseMigrationManager,
         )
 
         # 創建遷移管理器

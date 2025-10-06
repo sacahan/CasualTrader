@@ -38,7 +38,7 @@ DELETE /api/agents/{id}               # 刪除代理人
 {
   "name": "Prudent Investor",
   "description": "穩健投資策略代理人",
-  "ai_model": "gpt-4",
+  "ai_model": "gpt-4o",
   "strategy_type": "conservative",
   "strategy_prompt": "保守投資策略，專注於穩定成長...",
   "color_theme": "#007bff",
@@ -66,6 +66,33 @@ DELETE /api/agents/{id}               # 刪除代理人
 }
 ```
 
+**支援的 AI 模型列表** (`ai_model` 欄位):
+
+- **OpenAI 系列**:
+  - `gpt-4o` (推薦，預設值)
+  - `gpt-4o-mini` (成本優化)
+  - `gpt-4-turbo`
+  
+- **Anthropic Claude 系列**:
+  - `claude-sonnet-4.5` (高性能推理)
+  - `claude-opus-4`
+  
+- **Google Gemini 系列**:
+  - `gemini-2.5-pro` (多模態能力)
+  - `gemini-2.0-flash` (快速響應)
+  
+- **其他模型**:
+  - `deepseek-v3`
+  - `grok-2`
+
+**模型選擇說明**:
+
+- 前端下拉選單提供模型選擇
+- 預設值為 `gpt-4o`（平衡性能與成本）
+- 模型資訊在 Agent 創建時保存，執行期間記錄在交易與策略變更記錄中
+
+```
+
 **Response**:
 
 ```json
@@ -73,7 +100,7 @@ DELETE /api/agents/{id}               # 刪除代理人
   "id": "agent_001",
   "name": "Prudent Investor",
   "description": "穩健投資策略代理人",
-  "ai_model": "gpt-4",
+  "ai_model": "gpt-4o",
   "strategy_type": "conservative",
   "strategy_prompt": "保守投資策略...",
   "color_theme": "#007bff",
@@ -748,15 +775,66 @@ tests/integration/                 # 跨模塊整合測試
 
 ---
 
+## 📊 資料庫 Schema 更新
+
+### AI 模型追蹤
+
+為了支援多 AI 模型功能，資料庫 schema 已更新以追蹤模型使用情況：
+
+**agents 表** - 記錄 Agent 使用的 AI 模型:
+
+```sql
+CREATE TABLE IF NOT EXISTS agents (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    description TEXT,
+    model TEXT NOT NULL DEFAULT 'gpt-4o',  -- AI 模型選擇
+    -- ... 其他欄位
+);
+```
+
+**transactions 表** - 記錄交易時使用的 AI 模型:
+
+```sql
+CREATE TABLE IF NOT EXISTS transactions (
+    id TEXT PRIMARY KEY,
+    agent_id TEXT NOT NULL,
+    -- ... 交易資訊
+    ai_model TEXT,                          -- 執行交易時使用的 AI 模型
+    -- ... 其他欄位
+);
+```
+
+**strategy_changes 表** - 記錄策略變更時使用的 AI 模型:
+
+```sql
+CREATE TABLE IF NOT EXISTS strategy_changes (
+    id TEXT PRIMARY KEY,
+    agent_id TEXT NOT NULL,
+    -- ... 變更資訊
+    ai_model TEXT,                          -- 進行策略變更時使用的 AI 模型
+    -- ... 其他欄位
+);
+```
+
+### 模型追蹤目的
+
+1. **模型比較**: 比較不同 AI 模型的投資績效與決策品質
+2. **成本分析**: 追蹤不同模型的 API 使用成本
+3. **決策追溯**: 了解特定交易或策略變更背後使用的模型
+4. **效能評估**: 評估不同模型在不同市場條件下的表現
+
+---
+
 ## ✅ 實作檢查清單
 
 ### 核心 API
 
-- [ ] 實作 Agent 管理 CRUD API
+- [ ] 實作 Agent 管理 CRUD API（包含 AI 模型選擇）
 - [ ] 實作 Agent 控制 API (start/stop/pause)
 - [ ] 實作模式切換 API
 - [ ] 實作投資組合查詢 API
-- [ ] 實作交易歷史 API
+- [ ] 實作交易歷史 API（包含 AI 模型資訊）
 
 ### WebSocket 系統
 

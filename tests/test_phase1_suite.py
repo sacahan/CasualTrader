@@ -80,7 +80,7 @@ class Phase1TestRunner:
         print(f"⏱️  執行時間: {elapsed_time:.2f} 秒")
 
         if self.failed_tests:
-            print(f"\n❌ 失敗的測試:")
+            print("\n❌ 失敗的測試:")
             for test in self.failed_tests:
                 print(f"  • {test}")
 
@@ -142,8 +142,6 @@ async def run_additional_agent_tests() -> bool:
     from src.agents import (
         AgentManager,
         create_default_agent_config,
-        PersistentTradingAgent,
-        DatabaseConfig,
     )
 
     try:

@@ -344,6 +344,7 @@ interface AgentCreationForm {
   // 基本資訊
   name: string;
   description: string;
+  ai_model: string;                      // AI 模型選擇（下拉選單）
   initial_funds: number;
 
   // 核心投資設定（開放式文字輸入）
@@ -377,6 +378,34 @@ const AgentCreationForm = () => {
           className="form-textarea"
           rows={2}
         />
+        
+        {/* AI 模型選擇 */}
+        <div className="input-group">
+          <label>AI 模型</label>
+          <select className="form-select" defaultValue="gpt-4o">
+            <optgroup label="OpenAI">
+              <option value="gpt-4o">GPT-4o (推薦)</option>
+              <option value="gpt-4o-mini">GPT-4o Mini (成本優化)</option>
+              <option value="gpt-4-turbo">GPT-4 Turbo</option>
+            </optgroup>
+            <optgroup label="Anthropic Claude">
+              <option value="claude-sonnet-4.5">Claude Sonnet 4.5</option>
+              <option value="claude-opus-4">Claude Opus 4</option>
+            </optgroup>
+            <optgroup label="Google Gemini">
+              <option value="gemini-2.5-pro">Gemini 2.5 Pro</option>
+              <option value="gemini-2.0-flash">Gemini 2.0 Flash</option>
+            </optgroup>
+            <optgroup label="其他">
+              <option value="deepseek-v3">DeepSeek V3</option>
+              <option value="grok-2">Grok 2</option>
+            </optgroup>
+          </select>
+          <small className="form-hint">
+            選擇用於投資決策的 AI 模型，不同模型具有不同的推理風格與成本
+          </small>
+        </div>
+        
         <input
           type="number"
           placeholder="初始資金 (TWD)"

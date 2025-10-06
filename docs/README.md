@@ -27,9 +27,34 @@
 
 ---
 
-## 🔄 最新重構 (2025-10-06)
+## 🔄 最新更新
 
-### **Agent 文檔整合**
+### **AI 模型選擇功能** (2025-10-06)
+
+**功能更新**: 支援多種 AI 模型選擇與追蹤
+
+**新增文檔**:
+
+- ✅ **`AI_MODEL_SELECTION_FEATURE.md`** - 完整的 AI 模型選擇功能規格
+- ✅ **`AI_MODEL_UPDATE_SUMMARY.md`** - 文檔更新總結與實作指南
+
+**更新文檔**:
+
+- ✅ `SYSTEM_DESIGN.md` - 新增多模型支援說明
+- ✅ `API_IMPLEMENTATION.md` - 新增模型 API 規格與資料庫 Schema
+- ✅ `AGENT_IMPLEMENTATION.md` - 新增模型選擇表單設計
+- ✅ `FRONTEND_IMPLEMENTATION.md` - 新增模型顯示組件
+- ✅ `../src/database/schema.sql` - 新增模型追蹤欄位
+
+**功能特點**:
+
+- 🤖 支援 8+ 種主流 AI 模型（OpenAI / Anthropic / Google 等）
+- 📊 完整追蹤交易與策略變更時使用的模型
+- 🎨 前端提供直觀的模型選擇介面
+- 💾 資料庫完整記錄模型使用歷史
+- 📈 支援模型績效比較分析
+
+### **Agent 文檔整合** (2025-10-06)
 
 **整合目的**: 避免維護兩份相似內容的 Agent 文檔
 

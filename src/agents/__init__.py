@@ -6,33 +6,33 @@ CasualTrader Agent System
 
 from __future__ import annotations
 
-from .core.base_agent import CasualTradingAgent
 from .core.agent_manager import AgentManager
 from .core.agent_session import AgentSession
+from .core.base_agent import CasualTradingAgent
 from .core.models import (
     AgentConfig,
-    AgentState,
+    AgentCreationRequest,
+    AgentCreationResponse,
     AgentExecutionContext,
     AgentExecutionResult,
     AgentMode,
+    AgentState,
     AgentStatus,
-    SessionStatus,
     AutoAdjustSettings,
     InvestmentPreferences,
-    TradingSettings,
+    SessionStatus,
     StrategyChange,
-    AgentCreationRequest,
-    AgentCreationResponse,
+    TradingSettings,
     create_default_agent_config,
     generate_agent_id,
     generate_session_id,
 )
-from .trading.trading_agent import TradingAgent
 from .integrations import (
     AgentDatabaseService,
     DatabaseConfig,
     PersistentTradingAgent,
 )
+from .trading.trading_agent import TradingAgent
 
 __all__ = [
     # Core Classes

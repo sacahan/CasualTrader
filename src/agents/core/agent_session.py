@@ -5,7 +5,6 @@ Agent Session - 處理單個 Agent 執行會話
 
 from __future__ import annotations
 
-import asyncio
 import json
 import logging
 from collections.abc import AsyncIterator
@@ -409,7 +408,7 @@ class AgentSession:
 
         try:
             yield self
-        except asyncio.TimeoutError:
+        except TimeoutError:
             await self.timeout()
             raise
         except Exception as e:

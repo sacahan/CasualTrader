@@ -199,7 +199,12 @@ frontend/
   <div class="agent-header flex justify-between items-start mb-4">
     <div class="agent-info">
       <h3 class="text-lg font-semibold text-gray-900">{agent.name}</h3>
-      <p class="text-sm text-gray-600">{agent.ai_model}</p>
+      <div class="flex items-center gap-2">
+        <p class="text-sm text-gray-600">{agent.description}</p>
+        <span class="text-xs px-2 py-0.5 bg-blue-100 text-blue-800 rounded">
+          {agent.ai_model}
+        </span>
+      </div>
     </div>
     <div class="agent-controls flex items-center gap-2">
       <span class="mode-badge px-2 py-1 rounded-full text-xs font-medium text-white {modeColor}">
@@ -400,6 +405,34 @@ ${data.additional_instructions ? `\nADDITIONAL INSTRUCTIONS:\n${data.additional_
         rows="3"
         required
       />
+    </div>
+
+    <div class="input-group">
+      <label class="block text-sm font-medium text-gray-700 mb-2">AI 模型 *</label>
+      <select
+        bind:value={formData.ai_model}
+        class="form-select w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+        required
+      >
+        <optgroup label="OpenAI">
+          <option value="gpt-4o" selected>GPT-4o (推薦)</option>
+          <option value="gpt-4o-mini">GPT-4o Mini (成本優化)</option>
+          <option value="gpt-4-turbo">GPT-4 Turbo</option>
+        </optgroup>
+        <optgroup label="Anthropic Claude">
+          <option value="claude-sonnet-4.5">Claude Sonnet 4.5</option>
+          <option value="claude-opus-4">Claude Opus 4</option>
+        </optgroup>
+        <optgroup label="Google Gemini">
+          <option value="gemini-2.5-pro">Gemini 2.5 Pro</option>
+          <option value="gemini-2.0-flash">Gemini 2.0 Flash</option>
+        </optgroup>
+        <optgroup label="其他">
+          <option value="deepseek-v3">DeepSeek V3</option>
+          <option value="grok-2">Grok 2</option>
+        </optgroup>
+      </select>
+      <p class="text-xs text-gray-500 mt-1">選擇用於投資決策的 AI 模型，不同模型具有不同的推理風格與成本</p>
     </div>
 
     <div class="input-group">

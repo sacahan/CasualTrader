@@ -6,7 +6,6 @@ Trading Agent Implementation
 
 from __future__ import annotations
 
-import asyncio
 import logging
 from datetime import datetime, time
 from typing import Any

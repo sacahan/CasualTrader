@@ -17,7 +17,6 @@ sys.path.insert(0, str(project_root))
 
 from src.agents import (  # noqa: E402
     AgentConfig,
-    AgentDatabaseService,
     AgentMode,
     DatabaseConfig,
     PersistentTradingAgent,

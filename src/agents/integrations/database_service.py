@@ -8,11 +8,10 @@ from __future__ import annotations
 
 import json
 import logging
-import uuid
 from datetime import datetime
 from typing import Any
 
-from sqlalchemy import and_, desc, select, text, update
+from sqlalchemy import desc, select, text
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, create_async_engine
 from sqlalchemy.orm import sessionmaker
 
@@ -20,10 +19,7 @@ from ...database.models import (
     Agent as DBAgent,
 )
 from ...database.models import (
-    AgentConfigCache,
     AgentHolding,
-    AgentPerformance,
-    Transaction,
 )
 from ...database.models import (
     AgentSession as DBAgentSession,
@@ -201,9 +197,6 @@ class AgentDatabaseService:
 
     async def _db_agent_to_state(self, db_agent: DBAgent) -> AgentState:
         """將資料庫 Agent 轉換為 AgentState"""
-        # 反序列化配置
-        config_data = json.loads(db_agent.config) if db_agent.config else {}
-
         # 重建 AgentConfig
         config = AgentConfig(
             name=db_agent.name,

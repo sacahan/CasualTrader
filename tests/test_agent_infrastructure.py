@@ -155,7 +155,7 @@ async def test_agent_manager() -> None:
     print("\n🏢 測試 AgentManager...")
 
     manager = AgentManager()
-    print(f"✅ AgentManager 創建成功")
+    print("✅ AgentManager 創建成功")
 
     # 啟動管理器
     await manager.start()
@@ -174,7 +174,7 @@ async def test_agent_manager() -> None:
         agent_id1 = await manager.create_agent(config1, auto_start=False)
         agent_id2 = await manager.create_agent(config2, auto_start=False)
 
-        print(f"✅ 創建了 2 個 Agent:")
+        print("✅ 創建了 2 個 Agent:")
         print(f"   {agent_id1}: {config1.name}")
         print(f"   {agent_id2}: {config2.name}")
 

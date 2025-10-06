@@ -53,6 +53,7 @@
 - **策略分析**：比較不同投資方法的效果
 - **智能決策**：AI 代理人基於市場數據和研究分析進行自主交易
 - **策略持久化**：投資策略和決策過程完整記錄與追蹤
+- **多模型支援**：支援多種主流 AI 模型（GPT-4o, Claude Sonnet 4.5, Gemini 2.5 Pro 等）進行策略競賽與比較
 
 ### 技術架構優勢
 
@@ -150,7 +151,12 @@
 
 **AI 與工具層**:
 
-- **AI 模型**: GPT-4o-mini, GPT-4o, DeepSeek, Grok, Gemini
+- **AI 模型**: 支援多種主流模型，包括：
+  - OpenAI: GPT-4o, GPT-4o-mini, GPT-4-turbo
+  - Anthropic: Claude Sonnet 4.5, Claude Opus 4
+  - Google: Gemini 2.5 Pro, Gemini 2.0 Flash
+  - 其他: DeepSeek, Grok 等
+- **模型選擇**: Agent 創建時可選擇模型，執行期間記錄當前使用模型
 - **資料來源**: casual-market-mcp (21 個台灣股市專業工具)
 - **協議**: Model Context Protocol (MCP)
 
@@ -163,7 +169,9 @@
 **生命週期管理**:
 
 - 動態創建、配置、啟動/停止 Agent
-- 支援多種 AI 模型和自定義策略
+- 支援多種 AI 模型選擇（GPT-4o, Claude Sonnet 4.5, Gemini 2.5 Pro 等）
+- 模型資訊持久化與追蹤（創建時選擇、執行時記錄）
+- 支援自定義策略與投資偏好
 - SQLite Session 持久化
 
 **四種執行模式**:
