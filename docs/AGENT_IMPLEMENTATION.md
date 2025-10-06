@@ -53,7 +53,7 @@ trading_agent = Agent(
         WebSearchTool(),
         CodeInterpreterTool(),
 
-        # CasualTrader MCP Tools (透過HostedMCPTool整合)
+        # CasualMarket MCP Tools (透過外部MCP服務整合)
         get_taiwan_stock_price,
         buy_taiwan_stock,
         sell_taiwan_stock,
@@ -69,27 +69,332 @@ trading_agent = Agent(
 )
 ```
 
-### 三種執行模式
+### 台股交易時間限定的四種執行模式系統
 
-TradingAgent 根據市場條件和用戶設定動態調整執行策略：
+TradingAgent 嚴格遵循台股交易時間，採用四種智能模式在交易時段循環運作：
 
-**TRADING 模式** - 主動交易決策
+#### 台股交易時間模式架構
 
-- 調用所有分析Agent Tools獲取市場洞察
-- 使用WebSearchTool獲取最新市場新聞
-- 執行買賣決策並追蹤績效
+**核心設計理念**：
 
-**REBALANCING 模式** - 投資組合調整
+- 模式切換完全配合台股交易時間（週一至週五 09:00-13:30）
+- 交易時間外進行深度分析和策略優化
+- 非交易日執行週度策略檢討
 
-- 重點使用風險評估和現金查詢工具
-- 調整持股配置以符合目標分配
-- 考慮交易成本和稅務優化
+**交易日時間分配**：
 
-**OBSERVATION 模式** - 純分析不交易
+- **08:30-09:00 (30分鐘)**: 開盤前準備 (OBSERVATION)
+- **09:00-11:00 (120分鐘)**: 早盤交易 (TRADING)
+- **11:00-11:30 (30分鐘)**: 中場調整 (REBALANCING)
+- **11:30-13:00 (90分鐘)**: 午盤交易 (TRADING)
+- **13:00-13:30 (30分鐘)**: 收盤檢討 (STRATEGY_REVIEW)
 
-- 只使用分析類工具，不執行交易
-- 建立觀察清單和市場研究報告
-- 提供投資建議但不採取行動
+#### 台股交易時間狀態機架構
+
+```python
+from enum import Enum
+from datetime import datetime, timedelta, time
+import pytz
+
+class AgentMode(Enum):
+    # 交易時間模式
+    OBSERVATION = "OBSERVATION"           # 開盤前準備
+    TRADING = "TRADING"                   # 主動交易
+    REBALANCING = "REBALANCING"           # 中場調整
+    STRATEGY_REVIEW = "STRATEGY_REVIEW"   # 收盤檢討
+
+    # 非交易時間模式
+    DEEP_OBSERVATION = "DEEP_OBSERVATION"  # 深度分析
+    WEEKLY_REVIEW = "WEEKLY_REVIEW"        # 週末檢討
+    STANDBY = "STANDBY"                    # 待機模式
+
+class TaiwanStockTradingTimeManager:
+    """台股交易時間管理器"""
+
+    def __init__(self):
+        self.taiwan_tz = pytz.timezone('Asia/Taipei')
+        self.trading_schedule = {
+            'pre_market': {
+                'start': time(8, 30),
+                'end': time(9, 0),
+                'mode': AgentMode.OBSERVATION,
+                'duration': timedelta(minutes=30)
+            },
+            'morning_trading': {
+                'start': time(9, 0),
+                'end': time(11, 0),
+                'mode': AgentMode.TRADING,
+                'duration': timedelta(minutes=120)
+            },
+            'mid_session': {
+                'start': time(11, 0),
+                'end': time(11, 30),
+                'mode': AgentMode.REBALANCING,
+                'duration': timedelta(minutes=30)
+            },
+            'afternoon_trading': {
+                'start': time(11, 30),
+                'end': time(13, 0),
+                'mode': AgentMode.TRADING,
+                'duration': timedelta(minutes=90)
+            },
+            'closing_review': {
+                'start': time(13, 0),
+                'end': time(13, 30),
+                'mode': AgentMode.STRATEGY_REVIEW,
+                'duration': timedelta(minutes=30)
+            }
+        }
+
+    def is_trading_day(self, dt: datetime = None) -> bool:
+        """檢查是否為交易日（週一到週五）"""
+        if dt is None:
+            dt = datetime.now(self.taiwan_tz)
+        return dt.weekday() < 5
+
+    def get_current_mode(self, dt: datetime = None) -> AgentMode:
+        """根據當前時間決定應該執行的模式"""
+        if dt is None:
+            dt = datetime.now(self.taiwan_tz)
+
+        # 週末執行週度檢討
+        if dt.weekday() >= 5:
+            return AgentMode.WEEKLY_REVIEW
+
+        # 交易日檢查交易時間
+        if self.is_trading_day(dt):
+            current_time = dt.time()
+            for phase, schedule in self.trading_schedule.items():
+                if schedule['start'] <= current_time < schedule['end']:
+                    return schedule['mode']
+
+        # 非交易時間執行深度觀察
+        return AgentMode.DEEP_OBSERVATION
+
+class AgentState:
+    def __init__(self):
+        self.current_mode: AgentMode = AgentMode.STANDBY
+        self.mode_start_time: datetime = datetime.now()
+        self.trading_time_manager = TaiwanStockTradingTimeManager()
+        self.performance_metrics: Dict[str, float] = {}
+        self.strategy_evolution_history: List[Dict] = []
+
+    def update_mode(self) -> bool:
+        """更新當前模式，返回是否發生模式切換"""
+        new_mode = self.trading_time_manager.get_current_mode()
+        if new_mode != self.current_mode:
+            self.current_mode = new_mode
+            self.mode_start_time = datetime.now()
+            return True
+        return False
+```
+
+#### 台股交易時間限定的四種模式詳細說明
+
+**OBSERVATION 模式** - 開盤前準備 (08:30-09:00)
+
+- **時間窗口**: 30分鐘的開盤前準備時間
+- **核心任務**: 檢視隔夜重要資訊、分析美股收盤影響、確認今日交易計畫
+- **工具使用**: WebSearchTool搜尋盤前新聞、基本面工具檢查重要公告
+- **目標**: 為開盤後交易做好充分準備
+- **觸發條件**: 交易日08:30自動啟動、重大突發事件
+
+**TRADING 模式** - 主動交易決策 (09:00-11:00 + 11:30-13:00)
+
+- **時間窗口**: 早盤120分鐘 + 午盤90分鐘，總計210分鐘
+- **早盤重點**: 開盤動能捕捉、主要部位建立、趨勢確認
+- **午盤重點**: 機會補強、部位優化、收盤準備
+- **目標**: 每日1-3筆主要交易，單日超額報酬0.5%
+- **觸發條件**: 定時調度、技術突破、成交量異常
+
+**REBALANCING 模式** - 中場組合調整 (11:00-11:30)
+
+- **時間窗口**: 30分鐘的中場調整時間
+- **核心任務**: 早盤效果評估、風險檢視、午盤策略調整
+- **快速執行**: 必要的風險控制調整和部位優化
+- **目標**: 確保風險可控、為午盤做好準備
+- **觸發條件**: 11:00固定啟動、早盤虧損>3%、集中度警示
+
+**STRATEGY_REVIEW 模式** - 收盤檢討 (13:00-13:30)
+
+- **時間窗口**: 30分鐘的收盤前檢討時間
+- **核心任務**: 當日總結、部位檢查、隔夜風險評估、明日準備
+- **重要產出**: 當日學習點記錄、明日策略調整
+- **目標**: 經驗累積和持續改進
+- **觸發條件**: 13:00固定啟動、異常績效、重大消息
+
+**非交易時間模式**:
+
+**DEEP_OBSERVATION 模式** - 深度分析 (13:30-次日08:30)
+
+- **收盤後分析**: 市場深度檢討、個股研究、策略全面評估
+- **隔夜監控**: 國際市場追蹤、新聞事件監控、模型優化
+- **策略優化**: 基於當日結果進行深度策略調整
+
+**WEEKLY_REVIEW 模式** - 週末檢討 (週六、週日)
+
+- **週度績效**: 完整的一週交易表現分析
+- **策略演化**: 決定是否需要重大策略調整
+- **下週準備**: 制定下週交易計畫和重點
+
+#### 模式專用提示詞策略
+
+```python
+class ModePromptStrategy:
+    @staticmethod
+    def get_mode_instructions(mode: AgentMode, trader_name: str, context: Dict) -> str:
+        mode_instructions = {
+            AgentMode.TRADING: f"""
+You are {trader_name} in ACTIVE TRADING mode.
+
+TRADING FOCUS:
+- Identify immediate trading opportunities
+- Execute trades based on technical and fundamental analysis
+- Monitor market momentum and volatility
+- Risk management: max 5% position size per trade
+- Target: 2-4 trades within this session
+
+PERFORMANCE TARGET: Beat benchmark by 1.5% this session
+""",
+
+            AgentMode.STRATEGY_REVIEW: f"""
+You are {trader_name} in STRATEGY REVIEW mode.
+
+REVIEW FOCUS:
+- Analyze recent performance vs benchmark
+- Identify strategy strengths and weaknesses
+- Review market regime changes
+- Consider strategy modifications or pivots
+- Update risk parameters if needed
+
+DECISION FRAMEWORK: Evidence-based strategy evolution
+""",
+            # ... 其他模式
+        }
+        return mode_instructions[mode]
+```
+
+#### 動態策略演化系統
+
+**策略管理器**
+
+```python
+class StrategyManager:
+    def __init__(self, trader_name: str):
+        self.trader_name = trader_name
+        self.base_strategy = self._load_base_strategy()
+        self.strategy_variants: List[StrategyVariant] = []
+        self.performance_tracker = StrategyPerformanceTracker()
+
+    def create_strategy_variant(self, performance_feedback: Dict) -> StrategyVariant:
+        """基於性能回饋創建策略變體"""
+        variant = StrategyVariant(
+            base_strategy=self.base_strategy,
+            modifications=self._generate_modifications(performance_feedback),
+            creation_time=datetime.now(),
+            expected_improvement=self._estimate_improvement(performance_feedback)
+        )
+        return variant
+
+    def _generate_modifications(self, performance_feedback: Dict) -> Dict:
+        """根據表現生成策略修改建議"""
+        modifications = {}
+
+        if performance_feedback.get('sharpe_ratio', 0) < 0.5:
+            modifications['risk_reduction'] = {
+                'max_position_size': 0.03,  # 降低至3%
+                'stop_loss_tighter': True,
+                'volatility_filter': True
+            }
+
+        if performance_feedback.get('win_rate', 0) < 0.4:
+            modifications['entry_criteria'] = {
+                'technical_confirmation': True,
+                'volume_confirmation': True,
+                'trend_alignment': True
+            }
+
+        return modifications
+```
+
+**性能評估和模式切換**
+
+```python
+class AgentModeController:
+    def __init__(self, trader: EnhancedTrader):
+        self.trader = trader
+        self.mode_transition_rules = self._define_transition_rules()
+
+    async def check_mode_transition(self):
+        """檢查是否需要切換Agent模式"""
+        current_mode = self.trader.agent_state.current_mode
+        mode_duration = datetime.now() - self.trader.agent_state.mode_start_time
+
+        # 時間驅動的切換
+        if mode_duration >= self.trader.agent_state.mode_duration_config[current_mode]:
+            next_mode = self._get_next_scheduled_mode(current_mode)
+            await self._transition_to_mode(next_mode, "scheduled_transition")
+            return
+
+        # 性能驅動的切換
+        performance_metrics = await self.trader.performance_evaluator.get_current_metrics()
+
+        # 緊急停止條件
+        if performance_metrics.get('max_drawdown', 0) > 0.10:  # 10%回撤
+            await self._transition_to_mode(AgentMode.STRATEGY_REVIEW, "emergency_stop")
+            return
+
+        # 優異表現觸發策略檢討
+        if (performance_metrics.get('daily_return', 0) > 0.05 and
+            current_mode == AgentMode.TRADING):
+            await self._transition_to_mode(AgentMode.STRATEGY_REVIEW, "high_performance")
+```
+
+**增強的TradingAgent架構**
+
+```python
+class EnhancedTradingAgent(Agent):
+    def __init__(self, name: str, **kwargs):
+        super().__init__(name=name, **kwargs)
+        self.agent_state = AgentState()
+        self.strategy_manager = StrategyManager(name)
+        self.performance_evaluator = PerformanceEvaluator(name)
+        self.mode_controller = AgentModeController(self)
+
+    async def run_mode_cycle(self):
+        """執行完整的Agent模式循環"""
+        while True:
+            current_mode = self.agent_state.current_mode
+
+            # 根據當前模式執行對應邏輯
+            match current_mode:
+                case AgentMode.TRADING:
+                    await self._execute_trading_mode()
+                case AgentMode.REBALANCING:
+                    await self._execute_rebalancing_mode()
+                case AgentMode.STRATEGY_REVIEW:
+                    await self._execute_strategy_review_mode()
+                case AgentMode.OBSERVATION:
+                    await self._execute_observation_mode()
+
+            # 檢查是否需要切換模式
+            await self.mode_controller.check_mode_transition()
+
+    async def _execute_strategy_review_mode(self):
+        """執行策略檢討模式"""
+        # 獲取性能指標
+        performance = await self.performance_evaluator.get_comprehensive_metrics()
+
+        # 如需演化策略，創建新變體
+        if performance['needs_evolution']:
+            variant = self.strategy_manager.create_strategy_variant(performance)
+
+            # 更新Agent指令以包含新策略
+            self.instructions = self._build_strategy_review_instructions(variant)
+
+            # 執行策略檢討任務
+            await self._run_agent_with_mode_prompt(AgentMode.STRATEGY_REVIEW)
+```
 
 ---
 
@@ -160,7 +465,7 @@ TradingAgent 根據市場條件和用戶設定動態調整執行策略：
 ```python
 from agents import Agent, function_tool
 
-# CasualTrader MCP 工具整合
+# CasualMarket MCP 工具整合
 @function_tool
 async def get_company_fundamentals(symbol: str) -> dict:
     """Get comprehensive company fundamental data"""
@@ -182,7 +487,7 @@ fundamental_agent = Agent(
     Provide clear buy/hold/sell recommendations with rationale.
     """,
     tools=[
-        # CasualTrader MCP Tools 作為 function_tool 包裝
+        # CasualMarket MCP Tools 作為 function_tool 包裝
         get_company_fundamentals,
         get_company_income_statement,
         get_company_balance_sheet,
@@ -429,24 +734,33 @@ async def validate_trade_parameters(
 
 ---
 
-## 🛠️ CasualTrader MCP工具整合
+## 🛠️ CasualMarket MCP 服務整合
 
-### HostedMCPTool 設定
+### 外部專案依賴
+
+**CasualMarket 專案**:
+
+- **GitHub**: <https://github.com/sacahan/CasualMarket>
+- **功能**: 提供台灣股票市場數據的 MCP 服務
+- **安裝**: `uvx --from git+https://github.com/sacahan/CasualMarket.git market-mcp-server`
+- **用途**: Agent 透過 MCP 協定調用股票價格、交易模擬等功能
+
+### 外部 MCP 服務設定
 
 ````python
 from agents import HostedMCPTool
 
-# 整合 CasualTrader MCP Server
-casualtrader_mcp = HostedMCPTool(
+# 整合 CasualMarket MCP Server (獨立專案)
+casualmarket_mcp = HostedMCPTool(
     tool_config={
         "type": "mcp",
-        "server_label": "casualtrader",
-        "server_url": "uvx://casualtrader/market-mcp-server",
+        "server_label": "casualmarket",
+        "server_url": "uvx://casualmarket/market-mcp-server",
         "require_approval": "never",
     }
 )
 
-# TradingAgent 可使用的 CasualTrader 工具：
+# TradingAgent 可使用的 CasualMarket 工具：
 
 ### 核心交易工具
 
@@ -806,38 +1120,93 @@ class AgentNotificationService {
 ## 📁 檔案結構
 
 ```
-src/agents/
-├── trading_agent.py           # 主TradingAgent實作
-├── agent_tools/               # 專門化Agent Tools
-│   ├── fundamental_agent.py   # 基本面分析Agent Tool
-│   ├── technical_agent.py     # 技術分析Agent Tool
-│   ├── risk_agent.py         # 風險評估Agent Tool
-│   └── sentiment_agent.py     # 市場情緒分析Agent Tool
-├── function_tools/            # 交易驗證Function Tools
-│   ├── trading_validation.py  # 交易參數驗證
-│   ├── market_status.py       # 市場狀態檢查
-│   └── portfolio_queries.py   # 投資組合查詢
-├── mcp_integration/           # CasualTrader MCP整合
-│   ├── hosted_mcp_setup.py   # HostedMCPTool設定
-│   └── mcp_function_wrappers.py # MCP工具Function包裝
-├── frontend_api/              # 前端管理API
-│   ├── agent_management.py   # Agent CRUD操作
-│   ├── agent_monitoring.py   # 狀態監控API
-│   └── websocket_service.py  # 即時通知服務
-├── config_manager.py          # SQLite 配置管理
-├── trace_logger.py            # 執行追蹤記錄
-└── models.py                 # 資料模型定義
+src/
+├── agents/                    # Agent 系統模塊
+│   ├── core/                  # 核心 Agent 實作
+│   │   ├── trading_agent.py   # 主TradingAgent實作
+│   │   ├── config_manager.py  # SQLite 配置管理
+│   │   ├── trace_logger.py    # 執行追蹤記錄
+│   │   └── models.py          # Agent 資料模型定義
+│   ├── tools/                 # 專門化Agent Tools
+│   │   ├── fundamental_agent.py   # 基本面分析Agent Tool
+│   │   ├── technical_agent.py     # 技術分析Agent Tool
+│   │   ├── risk_agent.py         # 風險評估Agent Tool
+│   │   └── sentiment_agent.py     # 市場情緒分析Agent Tool
+│   ├── functions/             # 交易驗證Function Tools
+│   │   ├── trading_validation.py  # 交易參數驗證
+│   │   ├── market_status.py       # 市場狀態檢查
+│   │   └── portfolio_queries.py   # 投資組合查詢
+│   └── integrations/          # 外部服務整合
+│       ├── mcp_client.py          # CasualMarket MCP客戶端
+│       └── mcp_function_wrappers.py # MCP工具Function包裝
+├── api/                       # FastAPI 應用 (Agent管理API整合在此)
+│   ├── routers/
+│   │   ├── agents.py          # Agent CRUD操作路由
+│   │   └── agent_monitoring.py # Agent狀態監控路由
+│   ├── services/
+│   │   ├── agent_service.py   # Agent 業務邏輯
+│   │   └── websocket_service.py # 即時通知服務
+│   └── models/
+│       └── agent_models.py    # Agent API 模型
+└── shared/                    # 共享組件
+    ├── database/              # 資料庫相關
+    │   ├── models.py          # 共享資料模型
+    │   └── connection.py      # 資料庫連接
+    ├── utils/                 # 共享工具
+    │   ├── logging.py         # 統一日誌
+    │   └── config.py          # 配置管理
+    └── types/                 # 共享類型定義
+        └── agent_types.py     # Agent類型定義
 
 frontend/src/
-├── components/agents/         # Agent管理組件
-│   ├── AgentCreationForm.tsx  # Agent創建表單
-│   ├── AgentDashboard.tsx     # Agent監控儀表板
-│   └── AgentConfigEditor.tsx  # Agent配置編輯器
-├── services/
-│   ├── AgentAPI.ts           # Agent管理API客戶端
-│   └── NotificationService.ts # WebSocket通知服務
+├── components/
+│   └── Agent/                 # Agent管理組件
+│       ├── AgentCreationForm.svelte  # Agent創建表單
+│       ├── AgentDashboard.svelte     # Agent監控儀表板
+│       ├── AgentConfigEditor.svelte  # Agent配置編輯器
+│       ├── AgentCard.svelte          # Agent基礎卡片
+│       ├── AgentGrid.svelte          # Agent網格布局
+│       ├── AgentModal.svelte         # Agent彈窗組件
+│       ├── AgentToolsSelector.svelte # Agent Tools選擇器
+│       └── AgentPerformancePanel.svelte # Agent績效面板
+├── stores/
+│   ├── agents.js             # Agent狀態管理
+│   └── websocket.js          # WebSocket連線狀態
+├── lib/
+│   ├── api.js                # API客戶端 (包含Agent API)
+│   └── websocket.js          # WebSocket管理
 └── types/
     └── agent.ts              # Agent相關TypeScript類型定義
+
+tests/
+├── agents/                   # Agent系統測試
+│   ├── core/
+│   │   ├── test_trading_agent.py
+│   │   ├── test_config_manager.py
+│   │   └── test_trace_logger.py
+│   ├── tools/
+│   │   ├── test_fundamental_agent.py
+│   │   ├── test_technical_agent.py
+│   │   ├── test_risk_agent.py
+│   │   └── test_sentiment_agent.py
+│   ├── functions/
+│   │   ├── test_trading_validation.py
+│   │   └── test_market_status.py
+│   └── integrations/
+│       └── test_mcp_integration.py
+├── api/
+│   ├── routers/
+│   │   └── test_agents.py    # Agent路由測試
+│   └── services/
+│       └── test_agent_service.py # Agent服務測試
+└── frontend/
+    ├── unit/
+    │   └── components/
+    │       └── Agent/
+    │           ├── AgentCard.test.js
+    │           └── AgentDashboard.test.js
+    └── integration/
+        └── agent-api.test.js
 ```
 
 ---
@@ -846,11 +1215,37 @@ frontend/src/
 
 ### 主 TradingAgent 架構
 
-- [ ] TradingAgent 基礎架構實作
-- [ ] 三種執行模式 (TRADING/REBALANCING/OBSERVATION)
+- [ ] EnhancedTradingAgent 基礎架構實作
+- [ ] 四種執行模式 (TRADING/REBALANCING/STRATEGY_REVIEW/OBSERVATION)
+- [ ] 動態策略演化系統整合
+- [ ] Agent模式狀態機實作
+- [ ] 模式切換控制器 (AgentModeController)
+- [ ] 策略管理器 (StrategyManager)
+- [ ] 性能評估器 (PerformanceEvaluator)
 - [ ] Agent Tool 整合機制
 - [ ] OpenAI Agents SDK 整合
 - [ ] SQLite 配置管理和持久化
+
+### 動態策略演化系統
+
+- [ ] 策略變體生成機制 (`StrategyVariant`)
+- [ ] 性能回饋分析系統
+- [ ] 策略修改建議生成
+- [ ] 模式專用提示詞策略 (`ModePromptStrategy`)
+- [ ] 自動策略參數調整
+- [ ] 策略演化歷史追蹤
+- [ ] 緊急切換機制實作
+- [ ] 時間和性能雙重驅動切換
+
+### 模式切換和控制系統
+
+- [ ] AgentState 狀態管理
+- [ ] 模式持續時間配置
+- [ ] 觸發條件檢測系統
+- [ ] 緊急停止機制 (10%回撤觸發)
+- [ ] 優異表現檢測 (5%日報酬觸發)
+- [ ] 模式切換日誌記錄
+- [ ] 切換原因追蹤
 
 ### 專門化 Agent Tools
 
@@ -886,10 +1281,10 @@ frontend/src/
 - [ ] 交易參數驗證 (`validate_trade_parameters`)
 - [ ] 台股交易規則驗證
 
-### CasualTrader MCP 整合
+### CasualMarket MCP 整合
 
-- [ ] HostedMCPTool 設定
-- [ ] CasualTrader MCP Server 連接
+- [ ] 外部 MCP 服務設定 (CasualMarket 專案)
+- [ ] CasualMarket MCP Server 連接
 - [ ] MCP工具Function包裝器
 - [ ] MCP工具錯誤處理和重試機制
 

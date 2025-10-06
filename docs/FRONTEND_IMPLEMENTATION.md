@@ -23,43 +23,64 @@
 ### 1. 專案結構
 
 ```
-src/
-├── App.svelte              # 主應用程式組件
-├── main.js                 # Vite 進入點
-├── app.html               # HTML 模板
-├── components/            # 可重用組件
-│   ├── Layout/
-│   │   ├── Navbar.svelte
-│   │   └── Sidebar.svelte
-│   ├── Agent/
-│   │   ├── AgentCard.svelte           # Agent 基礎卡片顯示
-│   │   ├── AgentGrid.svelte           # Agent 網格布局
-│   │   ├── AgentModal.svelte          # Agent 彈窗組件
-│   │   ├── AgentCreationForm.svelte   # Agent 創建表單
-│   │   ├── AgentDashboard.svelte      # Agent 監控儀表板
-│   │   ├── AgentConfigEditor.svelte   # Agent 配置編輯器
-│   │   ├── AgentToolsSelector.svelte  # Agent Tools 選擇器
-│   │   └── AgentPerformancePanel.svelte # Agent 績效面板
-│   ├── Chart/
-│   │   ├── PerformanceChart.svelte
-│   │   └── MarketChart.svelte
-│   └── UI/
-│       ├── Button.svelte
-│       ├── Modal.svelte
-│       └── StatusIndicator.svelte
-├── routes/                # 路由頁面
-│   ├── +layout.svelte
-│   ├── +page.svelte       # 主儀表板
-│   └── settings/
-│       └── +page.svelte   # 設定頁面
-├── stores/                # Svelte stores
-│   ├── agents.js          # Agent 狀態管理
-│   ├── websocket.js       # WebSocket 連線狀態
-│   └── market.js          # 市場數據狀態
-└── lib/                   # 工具函數
-    ├── api.js             # API 客戶端
-    ├── websocket.js       # WebSocket 管理
-    └── utils.js           # 共用工具
+frontend/
+├── public/                # 靜態資源
+│   └── vite.svg
+├── src/                   # 前端源代碼
+│   ├── App.svelte         # 主應用程式組件
+│   ├── main.js            # Vite 進入點
+│   ├── app.css           # 全域樣式
+│   ├── components/        # 可重用組件
+│   │   ├── Layout/        # 佈局組件
+│   │   │   ├── Navbar.svelte
+│   │   │   └── Sidebar.svelte
+│   │   ├── Agent/         # Agent 相關組件
+│   │   │   ├── AgentCard.svelte           # Agent 基礎卡片顯示
+│   │   │   ├── AgentGrid.svelte           # Agent 網格布局
+│   │   │   ├── AgentModal.svelte          # Agent 彈窗組件
+│   │   │   ├── AgentCreationForm.svelte   # Agent 創建表單
+│   │   │   ├── AgentDashboard.svelte      # Agent 監控儀表板
+│   │   │   ├── AgentConfigEditor.svelte   # Agent 配置編輯器
+│   │   │   ├── AgentToolsSelector.svelte  # Agent Tools 選擇器
+│   │   │   └── AgentPerformancePanel.svelte # Agent 績效面板
+│   │   ├── Chart/         # 圖表組件
+│   │   │   ├── PerformanceChart.svelte
+│   │   │   └── MarketChart.svelte
+│   │   ├── Market/        # 市場相關組件
+│   │   │   ├── MarketPanel.svelte
+│   │   │   └── StockQuote.svelte
+│   │   └── UI/            # 基礎 UI 組件
+│   │       ├── Button.svelte
+│   │       ├── Modal.svelte
+│   │       └── StatusIndicator.svelte
+│   ├── routes/            # SvelteKit 路由頁面
+│   │   ├── +layout.svelte
+│   │   ├── +page.svelte   # 主儀表板
+│   │   ├── agents/        # Agent 管理頁面
+│   │   │   ├── +page.svelte
+│   │   │   └── [id]/
+│   │   │       └── +page.svelte
+│   │   └── settings/      # 設定頁面
+│   │       └── +page.svelte
+│   ├── stores/            # Svelte stores 狀態管理
+│   │   ├── agents.js      # Agent 狀態管理
+│   │   ├── websocket.js   # WebSocket 連線狀態
+│   │   ├── market.js      # 市場數據狀態
+│   │   └── notifications.js # 通知系統
+│   ├── lib/               # 前端工具函數
+│   │   ├── api.js         # API 客戶端
+│   │   ├── websocket.js   # WebSocket 管理
+│   │   ├── utils.js       # 共用工具
+│   │   └── constants.js   # 前端常數
+│   └── types/             # TypeScript 類型定義
+│       ├── agent.ts       # Agent 類型
+│       ├── api.ts         # API 類型
+│       └── websocket.ts   # WebSocket 類型
+├── vite.config.js         # Vite 配置
+├── tailwind.config.js     # Tailwind CSS 配置
+├── postcss.config.js      # PostCSS 配置
+├── package.json           # NPM 配置
+└── tsconfig.json          # TypeScript 配置
 ```
 
 ### 2. 主應用程式組件 (App.svelte)
@@ -686,39 +707,93 @@ export default defineConfig({
 ## 📁 專案檔案結構
 
 ```
-frontend/
-├── public/
+frontend/                          # 前端應用根目錄
+├── public/                        # 靜態資源
 │   └── vite.svg
-├── src/
-│   ├── App.svelte
-│   ├── main.js
-│   ├── app.css
-│   ├── components/
-│   │   ├── Layout/
+├── src/                           # 前端源代碼
+│   ├── App.svelte                 # 主應用程式組件
+│   ├── main.js                    # Vite 進入點
+│   ├── app.css                    # 全域樣式
+│   ├── components/                # 可重用組件
+│   │   ├── Layout/                # 佈局組件
 │   │   │   ├── Navbar.svelte
 │   │   │   └── Sidebar.svelte
-│   │   ├── Agent/
+│   │   ├── Agent/                 # Agent 相關組件
 │   │   │   ├── AgentCard.svelte
 │   │   │   ├── AgentGrid.svelte
-│   │   │   └── AgentModal.svelte
-│   │   ├── Chart/
-│   │   │   └── PerformanceChart.svelte
-│   │   └── UI/
+│   │   │   ├── AgentModal.svelte
+│   │   │   ├── AgentCreationForm.svelte
+│   │   │   ├── AgentDashboard.svelte
+│   │   │   ├── AgentConfigEditor.svelte
+│   │   │   ├── AgentToolsSelector.svelte
+│   │   │   └── AgentPerformancePanel.svelte
+│   │   ├── Chart/                 # 圖表組件
+│   │   │   ├── PerformanceChart.svelte
+│   │   │   └── MarketChart.svelte
+│   │   ├── Market/                # 市場相關組件
+│   │   │   ├── MarketPanel.svelte
+│   │   │   └── StockQuote.svelte
+│   │   └── UI/                    # 基礎 UI 組件
 │   │       ├── Button.svelte
 │   │       ├── Modal.svelte
 │   │       └── StatusIndicator.svelte
-│   ├── stores/
-│   │   ├── agents.js
-│   │   ├── websocket.js
-│   │   └── market.js
-│   └── lib/
-│       ├── api.js
-│       ├── websocket.js
-│       └── utils.js
-├── vite.config.js
-├── tailwind.config.js
-├── postcss.config.js
-└── package.json
+│   ├── routes/                    # SvelteKit 路由頁面
+│   │   ├── +layout.svelte
+│   │   ├── +page.svelte           # 主儀表板
+│   │   ├── agents/                # Agent 管理頁面
+│   │   │   ├── +page.svelte
+│   │   │   └── [id]/
+│   │   │       └── +page.svelte
+│   │   └── settings/              # 設定頁面
+│   │       └── +page.svelte
+│   ├── stores/                    # Svelte stores 狀態管理
+│   │   ├── agents.js              # Agent 狀態管理
+│   │   ├── websocket.js           # WebSocket 連線狀態
+│   │   ├── market.js              # 市場數據狀態
+│   │   └── notifications.js       # 通知系統
+│   ├── lib/                       # 前端工具函數
+│   │   ├── api.js                 # API 客戶端
+│   │   ├── websocket.js           # WebSocket 管理
+│   │   ├── utils.js               # 共用工具
+│   │   └── constants.js           # 前端常數
+│   └── types/                     # TypeScript 類型定義
+│       ├── agent.ts               # Agent 類型
+│       ├── api.ts                 # API 類型
+│       └── websocket.ts           # WebSocket 類型
+├── vite.config.js                 # Vite 配置
+├── tailwind.config.js             # Tailwind CSS 配置
+├── postcss.config.js              # PostCSS 配置
+├── package.json                   # NPM 配置
+└── tsconfig.json                  # TypeScript 配置
+
+tests/frontend/                    # 前端測試 (與主專案 tests/ 目錄整合)
+├── unit/                          # 單元測試
+│   ├── components/                # 組件測試
+│   │   ├── Agent/
+│   │   │   ├── AgentCard.test.js
+│   │   │   ├── AgentDashboard.test.js
+│   │   │   └── AgentConfigEditor.test.js
+│   │   ├── Chart/
+│   │   │   └── PerformanceChart.test.js
+│   │   └── UI/
+│   │       ├── Button.test.js
+│   │       └── Modal.test.js
+│   ├── stores/                    # Store 測試
+│   │   ├── agents.test.js
+│   │   ├── websocket.test.js
+│   │   └── market.test.js
+│   └── lib/                       # 工具函數測試
+│       ├── api.test.js
+│       ├── websocket.test.js
+│       └── utils.test.js
+├── integration/                   # 整合測試
+│   ├── api-integration.test.js    # API 整合測試
+│   ├── websocket-flow.test.js     # WebSocket 流程測試
+│   └── agent-workflow.test.js     # Agent 工作流程測試
+└── e2e/                           # 端到端測試
+    ├── agent-management.test.js   # Agent 管理流程
+    ├── trading-simulation.test.js # 交易模擬流程
+    └── dashboard-functionality.test.js # 儀表板功能測試
 ```
 
 ---
