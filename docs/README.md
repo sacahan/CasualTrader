@@ -1,101 +1,88 @@
 # CasualTrader 文檔結構
 
-**重構日期**: 2025-10-06
-**版本**: 4.0
+**最後更新**: 2025-10-06
+**版本**: 5.0
 
 ---
 
 ## 📚 文檔概覽
 
-為了消除內容重複和提高維護效率，我們將原本複雜的文檔結構重新組織為：
+為了消除內容重複和提高維護效率，文檔結構已精簡為以下核心文件：
 
-### **主要規範文件** (1 份)
+### **主要規範文件**
 
 - `SYSTEM_DESIGN.md` - 系統設計規範與高層架構
 
-### **詳細實作規格** (4 份)
+### **詳細實作規格**
 
-- **`AGENT_IMPLEMENTATION.md`** ⭐ **核心文檔** - Agent 系統完整實作規格 (50KB | 1702行 | 84章節)
+- `AGENT_IMPLEMENTATION.md` - Agent 系統完整實作規格
 - `API_IMPLEMENTATION.md` - 後端 API 詳細實作規格
 - `FRONTEND_IMPLEMENTATION.md` - 前端介面詳細實作規格
+
+### **專案結構與部署**
+
+- `PROJECT_STRUCTURE.md` - 統一的專案結構規範
 - `DEPLOYMENT_GUIDE.md` - 部署和配置詳細指南
 
-### **補充文檔** (2 份)
+### **技術參考文檔**
 
 - `API_DEPENDENCIES.md` - API 套件依賴清單和配置指南
-- **`AGENT_DOCS_CHANGELOG.md`** - Agent 文檔整合變更說明 (新增)
 
 ---
 
-## 🔄 最新更新
+## � 歷史文檔
 
-### **AI 模型選擇功能** (2025-10-06)
+為了保持文檔清晰度和可維護性，以下歷史文檔已移至 `archives/` 目錄：
 
-**功能更新**: 支援多種 AI 模型選擇與追蹤
+### **功能規格與更新記錄**
 
-**新增文檔**:
+- `AI_MODEL_SELECTION_FEATURE.md` - AI 模型選擇功能規格（功能已整合至主文檔）
+- `AI_MODEL_UPDATE_SUMMARY.md` - AI 模型功能更新總結
 
-- ✅ **`AI_MODEL_SELECTION_FEATURE.md`** - 完整的 AI 模型選擇功能規格
-- ✅ **`AI_MODEL_UPDATE_SUMMARY.md`** - 文檔更新總結與實作指南
+### **里程碑記錄**
 
-**更新文檔**:
+- `PHASE1_COMPLETION_REPORT.md` - Phase 1 完成報告
+- `PHASE1_SUMMARY.md` - Phase 1 總結
 
-- ✅ `SYSTEM_DESIGN.md` - 新增多模型支援說明
-- ✅ `API_IMPLEMENTATION.md` - 新增模型 API 規格與資料庫 Schema
-- ✅ `AGENT_IMPLEMENTATION.md` - 新增模型選擇表單設計
-- ✅ `FRONTEND_IMPLEMENTATION.md` - 新增模型顯示組件
-- ✅ `../src/database/schema.sql` - 新增模型追蹤欄位
+### **結構調整記錄**
 
-**功能特點**:
+- `STRUCTURE_ADJUSTMENT_SUMMARY.md` - 專案結構調整總結
+- `STRUCTURE_MIGRATION_GUIDE.md` - 專案結構遷移指南
 
-- 🤖 支援 8+ 種主流 AI 模型（OpenAI / Anthropic / Google 等）
-- 📊 完整追蹤交易與策略變更時使用的模型
-- 🎨 前端提供直觀的模型選擇介面
-- 💾 資料庫完整記錄模型使用歷史
-- 📈 支援模型績效比較分析
-
-### **Agent 文檔整合** (2025-10-06)
-
-**整合目的**: 避免維護兩份相似內容的 Agent 文檔
-
-**整合前**:
-
-- ❌ `AGENT_IMPLEMENTATION.md` - Agent 實作規格
-- ❌ `AGENT_DYNAMIC_STRATEGY_ARCHITECTURE.md` - 策略架構設計
-
-**整合後**:
-
-- ✅ **`AGENT_IMPLEMENTATION.md`** - 完整的 Agent 系統實作規格 (已整合所有內容)
-- 📦 `AGENT_DYNAMIC_STRATEGY_ARCHITECTURE.md.backup` - 備份文件
-
-**新增內容** (整合自 AGENT_DYNAMIC_STRATEGY_ARCHITECTURE.md):
-
-- ✨ **交易模式詳細設計** - 四種模式 (TRADING/REBALANCING/OBSERVATION/STRATEGY_REVIEW) 的完整說明
-- ✨ **策略演化詳細說明** - 用戶定義調整依據、自主調整流程、實際範例
-- ✨ **更豐富的 Prompt 範例** - 每個模式的詳細 Prompt 指令範例
-
-詳細變更請參考: **[AGENT_DOCS_CHANGELOG.md](./AGENT_DOCS_CHANGELOG.md)**
+**注意**: 這些文檔僅供參考，所有最新資訊請查看上述核心文檔。
 
 ---
 
-## 🔍 重構歷史
+## � 文檔整理歷史
 
-### **解決的問題**
+### **2025-10-06 - 文檔結構精簡**
 
-✅ **消除重複** - 移除了文檔間的內容重複和維護負擔
-✅ **職責分離** - 每個文檔有明確的範圍和職責
-✅ **易於維護** - 更新時不需要同步多個文檔
-✅ **便於查找** - 根據需求直接找到對應文檔
-✅ **內容完整** - 整合後的文檔提供更完整的視角
+**目標**: 消除冗餘文檔，保持文檔結構清晰
 
-### **已移除的文檔**
+**執行動作**:
 
-以下文檔已移除（內容已整合到新的文檔結構中）：
+- ✅ 移動 6 份歷史文檔至 `archives/` 目錄
+- ✅ 刪除 `api/` 子目錄（自動生成的文檔）
+- ✅ 確認所有核心功能已整合至主文檔
+- ✅ 更新文檔索引結構
 
-- `AGENT_CONTROL_FEATURES.md` - 內容已整合到 `AGENT_IMPLEMENTATION.md`
-- `AGENT_CONTROL_QUICK_REF.md` - 內容已整合到 `AGENT_IMPLEMENTATION.md`
-- `DESIGN_SPECIFICATION.md` - 內容已重構分散到各實作規格文檔
-- **`AGENT_DYNAMIC_STRATEGY_ARCHITECTURE.md`** - 內容已整合到 `AGENT_IMPLEMENTATION.md` (備份保留)
+**保留的核心文檔** (8 份):
+
+1. `SYSTEM_DESIGN.md` - 系統設計規範
+2. `AGENT_IMPLEMENTATION.md` - Agent 實作規格
+3. `API_IMPLEMENTATION.md` - API 實作規格
+4. `FRONTEND_IMPLEMENTATION.md` - 前端實作規格
+5. `PROJECT_STRUCTURE.md` - 專案結構規範
+6. `DEPLOYMENT_GUIDE.md` - 部署配置指南
+7. `API_DEPENDENCIES.md` - 套件依賴清單
+8. `README.md` - 文檔導讀
+
+### **整理原則**
+
+✅ **消除重複** - 移除內容重複的文檔
+✅ **保留歷史** - 歷史文檔移至 archives 而非刪除
+✅ **清晰分類** - 核心實作文檔 vs 歷史記錄文檔
+✅ **易於維護** - 減少需要同步更新的文檔數量
 
 ---
 

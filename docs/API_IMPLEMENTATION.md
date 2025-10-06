@@ -91,8 +91,6 @@ DELETE /api/agents/{id}               # 刪除代理人
 - 預設值為 `gpt-4o`（平衡性能與成本）
 - 模型資訊在 Agent 創建時保存，執行期間記錄在交易與策略變更記錄中
 
-```
-
 **Response**:
 
 ```json
