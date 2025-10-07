@@ -203,37 +203,117 @@ class TechnicalAgent:
     async def _calculate_technical_indicators(
         self, price_data: dict[str, Any]
     ) -> TechnicalIndicators:
-        """計算技術指標"""
-        current_price = price_data["current_price"]
-        price_data["daily_data"]
+        """
+        計算技術指標（使用真實計算）
 
-        # 模擬計算結果（實際實作時會進行真實計算）
-        return TechnicalIndicators(
-            symbol=price_data["symbol"],
-            price_data={
-                "open": current_price - 1.0,
-                "high": current_price + 1.5,
-                "low": current_price - 2.0,
-                "close": current_price,
-                "volume": 1500000,
-            },
-            ma5=current_price - 0.5,
-            ma10=current_price - 1.0,
-            ma20=current_price - 2.0,
-            ma60=current_price - 5.0,
-            rsi=65.5,
-            macd=1.2,
-            macd_signal=1.0,
-            macd_histogram=0.2,
-            bollinger_upper=current_price + 3.0,
-            bollinger_middle=current_price,
-            bollinger_lower=current_price - 3.0,
-            k_value=75.0,
-            d_value=68.0,
-            volume_ma5=1200000,
-            volume_ratio=1.25,
-            analysis_timestamp=datetime.now(),
-        )
+        Args:
+            price_data: 價格數據
+
+        Returns:
+            技術指標結果
+        """
+        try:
+            from ..utils.technical_indicators import get_indicator_calculator
+
+            calculator = get_indicator_calculator()
+            daily_data = price_data.get("daily_data", [])
+
+            if not daily_data:
+                # 無歷史數據時返回基本結構
+                current_price = price_data["current_price"]
+                return TechnicalIndicators(
+                    symbol=price_data["symbol"],
+                    price_data={
+                        "open": current_price,
+                        "high": current_price,
+                        "low": current_price,
+                        "close": current_price,
+                        "volume": 0,
+                    },
+                    analysis_timestamp=datetime.now(),
+                )
+
+            # 提取價格數據
+            closes = [d["close"] for d in daily_data]
+            highs = [d["high"] for d in daily_data]
+            lows = [d["low"] for d in daily_data]
+            volumes = [d["volume"] for d in daily_data]
+
+            current_price = closes[-1] if closes else price_data["current_price"]
+
+            # 計算移動平均線
+            ma5_list = calculator.calculate_ma(closes, 5)
+            ma10_list = calculator.calculate_ma(closes, 10)
+            ma20_list = calculator.calculate_ma(closes, 20)
+            ma60_list = calculator.calculate_ma(closes, 60)
+
+            # 計算 RSI
+            rsi_list = calculator.calculate_rsi(closes, 14)
+
+            # 計算 MACD
+            macd_result = calculator.calculate_macd(closes)
+
+            # 計算布林通道
+            bollinger = calculator.calculate_bollinger_bands(closes, 20, 2.0)
+
+            # 計算 KD 指標
+            stochastic = calculator.calculate_stochastic(highs, lows, closes, 14, 3)
+
+            # 計算成交量指標
+            volume_indicators = calculator.calculate_volume_indicators(volumes, 5)
+
+            return TechnicalIndicators(
+                symbol=price_data["symbol"],
+                price_data={
+                    "open": daily_data[-1]["open"],
+                    "high": daily_data[-1]["high"],
+                    "low": daily_data[-1]["low"],
+                    "close": current_price,
+                    "volume": daily_data[-1]["volume"],
+                },
+                ma5=ma5_list[-1] if ma5_list else None,
+                ma10=ma10_list[-1] if ma10_list else None,
+                ma20=ma20_list[-1] if ma20_list else None,
+                ma60=ma60_list[-1] if ma60_list else None,
+                rsi=rsi_list[-1] if rsi_list else None,
+                macd=macd_result["macd"][-1] if macd_result["macd"] else None,
+                macd_signal=(
+                    macd_result["signal"][-1] if macd_result["signal"] else None
+                ),
+                macd_histogram=(
+                    macd_result["histogram"][-1] if macd_result["histogram"] else None
+                ),
+                bollinger_upper=(
+                    bollinger["upper"][-1] if bollinger["upper"] else None
+                ),
+                bollinger_middle=(
+                    bollinger["middle"][-1] if bollinger["middle"] else None
+                ),
+                bollinger_lower=(
+                    bollinger["lower"][-1] if bollinger["lower"] else None
+                ),
+                k_value=stochastic["k"][-1] if stochastic["k"] else None,
+                d_value=stochastic["d"][-1] if stochastic["d"] else None,
+                volume_ma5=volume_indicators.get("average_volume"),
+                volume_ratio=volume_indicators.get("volume_ratio"),
+                analysis_timestamp=datetime.now(),
+            )
+
+        except Exception as e:
+            self.logger.error(f"Failed to calculate technical indicators: {e}")
+            # 失敗時返回基本結構
+            current_price = price_data.get("current_price", 100.0)
+            return TechnicalIndicators(
+                symbol=price_data["symbol"],
+                price_data={
+                    "open": current_price,
+                    "high": current_price,
+                    "low": current_price,
+                    "close": current_price,
+                    "volume": 0,
+                },
+                analysis_timestamp=datetime.now(),
+            )
 
     async def _identify_chart_patterns(
         self, price_data: dict[str, Any], indicators: TechnicalIndicators

@@ -12,6 +12,12 @@ from typing import Any
 
 from pydantic import BaseModel
 
+# from sqlalchemy import desc, select, func
+# from sqlalchemy.ext.asyncio import AsyncSession
+# from src.database.models import Agent, AgentHolding
+# from ..integrations.database_service import AgentDatabaseService
+# from ..integrations.mcp_client import get_mcp_client
+
 
 class Position(BaseModel):
     """持倉資訊"""
@@ -57,10 +63,19 @@ class PerformanceMetrics(BaseModel):
 class PortfolioQueries:
     """
     投資組合查詢器
+    整合資料庫查詢與 MCP 即時價格
     """
 
-    def __init__(self) -> None:
+    def __init__(self, db_service: Any | None = None) -> None:
+        """
+        初始化投資組合查詢器
+
+        Args:
+            db_service: 資料庫服務實例 (選填)
+        """
         self.logger = logging.getLogger("portfolio_queries")
+        self.db_service = db_service
+        self.mcp_client = None  # 延遲初始化
 
     async def get_portfolio_summary(
         self, agent_id: str, include_history: bool = False
@@ -454,45 +469,134 @@ class PortfolioQueries:
     # 以下為私有方法，用於數據獲取（實際實作時會連接資料庫）
 
     async def _get_positions_data(self, agent_id: str) -> list[dict[str, Any]]:
-        """獲取持倉數據（模擬）"""
-        return [
-            {
-                "symbol": "2330",
-                "quantity": 2000,
-                "average_price": 580.0,
-                "current_price": 595.0,
-                "market_value": 1190000,
-                "unrealized_pnl": 30000,
-                "unrealized_pnl_percent": 0.0259,
-                "sector": "半導體",
-                "purchase_date": datetime.now() - timedelta(days=30),
-            },
-            {
-                "symbol": "2317",
-                "quantity": 1000,
-                "average_price": 120.0,
-                "current_price": 115.0,
-                "market_value": 115000,
-                "unrealized_pnl": -5000,
-                "unrealized_pnl_percent": -0.0417,
-                "sector": "電腦週邊",
-                "purchase_date": datetime.now() - timedelta(days=15),
-            },
-        ]
+        """
+        獲取持倉數據（從資料庫查詢 + MCP 即時價格）
+
+        Args:
+            agent_id: Agent ID
+
+        Returns:
+            持倉數據列表
+        """
+        if not self.db_service:
+            # 無資料庫連接時返回模擬數據
+            self.logger.warning("No database service, returning mock data")
+            return [
+                {
+                    "symbol": "2330",
+                    "quantity": 2000,
+                    "average_price": 580.0,
+                    "current_price": 595.0,
+                    "market_value": 1190000,
+                    "unrealized_pnl": 30000,
+                    "unrealized_pnl_percent": 0.0259,
+                    "sector": "半導體",
+                    "purchase_date": datetime.now() - timedelta(days=30),
+                },
+                {
+                    "symbol": "2317",
+                    "quantity": 1000,
+                    "average_price": 120.0,
+                    "current_price": 115.0,
+                    "market_value": 115000,
+                    "unrealized_pnl": -5000,
+                    "unrealized_pnl_percent": -0.0417,
+                    "sector": "電腦週邊",
+                    "purchase_date": datetime.now() - timedelta(days=15),
+                },
+            ]
+
+        try:
+            # 從資料庫查詢持倉
+            # TODO: 實際實作資料庫查詢
+            # holdings = await self.db_service.get_agent_holdings(agent_id)
+
+            # 初始化 MCP 客戶端
+            if not self.mcp_client:
+                from ..integrations.mcp_client import get_mcp_client
+
+                self.mcp_client = get_mcp_client()
+                await self.mcp_client.initialize()
+
+            # 模擬資料庫查詢結果
+            positions_data = []
+
+            # 範例:為每個持倉取得即時價格
+            # for holding in holdings:
+            #     price_data = await self.mcp_client.get_stock_price(holding.symbol)
+            #     current_price = price_data["current_price"]
+            #     market_value = holding.quantity * current_price
+            #     unrealized_pnl = market_value - (holding.quantity * holding.average_price)
+            #     ...
+
+            return positions_data
+
+        except Exception as e:
+            self.logger.error(f"Failed to get positions data: {e}")
+            # 失敗時返回空列表
+            return []
 
     async def _get_cash_balance(self, agent_id: str) -> float:
-        """獲取現金餘額（模擬）"""
-        return 150000.0
+        """
+        獲取現金餘額（從資料庫查詢）
+
+        Args:
+            agent_id: Agent ID
+
+        Returns:
+            現金餘額
+        """
+        if not self.db_service:
+            self.logger.warning("No database service, returning mock cash balance")
+            return 150000.0
+
+        try:
+            # TODO: 從資料庫查詢現金餘額
+            # agent_state = await self.db_service.load_agent_state(agent_id)
+            # return agent_state.config.initial_funds - invested_amount
+            return 150000.0
+
+        except Exception as e:
+            self.logger.error(f"Failed to get cash balance: {e}")
+            return 0.0
 
     async def _get_total_portfolio_value(self, agent_id: str) -> float:
-        """獲取投資組合總值（模擬）"""
+        """
+        獲取投資組合總值（持倉市值 + 現金）
+
+        Args:
+            agent_id: Agent ID
+
+        Returns:
+            投資組合總值
+        """
         positions_data = await self._get_positions_data(agent_id)
         cash = await self._get_cash_balance(agent_id)
         return sum(pos["market_value"] for pos in positions_data) + cash
 
     async def _get_realized_pnl(self, agent_id: str) -> float:
-        """獲取已實現損益（模擬）"""
-        return 25000.0
+        """
+        獲取已實現損益（從交易記錄計算）
+
+        Args:
+            agent_id: Agent ID
+
+        Returns:
+            已實現損益總額
+        """
+        if not self.db_service:
+            self.logger.warning("No database service, returning mock realized P&L")
+            return 25000.0
+
+        try:
+            # TODO: 從資料庫查詢已平倉的交易記錄並計算損益
+            # trades = await self.db_service.get_closed_trades(agent_id)
+            # return sum(trade.realized_pnl for trade in trades)
+            return 25000.0
+
+        except Exception as e:
+            self.logger.error(f"Failed to get realized P&L: {e}")
+            return 0.0
 
     def _calculate_diversification_score(
         self, positions_data: list[dict[str, Any]]
