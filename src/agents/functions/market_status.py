@@ -4,18 +4,19 @@
 使用 Python 3.12+ 語法
 """
 
-from __future__ import annotations
-
 import logging
+from collections.abc import Callable
 from datetime import datetime, time
 from typing import Any
 
 import pytz
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 
 class MarketSession(BaseModel):
     """交易時段定義"""
+
+    model_config = ConfigDict(arbitrary_types_allowed=True)
 
     name: str
     start_time: time
@@ -25,6 +26,8 @@ class MarketSession(BaseModel):
 
 class MarketStatus(BaseModel):
     """市場狀態"""
+
+    model_config = ConfigDict(arbitrary_types_allowed=True)
 
     is_open: bool
     current_session: str | None = None
@@ -46,11 +49,25 @@ class MarketHoliday(BaseModel):
 class MarketStatusChecker:
     """
     市場狀態檢查器
+    使用 MCP tool 動態查詢台股交易日和假日資訊
     """
 
-    def __init__(self) -> None:
+    def __init__(
+        self,
+        mcp_check_trading_day: Callable[[str], Any] | None = None,
+        mcp_get_holiday_info: Callable[[str], Any] | None = None,
+    ) -> None:
+        """
+        初始化市場狀態檢查器
+
+        Args:
+            mcp_check_trading_day: MCP tool 函數,用於檢查是否為交易日
+            mcp_get_holiday_info: MCP tool 函數,用於取得假日資訊
+        """
         self.logger = logging.getLogger("market_status_checker")
         self.timezone = pytz.timezone("Asia/Taipei")
+        self.mcp_check_trading_day = mcp_check_trading_day
+        self.mcp_get_holiday_info = mcp_get_holiday_info
 
         # 台股交易時段定義
         self.trading_sessions = {
@@ -86,24 +103,8 @@ class MarketStatusChecker:
             ),
         }
 
-        # 2024年台股假日 (可以從外部API獲取)
-        self.market_holidays = [
-            MarketHoliday(date="2024-01-01", name="元旦", type="national"),
-            MarketHoliday(date="2024-02-08", name="農曆春節前", type="market_specific"),
-            MarketHoliday(date="2024-02-09", name="農曆除夕", type="national"),
-            MarketHoliday(date="2024-02-10", name="農曆春節", type="national"),
-            MarketHoliday(date="2024-02-11", name="農曆春節", type="national"),
-            MarketHoliday(date="2024-02-12", name="農曆春節", type="national"),
-            MarketHoliday(date="2024-02-13", name="農曆春節", type="national"),
-            MarketHoliday(date="2024-02-14", name="農曆春節", type="national"),
-            MarketHoliday(date="2024-02-28", name="和平紀念日", type="national"),
-            MarketHoliday(date="2024-04-04", name="清明節", type="national"),
-            MarketHoliday(date="2024-04-05", name="清明節", type="national"),
-            MarketHoliday(date="2024-05-01", name="勞動節", type="national"),
-            MarketHoliday(date="2024-06-10", name="端午節", type="national"),
-            MarketHoliday(date="2024-09-17", name="中秋節", type="national"),
-            MarketHoliday(date="2024-10-10", name="國慶日", type="national"),
-        ]
+        # 假日資訊快取 (避免重複 MCP 查詢)
+        self._holiday_cache: dict[str, MarketHoliday | None] = {}
 
     async def get_market_status(
         self, check_time: datetime | None = None
@@ -124,12 +125,10 @@ class MarketStatusChecker:
             else:
                 current_time = check_time.astimezone(self.timezone)
 
-            # 檢查是否為工作日
-            is_weekday = current_time.weekday() < 5  # 0-4 為週一到週五
-
-            # 檢查是否為假日
             date_str = current_time.strftime("%Y-%m-%d")
-            is_holiday = any(h.date == date_str for h in self.market_holidays)
+
+            # 使用 MCP tool 檢查是否為交易日
+            is_trading_day = await self._check_is_trading_day(date_str)
 
             # 確定當前交易時段
             current_session = self._get_current_session(current_time)
@@ -138,16 +137,15 @@ class MarketStatusChecker:
                 current_time, next_session
             )
 
-            # 判斷市場是否開盤
+            # 判斷市場是否開盤 (必須是交易日且在交易時段內)
             is_open = (
-                is_weekday
-                and not is_holiday
+                is_trading_day
                 and current_session is not None
                 and self.trading_sessions[current_session].is_trading
             )
 
             self.logger.info(
-                f"Market status checked: open={is_open}, session={current_session}"
+                f"Market status checked: open={is_open}, session={current_session}, is_trading_day={is_trading_day}"
             )
 
             return MarketStatus(
@@ -155,13 +153,99 @@ class MarketStatusChecker:
                 current_session=current_session,
                 next_session=next_session,
                 time_to_next_session=time_to_next,
-                market_date=current_time.strftime("%Y-%m-%d"),
+                market_date=date_str,
                 current_time=current_time,
             )
 
         except Exception as e:
             self.logger.error(f"Failed to get market status: {e}")
             raise
+
+    async def _check_is_trading_day(self, date: str) -> bool:
+        """
+        使用 MCP tool 檢查是否為交易日
+
+        Args:
+            date: 日期 (YYYY-MM-DD)
+
+        Returns:
+            是否為交易日
+        """
+        try:
+            if self.mcp_check_trading_day is None:
+                # 如果沒有提供 MCP tool,使用基本邏輯判斷 (週末)
+                self.logger.warning(
+                    "MCP tool not provided, falling back to basic weekday check"
+                )
+                from datetime import datetime as dt
+
+                check_date = dt.strptime(date, "%Y-%m-%d")
+                return check_date.weekday() < 5
+
+            # 呼叫 MCP tool: check_taiwan_trading_day
+            result = await self.mcp_check_trading_day(date)
+
+            if result.get("success"):
+                data = result.get("data", {})
+                return data.get("is_trading_day", False)
+            else:
+                self.logger.warning(
+                    f"MCP check_trading_day failed: {result.get('error')}"
+                )
+                return False
+
+        except Exception as e:
+            self.logger.error(f"Failed to check trading day via MCP: {e}")
+            # 發生錯誤時,fallback 到基本判斷
+            from datetime import datetime as dt
+
+            check_date = dt.strptime(date, "%Y-%m-%d")
+            return check_date.weekday() < 5
+
+    async def _get_holiday_info(self, date: str) -> MarketHoliday | None:
+        """
+        使用 MCP tool 取得假日資訊
+
+        Args:
+            date: 日期 (YYYY-MM-DD)
+
+        Returns:
+            假日資訊,如果不是假日則返回 None
+        """
+        # 檢查快取
+        if date in self._holiday_cache:
+            return self._holiday_cache[date]
+
+        try:
+            if self.mcp_get_holiday_info is None:
+                self.logger.warning("MCP tool get_holiday_info not provided")
+                return None
+
+            # 呼叫 MCP tool: get_taiwan_holiday_info
+            result = await self.mcp_get_holiday_info(date)
+
+            if result.get("success"):
+                data = result.get("data", {})
+                if data.get("is_holiday"):
+                    holiday = MarketHoliday(
+                        date=date,
+                        name=data.get("name", "未知假日"),
+                        type=data.get("holiday_category", "national"),
+                    )
+                    self._holiday_cache[date] = holiday
+                    return holiday
+                else:
+                    self._holiday_cache[date] = None
+                    return None
+            else:
+                self.logger.warning(
+                    f"MCP get_holiday_info failed: {result.get('error')}"
+                )
+                return None
+
+        except Exception as e:
+            self.logger.error(f"Failed to get holiday info via MCP: {e}")
+            return None
 
     def _get_current_session(self, current_time: datetime) -> str | None:
         """獲取當前交易時段"""
@@ -308,16 +392,13 @@ class MarketStatusChecker:
             while current_date <= end:
                 date_str = current_date.strftime("%Y-%m-%d")
 
-                # 檢查是否為工作日
-                is_weekday = current_date.weekday() < 5
+                # 使用 MCP tool 檢查是否為交易日
+                is_trading_day = await self._check_is_trading_day(date_str)
 
-                # 檢查是否為假日
-                is_holiday = any(h.date == date_str for h in self.market_holidays)
-                holiday_info = next(
-                    (h for h in self.market_holidays if h.date == date_str), None
-                )
+                # 取得假日資訊
+                holiday_info = await self._get_holiday_info(date_str)
 
-                if is_weekday and not is_holiday:
+                if is_trading_day:
                     trading_days.append(
                         {
                             "date": date_str,
@@ -327,9 +408,11 @@ class MarketStatusChecker:
                     )
                 else:
                     reason = []
+                    is_weekday = current_date.weekday() < 5
+
                     if not is_weekday:
                         reason.append("週末")
-                    if is_holiday:
+                    if holiday_info:
                         reason.append(f"假日({holiday_info.name})")
 
                     non_trading_days.append(
@@ -337,7 +420,7 @@ class MarketStatusChecker:
                             "date": date_str,
                             "day_of_week": current_date.strftime("%A"),
                             "is_trading_day": False,
-                            "reason": ", ".join(reason),
+                            "reason": ", ".join(reason) if reason else "非交易日",
                             "holiday_info": (
                                 holiday_info.dict() if holiday_info else None
                             ),
@@ -359,63 +442,13 @@ class MarketStatusChecker:
             self.logger.error(f"Failed to get market calendar: {e}")
             raise
 
-    async def add_market_holiday(
-        self, date: str, name: str, holiday_type: str = "market_specific"
-    ) -> bool:
+    def clear_holiday_cache(self) -> None:
         """
-        添加市場假日
-
-        Args:
-            date: 日期 (YYYY-MM-DD)
-            name: 假日名稱
-            holiday_type: 假日類型
-
-        Returns:
-            是否添加成功
+        清除假日快取
+        在需要重新載入最新假日資訊時使用
         """
-        try:
-            # 檢查是否已存在
-            if any(h.date == date for h in self.market_holidays):
-                self.logger.warning(f"Holiday {date} already exists")
-                return False
-
-            holiday = MarketHoliday(date=date, name=name, type=holiday_type)
-            self.market_holidays.append(holiday)
-
-            # 按日期排序
-            self.market_holidays.sort(key=lambda x: x.date)
-
-            self.logger.info(f"Added market holiday: {date} - {name}")
-            return True
-
-        except Exception as e:
-            self.logger.error(f"Failed to add market holiday: {e}")
-            return False
-
-    async def remove_market_holiday(self, date: str) -> bool:
-        """
-        移除市場假日
-
-        Args:
-            date: 日期 (YYYY-MM-DD)
-
-        Returns:
-            是否移除成功
-        """
-        try:
-            original_count = len(self.market_holidays)
-            self.market_holidays = [h for h in self.market_holidays if h.date != date]
-
-            if len(self.market_holidays) < original_count:
-                self.logger.info(f"Removed market holiday: {date}")
-                return True
-            else:
-                self.logger.warning(f"Holiday {date} not found")
-                return False
-
-        except Exception as e:
-            self.logger.error(f"Failed to remove market holiday: {e}")
-            return False
+        self._holiday_cache.clear()
+        self.logger.info("Holiday cache cleared")
 
     def get_trading_sessions_info(self) -> dict[str, Any]:
         """獲取交易時段資訊"""

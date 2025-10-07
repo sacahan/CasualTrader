@@ -1,7 +1,7 @@
 # Agent 系統實作規格
 
-**版本**: 3.0
-**日期**: 2025-10-06
+**版本**: 3.1
+**日期**: 2025-10-07
 **相關設計**: SYSTEM_DESIGN.md
 **基於**: OpenAI Agents SDK + Prompt-Based Strategy Management
 
@@ -971,6 +971,185 @@ async def validate_trade_parameters(
     }
 ```
 
+### 進階市場狀態檢查器 (MarketStatusChecker)
+
+為了提供更準確的市場狀態判斷，系統整合了 `MarketStatusChecker` 組件，支援動態查詢台灣股市交易日和假日資訊。
+
+#### 核心改進與更新
+
+##### 從硬編碼到動態查詢 (2025-10-07 更新)
+
+**修改前 (硬編碼方式):**
+
+```python
+# 假日列表硬編碼在類別中
+self.market_holidays = [
+    MarketHoliday(date="2024-01-01", name="元旦", type="national"),
+    # ... 需要每年手動更新
+]
+```
+
+**修改後 (MCP 動態查詢):**
+
+```python
+# 透過 MCP 工具動態查詢
+checker = MarketStatusChecker(
+    mcp_check_trading_day=mcp_client.check_trading_day,
+    mcp_get_holiday_info=mcp_client.get_holiday_info
+)
+```
+
+#### 主要改進優勢
+
+1. ✅ **自動更新** - 假日資訊由 MCP 服務維護
+2. ✅ **準確性** - 使用官方資料來源
+3. ✅ **向後相容** - 現有代碼無需修改
+4. ✅ **容錯性** - 自動 fallback 到基本邏輯
+
+#### Agent 中的整合使用
+
+```python
+from agents.functions.market_status import MarketStatusChecker
+from agents.core.base_agent import CasualTradingAgent
+
+class TradingAgent(CasualTradingAgent):
+    def __init__(self):
+        super().__init__()
+        
+        # 初始化市場狀態檢查器 (整合 MCP 工具)
+        self.market_checker = MarketStatusChecker(
+            mcp_check_trading_day=self._mcp_check_trading_day,
+            mcp_get_holiday_info=self._mcp_get_holiday_info
+        )
+    
+    async def _mcp_check_trading_day(self, date: str):
+        """透過 MCP 客戶端檢查交易日"""
+        return await self.mcp_client.call_tool(
+            "check_taiwan_trading_day",
+            {"date": date}
+        )
+    
+    async def _mcp_get_holiday_info(self, date: str):
+        """透過 MCP 客戶端取得假日資訊"""
+        return await self.mcp_client.call_tool(
+            "get_taiwan_holiday_info",
+            {"date": date}
+        )
+    
+    async def execute_trade(self, symbol: str, quantity: int):
+        """執行交易前檢查市場狀態"""
+        # 檢查市場是否開盤
+        status = await self.market_checker.get_market_status()
+        
+        if not status.is_open:
+            return {
+                "success": False,
+                "error": f"市場未開盤 (當前時段: {status.current_session})"
+            }
+        
+        # 執行交易...
+        return await self._execute_order(symbol, quantity)
+```
+
+#### 使用的 MCP 工具
+
+**1. `check_taiwan_trading_day`**
+
+用途: 檢查指定日期是否為交易日
+
+參數:
+
+- `date`: 日期字串 (YYYY-MM-DD)
+
+回應格式:
+
+```python
+{
+    "success": True,
+    "data": {
+        "date": "2025-10-10",
+        "is_trading_day": False,
+        "is_weekend": False,
+        "is_holiday": True,
+        "holiday_name": "國慶日",
+        "reason": "國定假日"
+    }
+}
+```
+
+**2. `get_taiwan_holiday_info`**
+
+用途: 取得假日詳細資訊
+
+參數:
+
+- `date`: 日期字串 (YYYY-MM-DD)
+
+回應格式:
+
+```python
+{
+    "success": True,
+    "data": {
+        "date": "2025-10-10",
+        "is_holiday": True,
+        "name": "國慶日",
+        "holiday_category": "national",
+        "description": "中華民國國慶日"
+    }
+}
+```
+
+#### Fallback 機制
+
+當 MCP 工具不可用或呼叫失敗時，系統會自動使用基本的週末判斷邏輯：
+
+- 週一到週五 → 視為可能的交易日
+- 週六日 → 視為非交易日
+- 記錄警告訊息但不會中斷執行
+
+#### 完整 API 參考
+
+**MarketStatusChecker 初始化:**
+
+```python
+MarketStatusChecker(
+    mcp_check_trading_day: Callable[[str], Any] | None = None,
+    mcp_get_holiday_info: Callable[[str], Any] | None = None
+)
+```
+
+**主要方法:**
+
+- `get_market_status(check_time=None)`: 取得市場開盤狀態
+- `get_market_calendar(start_date, end_date)`: 取得交易日曆
+- `clear_holiday_cache()`: 清除假日快取
+
+**快取機制:**
+
+- 使用 `_holiday_cache` 避免重複查詢同一日期
+- 快取僅在單次執行期間有效，程序重啟後會清空
+
+#### 最佳實踐建議
+
+1. **注入 MCP 工具**: 在初始化時提供 MCP 工具函數，獲得最準確的交易日資訊
+2. **快取管理**: 如需更新假日資訊，呼叫 `clear_holiday_cache()`
+3. **錯誤處理**: MCP 呼叫失敗時會自動 fallback，無需額外處理
+4. **日誌監控**: 檢查日誌中的 warning，了解 MCP 呼叫狀態
+
+#### 測試狀態
+
+✅ 所有測試通過 (8/8)
+
+- ✓ 基本功能 (無 MCP)
+- ✓ MCP 整合
+- ✓ 假日偵測
+- ✓ 週末偵測
+- ✓ 交易時段識別
+- ✓ 交易日曆整合
+- ✓ 快取機制
+- ✓ MCP 失敗 fallback
+
 ---
 
 ## 🛠️ CasualMarket MCP 服務整合
@@ -1003,7 +1182,7 @@ casualmarket_mcp = HostedMCPTool(
 
 ### 核心交易工具
 
-**股票價格查詢**
+#### 股票價格查詢
 
 ```python
 # 工具: get_taiwan_stock_price
@@ -1014,7 +1193,7 @@ response = await mcp_client.call_tool("get_taiwan_stock_price", {
 # 返回: 即時價格、漲跌幅、成交量、五檔報價等
 ````
 
-**模擬交易執行**
+#### 模擬交易執行
 
 ```python
 # 工具: buy_taiwan_stock
@@ -1036,7 +1215,7 @@ response = await mcp_client.call_tool("sell_taiwan_stock", {
 
 ### 基本面分析工具
 
-**公司基本資料**
+#### 公司基本資料
 
 ```python
 # 工具: get_company_profile
@@ -1046,7 +1225,7 @@ response = await mcp_client.call_tool("get_company_profile", {
 })
 ```
 
-**財務報表工具**
+#### 財務報表工具
 
 ```python
 # 工具: get_company_income_statement
@@ -1068,7 +1247,7 @@ revenue_data = await mcp_client.call_tool("get_company_monthly_revenue", {
 })
 ```
 
-**估值分析工具**
+#### 估值分析工具
 
 ```python
 # 工具: get_stock_valuation_ratios
@@ -1080,7 +1259,7 @@ valuation = await mcp_client.call_tool("get_stock_valuation_ratios", {
 
 ### 市場數據工具
 
-**交易統計工具**
+#### 交易統計工具
 
 ```python
 # 工具: get_stock_daily_trading
@@ -1094,7 +1273,7 @@ daily_stats = await mcp_client.call_tool("get_stock_daily_trading", {
 realtime_stats = await mcp_client.call_tool("get_real_time_trading_stats")
 ```
 
-**市場指數工具**
+#### 市場指數工具
 
 ```python
 # 工具: get_market_index_info
@@ -1107,7 +1286,7 @@ market_index = await mcp_client.call_tool("get_market_index_info", {
 
 ### Agent中的MCP工具使用範例
 
-**分析Agent使用範例**
+#### 分析Agent使用範例
 
 ```python
 class AnalysisAgent:
@@ -1126,7 +1305,7 @@ class AnalysisAgent:
         return self._combine_fundamental_analysis(profile, income, balance, valuation)
 ```
 
-**執行Agent使用範例**
+#### 執行Agent使用範例
 
 ```python
 class ExecutionAgent:
@@ -1155,7 +1334,7 @@ class ExecutionAgent:
 
 ### 錯誤處理和重試機制
 
-**MCP工具調用的統一錯誤處理**
+#### MCP工具調用的統一錯誤處理
 
 ```python
 class MCPToolWrapper:
@@ -1371,7 +1550,7 @@ class AgentNotificationService {
 
 ### Agent 系統相關檔案
 
-```
+```bash
 backend/src/agents/           # Agent 系統模塊
 ├── core/                     # 核心 Agent 實作
 │   ├── trading_agent.py      # 簡化的TradingAgent實作
