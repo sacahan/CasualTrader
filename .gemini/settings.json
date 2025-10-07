@@ -1,0 +1,12 @@
+{
+    "mcpServers": {
+        "casual-market": {
+            "command": "uvx",
+            "args": [
+                "--from",
+                "/Users/sacahan/Documents/workspace/CasualMarket",
+                "casual-market-mcp"
+            ]
+        }
+    }
+}
