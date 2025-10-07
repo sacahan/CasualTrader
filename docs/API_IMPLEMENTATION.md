@@ -72,15 +72,15 @@ DELETE /api/agents/{id}               # 刪除代理人
   - `gpt-4o` (推薦，預設值)
   - `gpt-4o-mini` (成本優化)
   - `gpt-4-turbo`
-  
+
 - **Anthropic Claude 系列**:
   - `claude-sonnet-4.5` (高性能推理)
   - `claude-opus-4`
-  
+
 - **Google Gemini 系列**:
   - `gemini-2.5-pro` (多模態能力)
   - `gemini-2.0-flash` (快速響應)
-  
+
 - **其他模型**:
   - `deepseek-v3`
   - `grok-2`
@@ -682,7 +682,7 @@ class CasualMarketMCPClient:
 
 ## 📁 檔案結構
 
-> **注意**: 完整的專案結構定義請參閱 [PROJECT_STRUCTURE.md](PROJECT_STRUCTURE.md)  
+> **注意**: 完整的專案結構定義請參閱 [PROJECT_STRUCTURE.md](PROJECT_STRUCTURE.md)
 > 本節僅列出與 API 系統直接相關的檔案。
 
 ### API 系統相關檔案

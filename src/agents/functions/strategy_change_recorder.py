@@ -536,3 +536,55 @@ class StrategyChangeRecorder:
             "total_changes": sum(len(tracker) for tracker in self._trackers.values()),
             "status": "operational",
         }
+
+    def as_tool(self) -> dict[str, Any]:
+        """
+        將 StrategyChangeRecorder 轉換為可供 OpenAI Agent 使用的工具
+
+        Returns:
+            工具配置字典
+        """
+        return {
+            "type": "function",
+            "function": {
+                "name": "record_strategy_change",
+                "description": "記錄和應用策略變更",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "trigger_reason": {
+                            "type": "string",
+                            "description": "策略變更的觸發原因",
+                        },
+                        "new_strategy_addition": {
+                            "type": "string",
+                            "description": "新增的策略內容",
+                        },
+                        "change_summary": {
+                            "type": "string",
+                            "description": "變更摘要說明",
+                        },
+                        "agent_explanation": {
+                            "type": "string",
+                            "description": "Agent 對此變更的說明",
+                        },
+                        "auto_apply": {
+                            "type": "boolean",
+                            "description": "是否自動應用變更",
+                            "default": True,
+                        },
+                        "performance_snapshot": {
+                            "type": "object",
+                            "description": "當前績效快照 (可選)",
+                        },
+                    },
+                    "required": [
+                        "trigger_reason",
+                        "new_strategy_addition",
+                        "change_summary",
+                        "agent_explanation",
+                    ],
+                },
+            },
+            "implementation": self.record_change,
+        }

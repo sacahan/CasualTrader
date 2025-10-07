@@ -205,7 +205,7 @@ class TechnicalAgent:
     ) -> TechnicalIndicators:
         """計算技術指標"""
         current_price = price_data["current_price"]
-        daily_data = price_data["daily_data"]
+        price_data["daily_data"]
 
         # 模擬計算結果（實際實作時會進行真實計算）
         return TechnicalIndicators(
@@ -449,7 +449,7 @@ class TechnicalAgent:
     ) -> dict[str, Any]:
         """識別支撐阻力位"""
         current_price = price_data["current_price"]
-        daily_data = price_data["daily_data"]
+        price_data["daily_data"]
 
         # 模擬支撐阻力計算（實際實作時會基於歷史高低點）
         support_levels = [
@@ -583,16 +583,16 @@ class TechnicalAgent:
 {symbol} 技術分析摘要：
 
 當前股價：NT${current_price:.2f}
-綜合信號：{signals['overall']} (信心度: {signals['confidence']:.0%})
+綜合信號：{signals["overall"]} (信心度: {signals["confidence"]:.0%})
 
 關鍵技術指標：
-- RSI：{indicators.rsi or 'N/A'} (動能{'偏強' if indicators.rsi and indicators.rsi > 50 else '偏弱'})
-- MACD：{indicators.macd or 'N/A'} (趨勢{'向上' if indicators.macd and indicators.macd > 0 else '向下'})
-- 布林通道位置：{'上軌附近' if indicators.bollinger_upper and current_price > indicators.bollinger_upper * 0.98 else '中軌附近'}
+- RSI：{indicators.rsi or "N/A"} (動能{"偏強" if indicators.rsi and indicators.rsi > 50 else "偏弱"})
+- MACD：{indicators.macd or "N/A"} (趨勢{"向上" if indicators.macd and indicators.macd > 0 else "向下"})
+- 布林通道位置：{"上軌附近" if indicators.bollinger_upper and current_price > indicators.bollinger_upper * 0.98 else "中軌附近"}
 
-{pattern_summary}{signals['action']}。
-{'目標價 NT$' + f'{signals["target_price"]:.2f}' if signals.get("target_price") else ''}
-{'，停損設於 NT$' + f'{signals["stop_loss"]:.2f}' if signals.get("stop_loss") else ''}。
+{pattern_summary}{signals["action"]}。
+{"目標價 NT$" + f"{signals['target_price']:.2f}" if signals.get("target_price") else ""}
+{"，停損設於 NT$" + f"{signals['stop_loss']:.2f}" if signals.get("stop_loss") else ""}。
         """.strip()
 
     def get_technical_watchlist(self, symbols: list[str]) -> dict[str, Any]:
@@ -613,4 +613,50 @@ class TechnicalAgent:
                 "跌破重要支撐位",
             ],
             "update_frequency": "即時",
+        }
+
+    def as_tool(self, tool_name: str, tool_description: str) -> dict[str, Any]:
+        """
+        將 TechnicalAgent 轉換為可供 OpenAI Agent 使用的工具
+
+        Args:
+            tool_name: 工具名稱
+            tool_description: 工具描述
+
+        Returns:
+            工具配置字典
+        """
+        return {
+            "type": "function",
+            "function": {
+                "name": tool_name,
+                "description": tool_description,
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "symbol": {
+                            "type": "string",
+                            "description": "股票代碼 (例如: 2330)",
+                        },
+                        "analysis_period": {
+                            "type": "string",
+                            "enum": ["short", "medium", "long"],
+                            "description": "分析週期",
+                            "default": "medium",
+                        },
+                        "include_patterns": {
+                            "type": "boolean",
+                            "description": "是否包含圖表形態分析",
+                            "default": True,
+                        },
+                        "indicators": {
+                            "type": "array",
+                            "items": {"type": "string"},
+                            "description": "要分析的技術指標 (可選)",
+                        },
+                    },
+                    "required": ["symbol"],
+                },
+            },
+            "implementation": self.analyze_technical_indicators,
         }

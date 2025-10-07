@@ -124,7 +124,7 @@ def generate_markdown_docs() -> str:
                     docs.append(f"- `{method_name}{signature}`\n")
                     first_line = method.__doc__.strip().split("\n")[0]
                     docs.append(f"  - {first_line}\n")
-                except:
+                except Exception:
                     pass
 
     docs.append("\n")
@@ -275,7 +275,7 @@ def generate_markdown_docs() -> str:
                     docs.append(f"- `{method_name}{signature}`\n")
                     first_line = method.__doc__.strip().split("\n")[0]
                     docs.append(f"  - {first_line}\n")
-                except:
+                except Exception:
                     pass
 
     docs.append("\n")
@@ -308,18 +308,18 @@ async def main():
         description="智能交易代理人",
         initial_funds=1000000.0,
     )
-    
+
     # 創建 Agent
     agent = TradingAgent(config)
-    
+
     # 初始化 Agent
     await agent.initialize()
-    
+
     # 執行交易決策
     result = await agent.execute("分析台積電 2330 的投資機會")
-    
+
     print(f"執行結果: {result}")
-    
+
     # 關閉 Agent
     await agent.shutdown()
 
@@ -340,21 +340,21 @@ async def main():
     # 創建 Agent Manager
     manager = AgentManager()
     await manager.start()
-    
+
     # 創建多個 Agent
     config1 = create_default_agent_config(name="Agent Alpha")
     config2 = create_default_agent_config(name="Agent Beta")
-    
+
     agent1_id = await manager.create_agent(config1)
     agent2_id = await manager.create_agent(config2)
-    
+
     # 列出所有 Agent
     agents = manager.list_agents()
     print(f"總共 {len(agents)} 個 Agent")
-    
+
     # 執行 Agent
     result = await manager.execute_agent(agent1_id, "查詢市場指數")
-    
+
     # 關閉 Manager
     await manager.shutdown()
 
@@ -376,28 +376,28 @@ async def main():
     db_config = DatabaseConfig(
         database_url="sqlite+aiosqlite:///casualtrader.db"
     )
-    
+
     # 創建配置
     config = create_default_agent_config(
         name="持久化 Agent",
         initial_funds=500000.0,
     )
-    
+
     # 創建持久化 Agent
     agent = PersistentTradingAgent(
         agent_id="my-persistent-agent",
         config=config,
         db_config=db_config,
     )
-    
+
     # 初始化 (會自動載入之前的狀態)
     await agent.initialize()
-    
+
     # 執行操作
     await agent.execute("分析金融股")
-    
+
     # 狀態會自動保存到資料庫
-    
+
     # 關閉
     await agent.shutdown()
 

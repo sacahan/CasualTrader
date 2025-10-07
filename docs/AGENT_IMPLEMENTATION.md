@@ -130,7 +130,7 @@ def generate_trading_instructions(config: AgentConfig) -> str:
 
 自動調整設定（結構化 - 代理人自主）：
 - 觸發條件（自由文字範例/優先順序）：{auto_adjust.get('triggers')}
-- 自動套用：{bool(auto_adjust.get('auto_apply', True))} 
+- 自動套用：{bool(auto_adjust.get('auto_apply', True))}
 
 交易限制：
 - 可用資金：NT${config.initial_funds:,}
@@ -378,7 +378,7 @@ const AgentCreationForm = () => {
           className="form-textarea"
           rows={2}
         />
-        
+
         {/* AI 模型選擇 */}
         <div className="input-group">
           <label>AI 模型</label>
@@ -405,7 +405,7 @@ const AgentCreationForm = () => {
             選擇用於投資決策的 AI 模型，不同模型具有不同的推理風格與成本
           </small>
         </div>
-        
+
         <input
           type="number"
           placeholder="初始資金 (TWD)"
@@ -1015,38 +1015,38 @@ from agents.core.base_agent import CasualTradingAgent
 class TradingAgent(CasualTradingAgent):
     def __init__(self):
         super().__init__()
-        
+
         # 初始化市場狀態檢查器 (整合 MCP 工具)
         self.market_checker = MarketStatusChecker(
             mcp_check_trading_day=self._mcp_check_trading_day,
             mcp_get_holiday_info=self._mcp_get_holiday_info
         )
-    
+
     async def _mcp_check_trading_day(self, date: str):
         """透過 MCP 客戶端檢查交易日"""
         return await self.mcp_client.call_tool(
             "check_taiwan_trading_day",
             {"date": date}
         )
-    
+
     async def _mcp_get_holiday_info(self, date: str):
         """透過 MCP 客戶端取得假日資訊"""
         return await self.mcp_client.call_tool(
             "get_taiwan_holiday_info",
             {"date": date}
         )
-    
+
     async def execute_trade(self, symbol: str, quantity: int):
         """執行交易前檢查市場狀態"""
         # 檢查市場是否開盤
         status = await self.market_checker.get_market_status()
-        
+
         if not status.is_open:
             return {
                 "success": False,
                 "error": f"市場未開盤 (當前時段: {status.current_session})"
             }
-        
+
         # 執行交易...
         return await self._execute_order(symbol, quantity)
 ```
@@ -1545,7 +1545,7 @@ class AgentNotificationService {
 
 ## 📁 檔案結構
 
-> **注意**: 完整的專案結構定義請參閱 [PROJECT_STRUCTURE.md](PROJECT_STRUCTURE.md)  
+> **注意**: 完整的專案結構定義請參閱 [PROJECT_STRUCTURE.md](PROJECT_STRUCTURE.md)
 > 本節僅列出與 Agent 系統直接相關的檔案。
 
 ### Agent 系統相關檔案

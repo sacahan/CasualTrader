@@ -462,3 +462,47 @@ class TradingValidator:
                         del simulated_positions[symbol]
 
         return results
+
+    def as_tool(self) -> dict[str, Any]:
+        """
+        將 TradingValidator 轉換為可供 OpenAI Agent 使用的工具
+
+        Returns:
+            工具配置字典
+        """
+        return {
+            "type": "function",
+            "function": {
+                "name": "validate_trade_parameters",
+                "description": "驗證交易參數的合理性和合規性",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "symbol": {
+                            "type": "string",
+                            "description": "股票代碼 (例如: 2330)",
+                        },
+                        "action": {
+                            "type": "string",
+                            "enum": ["buy", "sell"],
+                            "description": "交易動作",
+                        },
+                        "quantity": {
+                            "type": "integer",
+                            "description": "交易數量 (股數)",
+                            "minimum": 1000,
+                        },
+                        "price": {
+                            "type": "number",
+                            "description": "交易價格 (可選，市價單時不需要)",
+                        },
+                        "portfolio_data": {
+                            "type": "object",
+                            "description": "投資組合數據 (用於驗證)",
+                        },
+                    },
+                    "required": ["symbol", "action", "quantity"],
+                },
+            },
+            "implementation": self.validate_trade_parameters,
+        }

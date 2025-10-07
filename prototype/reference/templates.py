@@ -1,4 +1,5 @@
 from datetime import datetime
+
 from market import is_paid_polygon, is_realtime_polygon
 
 if is_realtime_polygon:
@@ -27,11 +28,13 @@ If there isn't a specific request, then just respond with investment opportuniti
 The current datetime is {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
 """
 
+
 def research_tool():
     return "This tool researches online for news and opportunities, \
 either based on your specific request to look into a certain stock, \
 or generally for notable financial news and opportunities. \
 Describe what kind of research you're looking for."
+
 
 def trader_instructions(name: str):
     return f"""
@@ -46,6 +49,7 @@ Use these tools to carry out research, make decisions, and execute trades.
 After you've completed trading, send a push notification with a brief summary of activity, then reply with a 2-3 sentence appraisal.
 Your goal is to maximize your profits according to your strategy.
 """
+
 
 def trade_message(name, strategy, account):
     return f"""Based on your investment strategy, you should now look for new opportunities.
@@ -66,6 +70,7 @@ Now, carry out analysis, make your decision and execute trades. Your account nam
 After you've executed your trades, send a push notification with a brief sumnmary of trades and the health of the portfolio, then
 respond with a brief 2-3 sentence appraisal of your portfolio and its outlook.
 """
+
 
 def rebalance_message(name, strategy, account):
     return f"""Based on your investment strategy, you should now examine your portfolio and decide if you need to rebalance.

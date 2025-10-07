@@ -525,17 +525,17 @@ class FundamentalAgent:
         return f"""
 {fundamentals.company_name} ({fundamentals.symbol}) 基本面分析摘要：
 
-綜合評分：{overall_score['score']:.1f} 分 (評級: {overall_score['rating']})
-投資建議：{recommendation['action']} (信心度: {recommendation['confidence']:.0%})
+綜合評分：{overall_score["score"]:.1f} 分 (評級: {overall_score["rating"]})
+投資建議：{recommendation["action"]} (信心度: {recommendation["confidence"]:.0%})
 
 關鍵指標：
-- P/E 比：{fundamentals.pe_ratio or 'N/A'}
-- P/B 比：{fundamentals.pb_ratio or 'N/A'}
+- P/E 比：{fundamentals.pe_ratio or "N/A"}
+- P/B 比：{fundamentals.pb_ratio or "N/A"}
 - ROE：{(fundamentals.roe or 0) * 100:.1f}%
 - 負債股權比：{(fundamentals.debt_to_equity or 0) * 100:.1f}%
 - 營收成長率：{(fundamentals.revenue_growth or 0) * 100:.1f}%
 
-{overall_score['description']}，建議{self._suggest_investment_horizon(fundamentals)}持有。
+{overall_score["description"]}，建議{self._suggest_investment_horizon(fundamentals)}持有。
         """.strip()
 
     def get_analysis_template(self, symbol: str) -> dict[str, Any]:
@@ -558,4 +558,45 @@ class FundamentalAgent:
                 "market_data",
             ],
             "output_format": "comprehensive_report",
+        }
+
+    def as_tool(self, tool_name: str, tool_description: str) -> dict[str, Any]:
+        """
+        將 FundamentalAgent 轉換為可供 OpenAI Agent 使用的工具
+
+        Args:
+            tool_name: 工具名稱
+            tool_description: 工具描述
+
+        Returns:
+            工具配置字典
+        """
+        return {
+            "type": "function",
+            "function": {
+                "name": tool_name,
+                "description": tool_description,
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "symbol": {
+                            "type": "string",
+                            "description": "股票代碼 (例如: 2330)",
+                        },
+                        "analysis_depth": {
+                            "type": "string",
+                            "enum": ["basic", "standard", "comprehensive"],
+                            "description": "分析深度",
+                            "default": "standard",
+                        },
+                        "focus_areas": {
+                            "type": "array",
+                            "items": {"type": "string"},
+                            "description": "重點分析領域 (可選)",
+                        },
+                    },
+                    "required": ["symbol"],
+                },
+            },
+            "implementation": self.analyze_company_fundamentals,
         }

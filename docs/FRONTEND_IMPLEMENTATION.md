@@ -216,10 +216,10 @@ frontend/
       <Button size="sm" variant="ghost" on:click={stopAgent} title="停止">
         ⏹
       </Button>
-      <Button 
-        size="sm" 
-        variant="ghost" 
-        on:click={openSettings} 
+      <Button
+        size="sm"
+        variant="ghost"
+        on:click={openSettings}
         disabled={isConfigLocked}
         title={isConfigLocked ? "Agent 執行中，無法修改設定" : "設定"}
         class={isConfigLocked ? "opacity-50 cursor-not-allowed" : ""}
@@ -302,7 +302,7 @@ frontend/
 
   // 預覽生成的 Agent 指令
   let instructionsPreview = '';
-  
+
   $: {
     instructionsPreview = generateInstructionsPreview(formData);
   }
@@ -355,7 +355,7 @@ ${data.additional_instructions ? `\nADDITIONAL INSTRUCTIONS:\n${data.additional_
 
       await agentsStore.createAgent(agentConfig);
       dispatch('created');
-      
+
       // 重置表單
       resetForm();
     } catch (error) {
@@ -384,7 +384,7 @@ ${data.additional_instructions ? `\nADDITIONAL INSTRUCTIONS:\n${data.additional_
   <!-- 基本資訊區塊 -->
   <div class="basic-info mb-6 space-y-4">
     <h3 class="text-lg font-semibold text-gray-800 mb-3">基本資訊</h3>
-    
+
     <div class="input-group">
       <label class="block text-sm font-medium text-gray-700 mb-2">Agent 名稱 *</label>
       <input
@@ -451,7 +451,7 @@ ${data.additional_instructions ? `\nADDITIONAL INSTRUCTIONS:\n${data.additional_
   <!-- 核心投資設定區塊 -->
   <div class="investment-settings mb-6 space-y-4">
     <h3 class="text-lg font-semibold text-gray-800 mb-3">核心投資設定</h3>
-    
+
     <div class="input-group">
       <label class="block text-sm font-medium text-gray-700 mb-2">投資偏好 *</label>
       <textarea
@@ -486,7 +486,7 @@ ${data.additional_instructions ? `\nADDITIONAL INSTRUCTIONS:\n${data.additional_
   <!-- 進階設定區塊 -->
   <div class="advanced-settings mb-6 space-y-4">
     <h3 class="text-lg font-semibold text-gray-800 mb-3">進階設定（可選）</h3>
-    
+
     <div class="input-group">
       <label class="block text-sm font-medium text-gray-700 mb-2">單股最大部位 (%)</label>
       <input
@@ -636,9 +636,9 @@ ${data.additional_instructions ? `\nADDITIONAL INSTRUCTIONS:\n${data.additional_
                 Agent 目前正在執行交易策略，為確保策略一致性，所有配置已被鎖定。
                 若需修改配置，請先停止 Agent 執行。
               </p>
-              <Button 
-                variant="warning" 
-                size="sm" 
+              <Button
+                variant="warning"
+                size="sm"
                 on:click={handleStopAgent}
               >
                 停止 Agent 並解鎖配置
@@ -650,11 +650,11 @@ ${data.additional_instructions ? `\nADDITIONAL INSTRUCTIONS:\n${data.additional_
 
       <!-- 配置表單 -->
       <form class="config-form space-y-6" on:submit|preventDefault={handleSave}>
-        
+
         <!-- 基本資訊 -->
         <div class="section">
           <h3 class="text-lg font-semibold text-gray-800 mb-4">基本資訊</h3>
-          
+
           <div class="input-group mb-4">
             <label class="block text-sm font-medium text-gray-700 mb-2">Agent 名稱</label>
             <input
@@ -683,7 +683,7 @@ ${data.additional_instructions ? `\nADDITIONAL INSTRUCTIONS:\n${data.additional_
         <!-- 投資策略配置 -->
         <div class="section">
           <h3 class="text-lg font-semibold text-gray-800 mb-4">投資策略配置</h3>
-          
+
           <div class="input-group mb-4">
             <label class="block text-sm font-medium text-gray-700 mb-2">投資偏好</label>
             <textarea
@@ -712,7 +712,7 @@ ${data.additional_instructions ? `\nADDITIONAL INSTRUCTIONS:\n${data.additional_
         <!-- 風險控制 -->
         <div class="section">
           <h3 class="text-lg font-semibold text-gray-800 mb-4">風險控制</h3>
-          
+
           <div class="input-group mb-4">
             <label class="block text-sm font-medium text-gray-700 mb-2">
               單股最大部位 (%)
@@ -751,8 +751,8 @@ ${data.additional_instructions ? `\nADDITIONAL INSTRUCTIONS:\n${data.additional_
           <Button variant="secondary" on:click={handleCancel}>
             取消
           </Button>
-          <Button 
-            type="submit" 
+          <Button
+            type="submit"
             variant="primary"
             disabled={isConfigLocked}
             title={isConfigLocked ? "配置已鎖定，無法儲存" : "儲存變更"}
@@ -809,9 +809,9 @@ ${data.additional_instructions ? `\nADDITIONAL INSTRUCTIONS:\n${data.additional_
   import { formatCurrency, formatPercentage, formatDateTime } from '../../lib/utils.js';
   import Button from '../UI/Button.svelte';
   import Modal from '../UI/Modal.svelte';
-  
+
   export let agentId;
-  
+
   let changes = [];
   let selectedChange = null;
   let loading = true;
@@ -882,7 +882,7 @@ ${data.additional_instructions ? `\nADDITIONAL INSTRUCTIONS:\n${data.additional_
       {#each changes as change, index}
         <div class="change-card border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow cursor-pointer"
              on:click={() => openDetailModal(change)}>
-          
+
           <!-- 變更標題列 -->
           <div class="change-header flex justify-between items-start mb-3">
             <div class="change-info flex-1">
@@ -915,7 +915,7 @@ ${data.additional_instructions ? `\nADDITIONAL INSTRUCTIONS:\n${data.additional_
             <div class="performance-context grid grid-cols-3 gap-2 mb-3 p-3 bg-gray-50 rounded">
               <div class="metric text-center">
                 <div class="text-xs text-gray-500">報酬率</div>
-                <div class="text-sm font-medium" 
+                <div class="text-sm font-medium"
                      class:text-green-600={change.performance_at_change.total_return > 0}
                      class:text-red-600={change.performance_at_change.total_return < 0}>
                   {formatPercentage(change.performance_at_change.total_return)}
@@ -960,7 +960,7 @@ ${data.additional_instructions ? `\nADDITIONAL INSTRUCTIONS:\n${data.additional_
   <Modal on:close={closeDetailModal}>
     <div class="strategy-detail-modal">
       <h2 class="text-2xl font-bold text-gray-900 mb-4">策略變更詳情</h2>
-      
+
       <!-- 基本資訊 -->
       <div class="detail-section mb-6">
         <h3 class="text-lg font-semibold text-gray-800 mb-3">基本資訊</h3>
@@ -1153,7 +1153,7 @@ Agent 管理介面採用 **Prompt 驅動** 的設計理念，讓用戶透過自�
   $: isConfigLocked = isRunning;
 
   // 顯示鎖定提示
-  $: lockMessage = isConfigLocked 
+  $: lockMessage = isConfigLocked
     ? "⚠️ Agent 執行中，配置已鎖定。請先停止 Agent 才能修改設定。"
     : null;
 
@@ -1167,7 +1167,7 @@ Agent 管理介面採用 **Prompt 驅動** 的設計理念，讓用戶透過自�
 </script>
 
 <!-- 配置編輯按鈕 -->
-<Button 
+<Button
   on:click={handleConfigEdit}
   disabled={isConfigLocked}
   title={isConfigLocked ? "Agent 執行中，無法修改" : "編輯配置"}
@@ -1191,8 +1191,8 @@ Agent 管理介面採用 **Prompt 驅動** 的設計理念，讓用戶透過自�
 {/if}
 
 <!-- 表單輸入禁用 -->
-<input 
-  type="text" 
+<input
+  type="text"
   bind:value={config.investment_preferences}
   disabled={isConfigLocked}
   class:opacity-50={isConfigLocked}
@@ -1626,7 +1626,7 @@ export function formatNumber(value, decimals = 0) {
 // 相對時間格式化（例如：2小時前）
 export function formatRelativeTime(dateString) {
   if (!dateString) return 'N/A';
-  
+
   const date = new Date(dateString);
   const now = new Date();
   const diffMs = now - date;
@@ -1654,7 +1654,7 @@ export function isMarketOpen() {
     // 09:00 - 13:30
     return timeInMinutes >= 540 && timeInMinutes <= 810;
   }
-  
+
   return false;
 }
 
@@ -1775,13 +1775,13 @@ function createAgentsStore() {
         await apiClient.startAgent(agentId);
         update((agents) =>
           agents.map((agent) =>
-            agent.id === agentId 
-              ? { 
-                  ...agent, 
+            agent.id === agentId
+              ? {
+                  ...agent,
                   status: "running",
                   config_locked: true, // 標記配置已鎖定
                   started_at: new Date().toISOString()
-                } 
+                }
               : agent,
           ),
         );
@@ -1796,13 +1796,13 @@ function createAgentsStore() {
         await apiClient.stopAgent(agentId);
         update((agents) =>
           agents.map((agent) =>
-            agent.id === agentId 
-              ? { 
-                  ...agent, 
+            agent.id === agentId
+              ? {
+                  ...agent,
                   status: "stopped",
                   config_locked: false, // 解鎖配置
                   stopped_at: new Date().toISOString()
-                } 
+                }
               : agent,
           ),
         );
@@ -1818,8 +1818,8 @@ function createAgentsStore() {
       update((agents) => {
         const agent = agents.find(a => a.id === agentId);
         if (agent) {
-          locked = agent.config_locked || 
-                   agent.status === 'running' || 
+          locked = agent.config_locked ||
+                   agent.status === 'running' ||
                    agent.status === 'active';
         }
         return agents;
@@ -1921,7 +1921,7 @@ VITE_DEV_MODE=true
 
 ## 📁 專案檔案結構
 
-> **注意**: 完整的專案結構定義請參閱 [PROJECT_STRUCTURE.md](PROJECT_STRUCTURE.md)  
+> **注意**: 完整的專案結構定義請參閱 [PROJECT_STRUCTURE.md](PROJECT_STRUCTURE.md)
 > 本節僅列出前端系統的完整檔案結構。
 
 ### 前端應用結構
@@ -2032,10 +2032,10 @@ import AgentCreationForm from '../../../../src/components/Agent/AgentCreationFor
 describe('AgentCreationForm', () => {
   test('即時生成指令預覽', async () => {
     const { getByRole, getByText } = render(AgentCreationForm);
-    
+
     const nameInput = getByRole('textbox', { name: /agent 名稱/i });
     await fireEvent.input(nameInput, { target: { value: '測試 Agent' } });
-    
+
     // 驗證預覽區域更新
     await waitFor(() => {
       expect(getByText(/You are 測試 Agent/)).toBeInTheDocument();
@@ -2044,10 +2044,10 @@ describe('AgentCreationForm', () => {
 
   test('表單驗證：必填欄位', async () => {
     const { getByRole, getByText } = render(AgentCreationForm);
-    
+
     const submitButton = getByRole('button', { name: /創建/i });
     await fireEvent.click(submitButton);
-    
+
     // 驗證錯誤訊息
     await waitFor(() => {
       expect(getByText(/請填寫/)).toBeInTheDocument();
@@ -2059,11 +2059,11 @@ describe('AgentCreationForm', () => {
     const { getByRole } = render(AgentCreationForm, {
       props: { onCreate: mockCreate }
     });
-    
+
     // 填寫表單...
     const submitButton = getByRole('button', { name: /創建/i });
     await fireEvent.click(submitButton);
-    
+
     await waitFor(() => {
       expect(mockCreate).toHaveBeenCalled();
     });

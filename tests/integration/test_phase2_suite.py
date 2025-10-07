@@ -8,9 +8,9 @@ from __future__ import annotations
 
 import asyncio
 import sys
-from datetime import datetime, timedelta
+from datetime import datetime
 from pathlib import Path
-from unittest.mock import AsyncMock, Mock, patch
+from unittest.mock import patch
 
 import pytest
 
@@ -464,7 +464,7 @@ class TestPhase2WorkflowIntegration:
             trade = trades[i]
             assert result.validated_parameters["symbol"] == trade["symbol"]
             assert isinstance(result.is_valid, bool)
-            assert isinstance(result.risk_score, (int, float))
+            assert isinstance(result.risk_score, int | float)
 
         # 至少有一些交易應該是有效的
         valid_trades = [r for r in results if r.is_valid]
@@ -485,7 +485,7 @@ class TestPhase2WorkflowIntegration:
             with patch.object(
                 technical, "_fetch_price_data", return_value=[100, 102, 98, 105, 103]
             ):
-                tech_result = await technical.analyze_technical_indicators("2330")
+                await technical.analyze_technical_indicators("2330")
 
             # 4. 基於技術分析結果進行風險評估
             risk_agent = RiskAgent()

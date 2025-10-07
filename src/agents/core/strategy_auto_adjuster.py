@@ -475,7 +475,7 @@ class StrategyAutoAdjuster:
         optimized = []
 
         # 整合同類型動作
-        for action_type, group_actions in action_groups.items():
+        for _action_type, group_actions in action_groups.items():
             if len(group_actions) == 1:
                 optimized.append(group_actions[0])
             else:
@@ -672,7 +672,7 @@ class StrategyAutoAdjuster:
 
             # 計算監控期間績效
             adjustment_date = target_change.timestamp
-            monitoring_end = adjustment_date + timedelta(days=monitoring_period_days)
+            adjustment_date + timedelta(days=monitoring_period_days)
 
             # 這裡應該整合實際的績效數據獲取
             # 目前返回模擬的監控結果

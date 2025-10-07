@@ -3,6 +3,7 @@ MarketStatusChecker MCP 整合簡單測試
 """
 
 import asyncio
+import importlib.util
 import sys
 from datetime import datetime
 from pathlib import Path
@@ -12,8 +13,6 @@ src_path = Path(__file__).parent / "src"
 sys.path.insert(0, str(src_path))
 
 # 直接導入 market_status 模組
-import importlib.util
-
 spec = importlib.util.spec_from_file_location(
     "market_status", src_path / "agents" / "functions" / "market_status.py"
 )

@@ -1,6 +1,5 @@
 import json
 import sqlite3
-from datetime import datetime
 
 from dotenv import load_dotenv
 
@@ -61,7 +60,6 @@ def write_log(name: str, type: str, message: str):
         type (str): The type of log entry
         message (str): The log message
     """
-    now = datetime.now().isoformat()
 
     with sqlite3.connect(DB) as conn:
         cursor = conn.cursor()
@@ -90,8 +88,8 @@ def read_log(name: str, last_n=10):
         cursor = conn.cursor()
         cursor.execute(
             """
-            SELECT datetime, type, message FROM logs 
-            WHERE name = ? 
+            SELECT datetime, type, message FROM logs
+            WHERE name = ?
             ORDER BY datetime DESC
             LIMIT ?
         """,

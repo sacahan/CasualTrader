@@ -405,7 +405,7 @@ class StrategyTracker:
     ) -> bool:
         """評估單個觸發條件"""
         try:
-            condition_lower = condition.lower()
+            condition.lower()
 
             # 連續虧損條件
             if "連續" in condition and "虧損" in condition:

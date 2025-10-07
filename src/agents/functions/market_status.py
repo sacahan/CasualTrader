@@ -502,3 +502,35 @@ class MarketStatusChecker:
                 await asyncio.sleep(wait_time)
             else:
                 await asyncio.sleep(check_interval)
+
+    def as_tool(self) -> dict[str, Any]:
+        """
+        將 MarketStatusChecker 轉換為可供 OpenAI Agent 使用的工具
+
+        Returns:
+            工具配置字典
+        """
+        return {
+            "type": "function",
+            "function": {
+                "name": "check_market_status",
+                "description": "檢查台灣股市當前開盤狀態和交易時間",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "include_holidays": {
+                            "type": "boolean",
+                            "description": "是否包含假日檢查",
+                            "default": True,
+                        },
+                        "detailed": {
+                            "type": "boolean",
+                            "description": "是否提供詳細市場時段資訊",
+                            "default": False,
+                        },
+                    },
+                    "required": [],
+                },
+            },
+            "implementation": self.get_market_status,
+        }

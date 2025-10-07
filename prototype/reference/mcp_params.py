@@ -1,7 +1,6 @@
 import os
 
 from dotenv import load_dotenv
-
 from market import is_paid_polygon, is_realtime_polygon
 
 load_dotenv(override=True)

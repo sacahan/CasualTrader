@@ -7,7 +7,7 @@
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime
 from typing import Any
 
 from pydantic import BaseModel
@@ -265,7 +265,9 @@ class SentimentAgent:
             "sentiment_level": (
                 "樂觀"
                 if sentiment_score > 60
-                else "中性" if sentiment_score > 40 else "悲觀"
+                else "中性"
+                if sentiment_score > 40
+                else "悲觀"
             ),
             "price_momentum": "正向" if sentiment_score > 55 else "負向",
             "volume_sentiment": "活躍" if sentiment_score > 65 else "普通",
@@ -290,4 +292,56 @@ class SentimentAgent:
                 "異常熱度": "討論量暴增 > 3倍",
             },
             "更新頻率": "每小時",
+        }
+
+    def as_tool(self, tool_name: str, tool_description: str) -> dict[str, Any]:
+        """
+        將 SentimentAgent 轉換為可供 OpenAI Agent 使用的工具
+
+        Args:
+            tool_name: 工具名稱
+            tool_description: 工具描述
+
+        Returns:
+            工具配置字典
+        """
+        return {
+            "type": "function",
+            "function": {
+                "name": tool_name,
+                "description": tool_description,
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "symbol": {
+                            "type": "string",
+                            "description": "股票代碼 (例如: 2330, 可選)",
+                        },
+                        "market_scope": {
+                            "type": "string",
+                            "enum": ["individual", "sector", "market"],
+                            "description": "分析範圍",
+                            "default": "market",
+                        },
+                        "include_news": {
+                            "type": "boolean",
+                            "description": "是否包含新聞分析",
+                            "default": True,
+                        },
+                        "include_social": {
+                            "type": "boolean",
+                            "description": "是否包含社群媒體分析",
+                            "default": True,
+                        },
+                        "time_range": {
+                            "type": "string",
+                            "enum": ["1d", "3d", "1w", "1m"],
+                            "description": "分析時間範圍",
+                            "default": "3d",
+                        },
+                    },
+                    "required": [],
+                },
+            },
+            "implementation": self.analyze_market_sentiment,
         }

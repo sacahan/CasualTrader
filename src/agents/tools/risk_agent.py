@@ -331,7 +331,7 @@ class RiskAgent:
     ) -> dict[str, Any]:
         """計算投資組合統計量"""
         # 模擬投資組合統計計算
-        weights = [pos.get("weight", 0) for pos in positions]
+        [pos.get("weight", 0) for pos in positions]
 
         # 加權平均 Beta
         weighted_beta = sum(
@@ -622,21 +622,21 @@ class RiskAgent:
         return f"""
 投資組合風險評估摘要：
 
-整體風險等級：{assessment['level']} (評分: {assessment['score']:.0f}/100)
-信心度：{assessment['confidence']:.0%}
+整體風險等級：{assessment["level"]} (評分: {assessment["score"]:.0f}/100)
+信心度：{assessment["confidence"]:.0%}
 
 投資組合特徵：
 - 持股檔數：{portfolio_risk.number_of_positions}
 - 最大單股權重：{portfolio_risk.single_stock_max_weight:.1%}
-- 投資組合 Beta：{portfolio_risk.portfolio_beta or 'N/A'}
-- 集中度指數：{portfolio_risk.concentration_risk['hhi_index']:.3f}
+- 投資組合 Beta：{portfolio_risk.portfolio_beta or "N/A"}
+- 集中度指數：{portfolio_risk.concentration_risk["hhi_index"]:.3f}
 
 壓力測試結果：
 - 最壞情境：{worst_scenario[0]}
-- 預期損失：{worst_scenario[1]['portfolio_loss']:.1%}
+- 預期損失：{worst_scenario[1]["portfolio_loss"]:.1%}
 
 主要風險因子：
-{chr(10).join(f'• {factor}' for factor in assessment['key_factors'][:3])}
+{chr(10).join(f"• {factor}" for factor in assessment["key_factors"][:3])}
 
 建議採取適當的風險控制措施，定期檢討投資組合配置。
         """.strip()
@@ -659,4 +659,52 @@ class RiskAgent:
             },
             "monitoring_frequency": "即時",
             "reporting_schedule": "每日",
+        }
+
+    def as_tool(self, tool_name: str, tool_description: str) -> dict[str, Any]:
+        """
+        將 RiskAgent 轉換為可供 OpenAI Agent 使用的工具
+
+        Args:
+            tool_name: 工具名稱
+            tool_description: 工具描述
+
+        Returns:
+            工具配置字典
+        """
+        return {
+            "type": "function",
+            "function": {
+                "name": tool_name,
+                "description": tool_description,
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "portfolio_data": {
+                            "type": "object",
+                            "description": "投資組合數據",
+                        },
+                        "risk_tolerance": {
+                            "type": "string",
+                            "enum": ["conservative", "moderate", "aggressive"],
+                            "description": "風險承受度",
+                            "default": "moderate",
+                        },
+                        "assessment_type": {
+                            "type": "string",
+                            "enum": ["individual", "portfolio", "scenario"],
+                            "description": "評估類型",
+                            "default": "portfolio",
+                        },
+                        "time_horizon": {
+                            "type": "string",
+                            "enum": ["short", "medium", "long"],
+                            "description": "投資時間範圍",
+                            "default": "medium",
+                        },
+                    },
+                    "required": ["portfolio_data"],
+                },
+            },
+            "implementation": self.assess_portfolio_risk,
         }

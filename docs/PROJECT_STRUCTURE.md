@@ -1,7 +1,7 @@
 # CasualTrader 專案結構規範
 
-**版本**: 1.0  
-**日期**: 2025-10-06  
+**版本**: 1.0
+**日期**: 2025-10-06
 **適用於**: API、Agent、Frontend 三大模塊
 
 ---
@@ -393,5 +393,5 @@ CasualMarket (External MCP Server)
 
 ---
 
-**文檔維護**: CasualTrader 開發團隊  
+**文檔維護**: CasualTrader 開發團隊
 **最後更新**: 2025-10-06

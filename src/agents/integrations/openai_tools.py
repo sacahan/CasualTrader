@@ -68,9 +68,9 @@ class OpenAIToolsIntegrator:
             # 模擬搜尋結果
             mock_results = [
                 {
-                    "title": f"搜尋結果 {i+1} - {query}",
-                    "url": f"https://example.com/result{i+1}",
-                    "snippet": f"這是關於 {query} 的搜尋結果摘要 {i+1}",
+                    "title": f"搜尋結果 {i + 1} - {query}",
+                    "url": f"https://example.com/result{i + 1}",
+                    "snippet": f"這是關於 {query} 的搜尋結果摘要 {i + 1}",
                     "relevance_score": 0.9 - i * 0.1,
                 }
                 for i in range(min(max_results, 5))
@@ -454,4 +454,43 @@ for i, insight in enumerate(insights, 1):
             "code_analysis": analysis_result,
             "integrated_summary": f"完成 {symbol} 的 {analysis_request} 整合分析",
             "timestamp": datetime.now(),
+        }
+
+    def get_web_search_tool(self) -> dict[str, Any]:
+        """
+        獲取 WebSearchTool 配置
+
+        Returns:
+            Web Search Tool 配置
+        """
+        return {
+            "type": "web_search",
+            "web_search": {
+                "description": "搜尋最新市場新聞和資訊",
+                "max_results": 10,
+                "search_types": ["general", "news", "finance"],
+            },
+        }
+
+    def get_code_interpreter_tool(self) -> dict[str, Any]:
+        """
+        獲取 CodeInterpreterTool 配置
+
+        Returns:
+            Code Interpreter Tool 配置
+        """
+        return {
+            "type": "code_interpreter",
+            "code_interpreter": {
+                "description": "執行量化分析和計算",
+                "supported_languages": ["python"],
+                "timeout": 30,
+                "libraries": [
+                    "pandas",
+                    "numpy",
+                    "matplotlib",
+                    "scipy",
+                    "scikit-learn",
+                ],
+            },
         }
