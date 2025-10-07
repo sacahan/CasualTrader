@@ -1,23 +1,135 @@
 {
-    "chat.mcp.serverSampling": {
-        "CasualTrader/.vscode/mcp.json: market": {
-            "allowedModels": [
-                "copilot/gpt-4.1",
-                "copilot/claude-3.5-sonnet",
-                "copilot/claude-3.7-sonnet",
-                "copilot/claude-3.7-sonnet-thought",
-                "copilot/claude-sonnet-4",
-                "copilot/claude-sonnet-4.5",
-                "copilot/gemini-2.0-flash-001",
-                "copilot/gemini-2.5-pro",
-                "copilot/gpt-4o",
-                "copilot/gpt-5",
-                "copilot/gpt-5-mini",
-                "copilot/gpt-5-codex",
-                "copilot/grok-code-fast-1",
-                "copilot/o3-mini",
-                "copilot/o4-mini"
-            ]
-        }
+  // *******************************
+  // 以下設定僅適用於 User Settings
+  // *******************************
+  "github.copilot.enable": {
+    "*": true,
+    "plaintext": false,
+    "markdown": true,
+    "scminput": true,
+    "yaml": true,
+    "html": true,
+    "powershell": true,
+    "javascript": true,
+    "aspnetcorerazor": true
+  },
+  "chat.editing.confirmEditRequestRemoval": true,
+  "chat.editing.confirmEditRequestRetry": true,
+  "telemetry.telemetryLevel": "off",
+
+  // ***************************************************
+  // 以下設定適用於 User Settings 或 Workspace Settings
+  // ***************************************************
+  "window.commandCenter": true,
+  "chat.commandCenter.enabled": true,
+
+  // 目前 gpt-4o-copilot 已經是預設值，但明確設定可確保一致性
+  "github.copilot.selectedCompletionModel": "gpt-4o-copilot",
+  "github.copilot.editor.enableCodeActions": true,
+  "github.copilot.renameSuggestions.triggerAutomatically": true,
+  "workbench.commandPalette.experimental.askChatLocation": "chatView",
+  "github.copilot.chat.search.semanticTextResults": true,
+  "github.copilot.nextEditSuggestions.enabled": true,
+  "editor.inlineSuggest.edits.showCollapsed": true,
+
+  // GitHub Copilot Chat
+  "github.copilot.chat.followUps": "always",
+  "github.copilot.chat.localeOverride": "zh-TW",
+  "github.copilot.chat.useProjectTemplates": false,
+  "github.copilot.chat.scopeSelection": true,
+  "chat.detectParticipant.enabled": false,
+  "chat.promptFiles": true,
+  "chat.promptFilesLocations": {
+    ".github/prompts": true
+  },
+  "github.copilot.chat.languageContext.typescript.enabled": true,
+  "github.copilot.chat.agent.thinkingTool": true,
+  // GitHub Copilot Chat - 內嵌聊天 (Inline Chat)
+  "github.copilot.chat.editor.temporalContext.enabled": true,
+  "inlineChat.holdToSpeech": true,
+  "inlineChat.finishOnType": false,
+  // GitHub Copilot Chat - 偵錯相關設定
+  "github.copilot.chat.startDebugging.enabled": true,
+  "github.copilot.chat.reviewSelection.enabled": true,
+  "github.copilot.chat.copilotDebugCommand.enabled": true,
+  "github.copilot.chat.edits.temporalContext.enabled": false,
+  // GitHub Copilot Chat - 測試相關設定
+  "github.copilot.chat.setupTests.enabled": true,
+  "github.copilot.chat.generateTests.codeLens": true,
+  // "github.copilot.chat.testGeneration.instructions": [
+  //     {
+  //         "file": ".copilot-test-instructions.md"
+  //     }
+  // ],
+  // GitHub Copilot Chat - 自訂提示
+  "github.copilot.chat.codeGeneration.useInstructionFiles": true,
+  // "github.copilot.chat.codeGeneration.instructions": [
+  //     {
+  //         "file": ".github/copilot-instructions.md"
+  //     },
+  // 	{
+  // 		"text": "Code comments should be in #zh-tw."
+  // 	}
+  // ],
+  "github.copilot.chat.reviewSelection.instructions": [
+    {
+      "text": "Always response in #zh-tw."
+    },
+    {
+      "file": ".copilot-review-instructions.md"
     }
+  ],
+  // GitHub Copilot Chat - 自訂 Git Commit 訊息提示
+  "github.copilot.chat.commitMessageGeneration.instructions": [
+    {
+      "file": ".github/copilot-commit-message-instructions.md"
+    }
+  ],
+  // GitHub Copilot Chat - 自訂 Pull Request 描述提示
+  "github.copilot.chat.pullRequestDescriptionGeneration.instructions": [
+    {
+      "file": ".copilot-pull-request-description-instructions.md"
+    }
+  ],
+  // GitHub Copilot Chat Edit
+  "github.copilot.chat.edits.suggestRelatedFilesForTests": true,
+  "github.copilot.chat.edits.suggestRelatedFilesFromGitHistory": true,
+
+  // GitHub Copilot Chat - Agent Mode
+  "chat.agent.enabled": true,
+  "chat.agent.maxRequests": 50,
+  "github.copilot.chat.agent.runTasks": true,
+  "github.copilot.chat.codesearch.enabled": true,
+  "github.copilot.chat.newWorkspaceCreation.enabled": true,
+  "terminal.integrated.scrollback": 50000,
+  "chat.mcp.discovery.enabled": {
+    "claude-desktop": false,
+    "windsurf": false,
+    "cursor-global": false,
+    "cursor-workspace": false
+  },
+  // "chat.mcp.discovery.enabled": {
+  //     "claude-desktop": false,
+  //     "windsurf": false,
+  //     "cursor-global": false,
+  //     "cursor-workspace": false
+  // },
+  "mcp": {
+    "servers": {}
+  },
+
+  // Accessibility
+  "accessibility.voice.speechLanguage": "zh-TW",
+  "accessibility.voice.autoSynthesize": "off",
+  // accessibility.voice.keywordActivation 預設為 off，習慣用語音輸入可以改為 chatInContext
+  // "accessibility.voice.keywordActivation": "chatInContext",
+  "accessibility.voice.speechTimeout": 10000,
+  "accessibility.voice.ignoreCodeBlocks": true,
+
+  // Live Preview
+  "livePreview.autoRefreshPreview": "On Changes to Saved Files",
+  "python.testing.pytestArgs": ["src"],
+  "python.testing.unittestEnabled": false,
+  "python.testing.pytestEnabled": true,
+  "chat.mcp.access": "all"
 }
