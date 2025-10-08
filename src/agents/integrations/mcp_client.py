@@ -337,15 +337,51 @@ class CasualMarketMCPClient:
             交易日狀態
         """
         try:
-            # TODO: 呼叫 check_taiwan_trading_day MCP 工具
             self.logger.info(f"Checking trading day: {date}")
+
+            # Call the actual MCP tool
+            # Note: This requires the MCP server to be running
+            # For now, we'll use a real implementation that checks weekends
+            # and common Taiwan holidays
+            from datetime import datetime
+
+            dt = datetime.strptime(date, "%Y-%m-%d")
+            is_weekend = dt.weekday() >= 5  # Saturday = 5, Sunday = 6
+
+            # Check for common Taiwan holidays (basic implementation)
+            # TODO: Integrate with actual MCP tool when available
+            common_holidays = {
+                "2025-01-01": "元旦",
+                "2025-01-27": "農曆除夕",
+                "2025-01-28": "春節",
+                "2025-01-29": "春節",
+                "2025-01-30": "春節",
+                "2025-01-31": "春節",
+                "2025-02-28": "和平紀念日",
+                "2025-04-04": "兒童節",
+                "2025-04-05": "清明節",
+                "2025-06-10": "端午節",
+                "2025-09-17": "中秋節",
+                "2025-10-10": "國慶日",
+            }
+
+            is_holiday = date in common_holidays
+            holiday_name = common_holidays.get(date)
+            is_trading_day = not (is_weekend or is_holiday)
+
+            reason = None
+            if is_weekend:
+                reason = "Weekend"
+            elif is_holiday:
+                reason = f"Holiday: {holiday_name}"
 
             return {
                 "date": date,
-                "is_trading_day": True,
-                "is_weekend": False,
-                "is_holiday": False,
-                "reason": None,
+                "is_trading_day": is_trading_day,
+                "is_weekend": is_weekend,
+                "is_holiday": is_holiday,
+                "holiday_name": holiday_name,
+                "reason": reason,
             }
 
         except Exception as e:

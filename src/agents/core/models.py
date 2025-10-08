@@ -80,6 +80,39 @@ class InvestmentPreferences:
     min_position_size: float = 1.0  # 單筆最小投資比例 (%)
     risk_tolerance: str = "medium"  # low, medium, high
     investment_horizon: str = "long_term"  # short_term, medium_term, long_term
+    strategy_type: str = "balanced"  # conservative, balanced, aggressive, custom
+
+    @staticmethod
+    def risk_tolerance_from_float(value: float) -> str:
+        """
+        Convert risk tolerance from float (0.0-1.0) to string category.
+
+        Args:
+            value: Risk tolerance as float (0.0 = low risk, 1.0 = high risk)
+
+        Returns:
+            Risk tolerance category: "low", "medium", or "high"
+        """
+        if value < 0.35:
+            return "low"
+        elif value < 0.70:
+            return "medium"
+        else:
+            return "high"
+
+    @staticmethod
+    def risk_tolerance_to_float(category: str) -> float:
+        """
+        Convert risk tolerance from string category to float.
+
+        Args:
+            category: Risk tolerance category ("low", "medium", "high")
+
+        Returns:
+            Risk tolerance as float (0.0-1.0)
+        """
+        mapping = {"low": 0.2, "medium": 0.5, "high": 0.8}
+        return mapping.get(category.lower(), 0.5)
 
 
 @dataclass

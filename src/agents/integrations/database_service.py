@@ -506,7 +506,7 @@ class AgentDatabaseService:
                 self.logger.error(f"Failed to save holdings: {e}")
                 raise
 
-    async def get_agent_holdings(self, agent_id: str) -> dict[str, Any]:
+    async def get_agent_holdings(self, agent_id: str) -> list[AgentHolding]:
         """獲取 Agent 持倉資料"""
         if not self.session_factory:
             raise RuntimeError("Database service not initialized")
@@ -517,22 +517,49 @@ class AgentDatabaseService:
                 result = await session.execute(stmt)
                 db_holdings = result.scalars().all()
 
-                # 轉換為字典格式
-                holdings = {}
-                for holding in db_holdings:
-                    holdings[holding.symbol] = {
-                        "company_name": holding.company_name,
-                        "quantity": holding.quantity,
-                        "average_cost": float(holding.average_cost),
-                        "total_cost": float(holding.total_cost),
-                        "market_value": holding.quantity * float(holding.average_cost),
-                    }
-
-                return holdings
+                return list(db_holdings)
 
             except Exception as e:
                 self.logger.error(f"Failed to get holdings: {e}")
                 raise
+
+    async def get_agent_transactions(
+        self, agent_id: str, limit: int = 100, offset: int = 0
+    ) -> list:
+        """
+        獲取 Agent 交易歷史
+
+        Args:
+            agent_id: Agent ID
+            limit: 返回數量限制
+            offset: 偏移量
+
+        Returns:
+            交易記錄列表
+        """
+        if not self.session_factory:
+            raise RuntimeError("Database service not initialized")
+
+        async with self.session_factory() as session:
+            try:
+                from src.database.models import Transaction
+
+                stmt = (
+                    select(Transaction)
+                    .where(Transaction.agent_id == agent_id)
+                    .order_by(desc(Transaction.executed_at))
+                    .limit(limit)
+                    .offset(offset)
+                )
+
+                result = await session.execute(stmt)
+                transactions = result.scalars().all()
+
+                return list(transactions)
+
+            except Exception as e:
+                self.logger.error(f"Failed to get transactions: {e}")
+                return []
 
     # ==========================================
     # 輔助方法

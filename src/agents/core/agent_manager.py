@@ -141,8 +141,10 @@ class AgentManager:
         Returns:
             創建的 Agent ID
         """
+        # Auto-start Agent Manager if not running
         if not self._is_running:
-            raise RuntimeError("Agent Manager is not running")
+            self.logger.warning("Agent Manager not running, starting automatically...")
+            await self.start()
 
         # 生成或驗證 Agent ID
         final_agent_id = agent_id or generate_agent_id()
@@ -200,20 +202,71 @@ class AgentManager:
 
         self.logger.info(f"Agent {agent_id} removed successfully")
 
-    async def get_agent(self, agent_id: str) -> CasualTradingAgent:
-        """獲取指定 Agent"""
+    async def get_agent(self, agent_id: str) -> dict[str, Any]:
+        """獲取指定 Agent 的信息（API用）"""
+        if agent_id not in self._agents:
+            raise ValueError(f"Agent {agent_id} not found")
+
+        agent = self._agents[agent_id]
+        return self._agent_to_dict(agent)
+
+    def get_agent_instance(self, agent_id: str) -> CasualTradingAgent:
+        """獲取指定 Agent 實例（內部用）"""
         if agent_id not in self._agents:
             raise ValueError(f"Agent {agent_id} not found")
 
         return self._agents[agent_id]
 
-    def list_agents(self) -> list[str]:
+    async def list_agents(self) -> list[dict[str, Any]]:
+        """列出所有 Agent 及其狀態信息"""
+        agents_list = []
+        for agent in self._agents.values():
+            agent_dict = self._agent_to_dict(agent)
+            agents_list.append(agent_dict)
+        return agents_list
+
+    def list_agent_ids(self) -> list[str]:
         """列出所有 Agent ID"""
         return list(self._agents.keys())
 
     def get_agent_states(self) -> dict[str, AgentState]:
         """獲取所有 Agent 狀態"""
         return {agent_id: agent.state for agent_id, agent in self._agents.items()}
+
+    def _agent_to_dict(self, agent: CasualTradingAgent) -> dict[str, Any]:
+        """Convert agent to dictionary for API response."""
+
+        return {
+            "id": agent.agent_id,
+            "name": agent.config.name,
+            "description": agent.config.description,
+            "ai_model": agent.config.model,
+            "strategy_type": agent.config.investment_preferences.strategy_type,
+            "strategy_prompt": agent.config.instructions,
+            "current_mode": str(agent.state.current_mode.value),
+            "status": str(agent.state.status.value),
+            "initial_funds": float(agent.config.initial_funds),
+            "current_funds": float(
+                agent.config.current_funds or agent.config.initial_funds
+            ),
+            "max_turns": agent.config.max_turns,
+            "risk_tolerance": agent.config.investment_preferences.risk_tolerance_to_float(
+                agent.config.investment_preferences.risk_tolerance
+            ),
+            "enabled_tools": agent.config.enabled_tools,
+            "investment_preferences": {
+                "preferred_sectors": agent.config.investment_preferences.preferred_sectors,
+                "excluded_stocks": agent.config.investment_preferences.excluded_symbols,
+                "max_position_size": agent.config.investment_preferences.max_position_size
+                / 100,  # Convert back to 0-1 range
+                "rebalance_frequency": "weekly",  # Default value
+            },
+            "custom_instructions": agent.config.additional_instructions,
+            "created_at": agent.state.created_at,
+            "updated_at": agent.state.updated_at,
+            "portfolio": None,
+            "performance": None,
+        }
 
     # ==========================================
     # Agent 執行管理
@@ -469,3 +522,254 @@ class AgentManager:
             f"agents={self.agent_count}, "
             f"active={self.active_agent_count})"
         )
+
+    # ==========================================
+    # Trading Data Access Methods
+    # ==========================================
+
+    async def get_portfolio(self, agent_id: str) -> dict[str, Any]:
+        """
+        獲取 Agent 的投資組合
+
+        Args:
+            agent_id: Agent ID
+
+        Returns:
+            投資組合資訊
+        """
+        if agent_id not in self._agents:
+            raise ValueError(f"Agent {agent_id} not found")
+
+        agent = self._agents[agent_id]
+
+        # Try to get portfolio from persistent agent if available
+        if hasattr(agent, "get_portfolio_history"):
+            return await agent.get_portfolio_history()
+
+        # Otherwise return basic portfolio info from agent state
+        portfolio_data = {
+            "cash": float(agent.config.current_funds or agent.config.initial_funds),
+            "holdings": [],
+            "total_value": float(
+                agent.config.current_funds or agent.config.initial_funds
+            ),
+            "total_cost": float(agent.config.initial_funds),
+            "unrealized_pnl": 0.0,
+            "unrealized_pnl_percent": 0.0,
+        }
+
+        # Get holdings from database if available
+        if hasattr(agent, "db_service") and agent.db_service:
+            try:
+                holdings = await agent.db_service.get_agent_holdings(agent_id)
+                portfolio_data["holdings"] = [
+                    {
+                        "symbol": h.symbol,
+                        "quantity": int(h.quantity),
+                        "average_cost": float(h.average_cost),
+                        "current_price": float(h.current_price or h.average_cost),
+                        "market_value": float(
+                            h.quantity * (h.current_price or h.average_cost)
+                        ),
+                        "unrealized_pnl": float(
+                            h.quantity
+                            * ((h.current_price or h.average_cost) - h.average_cost)
+                        ),
+                        "weight": 0.0,  # Will be calculated
+                    }
+                    for h in holdings
+                ]
+
+                # Calculate total market value and weights
+                total_market_value = sum(
+                    h["market_value"] for h in portfolio_data["holdings"]
+                )
+                portfolio_data["total_value"] = (
+                    portfolio_data["cash"] + total_market_value
+                )
+
+                # Calculate weights
+                if portfolio_data["total_value"] > 0:
+                    for holding in portfolio_data["holdings"]:
+                        holding["weight"] = (
+                            holding["market_value"] / portfolio_data["total_value"]
+                        )
+
+                # Calculate total unrealized PnL
+                total_unrealized_pnl = sum(
+                    h["unrealized_pnl"] for h in portfolio_data["holdings"]
+                )
+                portfolio_data["unrealized_pnl"] = total_unrealized_pnl
+                portfolio_data["unrealized_pnl_percent"] = (
+                    (total_unrealized_pnl / portfolio_data["total_cost"] * 100)
+                    if portfolio_data["total_cost"] > 0
+                    else 0.0
+                )
+
+            except Exception as e:
+                self.logger.error(f"Error fetching holdings from database: {e}")
+
+        return portfolio_data
+
+    async def get_trades(
+        self, agent_id: str, limit: int = 100, offset: int = 0
+    ) -> list[dict[str, Any]]:
+        """
+        獲取 Agent 的交易歷史
+
+        Args:
+            agent_id: Agent ID
+            limit: 返回數量限制
+            offset: 偏移量
+
+        Returns:
+            交易記錄列表
+        """
+        if agent_id not in self._agents:
+            raise ValueError(f"Agent {agent_id} not found")
+
+        agent = self._agents[agent_id]
+
+        # Try to get trades from database
+        if hasattr(agent, "db_service") and agent.db_service:
+            try:
+                transactions = await agent.db_service.get_agent_transactions(
+                    agent_id=agent_id, limit=limit, offset=offset
+                )
+
+                return [
+                    {
+                        "id": t.id,
+                        "symbol": t.symbol,
+                        "action": t.action,
+                        "quantity": int(t.quantity),
+                        "price": float(t.price),
+                        "total_amount": float(t.total_amount),
+                        "fee": float(t.fee or 0),
+                        "tax": float(t.tax or 0),
+                        "status": t.status,
+                        "executed_at": (
+                            t.executed_at.isoformat() if t.executed_at else None
+                        ),
+                        "session_id": t.session_id,
+                    }
+                    for t in transactions
+                ]
+
+            except Exception as e:
+                self.logger.error(f"Error fetching trades from database: {e}")
+                return []
+
+        # Return empty list if no database service
+        return []
+
+    async def get_strategy_changes(
+        self, agent_id: str, limit: int = 50, offset: int = 0
+    ) -> list[dict[str, Any]]:
+        """
+        獲取 Agent 的策略變更歷史
+
+        Args:
+            agent_id: Agent ID
+            limit: 返回數量限制
+            offset: 偏移量
+
+        Returns:
+            策略變更記錄列表
+        """
+        if agent_id not in self._agents:
+            raise ValueError(f"Agent {agent_id} not found")
+
+        agent = self._agents[agent_id]
+
+        # Try to get strategy changes from database
+        if hasattr(agent, "db_service") and agent.db_service:
+            try:
+                changes = await agent.db_service.get_strategy_changes(
+                    agent_id=agent_id, limit=limit, offset=offset
+                )
+
+                return [
+                    {
+                        "id": c.id,
+                        "change_type": c.change_type,
+                        "old_strategy": c.old_strategy,
+                        "new_strategy": c.new_strategy,
+                        "reason": c.reason,
+                        "performance_before": c.performance_before,
+                        "performance_after": c.performance_after,
+                        "changed_at": c.changed_at.isoformat()
+                        if c.changed_at
+                        else None,
+                        "applied": c.applied,
+                    }
+                    for c in changes
+                ]
+
+            except Exception as e:
+                self.logger.error(f"Error fetching strategy changes from database: {e}")
+                return []
+
+        # Try to get from agent's strategy tracker
+        if hasattr(agent, "get_strategy_changes"):
+            try:
+                changes = agent.get_strategy_changes()
+                return changes[-limit:] if limit > 0 else changes
+            except Exception as e:
+                self.logger.error(f"Error getting strategy changes from agent: {e}")
+
+        return []
+
+    async def get_performance(self, agent_id: str) -> dict[str, Any]:
+        """
+        獲取 Agent 的績效指標
+
+        Args:
+            agent_id: Agent ID
+
+        Returns:
+            績效指標
+        """
+        if agent_id not in self._agents:
+            raise ValueError(f"Agent {agent_id} not found")
+
+        agent = self._agents[agent_id]
+
+        # Get basic metrics from agent config
+        initial_funds = float(agent.config.initial_funds)
+        current_funds = float(agent.config.current_funds or agent.config.initial_funds)
+
+        # Start with basic metrics
+        performance = {
+            "initial_funds": initial_funds,
+            "current_funds": current_funds,
+            "total_return": current_funds - initial_funds,
+            "total_return_percent": (
+                ((current_funds - initial_funds) / initial_funds * 100)
+                if initial_funds > 0
+                else 0.0
+            ),
+            "total_trades": 0,
+            "winning_trades": 0,
+            "losing_trades": 0,
+            "win_rate": 0.0,
+            "max_drawdown": 0.0,
+            "sharpe_ratio": None,
+        }
+
+        # Try to get additional performance metrics from agent
+        try:
+            if hasattr(agent, "get_performance_analytics"):
+                analytics = await agent.get_performance_analytics()
+                # Merge analytics with basic performance
+                performance.update(analytics)
+            elif hasattr(agent, "get_performance_summary"):
+                summary = agent.get_performance_summary()
+                # Merge summary but keep initial_funds and current_funds
+                for key, value in summary.items():
+                    if key not in ["initial_funds", "current_funds"]:
+                        performance[key] = value
+        except Exception as e:
+            self.logger.error(f"Error getting additional performance metrics: {e}")
+
+        return performance

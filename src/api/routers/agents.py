@@ -54,12 +54,18 @@ def _map_agent_to_response(agent_data: dict[str, Any]) -> AgentResponse:
     )
 
 
-@router.get("", response_model=AgentListResponse)
+@router.get("", response_model=AgentListResponse, summary="列出所有代理")
 async def list_agents():
-    """Get all trading agents."""
+    """
+    列出所有交易代理
+
+    返回系統中所有已創建的交易代理及其狀態。
+    """
+    logger.info("Listing all agents")
     try:
         agents = await agent_manager.list_agents()
         agent_responses = [_map_agent_to_response(agent) for agent in agents]
+        logger.info(f"Found {len(agent_responses)} agents")
         return AgentListResponse(agents=agent_responses, total=len(agent_responses))
     except Exception as e:
         logger.error(f"Error listing agents: {e}")
@@ -69,11 +75,51 @@ async def list_agents():
         ) from e
 
 
-@router.post("", response_model=AgentResponse, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "",
+    response_model=AgentResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="創建代理",
+)
 async def create_agent(request: CreateAgentRequest):
-    """Create a new trading agent."""
+    """
+    創建新的交易代理
+
+    根據指定的配置創建一個新的 AI 交易代理。
+
+    - **name**: 代理名稱
+    - **ai_model**: 使用的 AI 模型
+    - **strategy_prompt**: 交易策略描述
+    - **initial_funds**: 初始資金
+    """
+    logger.info(
+        f"Creating new agent: {request.name} with model {request.ai_model.value}"
+    )
     try:
         # Convert request to AgentConfig
+        logger.debug(
+            f"Agent config: initial_funds={request.initial_funds}, max_turns={request.max_turns}"
+        )
+
+        # Import InvestmentPreferences from agent models
+        from ...agents.core.models import (
+            InvestmentPreferences as AgentInvestmentPreferences,
+        )
+
+        # Convert risk_tolerance from float to string category
+        risk_category = AgentInvestmentPreferences.risk_tolerance_from_float(
+            request.risk_tolerance
+        )
+
+        # Create InvestmentPreferences dataclass
+        agent_investment_prefs = AgentInvestmentPreferences(
+            preferred_sectors=request.investment_preferences.preferred_sectors,
+            excluded_symbols=request.investment_preferences.excluded_stocks,
+            max_position_size=request.investment_preferences.max_position_size
+            * 100,  # Convert to percentage
+            risk_tolerance=risk_category,
+            strategy_type=request.strategy_type.value,
+        )
 
         config = AgentConfig(
             name=request.name,
@@ -84,46 +130,55 @@ async def create_agent(request: CreateAgentRequest):
             instructions=request.strategy_prompt,
             additional_instructions=request.custom_instructions,
             enabled_tools=request.enabled_tools.model_dump(),
+            investment_preferences=agent_investment_prefs,
         )
 
-        # Create agent with custom instructions
-        agent_id = await agent_manager.create_agent(
-            config=config,
-            strategy_prompt=request.strategy_prompt,
-            custom_instructions=request.custom_instructions,
-        )
+        # Create agent
+        agent_id = await agent_manager.create_agent(config=config)
+        logger.success(f"Agent created successfully: {agent_id}")
 
-        # Get created agent
-        agent_data = await agent_manager.get_agent(agent_id)
-        agent_data["color_theme"] = request.color_theme
+        # Get created agent (now returns dict)
+        agent_dict = await agent_manager.get_agent(agent_id)
+
+        # Add color_theme to agent_dict (not stored in agent config)
+        agent_dict["color_theme"] = request.color_theme
 
         # Broadcast creation event
+        logger.debug(f"Broadcasting agent creation event for {agent_id}")
         await websocket_manager.broadcast_agent_status(
             agent_id=agent_id,
             status="created",
             details={"name": request.name, "ai_model": request.ai_model.value},
         )
 
-        return _map_agent_to_response(agent_data)
+        return _map_agent_to_response(agent_dict)
 
     except Exception as e:
         logger.error(f"Error creating agent: {e}")
+        logger.exception("Full traceback:")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to create agent: {str(e)}",
         ) from e
 
 
-@router.get("/{agent_id}", response_model=AgentResponse)
+@router.get("/{agent_id}", response_model=AgentResponse, summary="查詢代理")
 async def get_agent(agent_id: str):
-    """Get specific agent details."""
+    """
+    查詢特定代理的詳細資訊
+
+    返回指定 ID 的交易代理的完整配置和狀態。
+    """
+    logger.info(f"Getting agent: {agent_id}")
     try:
         agent_data = await agent_manager.get_agent(agent_id)
         if not agent_data:
+            logger.warning(f"Agent not found: {agent_id}")
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail=f"Agent {agent_id} not found",
             )
+        logger.debug(f"Agent {agent_id} status: {agent_data.get('status')}")
         return _map_agent_to_response(agent_data)
     except HTTPException:
         raise

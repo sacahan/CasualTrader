@@ -1,7 +1,7 @@
 # API 實作規格
 
-**版本**: 1.0
-**日期**: 2025-10-06
+**版本**: 1.1
+**日期**: 2025-10-08
 **相關設計**: SYSTEM_DESIGN.md
 
 ---
@@ -15,6 +15,8 @@
 3. **資料模型** - API 請求/回應格式
 4. **錯誤處理** - 統一的錯誤處理機制
 5. **認證授權** - API 安全性實作
+6. **套件依賴清單** - 完整的依賴套件管理
+7. **使用文檔** - API 使用指南和測試工具
 
 ---
 
@@ -824,39 +826,555 @@ CREATE TABLE IF NOT EXISTS strategy_changes (
 
 ---
 
+## 📦 套件依賴清單
+
+### 核心依賴套件
+
+#### 1. Web 框架和 API
+
+```toml
+# 主要 Web 框架
+"fastapi>=0.104.0"          # 現代化異步 Web 框架
+"uvicorn[standard]>=0.24.0" # ASGI 服務器
+"websockets>=12.0"          # WebSocket 支援
+
+# 中間件和擴展
+"fastapi-cors>=1.0.0"       # CORS 支援
+"fastapi-limiter>=0.1.5"    # API 速率限制
+```
+
+#### 2. 數據驗證和模型
+
+```toml
+"pydantic>=2.5.0"           # 數據驗證和序列化
+"pydantic-settings>=2.1.0"  # 設定管理
+"typing-extensions>=4.8.0"  # 類型提示擴展
+```
+
+#### 3. 資料庫和 ORM
+
+```toml
+"sqlalchemy>=2.0.0"         # ORM 框架
+"alembic>=1.13.0"          # 資料庫遷移
+"asyncpg>=0.29.0"          # PostgreSQL 異步驅動
+"aiosqlite>=0.19.0"        # SQLite 異步驅動（開發用）
+```
+
+#### 4. 快取和會話
+
+```toml
+"redis>=5.0.0"             # Redis 客戶端
+"aioredis>=2.0.0"          # Redis 異步客戶端
+"python-memcached>=1.62"   # Memcached 支援（可選）
+```
+
+#### 5. AI 和 Agent 整合
+
+```toml
+"openai>=1.30.0"           # OpenAI API 客戶端
+"openai-agents>=0.1.0"     # OpenAI Agent SDK
+"anthropic>=0.25.0"        # Claude API（可選）
+```
+
+#### 6. MCP 工具整合
+
+```toml
+"casual-market-mcp>=1.0.0" # 台灣股市 MCP 工具
+"mcp>=1.0.0"               # Model Context Protocol 核心
+"fastmcp>=2.7.0"           # FastMCP 框架
+```
+
+#### 7. HTTP 客戶端和網路
+
+```toml
+"httpx>=0.25.0"            # 現代化 HTTP 客戶端
+"aiohttp>=3.9.0"           # 異步 HTTP 客戶端
+"requests>=2.31.0"         # 傳統 HTTP 客戶端（相容性）
+```
+
+#### 8. 日誌和監控
+
+```toml
+"structlog>=23.2.0"        # 結構化日誌
+"loguru>=0.7.0"            # 簡化日誌記錄
+"prometheus-client>=0.19.0" # Prometheus 指標
+"sentry-sdk[fastapi]>=1.38.0" # 錯誤追蹤（生產環境）
+```
+
+#### 9. 安全性
+
+```toml
+"passlib[bcrypt]>=1.7.4"   # 密碼雜湊
+"python-jose[cryptography]>=3.3.0" # JWT 處理
+"python-multipart>=0.0.6"  # 表單數據處理
+"cryptography>=41.0.0"     # 加密工具
+```
+
+#### 10. 環境和配置
+
+```toml
+"python-dotenv>=1.0.0"     # 環境變數載入
+"pyyaml>=6.0.1"            # YAML 配置支援
+"click>=8.1.0"             # CLI 工具
+```
+
+### 開發依賴套件
+
+```toml
+[project.optional-dependencies]
+dev = [
+    # 測試框架
+    "pytest>=7.4.0",
+    "pytest-asyncio>=0.21.0",
+    "pytest-cov>=4.1.0",
+    "pytest-mock>=3.12.0",
+    "pytest-xdist>=3.5.0",     # 並行測試
+
+    # 代碼品質
+    "ruff>=0.1.0",              # Linting 和格式化
+    "mypy>=1.7.0",              # 類型檢查
+    "black>=23.11.0",           # 代碼格式化
+    "isort>=5.12.0",            # import 排序
+
+    # 開發工具
+    "pre-commit>=3.6.0",        # Git hooks
+    "ipython>=8.17.0",          # 互動式 Python
+    "jupyter>=1.0.0",           # Jupyter Notebook
+    "watchdog>=3.0.0",          # 檔案監控
+
+    # 文檔生成
+    "mkdocs>=1.5.0",
+    "mkdocs-material>=9.4.0",
+    "mkdocs-mermaid2-plugin>=1.1.0",
+
+    # 效能分析
+    "memory-profiler>=0.61.0",
+    "py-spy>=0.3.14",
+]
+```
+
+---
+
+## 📚 API 使用文檔
+
+### 快速開始
+
+#### 啟動服務
+
+```bash
+# 方式 1: 使用啟動腳本
+./scripts/start_api.sh
+
+# 方式 2: 直接使用 uvicorn
+uvicorn src.api.server:app --reload --host 0.0.0.0 --port 8000
+```
+
+#### 訪問文檔
+
+- **Swagger UI**: <http://localhost:8000/api/docs>
+- **ReDoc**: <http://localhost:8000/api/redoc>
+- **OpenAPI JSON**: <http://localhost:8000/api/openapi.json>
+
+### 環境配置
+
+#### .env 文件配置
+
+創建 `.env` 文件並配置以下參數：
+
+```bash
+# API Server Settings
+API_HOST=0.0.0.0
+API_PORT=8000
+API_RELOAD=true
+API_WORKERS=1
+
+# CORS Settings
+CORS_ORIGINS=["http://localhost:3000", "http://localhost:5173"]
+CORS_ALLOW_CREDENTIALS=true
+
+# Logging Settings
+LOG_LEVEL=INFO
+LOG_FORMAT=<green>{time:YYYY-MM-DD HH:mm:ss.SSS}</green> | <level>{level: <8}</level> | <cyan>{name}</cyan>:<cyan>{function}</cyan>:<cyan>{line}</cyan> - <level>{message}</level>
+LOG_FILE=logs/api_{time:YYYY-MM-DD}.log
+LOG_ROTATION=500 MB
+LOG_RETENTION=30 days
+LOG_COMPRESSION=zip
+
+# Database Settings
+DATABASE_URL=sqlite+aiosqlite:///./casualtrader.db
+DATABASE_ECHO=false
+
+# Agent Settings
+MAX_AGENTS=10
+DEFAULT_AI_MODEL=gpt-4o-mini
+DEFAULT_INITIAL_CAPITAL=1000000
+
+# WebSocket Settings
+WS_HEARTBEAT_INTERVAL=30
+WS_MAX_CONNECTIONS=100
+
+# Environment
+ENVIRONMENT=development
+DEBUG=true
+```
+
+### 日誌系統
+
+#### 日誌級別
+
+- `DEBUG`: 詳細的除錯資訊
+- `INFO`: 一般資訊訊息
+- `WARNING`: 警告訊息
+- `ERROR`: 錯誤訊息
+- `CRITICAL`: 嚴重錯誤
+
+#### 日誌格式
+
+```
+2025-10-08 12:15:30.123 | INFO     | src.api.app:create_app:65 - Creating FastAPI application...
+2025-10-08 12:15:35.456 | INFO     | src.api.routers.agents:create_agent:80 - Creating new agent: 積極型成長投資者
+2025-10-08 12:15:40.789 | SUCCESS  | src.api.routers.agents:create_agent:95 - Agent created successfully: agent_20251008_123456
+```
+
+#### 查看日誌
+
+```bash
+# 查看最新日誌
+tail -f logs/api_$(date +%Y-%m-%d).log
+
+# 查看特定級別日誌
+grep "ERROR" logs/api_2025-10-08.log
+
+# 查看特定代理的日誌
+grep "agent_20251008_123456" logs/api_2025-10-08.log
+```
+
+### 測試工具
+
+#### 使用 curl 測試
+
+```bash
+# 健康檢查
+curl http://localhost:8000/api/health
+
+# 創建代理
+curl -X POST http://localhost:8000/api/agents \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "測試代理",
+    "ai_model": "gpt-4o-mini",
+    "strategy_prompt": "穩健投資",
+    "initial_funds": 1000000
+  }'
+
+# 列出代理
+curl http://localhost:8000/api/agents
+
+# 查詢投資組合
+curl http://localhost:8000/api/trading/agents/{agent_id}/portfolio
+```
+
+#### 使用 Python 測試
+
+```python
+import requests
+
+# API 基礎 URL
+BASE_URL = "http://localhost:8000/api"
+
+# 創建代理
+response = requests.post(
+    f"{BASE_URL}/agents",
+    json={
+        "name": "測試代理",
+        "ai_model": "gpt-4o-mini",
+        "strategy_prompt": "穩健投資",
+        "initial_funds": 1000000
+    }
+)
+agent = response.json()
+print(f"代理已創建: {agent['id']}")
+
+# 啟動代理
+requests.post(
+    f"{BASE_URL}/agents/{agent['id']}/start",
+    json={"mode": "TRADING"}
+)
+
+# 查詢投資組合
+portfolio = requests.get(
+    f"{BASE_URL}/trading/agents/{agent['id']}/portfolio"
+).json()
+print(f"投資組合: {portfolio}")
+```
+
+### 效能優化建議
+
+1. **連接池**: 使用 HTTP 連接池重用連接
+2. **批量操作**: 使用分頁參數避免一次查詢大量數據
+3. **WebSocket**: 使用 WebSocket 接收即時更新，減少輪詢
+4. **快取**: 適當快取不常變動的數據
+5. **壓縮**: 啟用 gzip 壓縮減少傳輸數據量
+
+### 安全建議
+
+1. **生產環境**: 設置 `ENVIRONMENT=production` 和 `DEBUG=false`
+2. **CORS**: 限制 `CORS_ORIGINS` 為可信域名
+3. **HTTPS**: 生產環境使用 HTTPS
+4. **認證**: 添加 API 認證機制
+5. **限流**: 啟用 API 請求限流
+
+---
+
 ## ✅ 實作檢查清單
 
-### 核心 API
+### 🔧 環境設定與基礎架構
 
-- [ ] 實作 Agent 管理 CRUD API（包含 AI 模型選擇）
-- [ ] 實作 Agent 控制 API (start/stop/pause)
-- [ ] 實作模式切換 API
-- [ ] 實作投資組合查詢 API
-- [ ] 實作交易歷史 API（包含 AI 模型資訊）
+#### 開發環境準備
 
-### WebSocket 系統
+- [ ] 設定 `.env` 環境配置文件
+- [ ] 配置 Python 虛擬環境 (uv/venv)
+- [ ] 設定 Git hooks 和 pre-commit
+- [ ] 配置 IDE/編輯器 (VS Code extensions)
 
-- [ ] 實作 WebSocket 連線管理
-- [ ] 實作即時事件推送
-- [ ] 實作事件過濾和路由
-- [ ] 實作連線狀態監控
+#### 日誌與監控系統
 
-### 整合功能
+- [ ] 配置日誌系統 (Loguru 結構化日誌)
+- [ ] 設定日誌輪轉和壓縮
+- [ ] 配置錯誤追蹤 (Sentry SDK)
+- [ ] 設定 Prometheus 監控指標
 
-- [ ] 實作 CasualMarket MCP 整合
-- [ ] 實作統一錯誤處理
-- [ ] 實作 API 認證授權
-- [ ] 實作請求頻率限制
-- [ ] 實作 API 文檔生成
+#### 資料庫設定
 
-### 測試
+- [ ] 配置 SQLAlchemy 異步連接
+- [ ] 設定資料庫遷移 (Alembic)
+- [ ] 建立 AI 模型追蹤 Schema
+- [ ] 配置連接池與效能調優
 
-- [ ] 單元測試：API 端點
-- [ ] 整合測試：WebSocket 事件
-- [ ] 效能測試：並發請求
-- [ ] 端到端測試：完整流程
+#### 快取與會話管理
+
+- [ ] 設定 Redis 異步客戶端
+- [ ] 配置會話管理
+- [ ] 實作快取策略
+- [ ] 設定快取過期策略
+
+### 📦 套件依賴管理
+
+#### 核心框架安裝
+
+- [ ] 安裝 FastAPI + Uvicorn (Web 框架)
+- [ ] 安裝 Pydantic v2 (資料驗證)
+- [ ] 安裝 SQLAlchemy 2.0+ (ORM)
+- [ ] 安裝 WebSocket 支援套件
+
+#### AI 與 Agent 整合
+
+- [ ] 安裝 OpenAI SDK (>= 1.30.0)
+- [ ] 安裝 OpenAI Agents SDK
+- [ ] 安裝 Anthropic Claude API (可選)
+- [ ] 安裝 Google Gemini API (可選)
+
+#### MCP 工具整合
+
+- [ ] 安裝 CasualMarket MCP 客戶端
+- [ ] 配置 MCP 連接設定
+- [ ] 測試 MCP 工具連接
+- [ ] 實作 MCP 錯誤處理
+
+#### 開發工具套件
+
+- [ ] 安裝測試框架 (pytest + asyncio)
+- [ ] 安裝代碼品質工具 (ruff, mypy, black)
+- [ ] 安裝文檔生成工具 (mkdocs)
+- [ ] 安裝效能分析工具 (py-spy, memory-profiler)
+
+### 🌐 REST API 端點實作
+
+#### Agent 管理 API
+
+- [ ] 實作 Agent CRUD 操作
+  - [ ] `GET /api/agents` - 列出所有代理
+  - [ ] `POST /api/agents` - 創建新代理
+  - [ ] `GET /api/agents/{id}` - 取得代理詳情
+  - [ ] `PUT /api/agents/{id}` - 更新代理設定
+  - [ ] `DELETE /api/agents/{id}` - 刪除代理
+- [ ] 實作 AI 模型選擇功能
+- [ ] 實作代理配置驗證
+- [ ] 實作代理狀態管理
+
+#### Agent 執行控制 API
+
+- [ ] 實作執行控制端點
+  - [ ] `POST /api/agents/{id}/start` - 啟動代理
+  - [ ] `POST /api/agents/{id}/stop` - 停止代理
+  - [ ] `POST /api/agents/{id}/pause` - 暫停代理
+  - [ ] `POST /api/agents/{id}/resume` - 恢復代理
+- [ ] 實作模式切換功能
+- [ ] 實作策略更新機制
+- [ ] 實作帳戶重置功能
+
+#### 投資組合與交易 API
+
+- [ ] 實作投資組合查詢
+  - [ ] `GET /api/agents/{id}/portfolio` - 投資組合總覽
+  - [ ] `GET /api/agents/{id}/holdings` - 持股明細
+  - [ ] `GET /api/agents/{id}/performance` - 績效數據
+- [ ] 實作交易歷史查詢
+  - [ ] `GET /api/agents/{id}/transactions` - 交易記錄
+  - [ ] `GET /api/agents/{id}/decisions` - 決策歷史
+- [ ] 整合 AI 模型資訊追蹤
+
+#### 追蹤系統 API
+
+- [ ] 實作追蹤記錄查詢
+  - [ ] `GET /api/traces/{agent_id}` - 追蹤歷史
+  - [ ] `GET /api/traces/{agent_id}/{trace_id}` - 追蹤詳情
+  - [ ] `DELETE /api/traces/{agent_id}/{trace_id}` - 刪除記錄
+- [ ] 實作追蹤統計分析
+- [ ] 實作追蹤數據過濾
+
+#### 市場數據 API
+
+- [ ] 實作市場數據代理
+  - [ ] `GET /api/market/stock/{symbol}` - 股票價格
+  - [ ] `GET /api/market/portfolio/value` - 組合估值
+  - [ ] `POST /api/market/trade/simulate` - 模擬交易
+- [ ] 整合 CasualMarket MCP 服務
+
+#### 系統管理 API
+
+- [ ] 實作系統狀態端點
+  - [ ] `GET /api/system/health` - 健康檢查
+  - [ ] `GET /api/system/stats` - 系統統計
+  - [ ] `POST /api/system/maintenance` - 維護模式
+- [ ] 實作系統監控功能
+
+### 📡 WebSocket 即時通訊系統
+
+#### 連線管理
+
+- [ ] 實作 WebSocket 連線管理器
+- [ ] 實作客戶端認證機制
+- [ ] 實作連線心跳檢測
+- [ ] 實作自動重連機制
+
+#### 事件系統
+
+- [ ] 實作事件類型定義
+- [ ] 實作 Agent 狀態事件
+- [ ] 實作交易執行事件
+- [ ] 實作投資組合更新事件
+- [ ] 實作追蹤完成事件
+- [ ] 實作策略調整事件
+
+#### 事件路由與過濾
+
+- [ ] 實作事件廣播機制
+- [ ] 實作個人化訊息推送
+- [ ] 實作事件過濾規則
+- [ ] 實作事件訂閱管理
+
+### 🔐 安全性與中間件
+
+#### 認證授權
+
+- [ ] 實作 API 認證中間件
+- [ ] 實作 JWT 令牌處理
+- [ ] 實作權限驗證
+- [ ] 實作會話管理
+
+#### 安全防護
+
+- [ ] 實作 CORS 中間件設定
+- [ ] 實作 API 請求頻率限制
+- [ ] 實作輸入驗證與清理
+- [ ] 實作 SQL 注入防護
+
+#### 錯誤處理
+
+- [ ] 實作統一異常處理器
+- [ ] 實作自定義異常類別
+- [ ] 實作錯誤日誌記錄
+- [ ] 實作用戶友好錯誤回應
+
+### 🧪 測試與品質保證
+
+#### 單元測試
+
+- [ ] API 端點測試
+- [ ] 服務層邏輯測試
+- [ ] 資料模型驗證測試
+- [ ] 工具函數測試
+
+#### 整合測試
+
+- [ ] API-Agent 整合測試
+- [ ] WebSocket 流程測試
+- [ ] MCP 工具整合測試
+- [ ] 資料庫操作測試
+
+#### 效能測試
+
+- [ ] API 並發請求測試
+- [ ] WebSocket 連線壓力測試
+- [ ] 資料庫查詢效能測試
+- [ ] 記憶體使用分析
+
+#### 端到端測試
+
+- [ ] 完整交易流程測試
+- [ ] 多代理並行測試
+- [ ] 錯誤恢復測試
+- [ ] 系統整體功能測試
+
+### 📊 監控與維運
+
+#### 效能監控
+
+- [ ] 設定 API 回應時間監控
+- [ ] 設定資料庫查詢效能監控
+- [ ] 設定記憶體與 CPU 使用監控
+- [ ] 設定錯誤率監控
+
+#### 日誌分析
+
+- [ ] 設定結構化日誌格式
+- [ ] 設定日誌聚合與搜尋
+- [ ] 設定關鍵指標儀表板
+- [ ] 設定告警規則
+
+#### 部署準備
+
+- [ ] 設定容器化 (Docker)
+- [ ] 設定環境變數管理
+- [ ] 設定負載均衡配置
+- [ ] 設定備份與恢復策略
+
+### 📚 文檔與維護
+
+#### API 文檔
+
+- [ ] 生成 OpenAPI 規格
+- [ ] 設定 Swagger UI
+- [ ] 設定 ReDoc 文檔
+- [ ] 編寫 API 使用範例
+
+#### 開發文檔
+
+- [ ] 更新專案 README
+- [ ] 編寫部署指南
+- [ ] 編寫故障排除指南
+- [ ] 編寫效能調優指南
+
+#### 測試工具
+
+- [ ] 提供 curl 測試腳本
+- [ ] 提供 Python 測試客戶端
+- [ ] 提供 WebSocket 測試工具
+- [ ] 提供負載測試腳本
 
 ---
 
 **文檔維護**: CasualTrader 開發團隊
-**最後更新**: 2025-10-06
+**最後更新**: 2025-10-08
+**整合來源**: API_DEPENDENCIES.md + API_DOCUMENTATION.md
