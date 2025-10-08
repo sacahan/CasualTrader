@@ -38,11 +38,17 @@ backend/
 │   │   │   ├── instruction_generator.py # Agent指令生成器
 │   │   │   ├── strategy_tracker.py      # 策略變更追蹤
 │   │   │   └── models.py                # Agent 資料模型
-│   │   ├── tools/             # 專門化分析工具
-│   │   │   ├── fundamental_agent.py     # 基本面分析工具
-│   │   │   ├── technical_agent.py       # 技術分析工具
-│   │   │   ├── risk_agent.py           # 風險評估工具
-│   │   │   └── sentiment_agent.py       # 市場情緒分析工具
+│   │   ├── tools/             # 專門化分析工具（自主型 Agent）
+│   │   │   ├── fundamental_agent.py     # 基本面分析 Agent（自主型）
+│   │   │   ├── technical_agent.py       # 技術分析 Agent（自主型）
+│   │   │   ├── risk_agent.py           # 風險評估 Agent（自主型）
+│   │   │   └── sentiment_agent.py       # 市場情緒分析 Agent（自主型）
+│   │   │   # 每個 Agent 都內建：
+│   │   │   # - 完整的專業領域 instructions
+│   │   │   # - WebSearchTool（搜尋最新資訊）
+│   │   │   # - CodeInterpreterTool（執行進階計算）
+│   │   │   # - 明確的成本控制準則
+│   │   │   # - 標準化的輸出格式
 │   │   ├── functions/         # 交易驗證功能
 │   │   │   ├── trading_validation.py    # 交易參數驗證
 │   │   │   ├── market_status.py         # 市場狀態檢查

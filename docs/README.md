@@ -1,8 +1,50 @@
 # CasualTrader 文檔結構
 
-**最後更新**: 2025-10-06
-**版本**: 5.0
+**最後更新**: 202## 🗂 歷史文檔
 
+為了保持文檔清晰度和可維護性，以下歷史文檔已移至 `archives/` 目錄：
+
+### **功能規格與更新記錄**
+
+- `AI_MODEL_SELECTION_FEATURE.md` - AI 模型選擇功能規格（功能已整合至主文檔）
+- `AI_MODEL_UPDATE_SUMMARY.md` - AI 模型功能更新總結
+
+### **里程碑記錄**
+
+- `PHASE1_COMPLETION_REPORT.md` - Phase 1 完成報告
+- `PHASE1_SUMMARY.md` - Phase 1 總結
+
+### **結構調整記錄**
+
+- `STRUCTURE_ADJUSTMENT_SUMMARY.md` - 專案結構調整總結
+- `STRUCTURE_MIGRATION_GUIDE.md` - 專案結構遷移指南
+
+**注意**: 這些文檔僅供參考，所有最新資訊請查看上述核心文檔。
+
+---
+
+## 📝 最新更新記錄
+
+### **2025-10-08 - Agent Tools 重構文檔更新**
+
+**更新原因**: `src/agents/tools/` 目錄完成重構，從簡單函數工具升級為自主型 Agent 架構
+
+**更新內容**:
+
+- ✅ `AGENT_IMPLEMENTATION.md` - 完整重寫「專門化 Agent Tools」章節
+- ✅ `SYSTEM_DESIGN.md` - 新增「Agent as Tool 架構設計」和「成本優化策略」章節
+- ✅ `PROJECT_STRUCTURE.md` - 更新 tools 目錄說明
+- ✅ `AGENT_TOOLS_REFACTORING.md` - 新建完整重構說明文檔
+- ✅ `DOCUMENTATION_UPDATE_SUMMARY.md` - 新建文檔更新摘要
+
+**核心變化**:
+
+1. **架構升級**: 從簡單函數工具升級為自主型 Agent
+2. **能力增強**: 整合 WebSearchTool 和 CodeInterpreterTool
+3. **成本控制**: 建立明確的工具使用準則和限制
+4. **標準化**: 統一的輸出格式和介面
+
+**詳細資訊**: 請參閱 `AGENT_TOOLS_REFACTORING.md` 和 `DOCUMENTATION_UPDATE_SUMMARY.md`
 ---
 
 ## 📚 文檔概覽
@@ -27,6 +69,8 @@
 ### **技術參考文檔**
 
 - `API_DEPENDENCIES.md` - API 套件依賴清單和配置指南
+- `AGENT_TOOLS_REFACTORING.md` - Agent Tools 重構說明文檔
+- `DOCUMENTATION_UPDATE_SUMMARY.md` - 文檔更新摘要（2025-10-08）
 
 ---
 
@@ -66,7 +110,7 @@
 - ✅ 確認所有核心功能已整合至主文檔
 - ✅ 更新文檔索引結構
 
-**保留的核心文檔** (8 份):
+**保留的核心文檔** (10 份):
 
 1. `SYSTEM_DESIGN.md` - 系統設計規範
 2. `AGENT_IMPLEMENTATION.md` - Agent 實作規格
@@ -75,7 +119,9 @@
 5. `PROJECT_STRUCTURE.md` - 專案結構規範
 6. `DEPLOYMENT_GUIDE.md` - 部署配置指南
 7. `API_DEPENDENCIES.md` - 套件依賴清單
-8. `README.md` - 文檔導讀
+8. `AGENT_TOOLS_REFACTORING.md` - Agent Tools 重構說明（2025-10-08 新增）
+9. `DOCUMENTATION_UPDATE_SUMMARY.md` - 文檔更新摘要（2025-10-08 新增）
+10. `README.md` - 文檔導讀
 
 ### **整理原則**
 

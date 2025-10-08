@@ -58,46 +58,87 @@ def create_trading_agent(agent_config: AgentConfig) -> Agent:
         name=agent_config.name,
         instructions=instructions,
         tools=[
-            # 專門化分析工具
+            # ========================================
+            # 專門化分析工具（自主型 Agent as Tool）
+            # ========================================
+            # 每個工具本身就是一個完整的 Agent，具備：
+            # - 自主分析決策能力
+            # - 內建 WebSearchTool（搜尋最新資訊）
+            # - 內建 CodeInterpreterTool（執行進階計算）
+            # - 明確的成本控制準則
+            # - 標準化的輸出格式
+
             fundamental_agent.as_tool(
                 tool_name="fundamental_analysis",
-                tool_description="Analyze company fundamentals and financial health"
+                tool_description="Comprehensive fundamental analysis including financial statements, ratios, valuation, and growth potential. Has access to web search and code interpreter for advanced DCF models."
             ),
             technical_agent.as_tool(
                 tool_name="technical_analysis",
-                tool_description="Perform technical analysis and chart patterns"
+                tool_description="Technical analysis with chart patterns, indicators (RSI, MACD, MA), trend analysis, and support/resistance levels. Can execute custom indicator calculations and backtests."
             ),
             risk_agent.as_tool(
                 tool_name="risk_assessment",
-                tool_description="Evaluate portfolio risk and position sizing"
+                tool_description="Portfolio risk evaluation including concentration risk, VaR calculations, stress testing, and position sizing recommendations. Capable of Monte Carlo simulations."
             ),
             sentiment_agent.as_tool(
                 tool_name="market_sentiment",
-                tool_description="Analyze market sentiment and news impact"
+                tool_description="Market sentiment analysis from news, social media, foreign investment flows, and fear/greed indicators. Provides timing recommendations based on sentiment extremes."
             ),
 
-            # OpenAI Hosted Tools
-            WebSearchTool(),
-            CodeInterpreterTool(),
+            # ========================================
+            # OpenAI Hosted Tools（TradingAgent 直接使用）
+            # ========================================
+            # 注意：專門化 Agent 內部也有這些工具，但 TradingAgent 可以直接使用
 
-            # CasualMarket MCP Tools
+            WebSearchTool(),           # 搜尋市場新聞、政策變化、突發事件
+            CodeInterpreterTool(),     # 執行投資組合優化、複雜計算、數據分析
+
+            # ========================================
+            # CasualMarket MCP Tools（台股專業數據）
+            # ========================================
+
+            # 核心交易工具
             get_taiwan_stock_price,
             buy_taiwan_stock,
             sell_taiwan_stock,
+
+            # 基本面數據工具
             get_company_fundamentals,
+            get_company_income_statement,
+            get_company_balance_sheet,
+            get_company_monthly_revenue,
             get_stock_valuation_ratios,
+            get_company_dividend,
 
-            # 交易驗證工具
-            check_trading_hours,
-            get_current_holdings,
-            get_available_cash,
-            validate_trade_parameters,
+            # 市場數據工具
+            get_market_index_info,
+            get_stock_daily_trading,
+            get_real_time_trading_stats,
+            get_foreign_investment_by_industry,
+            get_top_foreign_holdings,
 
-            # 策略變更記錄工具
-            record_strategy_change,
+            # 市場狀態工具
+            check_taiwan_trading_day,
+            get_taiwan_holiday_info,
+
+            # ========================================
+            # 交易驗證與投資組合查詢工具
+            # ========================================
+
+            check_trading_hours,           # 檢查是否在交易時間
+            get_current_holdings,          # 獲取當前持股
+            get_available_cash,            # 獲取可用資金
+            validate_trade_parameters,     # 驗證交易參數
+            get_portfolio_summary,         # 獲取投資組合摘要
+
+            # ========================================
+            # 策略演化記錄工具
+            # ========================================
+
+            record_strategy_change,        # 記錄策略變更
         ],
-        model="gpt-4",
-        max_turns=30
+        model=agent_config.ai_model or "gpt-4o",  # 支援多種 AI 模型
+        max_turns=agent_config.max_turns or 30
     )
 
     return trading_agent
@@ -697,12 +738,111 @@ async def get_latest_strategy(agent_id: str) -> StrategyChange:
 
 ---
 
-## 🧠 專門化 Agent Tools
+## 🧠 專門化 Agent Tools（自主型 Agent 架構）
+
+### 設計理念
+
+所有專業分析工具（基本面、技術面、風險評估、市場情緒）都採用 **自主型 Agent (Agent as Tool)** 架構：
+
+- **完整的 Agent 能力**: 每個工具本身就是一個具備自主決策能力的 Agent
+- **內建增強工具**: 整合 WebSearchTool 和 CodeInterpreterTool 提升分析能力
+- **MCP 資料存取**: 透過 Casual Market MCP Server 獲取即時市場數據
+- **成本優化設計**: 包含明確的工具使用準則，避免不必要的計算成本
+- **標準化輸出**: 統一的分析報告格式，便於 TradingAgent 整合
 
 ### 基本面分析 Agent Tool
 
 ```python
-from agents import Agent, function_tool
+"""Fundamental Agent - 基本面分析自主型 Agent
+
+這個模組實作具有自主分析能力的基本面分析 Agent。
+"""
+
+from agents import Agent, WebSearchTool, CodeInterpreterTool, function_tool
+
+def fundamental_agent_instructions() -> str:
+    """基本面分析 Agent 的指令定義"""
+    return f"""你是一位資深的基本面分析師,專精於公司財務分析和價值評估。
+
+## 你的專業能力
+
+1. 財務報表分析
+   - 資產負債表: 財務結構、償債能力
+   - 損益表: 獲利能力、營運效率
+   - 現金流量表: 現金創造能力
+
+2. 財務比率分析
+   - 獲利能力: ROE、ROA、毛利率、淨利率
+   - 償債能力: 負債比、流動比率
+   - 效率指標: 存貨周轉率、應收帳款周轉率
+   - 成長指標: 營收成長率、EPS 成長率
+
+3. 價值評估
+   - 本益比 (P/E)、股價淨值比 (P/B)
+   - 股利殖利率分析
+   - 相對估值與絕對估值
+
+4. 質化分析
+   - 產業地位與競爭優勢
+   - 經營團隊評估
+   - 商業模式分析
+
+## 分析方法
+
+1. 收集數據: 使用 MCP Server 獲取財務報表
+2. 計算比率: 使用工具計算財務指標
+3. 評估質量: 分析財務體質
+4. 估值分析: 評估股價合理性
+5. 成長評估: 分析成長潛力
+6. 綜合建議: 產生投資建議
+
+## 可用工具
+
+### 專業分析工具
+- calculate_financial_ratios: 計算財務比率
+- analyze_financial_health: 分析財務體質
+- evaluate_valuation: 評估估值水準
+- analyze_growth_potential: 分析成長潛力
+- generate_investment_rating: 產生投資評級
+- Casual Market MCP Server: 獲取財報數據
+
+### 增強能力工具
+- WebSearchTool: 搜尋產業研究報告、競爭對手分析、法說會資訊
+- CodeInterpreterTool: 執行財務模型計算、DCF 估值、敏感度分析
+
+## CodeInterpreterTool 使用準則 ⚠️
+
+為了控制成本和執行時間，請遵守以下原則：
+
+1. **優先使用自訂工具**
+   - 先嘗試使用提供的財務分析工具
+   - 只有當需要複雜模型時才使用 CodeInterpreterTool
+
+2. **適用場景**
+   - ✅ DCF（現金流折現）估值計算
+   - ✅ 敏感度分析（不同假設下的估值變化）
+   - ✅ 三表財務模型建構
+   - ❌ 不要用於簡單的財務比率計算
+   - ❌ 不要用於已有自訂工具的功能
+
+3. **程式碼效率要求**
+   - 保持程式碼簡潔（< 150 行）
+   - 避免過度複雜的模型
+   - 使用 pandas 進行高效數據處理
+
+4. **執行頻率限制**
+   - 每次分析最多使用 2 次 CodeInterpreterTool
+   - 優先執行最關鍵的估值計算
+
+## 輸出格式
+
+1. 財務體質: 健康度評分、關鍵指標
+2. 估值評估: 合理價位區間、買賣建議
+3. 成長分析: 成長動能評估、預期報酬
+4. 風險因素: 需要注意的財務風險
+5. 投資建議: BUY/HOLD/SELL 及理由
+6. 信心評估: 0-100% 信心度
+"""
 
 # CasualMarket MCP 工具整合
 @function_tool
@@ -710,29 +850,59 @@ async def get_company_fundamentals(symbol: str) -> dict:
     """Get comprehensive company fundamental data"""
     return await mcp_client.call_tool("get_company_profile", {"symbol": symbol})
 
+@function_tool
+async def calculate_financial_ratios(symbol: str, period: str = "latest") -> dict:
+    """Calculate key financial ratios from financial statements"""
+    # 實作財務比率計算邏輯
+    pass
+
+@function_tool
+async def analyze_financial_health(symbol: str) -> dict:
+    """Analyze overall financial health and stability"""
+    # 實作財務健康度分析邏輯
+    pass
+
+@function_tool
+async def evaluate_valuation(symbol: str) -> dict:
+    """Evaluate stock valuation using multiple methods"""
+    # 實作估值評估邏輯
+    pass
+
+@function_tool
+async def analyze_growth_potential(symbol: str) -> dict:
+    """Analyze company's growth potential and prospects"""
+    # 實作成長潛力分析邏輯
+    pass
+
+@function_tool
+async def generate_investment_rating(symbol: str) -> dict:
+    """Generate investment rating and recommendation"""
+    # 實作投資評級生成邏輯
+    pass
+
+# 創建基本面分析 Agent
 fundamental_agent = Agent(
     name="Fundamental Analysis Agent",
-    instructions="""
-    You are a fundamental analysis expert for Taiwan stock market.
-    Analyze company financial health, business model, and growth prospects.
-
-    Key analysis areas:
-    - Financial statement analysis (revenue, profit, debt ratios)
-    - Business model and competitive advantages
-    - Industry trends and market position
-    - Management quality and corporate governance
-    - Valuation metrics (P/E, P/B, ROE, etc.)
-
-    Provide clear buy/hold/sell recommendations with rationale.
-    """,
+    instructions=fundamental_agent_instructions(),
     tools=[
-        # CasualMarket MCP Tools 作為 function_tool 包裝
+        # 專業分析工具
+        calculate_financial_ratios,
+        analyze_financial_health,
+        evaluate_valuation,
+        analyze_growth_potential,
+        generate_investment_rating,
+
+        # CasualMarket MCP Tools（透過 function_tool 包裝）
         get_company_fundamentals,
         get_company_income_statement,
         get_company_balance_sheet,
         get_company_monthly_revenue,
         get_stock_valuation_ratios,
         get_company_dividend,
+
+        # 增強能力工具
+        WebSearchTool(),
+        CodeInterpreterTool(),
     ],
     model="gpt-4"
 )
@@ -741,26 +911,141 @@ fundamental_agent = Agent(
 ### 技術分析 Agent Tool
 
 ```python
+"""Technical Agent - 技術分析自主型 Agent
+
+這個模組實作具有自主分析能力的技術分析 Agent。
+"""
+
+from agents import Agent, WebSearchTool, CodeInterpreterTool, function_tool
+
+def technical_agent_instructions() -> str:
+    """技術分析 Agent 的指令定義"""
+    return f"""你是一位專業的技術分析師,專精於股票圖表分析和技術指標解讀。
+
+## 你的專業能力
+
+1. 圖表型態識別
+   - 經典型態: 頭肩頂底、雙重頂底、三角型態
+   - 整理型態: 旗型、楔形、矩形
+   - 反轉型態: 島狀反轉、V型反轉
+
+2. 技術指標分析
+   - 趨勢指標: MA、MACD
+   - 動能指標: RSI、KD
+   - 波動指標: 布林通道
+
+3. 趨勢判斷與風險管理
+   - 趨勢方向和強度
+   - 支撐壓力位
+   - 進場停損建議
+
+## 分析方法
+
+1. 收集數據: 使用 MCP Server 獲取價格資料
+2. 計算指標: 使用工具計算技術指標
+3. 識別型態: 分析圖表找出型態
+4. 判斷趨勢: 評估趨勢方向和強度
+5. 找關鍵價位: 確定支撐和壓力位
+6. 給出建議: 綜合分析產生交易訊號
+
+## 可用工具
+
+### 專業分析工具
+- calculate_technical_indicators: 計算 MA、RSI、MACD 等指標
+- identify_chart_patterns: 識別圖表型態
+- analyze_trend: 分析趨勢
+- analyze_support_resistance: 找支撐壓力位
+- generate_trading_signals: 產生交易訊號
+- Casual Market MCP Server: 獲取市場數據
+
+### 增強能力工具
+- WebSearchTool: 主動搜尋最新的技術分析報告、專家觀點、市場評論
+- CodeInterpreterTool: 執行自訂的技術指標計算、統計分析、回測驗證
+
+## CodeInterpreterTool 使用準則 ⚠️
+
+為了控制成本和執行時間，請遵守以下原則：
+
+1. **優先使用自訂工具**
+   - 先嘗試使用提供的專業分析工具
+   - 只有當自訂工具無法滿足需求時才使用 CodeInterpreterTool
+
+2. **適用場景**
+   - ✅ 複雜的自訂指標計算（如改良版 RSI、特殊加權均線）
+   - ✅ 統計檢定（如相關性分析、顯著性測試）
+   - ✅ 簡短的回測驗證（< 100 行程式碼）
+   - ❌ 不要用於簡單的數學計算（加減乘除）
+   - ❌ 不要用於可以用自訂工具完成的任務
+
+3. **程式碼效率要求**
+   - 保持程式碼簡潔（< 100 行）
+   - 避免不必要的迴圈和複雜邏輯
+   - 使用向量化操作（numpy, pandas）
+
+4. **執行頻率限制**
+   - 每次分析最多使用 2 次 CodeInterpreterTool
+   - 必要時將多個計算合併為一次執行
+
+## 輸出格式
+
+1. 趨勢分析: 方向、強度、延續性評估
+2. 技術指標: 數值、訊號、背離情況
+3. 關鍵價位: 支撐位、壓力位
+4. 交易建議: 方向、進場價、停損價、目標價
+5. 風險提示: 風險因素、注意事項
+6. 信心評估: 0-100% 信心度
+"""
+
+@function_tool
+async def calculate_technical_indicators(symbol: str, indicators: list[str]) -> dict:
+    """Calculate specified technical indicators"""
+    # 實作技術指標計算邏輯
+    pass
+
+@function_tool
+async def identify_chart_patterns(symbol: str, timeframe: str = "daily") -> dict:
+    """Identify chart patterns in price data"""
+    # 實作圖表型態識別邏輯
+    pass
+
+@function_tool
+async def analyze_trend(symbol: str) -> dict:
+    """Analyze price trend direction and strength"""
+    # 實作趨勢分析邏輯
+    pass
+
+@function_tool
+async def analyze_support_resistance(symbol: str) -> dict:
+    """Identify key support and resistance levels"""
+    # 實作支撐壓力位分析邏輯
+    pass
+
+@function_tool
+async def generate_trading_signals(symbol: str) -> dict:
+    """Generate trading signals based on technical analysis"""
+    # 實作交易訊號生成邏輯
+    pass
+
 technical_agent = Agent(
     name="Technical Analysis Agent",
-    instructions="""
-    You are a technical analysis expert specializing in Taiwan stock market.
-    Use CodeInterpreterTool to perform advanced technical analysis.
-
-    Analysis capabilities:
-    - Chart pattern recognition (head & shoulders, triangles, flags)
-    - Technical indicators (RSI, MACD, Bollinger Bands, Moving Averages)
-    - Volume analysis and momentum indicators
-    - Support and resistance levels
-    - Trend analysis and breakout detection
-
-    Generate trading signals with entry/exit points and stop-loss levels.
-    """,
+    instructions=technical_agent_instructions(),
     tools=[
-        CodeInterpreterTool(),  # 用於技術分析計算和圖表生成
+        # 專業分析工具
+        calculate_technical_indicators,
+        identify_chart_patterns,
+        analyze_trend,
+        analyze_support_resistance,
+        generate_trading_signals,
+
+        # CasualMarket MCP Tools
         get_stock_daily_trading,
         get_stock_monthly_trading,
         get_stock_monthly_average,
+        get_taiwan_stock_price,
+
+        # 增強能力工具
+        WebSearchTool(),
+        CodeInterpreterTool(),
     ],
     model="gpt-4"
 )
@@ -769,27 +1054,141 @@ technical_agent = Agent(
 ### 風險評估 Agent Tool
 
 ```python
+"""Risk Agent - 風險評估自主型 Agent
+
+這個模組實作具有自主分析能力的風險評估 Agent。
+"""
+
+from agents import Agent, WebSearchTool, CodeInterpreterTool, function_tool
+
+def risk_agent_instructions() -> str:
+    """風險評估 Agent 的指令定義"""
+    return f"""你是一位專業的風險管理專家,專精於投資組合風險分析和風險控制。
+
+## 你的專業能力
+
+1. 風險度量
+   - 波動性風險: 標準差、Beta 係數
+   - 下檔風險: VaR、最大回撤
+   - 流動性風險: 成交量、買賣價差
+
+2. 投資組合風險
+   - 集中度風險: HHI 指數
+   - 產業曝險分析
+   - 相關性分析
+
+3. 風險管理建議
+   - 部位大小建議
+   - 停損點設置
+   - 避險策略
+   - 風險預算分配
+
+## 分析方法
+
+1. 收集數據: 使用 MCP Server 獲取價格和部位數據
+2. 計算風險: 使用工具計算風險指標
+3. 評估集中度: 分析投資組合集中度
+4. 壓力測試: 模擬極端情況
+5. 給出建議: 產生風險管理建議
+
+## 可用工具
+
+### 專業分析工具
+- calculate_position_risk: 計算個別部位風險
+- analyze_portfolio_concentration: 分析投資組合集中度
+- calculate_portfolio_risk: 計算整體投資組合風險
+- perform_stress_test: 執行壓力測試
+- generate_risk_recommendations: 產生風險管理建議
+- Casual Market MCP Server: 獲取市場數據
+
+### 增強能力工具
+- WebSearchTool: 搜尋風險管理最佳實踐、市場風險事件、監管規範
+- CodeInterpreterTool: 執行 VaR 計算、蒙地卡羅模擬、相關性矩陣分析
+
+## CodeInterpreterTool 使用準則 ⚠️
+
+為了控制成本和執行時間，請遵守以下原則：
+
+1. **優先使用自訂工具**
+   - 先嘗試使用提供的風險分析工具
+   - 只有當需要進階風險模型時才使用 CodeInterpreterTool
+
+2. **適用場景**
+   - ✅ VaR（風險值）計算（歷史模擬法、蒙地卡羅法）
+   - ✅ 投資組合相關性矩陣分析
+   - ✅ 壓力測試情境模擬
+   - ❌ 不要用於簡單的風險比率計算
+   - ❌ 不要用於已有自訂工具的功能
+
+3. **程式碼效率要求**
+   - 保持程式碼簡潔（< 150 行）
+   - 蒙地卡羅模擬限制在 10,000 次以內
+   - 使用 numpy 進行高效數值計算
+
+4. **執行頻率限制**
+   - 每次分析最多使用 2 次 CodeInterpreterTool
+   - 優先執行最關鍵的風險計算
+
+## 輸出格式
+
+1. 風險評分: 0-100 分,越高越危險
+2. 風險等級: 低/中低/中/中高/高
+3. 關鍵風險: 需要注意的主要風險
+4. 風險警示: 需要立即處理的風險
+5. 管理建議: 具體的風險控制措施
+6. 信心評估: 0-100% 信心度
+"""
+
+@function_tool
+async def calculate_position_risk(symbol: str, quantity: int, entry_price: float) -> dict:
+    """Calculate risk metrics for a single position"""
+    # 實作個別部位風險計算邏輯
+    pass
+
+@function_tool
+async def analyze_portfolio_concentration(agent_id: str) -> dict:
+    """Analyze portfolio concentration risk"""
+    # 實作集中度分析邏輯
+    pass
+
+@function_tool
+async def calculate_portfolio_risk(agent_id: str) -> dict:
+    """Calculate overall portfolio risk metrics"""
+    # 實作投資組合風險計算邏輯
+    pass
+
+@function_tool
+async def perform_stress_test(agent_id: str, scenario: str) -> dict:
+    """Perform stress testing under various scenarios"""
+    # 實作壓力測試邏輯
+    pass
+
+@function_tool
+async def generate_risk_recommendations(agent_id: str) -> dict:
+    """Generate risk management recommendations"""
+    # 實作風險管理建議生成邏輯
+    pass
+
 risk_agent = Agent(
     name="Risk Assessment Agent",
-    instructions="""
-    You are a risk management specialist for portfolio optimization.
-
-    Risk evaluation areas:
-    - Portfolio diversification analysis
-    - Position sizing and concentration risk
-    - Market volatility and correlation analysis
-    - Drawdown and Value-at-Risk calculations
-    - Sector and geographical exposure
-    - Liquidity risk assessment
-
-    Recommend position sizing and risk mitigation strategies.
-    """,
+    instructions=risk_agent_instructions(),
     tools=[
-        CodeInterpreterTool(),  # 風險計算和統計分析
+        # 專業分析工具
+        calculate_position_risk,
+        analyze_portfolio_concentration,
+        calculate_portfolio_risk,
+        perform_stress_test,
+        generate_risk_recommendations,
+
+        # CasualMarket MCP Tools
         get_current_portfolio,
         get_market_index_info,
         get_foreign_investment_by_industry,
         get_margin_trading_info,
+
+        # 增強能力工具
+        WebSearchTool(),
+        CodeInterpreterTool(),
     ],
     model="gpt-4"
 )
@@ -798,27 +1197,146 @@ risk_agent = Agent(
 ### 市場情緒分析 Agent Tool
 
 ```python
+"""Sentiment Agent - 市場情緒分析自主型 Agent
+
+這個模組實作具有自主分析能力的市場情緒分析 Agent。
+"""
+
+from agents import Agent, WebSearchTool, CodeInterpreterTool, function_tool
+
+def sentiment_agent_instructions() -> str:
+    """市場情緒分析 Agent 的指令定義"""
+    return f"""你是一位專業的市場情緒分析師,專精於市場心理、資金流向和群眾行為分析。
+
+## 你的專業能力
+
+1. 市場情緒評估
+   - 恐懼貪婪指數
+   - 波動率指數 (VIX)
+   - 市場寬度指標
+
+2. 資金流向分析
+   - 大單追蹤
+   - 外資法人動向
+   - 散戶行為
+
+3. 新聞與社群情緒
+   - 新聞情緒分析
+   - 社群媒體情緒
+   - 話題熱度追蹤
+
+4. 情緒交易策略
+   - 反向操作時機
+   - 動能追蹤策略
+   - 情緒極端點識別
+
+## 分析方法
+
+1. 收集數據: 使用 MCP Server 獲取市場、新聞、社群數據
+2. 計算指標: 使用工具計算情緒指標
+3. 評估心理: 分析市場心理狀態
+4. 資金追蹤: 分析資金流向
+5. 給出建議: 產生情緒交易策略
+
+## 可用工具
+
+### 專業分析工具
+- calculate_fear_greed_index: 計算恐懼貪婪指數
+- analyze_money_flow: 分析資金流向
+- analyze_news_sentiment: 分析新聞情緒
+- analyze_social_sentiment: 分析社群媒體情緒
+- generate_sentiment_signals: 產生情緒交易訊號
+- Casual Market MCP Server: 獲取市場數據
+
+### 增強能力工具
+- WebSearchTool: 即時搜尋最新市場新聞、社群熱議話題、情緒指標變化
+- CodeInterpreterTool: 執行情緒指數計算、文字情緒分析、統計顯著性檢驗
+
+## CodeInterpreterTool 使用準則 ⚠️
+
+為了控制成本和執行時間，請遵守以下原則：
+
+1. **優先使用自訂工具**
+   - 先嘗試使用提供的情緒分析工具
+   - 只有當需要進階文字分析時才使用 CodeInterpreterTool
+
+2. **適用場景**
+   - ✅ 文字情緒分析（NLP 情緒評分）
+   - ✅ 統計檢定（情緒與價格相關性）
+   - ✅ 時間序列分析（情緒趨勢預測）
+   - ❌ 不要用於簡單的情緒指標計算
+   - ❌ 不要用於已有自訂工具的功能
+
+3. **程式碼效率要求**
+   - 保持程式碼簡潔（< 100 行）
+   - 文字分析限制在 1000 條以內
+   - 使用簡化的 NLP 方法（避免複雜模型）
+
+4. **執行頻率限制**
+   - 每次分析最多使用 2 次 CodeInterpreterTool
+   - 優先執行最關鍵的情緒計算
+
+## 輸出格式
+
+1. 情緒評分: -100 (極度恐慌) 到 +100 (極度貪婪)
+2. 市場階段: 恐慌/悲觀/中性/樂觀/亢奮
+3. 資金流向: 流入/流出/平衡
+4. 重要新聞: 影響市場的關鍵事件
+5. 交易建議: 情緒交易策略建議
+6. 信心評估: 0-100% 信心度
+"""
+
+@function_tool
+async def calculate_fear_greed_index() -> dict:
+    """Calculate market fear & greed index"""
+    # 實作恐懼貪婪指數計算邏輯
+    pass
+
+@function_tool
+async def analyze_money_flow(timeframe: str = "daily") -> dict:
+    """Analyze institutional and retail money flow"""
+    # 實作資金流向分析邏輯
+    pass
+
+@function_tool
+async def analyze_news_sentiment(keywords: list[str] = None) -> dict:
+    """Analyze sentiment from recent news articles"""
+    # 實作新聞情緒分析邏輯
+    pass
+
+@function_tool
+async def analyze_social_sentiment(platform: str = "all") -> dict:
+    """Analyze sentiment from social media platforms"""
+    # 實作社群媒體情緒分析邏輯
+    pass
+
+@function_tool
+async def generate_sentiment_signals(symbol: str = None) -> dict:
+    """Generate trading signals based on sentiment analysis"""
+    # 實作情緒交易訊號生成邏輯
+    pass
+
 sentiment_agent = Agent(
     name="Market Sentiment Agent",
-    instructions="""
-    You are a market sentiment and news analysis expert.
-    Monitor market mood and external factors affecting Taiwan stocks.
-
-    Analysis focus:
-    - Recent news and market developments
-    - Foreign investment flows and institutional activity
-    - Market breadth and sentiment indicators
-    - Economic data and policy changes
-    - Sector rotation and market themes
-
-    Provide market sentiment scoring and timing recommendations.
-    """,
+    instructions=sentiment_agent_instructions(),
     tools=[
-        WebSearchTool(),  # 搜尋最新市場新聞和分析
+        # 專業分析工具
+        calculate_fear_greed_index,
+        analyze_money_flow,
+        analyze_news_sentiment,
+        analyze_social_sentiment,
+        generate_sentiment_signals,
+
+        # CasualMarket MCP Tools
         get_real_time_trading_stats,
         get_top_foreign_holdings,
         get_foreign_investment_by_industry,
         get_etf_regular_investment_ranking,
+        get_market_index_info,
+
+        # 增強能力工具
+        WebSearchTool(),
+        CodeInterpreterTool(),
     ],
     model="gpt-4"
 )

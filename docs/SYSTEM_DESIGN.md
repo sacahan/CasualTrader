@@ -96,13 +96,24 @@
 │  │ OpenAI      │ │ Trading     │ │ Agent Tool          │  │
 │  │ Agent SDK   │ │ Agent       │ │ Manager             │  │
 │  └─────────────┘ └─────────────┘ └─────────────────────┘  │
+│                                                             │
+│  ┌──────────────── 專業分析 Agent Tools ────────────────┐  │
+│  │ 每個 Agent 都是自主型 Agent，具備：                    │  │
+│  │ • 完整的決策能力和專業領域知識                        │  │
+│  │ • 內建 WebSearchTool（搜尋最新資訊）                 │  │
+│  │ • 內建 CodeInterpreterTool（執行進階計算）           │  │
+│  │ • 明確的成本控制準則和工具使用指導                    │  │
+│  │ • 標準化的輸出格式                                   │  │
+│  └──────────────────────────────────────────────────────┘  │
 │  ┌─────────────┐ ┌─────────────┐ ┌─────────────────────┐  │
 │  │ Fundamental │ │ Technical   │ │ Risk Assessment     │  │
-│  │ Agent Tool  │ │ Agent Tool  │ │ Agent Tool          │  │
+│  │ Agent       │ │ Agent       │ │ Agent               │  │
+│  │ (自主型)     │ │ (自主型)     │ │ (自主型)             │  │
 │  └─────────────┘ └─────────────┘ └─────────────────────┘  │
 │  ┌─────────────┐ ┌─────────────┐ ┌─────────────────────┐  │
 │  │ Sentiment   │ │ SQLite      │ │ WebSocket           │  │
-│  │ Agent Tool  │ │ Session     │ │ Notification        │  │
+│  │ Agent       │ │ Session     │ │ Notification        │  │
+│  │ (自主型)     │ │ Persistence │ │ Service             │  │
 │  └─────────────┘ └─────────────┘ └─────────────────────┘  │
 └─────────────────────────────────────────────────────────┘
                               │ 工具調用
@@ -188,12 +199,33 @@
 - 完整的策略變更記錄 (觸發原因、變更內容、Agent 說明)
 - 策略變更歷史可查詢與追溯
 
-**工具整合**:
+**工具整合（Agent as Tool 架構）**:
 
-- 專業分析工具 (基本面、技術面、風險評估、市場情緒)
-- OpenAI Hosted Tools (WebSearch, CodeInterpreter)
-- CasualMarket MCP (21 個台灣股市工具)
-- 交易驗證與執行工具
+- **專業分析工具（自主型 Agent）**:
+  - `fundamental_agent`: 基本面分析 Agent（內建 WebSearch + CodeInterpreter）
+  - `technical_agent`: 技術分析 Agent（內建 WebSearch + CodeInterpreter）
+  - `risk_agent`: 風險評估 Agent（內建 WebSearch + CodeInterpreter）
+  - `sentiment_agent`: 市場情緒分析 Agent（內建 WebSearch + CodeInterpreter）
+  - 每個 Agent 具備完整的自主決策能力和專業領域知識
+  - 包含明確的成本控制準則和工具使用指導
+
+- **OpenAI Hosted Tools（直接整合）**:
+  - `WebSearchTool`: 搜尋最新市場資訊、新聞、研究報告
+  - `CodeInterpreterTool`: 執行複雜計算、量化分析、回測驗證
+  - TradingAgent 可直接使用，專業 Agent 內部也可使用
+
+- **CasualMarket MCP（21 個台灣股市工具）**:
+  - 核心交易工具（3 個）
+  - 基本面數據工具（6 個）
+  - 市場數據工具（7 個）
+  - 市場狀態工具（2 個）
+  - 資金動向工具（3 個）
+
+- **交易驗證與執行工具**:
+  - 交易時間驗證
+  - 投資組合查詢
+  - 交易參數驗證
+  - 策略變更記錄
 
 ### 2. 數據整合架構
 
@@ -295,6 +327,76 @@
 - **輸入驗證**: 所有外部輸入嚴格驗證
 - **錯誤邊界**: 防止單一 Agent 故障影響系統
 - **資源限制**: Agent 執行時間和頻率限制
+
+### 5. Agent as Tool 架構設計
+
+**核心概念**:
+
+專業分析工具（fundamental_agent, technical_agent, risk_agent, sentiment_agent）採用 **Agent as Tool** 架構，每個工具本身就是一個完整的自主型 Agent：
+
+**架構優勢**:
+
+1. **專業領域知識**: 每個 Agent 具備完整的專業領域指令和知識
+2. **自主決策能力**: 可以獨立進行複雜的多步驟分析
+3. **工具組合使用**: 內建 WebSearchTool 和 CodeInterpreterTool
+4. **標準化介面**: 透過 `.as_tool()` 方法轉換為 TradingAgent 的工具
+5. **獨立演進**: 可以單獨更新和優化每個專業 Agent
+
+**分層工具策略**:
+
+```text
+TradingAgent (主 Agent)
+    │
+    ├─ fundamental_agent (子 Agent)
+    │   ├─ WebSearchTool
+    │   ├─ CodeInterpreterTool
+    │   └─ 專業分析函數
+    │
+    ├─ technical_agent (子 Agent)
+    │   ├─ WebSearchTool
+    │   ├─ CodeInterpreterTool
+    │   └─ 專業分析函數
+    │
+    ├─ risk_agent (子 Agent)
+    │   ├─ WebSearchTool
+    │   ├─ CodeInterpreterTool
+    │   └─ 專業分析函數
+    │
+    └─ sentiment_agent (子 Agent)
+        ├─ WebSearchTool
+        ├─ CodeInterpreterTool
+        └─ 專業分析函數
+```
+
+### 6. 成本優化策略
+
+**CodeInterpreterTool 成本控制**:
+
+為了控制 AI 執行成本，系統在每個專業 Agent 的指令中嵌入明確的使用準則：
+
+**優先級設計**:
+
+1. **優先使用自訂工具**: 先嘗試使用提供的專業分析函數
+2. **謹慎使用 CodeInterpreter**: 僅用於自訂工具無法完成的進階計算
+3. **程式碼效率要求**: 限制程式碼行數（< 100-150 行）
+4. **執行頻率限制**: 每次分析最多使用 2 次
+
+**適用場景指導**:
+
+- ✅ **適合使用**: DCF 估值、蒙地卡羅模擬、NLP 情緒分析、回測驗證
+- ❌ **避免使用**: 簡單數學計算、已有自訂工具的功能、基本比率計算
+
+**WebSearchTool 使用指導**:
+
+- **搜尋時機**: 需要最新資訊、市場事件、政策變化時
+- **搜尋範圍**: 限制在相關的財經新聞、研究報告、產業分析
+- **結果整合**: 將搜尋結果與既有數據結合分析
+
+**效益評估**:
+
+- 預期減少 40-60% 的 CodeInterpreter 執行次數
+- 提高分析效率（優先使用快速的自訂工具）
+- 保持分析品質（在需要時仍可使用進階工具）
 
 ---
 
