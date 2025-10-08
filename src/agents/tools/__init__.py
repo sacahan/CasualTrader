@@ -1,13 +1,13 @@
 """Analysis tools package."""
 
-from .fundamental_agent import FundamentalAgent
-from .risk_agent import RiskAgent
-from .sentiment_agent import SentimentAgent
-from .technical_agent import TechnicalAgent
+from .fundamental_agent import FundamentalAnalysisTools
+from .risk_agent import RiskAnalysisTools
+from .sentiment_agent import SentimentAnalysisTools
+from .technical_agent import TechnicalAnalysisTools
 
 __all__ = [
-    "FundamentalAgent",
-    "TechnicalAgent",
-    "RiskAgent",
-    "SentimentAgent",
+    "FundamentalAnalysisTools",
+    "TechnicalAnalysisTools",
+    "RiskAnalysisTools",
+    "SentimentAnalysisTools",
 ]

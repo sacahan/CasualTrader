@@ -1,710 +1,533 @@
-"""
-風險評估工具
-專門化的投資風險分析和風險管理工具
-使用 Python 3.12+ 語法
+"""Risk Agent - 風險評估自主型 Agent
+
+這個模組實作具有自主分析能力的風險評估 Agent。
 """
 
 from __future__ import annotations
 
-import logging
 from datetime import datetime
 from typing import Any
 
-from pydantic import BaseModel
+# Logger
+from ..utils.logger import get_agent_logger
+
+# Agent SDK
+try:
+    from agents import Agent, CodeInterpreterTool, Tool, WebSearchTool
+except ImportError:
+    Agent = Any
+    Tool = Any
+    WebSearchTool = Any
+    CodeInterpreterTool = Any
 
 
-class RiskMetrics(BaseModel):
-    """風險度量指標"""
+def risk_agent_instructions() -> str:
+    """風險評估 Agent 的指令定義"""
+    return f"""你是一位專業的風險管理專家,專精於投資組合風險分析和風險控制。
 
-    symbol: str
-    portfolio_weight: float
-    position_size: float
-    current_value: float
+## 你的專業能力
 
-    # 波動性風險
-    daily_volatility: float | None = None
-    annual_volatility: float | None = None
-    beta: float | None = None
+1. 風險度量
+   - 波動性風險: 標準差、Beta 係數
+   - 下檔風險: VaR、最大回撤
+   - 流動性風險: 成交量、買賣價差
 
-    # 下檔風險
-    var_95: float | None = None  # 95% VaR
-    var_99: float | None = None  # 99% VaR
-    max_drawdown: float | None = None
-    downside_deviation: float | None = None
+2. 投資組合風險
+   - 集中度風險: HHI 指數
+   - 產業曝險分析
+   - 相關性分析
 
-    # 流動性風險
-    avg_daily_volume: float | None = None
-    bid_ask_spread: float | None = None
-    market_impact_cost: float | None = None
+3. 風險管理建議
+   - 部位大小建議
+   - 停損點設置
+   - 避險策略
+   - 風險預算分配
 
-    # 信用風險
-    debt_to_equity: float | None = None
-    credit_rating: str | None = None
-    default_probability: float | None = None
+## 分析方法
 
-    analysis_timestamp: datetime
+1. 收集數據: 使用 MCP Server 獲取價格和部位數據
+2. 計算風險: 使用工具計算風險指標
+3. 評估集中度: 分析投資組合集中度
+4. 壓力測試: 模擬極端情況
+5. 給出建議: 產生風險管理建議
+
+## 可用工具
+
+### 專業分析工具
+- calculate_position_risk: 計算個別部位風險
+- analyze_portfolio_concentration: 分析投資組合集中度
+- calculate_portfolio_risk: 計算整體投資組合風險
+- perform_stress_test: 執行壓力測試
+- generate_risk_recommendations: 產生風險管理建議
+- Casual Market MCP Server: 獲取市場數據
+
+### 增強能力工具
+- WebSearchTool: 搜尋風險管理最佳實踐、市場風險事件、監管規範
+- CodeInterpreterTool: 執行 VaR 計算、蒙地卡羅模擬、相關性矩陣分析
+
+## CodeInterpreterTool 使用準則 ⚠️
+
+為了控制成本和執行時間，請遵守以下原則：
+
+1. **優先使用自訂工具**
+   - 先嘗試使用提供的風險分析工具
+   - 只有當需要進階風險模型時才使用 CodeInterpreterTool
+
+2. **適用場景**
+   - ✅ VaR（風險值）計算（歷史模擬法、蒙地卡羅法）
+   - ✅ 投資組合相關性矩陣分析
+   - ✅ 壓力測試情境模擬
+   - ❌ 不要用於簡單的風險比率計算
+   - ❌ 不要用於已有自訂工具的功能
+
+3. **程式碼效率要求**
+   - 保持程式碼簡潔（< 150 行）
+   - 蒙地卡羅模擬限制在 10,000 次以內
+   - 使用 numpy 進行高效數值計算
+
+4. **執行頻率限制**
+   - 每次分析最多使用 2 次 CodeInterpreterTool
+   - 優先執行最關鍵的風險計算
+
+## 輸出格式
+
+1. 風險評分: 0-100 分,越高越危險
+2. 風險等級: 低/中低/中/中高/高
+3. 關鍵風險: 需要注意的主要風險
+4. 風險警示: 需要立即處理的風險
+5. 管理建議: 具體的風險控制措施
+6. 信心評估: 0-100% 信心度
+
+## 分析原則
+
+- 保守評估,寧可高估風險
+- 重視尾部風險和極端情況
+- 考慮流動性風險
+- 提供可執行的建議
+
+當前時間: {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
+"""
 
 
-class PortfolioRisk(BaseModel):
-    """投資組合風險"""
+class RiskAnalysisTools:
+    """風險分析輔助工具集合
 
-    total_value: float
-    cash_position: float
-    number_of_positions: int
-
-    # 集中度風險
-    concentration_risk: dict[str, Any]
-    sector_exposure: dict[str, float]
-    single_stock_max_weight: float
-
-    # 整體風險度量
-    portfolio_volatility: float | None = None
-    portfolio_beta: float | None = None
-    portfolio_var: float | None = None
-    sharpe_ratio: float | None = None
-
-    # 相關性風險
-    correlation_matrix: dict[str, dict[str, float]] | None = None
-    diversification_ratio: float | None = None
-
-    analysis_timestamp: datetime
-
-
-class RiskAssessmentResult(BaseModel):
-    """風險評估結果"""
-
-    assessment_type: str
-    overall_risk_level: str  # "低", "中低", "中", "中高", "高"
-    risk_score: float  # 0-100
-    confidence_level: float
-
-    individual_risks: list[RiskMetrics]
-    portfolio_risk: PortfolioRisk | None = None
-
-    key_risk_factors: list[str]
-    risk_warnings: list[str]
-    risk_recommendations: list[str]
-
-    position_sizing_suggestions: dict[str, float]
-    hedging_strategies: list[str]
-    stop_loss_levels: dict[str, float]
-
-    risk_budget_allocation: dict[str, float]
-    stress_test_results: dict[str, Any]
-
-    summary: str
-    analysis_timestamp: datetime
-
-
-class RiskAgent:
-    """
-    風險評估工具 - 提供全面的投資風險分析和管理建議
+    提供各種風險評估和管理功能。
+    Agent 根據需求靈活組合使用。
     """
 
     def __init__(self) -> None:
-        self.logger = logging.getLogger("risk_agent")
+        self.logger = get_agent_logger("risk_analysis_tools")
 
-    async def assess_investment_risk(
+    def calculate_position_risk(
         self,
-        positions: list[dict[str, Any]],
-        portfolio_value: float,
-        risk_tolerance: str = "medium",
-        analysis_depth: str = "comprehensive",
-    ) -> RiskAssessmentResult:
-        """
-        投資風險評估
+        symbol: str,
+        position_data: dict[str, Any],
+        market_data: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        """計算個別部位風險
 
         Args:
-            positions: 投資部位列表
-            portfolio_value: 投資組合總值
-            risk_tolerance: 風險承受度 ("low", "medium", "high")
-            analysis_depth: 分析深度
+            symbol: 股票代碼 (例如: "2330")
+            position_data: 部位數據
+            market_data: 市場數據 (可選)
 
         Returns:
-            風險評估結果
+            dict: 部位風險指標
         """
-        try:
-            # 計算個別股票風險
-            individual_risks = []
-            for position in positions:
-                risk_metrics = await self._calculate_individual_risk(position)
-                individual_risks.append(risk_metrics)
+        self.logger.info(f"開始計算部位風險 | 股票: {symbol}")
 
-            # 計算投資組合風險
-            portfolio_risk = await self._calculate_portfolio_risk(
-                positions, portfolio_value
-            )
+        quantity = position_data.get("quantity", 0)
+        avg_cost = position_data.get("avg_cost", 0)
+        current_price = position_data.get("current_price", 0)
 
-            # 綜合風險評估
-            overall_assessment = self._assess_overall_risk(
-                individual_risks, portfolio_risk, risk_tolerance
-            )
+        position_value = quantity * current_price
+        unrealized_pnl = (current_price - avg_cost) * quantity
+        pnl_percent = unrealized_pnl / (quantity * avg_cost) if avg_cost > 0 else 0
 
-            # 生成風險管理建議
-            recommendations = self._generate_risk_recommendations(
-                individual_risks, portfolio_risk, overall_assessment
-            )
-
-            # 壓力測試
-            stress_results = await self._perform_stress_testing(
-                positions, portfolio_value
-            )
-
-            result = RiskAssessmentResult(
-                assessment_type="comprehensive_risk_analysis",
-                overall_risk_level=overall_assessment["level"],
-                risk_score=overall_assessment["score"],
-                confidence_level=overall_assessment["confidence"],
-                individual_risks=individual_risks,
-                portfolio_risk=portfolio_risk,
-                key_risk_factors=overall_assessment["key_factors"],
-                risk_warnings=overall_assessment["warnings"],
-                risk_recommendations=recommendations["actions"],
-                position_sizing_suggestions=recommendations["position_sizing"],
-                hedging_strategies=recommendations["hedging"],
-                stop_loss_levels=recommendations["stop_losses"],
-                risk_budget_allocation=recommendations["risk_budget"],
-                stress_test_results=stress_results,
-                summary=self._generate_risk_summary(
-                    overall_assessment, portfolio_risk, stress_results
-                ),
-                analysis_timestamp=datetime.now(),
-            )
-
-            self.logger.info(
-                f"Risk assessment completed for {len(positions)} positions"
-            )
-            return result
-
-        except Exception as e:
-            self.logger.error(f"Risk assessment failed: {e}")
-            raise
-
-    async def _calculate_individual_risk(self, position: dict[str, Any]) -> RiskMetrics:
-        """計算個別股票風險指標"""
-        symbol = position["symbol"]
-        quantity = position.get("quantity", 0)
-        current_price = position.get("current_price", 0)
-        portfolio_weight = position.get("weight", 0)
-
-        # 獲取歷史數據進行風險計算
-        risk_data = await self._fetch_risk_data(symbol)
-
-        return RiskMetrics(
-            symbol=symbol,
-            portfolio_weight=portfolio_weight,
-            position_size=quantity,
-            current_value=quantity * current_price,
-            daily_volatility=risk_data.get("daily_vol", 0.02),
-            annual_volatility=risk_data.get("annual_vol", 0.25),
-            beta=risk_data.get("beta", 1.0),
-            var_95=risk_data.get("var_95", -0.03),
-            var_99=risk_data.get("var_99", -0.05),
-            max_drawdown=risk_data.get("max_drawdown", -0.15),
-            downside_deviation=risk_data.get("downside_dev", 0.018),
-            avg_daily_volume=risk_data.get("avg_volume", 1000000),
-            bid_ask_spread=risk_data.get("spread", 0.001),
-            market_impact_cost=risk_data.get("impact_cost", 0.002),
-            debt_to_equity=risk_data.get("debt_equity", 0.3),
-            credit_rating=risk_data.get("rating", "BBB"),
-            default_probability=risk_data.get("default_prob", 0.01),
-            analysis_timestamp=datetime.now(),
+        self.logger.debug(
+            f"部位基本資訊 | 股票: {symbol} | 數量: {quantity} | "
+            f"成本: {avg_cost} | 現價: {current_price} | 未實現損益: {unrealized_pnl:,.0f}"
         )
 
-    async def _fetch_risk_data(self, symbol: str) -> dict[str, Any]:
-        """獲取風險計算所需數據"""
-        # 這裡將整合實際的歷史數據和財務數據
-        # 目前返回模擬數據
+        volatility = market_data.get("volatility", 0.25) if market_data else 0.25
+        beta = market_data.get("beta", 1.0) if market_data else 1.0
+
+        var_95 = position_value * volatility * 1.65
+        max_drawdown = position_value * (volatility * 2)
+        risk_score = min(100, (volatility * 100 + abs(beta - 1) * 30))
+
+        self.logger.info(
+            f"部位風險計算完成 | 股票: {symbol} | 風險評分: {risk_score:.1f} | "
+            f"VaR(95%): {var_95:,.0f} | 波動率: {volatility:.2%}"
+        )
 
         return {
-            "daily_vol": 0.025,
-            "annual_vol": 0.30,
-            "beta": 1.2,
-            "var_95": -0.035,
-            "var_99": -0.055,
-            "max_drawdown": -0.18,
-            "downside_dev": 0.020,
-            "avg_volume": 1500000,
-            "spread": 0.0015,
-            "impact_cost": 0.0025,
-            "debt_equity": 0.35,
-            "rating": "BBB+",
-            "default_prob": 0.008,
+            "symbol": symbol,
+            "position_value": position_value,
+            "unrealized_pnl": unrealized_pnl,
+            "pnl_percent": pnl_percent,
+            "volatility": volatility,
+            "beta": beta,
+            "var_95": var_95,
+            "max_drawdown": max_drawdown,
+            "risk_score": risk_score,
         }
 
-    async def _calculate_portfolio_risk(
-        self, positions: list[dict[str, Any]], total_value: float
-    ) -> PortfolioRisk:
-        """計算投資組合整體風險"""
+    def analyze_portfolio_concentration(
+        self,
+        positions: list[dict[str, Any]],
+        total_value: float,
+    ) -> dict[str, Any]:
+        """分析投資組合集中度
 
-        # 計算集中度風險
-        concentration = self._calculate_concentration_risk(positions)
+        Args:
+            positions: 部位列表
+            total_value: 投資組合總值
 
-        # 計算產業曝險
-        sector_exposure = self._calculate_sector_exposure(positions)
-
-        # 計算最大單一股票權重
-        max_weight = max([pos.get("weight", 0) for pos in positions], default=0)
-
-        # 計算投資組合統計量
-        portfolio_stats = self._calculate_portfolio_statistics(positions)
-
-        # 計算相關性矩陣
-        correlation_matrix = await self._calculate_correlation_matrix(positions)
-
-        return PortfolioRisk(
-            total_value=total_value,
-            cash_position=total_value * 0.1,  # 假設 10% 現金
-            number_of_positions=len(positions),
-            concentration_risk=concentration,
-            sector_exposure=sector_exposure,
-            single_stock_max_weight=max_weight,
-            portfolio_volatility=portfolio_stats.get("volatility", 0.20),
-            portfolio_beta=portfolio_stats.get("beta", 1.0),
-            portfolio_var=portfolio_stats.get("var", -0.025),
-            sharpe_ratio=portfolio_stats.get("sharpe", 0.8),
-            correlation_matrix=correlation_matrix,
-            diversification_ratio=portfolio_stats.get("diversification", 0.7),
-            analysis_timestamp=datetime.now(),
+        Returns:
+            dict: 集中度分析結果
+        """
+        self.logger.info(
+            f"開始分析投資組合集中度 | 部位數: {len(positions)} | 總值: {total_value:,.0f}"
         )
 
-    def _calculate_concentration_risk(
-        self, positions: list[dict[str, Any]]
-    ) -> dict[str, Any]:
-        """計算集中度風險"""
-        weights = [pos.get("weight", 0) for pos in positions]
+        if not positions or total_value <= 0:
+            self.logger.warning("無效的投資組合數據")
+            return {"error": "無效的投資組合數據"}
 
-        # HHI (Herfindahl-Hirschman Index)
+        weights = []
+        sector_weights: dict[str, float] = {}
+
+        for pos in positions:
+            value = pos.get("value", 0)
+            weight = value / total_value if total_value > 0 else 0
+            weights.append(weight)
+
+            sector = pos.get("sector", "其他")
+            sector_weights[sector] = sector_weights.get(sector, 0) + weight
+
         hhi = sum(w**2 for w in weights)
-
-        # 有效股票數量
         effective_stocks = 1 / hhi if hhi > 0 else 0
-
-        # 前五大持股集中度
         top5_concentration = sum(sorted(weights, reverse=True)[:5])
+        max_weight = max(weights) if weights else 0
+
+        self.logger.debug(
+            f"集中度計算 | HHI: {hhi:.4f} | 有效股票數: {effective_stocks:.2f} | "
+            f"前5大集中度: {top5_concentration:.2%} | 最大權重: {max_weight:.2%}"
+        )
 
         if hhi < 0.1:
             concentration_level = "低"
+            risk_assessment = "投資組合分散良好"
         elif hhi < 0.18:
-            concentration_level = "中"
+            concentration_level = "中低"
+            risk_assessment = "投資組合適度分散"
         elif hhi < 0.25:
-            concentration_level = "中高"
+            concentration_level = "中"
+            risk_assessment = "投資組合集中度偏高"
         else:
             concentration_level = "高"
+            risk_assessment = "投資組合過度集中,風險較高"
+
+        self.logger.info(
+            f"集中度分析完成 | 等級: {concentration_level} | "
+            f"產業分布: {len(sector_weights)} 個產業"
+        )
 
         return {
             "hhi_index": hhi,
-            "effective_number_of_stocks": effective_stocks,
+            "effective_stocks": effective_stocks,
             "top5_concentration": top5_concentration,
+            "max_position_weight": max_weight,
+            "sector_concentration": sector_weights,
             "concentration_level": concentration_level,
-            "diversification_score": max(0, 1 - hhi),
+            "risk_assessment": risk_assessment,
         }
 
-    def _calculate_sector_exposure(
-        self, positions: list[dict[str, Any]]
-    ) -> dict[str, float]:
-        """計算產業曝險分布"""
-        # 模擬產業分類（實際實作時會基於真實產業數據）
-        sector_mapping = {
-            "2330": "半導體",
-            "2317": "電腦周邊",
-            "2454": "光電",
-            "1301": "塑化",
-            "2882": "金融",
-        }
-
-        sector_weights = {}
-        for position in positions:
-            symbol = position["symbol"]
-            weight = position.get("weight", 0)
-            sector = sector_mapping.get(symbol, "其他")
-
-            if sector in sector_weights:
-                sector_weights[sector] += weight
-            else:
-                sector_weights[sector] = weight
-
-        return sector_weights
-
-    def _calculate_portfolio_statistics(
-        self, positions: list[dict[str, Any]]
-    ) -> dict[str, Any]:
-        """計算投資組合統計量"""
-        # 模擬投資組合統計計算
-        [pos.get("weight", 0) for pos in positions]
-
-        # 加權平均 Beta
-        weighted_beta = sum(
-            pos.get("beta", 1.0) * pos.get("weight", 0) for pos in positions
-        )
-
-        # 投資組合波動度（簡化計算）
-        portfolio_vol = 0.20  # 實際計算需要相關性矩陣
-
-        return {
-            "volatility": portfolio_vol,
-            "beta": weighted_beta,
-            "var": -portfolio_vol * 1.65,  # 95% VaR 近似
-            "sharpe": 0.8,  # 假設夏普比率
-            "diversification": 0.75,  # 分散化比率
-        }
-
-    async def _calculate_correlation_matrix(
-        self, positions: list[dict[str, Any]]
-    ) -> dict[str, dict[str, float]]:
-        """計算相關性矩陣"""
-        symbols = [pos["symbol"] for pos in positions]
-        correlation_matrix = {}
-
-        # 模擬相關性計算（實際實作時會基於歷史價格數據）
-        for i, symbol1 in enumerate(symbols):
-            correlation_matrix[symbol1] = {}
-            for j, symbol2 in enumerate(symbols):
-                if i == j:
-                    correlation_matrix[symbol1][symbol2] = 1.0
-                else:
-                    # 模擬相關系數
-                    correlation_matrix[symbol1][symbol2] = 0.3 + (i + j) * 0.1 % 0.7
-
-        return correlation_matrix
-
-    def _assess_overall_risk(
+    def calculate_portfolio_risk(
         self,
-        individual_risks: list[RiskMetrics],
-        portfolio_risk: PortfolioRisk,
-        risk_tolerance: str,
+        position_risks: list[dict[str, Any]],
+        concentration: dict[str, Any],
+        total_value: float,
     ) -> dict[str, Any]:
-        """綜合風險評估"""
-
-        risk_factors = []
-        warnings = []
-        total_risk_score = 0
-
-        # 個別股票風險評估
-        high_risk_stocks = []
-        for risk in individual_risks:
-            if risk.annual_volatility and risk.annual_volatility > 0.35:
-                high_risk_stocks.append(risk.symbol)
-                total_risk_score += 20
-
-            if risk.beta and risk.beta > 1.5:
-                risk_factors.append(
-                    f"{risk.symbol} 系統風險較高 (Beta: {risk.beta:.2f})"
-                )
-                total_risk_score += 10
-
-            if risk.max_drawdown and risk.max_drawdown < -0.25:
-                warnings.append(f"{risk.symbol} 歷史最大回撤超過 25%")
-                total_risk_score += 15
-
-        # 投資組合層級風險
-        if portfolio_risk.single_stock_max_weight > 0.15:
-            risk_factors.append("單一股票集中度過高")
-            total_risk_score += 25
-
-        if portfolio_risk.concentration_risk["hhi_index"] > 0.2:
-            risk_factors.append("投資組合集中度偏高")
-            total_risk_score += 20
-
-        # 產業集中度檢查
-        max_sector_weight = max(portfolio_risk.sector_exposure.values(), default=0)
-        if max_sector_weight > 0.4:
-            risk_factors.append("產業集中度過高")
-            total_risk_score += 20
-
-        # 流動性風險
-        low_liquidity_stocks = [
-            risk.symbol
-            for risk in individual_risks
-            if risk.avg_daily_volume and risk.avg_daily_volume < 500000
-        ]
-        if low_liquidity_stocks:
-            warnings.append(f"流動性不足標的: {', '.join(low_liquidity_stocks)}")
-            total_risk_score += len(low_liquidity_stocks) * 10
-
-        # 根據風險承受度調整評分
-        tolerance_multiplier = {"low": 0.7, "medium": 1.0, "high": 1.3}.get(
-            risk_tolerance, 1.0
-        )
-        adjusted_score = total_risk_score * tolerance_multiplier
-
-        # 風險等級判定
-        if adjusted_score >= 80:
-            risk_level = "高"
-            confidence = 0.9
-        elif adjusted_score >= 60:
-            risk_level = "中高"
-            confidence = 0.85
-        elif adjusted_score >= 40:
-            risk_level = "中"
-            confidence = 0.8
-        elif adjusted_score >= 20:
-            risk_level = "中低"
-            confidence = 0.75
-        else:
-            risk_level = "低"
-            confidence = 0.7
-
-        return {
-            "level": risk_level,
-            "score": min(100, adjusted_score),
-            "confidence": confidence,
-            "key_factors": risk_factors[:5],  # 最多 5 個主要風險因子
-            "warnings": warnings,
-            "high_risk_stocks": high_risk_stocks,
-        }
-
-    def _generate_risk_recommendations(
-        self,
-        individual_risks: list[RiskMetrics],
-        portfolio_risk: PortfolioRisk,
-        assessment: dict[str, Any],
-    ) -> dict[str, Any]:
-        """生成風險管理建議"""
-
-        recommendations = []
-        position_sizing = {}
-        stop_losses = {}
-        hedging_strategies = []
-        risk_budget = {}
-
-        # 部位大小建議
-        for risk in individual_risks:
-            if risk.annual_volatility and risk.annual_volatility > 0.30:
-                suggested_weight = min(0.05, risk.portfolio_weight * 0.7)
-                position_sizing[risk.symbol] = suggested_weight
-                recommendations.append(
-                    f"建議降低 {risk.symbol} 部位至 {suggested_weight:.1%}"
-                )
-
-            # 停損水準建議
-            if risk.var_95:
-                stop_loss = abs(risk.var_95) * 2  # VaR 的 2 倍作為停損
-                stop_losses[risk.symbol] = stop_loss
-            else:
-                stop_losses[risk.symbol] = 0.08  # 預設 8% 停損
-
-        # 投資組合層級建議
-        if portfolio_risk.concentration_risk["hhi_index"] > 0.18:
-            recommendations.append("建議增加投資標的數量以降低集中度風險")
-
-        if portfolio_risk.single_stock_max_weight > 0.12:
-            recommendations.append("建議單一股票權重不超過 12%")
-
-        # 產業分散化建議
-        for sector, weight in portfolio_risk.sector_exposure.items():
-            if weight > 0.35:
-                recommendations.append(f"建議降低{sector}產業曝險 (目前 {weight:.1%})")
-
-        # 避險策略建議
-        if assessment["score"] > 60:
-            hedging_strategies.extend(
-                [
-                    "考慮購買台指期貨做空避險",
-                    "增加現金部位至 15-20%",
-                    "考慮配置防禦性股票",
-                ]
-            )
-
-        # 風險預算分配
-        total_risk_budget = 100
-        high_risk_allocation = min(30, max(10, 40 - assessment["score"] * 0.3))
-        medium_risk_allocation = 60
-        low_risk_allocation = (
-            total_risk_budget - high_risk_allocation - medium_risk_allocation
-        )
-
-        risk_budget = {
-            "高風險標的": high_risk_allocation,
-            "中風險標的": medium_risk_allocation,
-            "低風險標的": low_risk_allocation,
-        }
-
-        return {
-            "actions": recommendations,
-            "position_sizing": position_sizing,
-            "stop_losses": stop_losses,
-            "hedging": hedging_strategies,
-            "risk_budget": risk_budget,
-        }
-
-    async def _perform_stress_testing(
-        self, positions: list[dict[str, Any]], portfolio_value: float
-    ) -> dict[str, Any]:
-        """執行壓力測試"""
-
-        scenarios = {
-            "市場崩盤": {"market_drop": -0.20, "volatility_spike": 2.0},
-            "金融風暴": {"market_drop": -0.30, "correlation_increase": 0.8},
-            "利率急升": {"rate_rise": 0.03, "growth_stocks_impact": -0.25},
-            "科技股泡沫": {"tech_drop": -0.40, "other_sectors": -0.10},
-            "疫情衝擊": {"travel_drop": -0.50, "tech_gain": 0.15, "overall": -0.15},
-        }
-
-        stress_results = {}
-
-        for scenario_name, scenario_params in scenarios.items():
-            portfolio_impact = self._calculate_scenario_impact(
-                positions, scenario_params
-            )
-
-            stress_results[scenario_name] = {
-                "portfolio_loss": portfolio_impact["total_loss"],
-                "worst_stock": portfolio_impact["worst_performer"],
-                "recovery_time_estimate": portfolio_impact["recovery_days"],
-                "required_actions": portfolio_impact["recommended_actions"],
-            }
-
-        return stress_results
-
-    def _calculate_scenario_impact(
-        self, positions: list[dict[str, Any]], scenario: dict[str, Any]
-    ) -> dict[str, Any]:
-        """計算情境衝擊"""
-
-        total_loss = 0
-        worst_loss = 0
-        worst_stock = ""
-
-        # 模擬情境計算
-        market_impact = scenario.get("market_drop", 0)
-
-        for position in positions:
-            symbol = position["symbol"]
-            weight = position.get("weight", 0)
-
-            # 基礎市場衝擊
-            stock_impact = market_impact
-
-            # 特定產業衝擊
-            if "tech_drop" in scenario and symbol in ["2330", "2317", "2454"]:
-                stock_impact = scenario["tech_drop"]
-
-            position_loss = weight * stock_impact
-            total_loss += position_loss
-
-            if position_loss < worst_loss:
-                worst_loss = position_loss
-                worst_stock = symbol
-
-        # 恢復時間估算（天數）
-        recovery_days = int(abs(total_loss) * 365 * 2)  # 假設需要損失的2倍時間恢復
-
-        # 建議行動
-        recommended_actions = []
-        if abs(total_loss) > 0.15:
-            recommended_actions.append("立即檢討投資組合配置")
-            recommended_actions.append("考慮增加避險部位")
-        if abs(total_loss) > 0.25:
-            recommended_actions.append("緊急風險管理會議")
-
-        return {
-            "total_loss": total_loss,
-            "worst_performer": worst_stock,
-            "recovery_days": recovery_days,
-            "recommended_actions": recommended_actions,
-        }
-
-    def _generate_risk_summary(
-        self,
-        assessment: dict[str, Any],
-        portfolio_risk: PortfolioRisk,
-        stress_results: dict[str, Any],
-    ) -> str:
-        """生成風險評估摘要"""
-
-        worst_scenario = max(
-            stress_results.items(),
-            key=lambda x: abs(x[1]["portfolio_loss"]),
-            default=("無", {"portfolio_loss": 0}),
-        )
-
-        return f"""
-投資組合風險評估摘要：
-
-整體風險等級：{assessment["level"]} (評分: {assessment["score"]:.0f}/100)
-信心度：{assessment["confidence"]:.0%}
-
-投資組合特徵：
-- 持股檔數：{portfolio_risk.number_of_positions}
-- 最大單股權重：{portfolio_risk.single_stock_max_weight:.1%}
-- 投資組合 Beta：{portfolio_risk.portfolio_beta or "N/A"}
-- 集中度指數：{portfolio_risk.concentration_risk["hhi_index"]:.3f}
-
-壓力測試結果：
-- 最壞情境：{worst_scenario[0]}
-- 預期損失：{worst_scenario[1]["portfolio_loss"]:.1%}
-
-主要風險因子：
-{chr(10).join(f"• {factor}" for factor in assessment["key_factors"][:3])}
-
-建議採取適當的風險控制措施，定期檢討投資組合配置。
-        """.strip()
-
-    def get_risk_monitoring_dashboard(self) -> dict[str, Any]:
-        """風險監控儀表板配置"""
-        return {
-            "key_metrics": [
-                "投資組合 VaR",
-                "最大回撤",
-                "集中度指數",
-                "Beta 係數",
-                "夏普比率",
-            ],
-            "alert_thresholds": {
-                "單股權重": 0.15,
-                "產業集中度": 0.35,
-                "日 VaR": 0.03,
-                "最大回撤": 0.12,
-            },
-            "monitoring_frequency": "即時",
-            "reporting_schedule": "每日",
-        }
-
-    def as_tool(self, tool_name: str, tool_description: str) -> dict[str, Any]:
-        """
-        將 RiskAgent 轉換為可供 OpenAI Agent 使用的工具
+        """計算整體投資組合風險
 
         Args:
-            tool_name: 工具名稱
-            tool_description: 工具描述
+            position_risks: 個別部位風險列表
+            concentration: 集中度分析
+            total_value: 投資組合總值
 
         Returns:
-            工具配置字典
+            dict: 投資組合風險指標
         """
+        self.logger.info(
+            f"開始計算投資組合整體風險 | 部位數: {len(position_risks)} | 總值: {total_value:,.0f}"
+        )
+
+        if not position_risks:
+            self.logger.warning("無部位風險數據")
+            return {"error": "無部位風險數據"}
+
+        total_volatility = 0.0
+        total_beta = 0.0
+        total_var = 0.0
+
+        for risk in position_risks:
+            weight = (
+                risk.get("position_value", 0) / total_value if total_value > 0 else 0
+            )
+            total_volatility += risk.get("volatility", 0) * weight
+            total_beta += risk.get("beta", 0) * weight
+            total_var += risk.get("var_95", 0)
+
+        hhi = concentration.get("hhi_index", 0)
+        concentration_penalty = hhi * 50
+
+        self.logger.debug(
+            f"風險指標計算 | 波動度: {total_volatility:.4f} | Beta: {total_beta:.4f} | "
+            f"VaR總和: {total_var:,.0f} | 集中度懲罰: {concentration_penalty:.2f}"
+        )
+
+        overall_risk_score = min(
+            100,
+            (total_volatility * 100 + abs(total_beta - 1) * 20 + concentration_penalty),
+        )
+
+        if overall_risk_score >= 80:
+            risk_level = "高"
+        elif overall_risk_score >= 60:
+            risk_level = "中高"
+        elif overall_risk_score >= 40:
+            risk_level = "中"
+        elif overall_risk_score >= 20:
+            risk_level = "中低"
+        else:
+            risk_level = "低"
+
+        self.logger.info(
+            f"投資組合風險計算完成 | 風險等級: {risk_level} | 風險分數: {overall_risk_score:.2f} | "
+            f"組合VaR: {total_var:,.0f}"
+        )
+
         return {
-            "type": "function",
-            "function": {
-                "name": tool_name,
-                "description": tool_description,
-                "parameters": {
-                    "type": "object",
-                    "properties": {
-                        "portfolio_data": {
-                            "type": "object",
-                            "description": "投資組合數據",
-                        },
-                        "risk_tolerance": {
-                            "type": "string",
-                            "enum": ["conservative", "moderate", "aggressive"],
-                            "description": "風險承受度",
-                            "default": "moderate",
-                        },
-                        "assessment_type": {
-                            "type": "string",
-                            "enum": ["individual", "portfolio", "scenario"],
-                            "description": "評估類型",
-                            "default": "portfolio",
-                        },
-                        "time_horizon": {
-                            "type": "string",
-                            "enum": ["short", "medium", "long"],
-                            "description": "投資時間範圍",
-                            "default": "medium",
-                        },
-                    },
-                    "required": ["portfolio_data"],
-                },
-            },
-            "implementation": self.assess_portfolio_risk,
+            "total_value": total_value,
+            "portfolio_volatility": total_volatility,
+            "portfolio_beta": total_beta,
+            "portfolio_var": total_var,
+            "overall_risk_score": overall_risk_score,
+            "risk_level": risk_level,
         }
+
+    def perform_stress_test(
+        self,
+        positions: list[dict[str, Any]],
+        scenarios: list[dict[str, Any]] | None = None,
+    ) -> dict[str, Any]:
+        """執行壓力測試
+
+        Args:
+            positions: 部位列表
+            scenarios: 壓力情境列表 (可選)
+
+        Returns:
+            dict: 壓力測試結果
+        """
+        self.logger.info(
+            f"開始壓力測試 | 部位數: {len(positions)} | 情境數: {len(scenarios) if scenarios else 0}"
+        )
+        if not scenarios:
+            scenarios = [
+                {"name": "市場大跌 10%", "market_change": -0.10},
+                {"name": "市場暴跌 20%", "market_change": -0.20},
+                {"name": "個股腰斬", "stock_change": -0.50},
+            ]
+
+        results = []
+        total_value = sum(pos.get("value", 0) for pos in positions)
+
+        self.logger.debug(
+            f"壓力測試設定 | 總值: {total_value:,.0f} | 情境數: {len(scenarios)}"
+        )
+
+        for scenario in scenarios:
+            if "market_change" in scenario:
+                impact_percent = scenario["market_change"]
+                loss_amount = total_value * abs(impact_percent)
+            elif "stock_change" in scenario:
+                max_position = max(
+                    (pos.get("value", 0) for pos in positions), default=0
+                )
+                impact_percent = scenario["stock_change"]
+                loss_amount = max_position * abs(impact_percent)
+            else:
+                impact_percent = 0
+                loss_amount = 0
+
+            self.logger.debug(
+                f"情境測試: {scenario['name']} | 影響: {impact_percent:.1%} | "
+                f"損失: {loss_amount:,.0f}"
+            )
+
+            results.append(
+                {
+                    "name": scenario["name"],
+                    "impact": impact_percent,
+                    "loss_amount": loss_amount,
+                    "remaining_value": total_value - loss_amount,
+                }
+            )
+
+        max_loss = max((r["loss_amount"] for r in results), default=0)
+        self.logger.info(
+            f"壓力測試完成 | 情境數: {len(results)} | 最大損失: {max_loss:,.0f}"
+        )
+
+        return {"scenarios": results, "total_value": total_value}
+
+    def generate_risk_recommendations(
+        self,
+        portfolio_risk: dict[str, Any],
+        concentration: dict[str, Any],
+        position_risks: list[dict[str, Any]],
+    ) -> dict[str, Any]:
+        """產生風險管理建議
+
+        Args:
+            portfolio_risk: 投資組合風險
+            concentration: 集中度分析
+            position_risks: 個別部位風險列表
+
+        Returns:
+            dict: 風險管理建議
+        """
+        risk_score = portfolio_risk.get("overall_risk_score", 0)
+        hhi = concentration.get("hhi_index", 0)
+        max_weight = concentration.get("max_position_weight", 0)
+
+        self.logger.info(
+            f"開始產生風險管理建議 | 風險分數: {risk_score:.2f} | HHI: {hhi:.4f} | "
+            f"最大權重: {max_weight:.2%}"
+        )
+
+        key_risks = []
+        warnings = []
+        recommendations = []
+        position_adjustments = {}
+        stop_loss_suggestions = {}
+
+        if risk_score > 70:
+            key_risks.append(f"投資組合整體風險偏高 (評分: {risk_score:.1f})")
+            recommendations.append("建議降低整體部位或增加避險")
+
+        if hhi > 0.20:
+            key_risks.append(f"投資組合過度集中 (HHI: {hhi:.3f})")
+            recommendations.append("建議增加持股分散度")
+
+        if max_weight > 0.15:
+            warnings.append(f"單一持股權重過高 ({max_weight:.1%})")
+            recommendations.append("建議降低最大單一持股權重至 15% 以下")
+
+        for risk in position_risks:
+            symbol = risk["symbol"]
+            risk_score_pos = risk.get("risk_score", 0)
+
+            if risk_score_pos > 70:
+                warnings.append(f"{symbol} 風險偏高")
+                position_adjustments[symbol] = "建議減碼"
+
+                current_price = (
+                    risk.get("position_value", 0) / risk.get("quantity", 1)
+                    if "quantity" in risk
+                    else 0
+                )
+                stop_loss = current_price * 0.92
+                stop_loss_suggestions[symbol] = stop_loss
+
+        sector_conc = concentration.get("sector_concentration", {})
+        for sector, weight in sector_conc.items():
+            if weight > 0.40:
+                key_risks.append(f"{sector} 產業曝險過高 ({weight:.1%})")
+                recommendations.append(f"建議降低 {sector} 產業權重")
+
+        self.logger.info(
+            f"風險建議產生完成 | 關鍵風險: {len(key_risks)} 項 | "
+            f"警示: {len(warnings)} 項 | 建議: {len(recommendations)} 項 | "
+            f"部位調整: {len(position_adjustments)} 個 | 停損建議: {len(stop_loss_suggestions)} 個"
+        )
+
+        return {
+            "key_risks": key_risks,
+            "warnings": warnings,
+            "recommendations": recommendations,
+            "position_adjustments": position_adjustments,
+            "stop_loss_suggestions": stop_loss_suggestions,
+        }
+
+
+async def get_risk_agent(
+    mcp_servers: list[Any],
+    model_name: str = "gpt-4o-mini",
+) -> Agent:
+    """創建風險評估 Agent"""
+    tools_instance = RiskAnalysisTools()
+
+    custom_tools = [
+        Tool.from_function(
+            tools_instance.calculate_position_risk,
+            name="calculate_position_risk",
+            description="計算個別部位風險 (波動率, Beta, VaR, 最大回撤)",
+        ),
+        Tool.from_function(
+            tools_instance.analyze_portfolio_concentration,
+            name="analyze_portfolio_concentration",
+            description="分析投資組合集中度 (HHI 指數、產業曝險)",
+        ),
+        Tool.from_function(
+            tools_instance.calculate_portfolio_risk,
+            name="calculate_portfolio_risk",
+            description="計算整體投資組合風險評分和等級",
+        ),
+        Tool.from_function(
+            tools_instance.perform_stress_test,
+            name="perform_stress_test",
+            description="執行壓力測試模擬極端情境",
+        ),
+        Tool.from_function(
+            tools_instance.generate_risk_recommendations,
+            name="generate_risk_recommendations",
+            description="產生風險管理建議 (部位調整、停損點)",
+        ),
+    ]
+
+    # 添加 OpenAI Hosted Tools
+    hosted_tools = [
+        WebSearchTool(),  # 網路搜尋能力
+        CodeInterpreterTool(),  # Python 程式碼執行能力
+    ]
+
+    analyst = Agent(
+        name="Risk Manager",
+        instructions=risk_agent_instructions(),
+        model=model_name,
+        mcp_servers=mcp_servers,
+        tools=custom_tools + hosted_tools,  # 合併自訂工具和 hosted tools
+    )
+
+    return analyst
+
+
+async def get_risk_agent_tool(
+    mcp_servers: list[Any],
+    model_name: str = "gpt-4o-mini",
+) -> Tool:
+    """將風險評估 Agent 包裝成工具"""
+    analyst = await get_risk_agent(mcp_servers, model_name)
+    return analyst.as_tool(
+        tool_name="RiskManager",
+        tool_description="""專業風險管理 Agent,提供全面的風險評估和控制建議。
+
+功能: 部位風險計算、集中度分析、投資組合風險評估、壓力測試、風險管理建議
+
+適用場景: 風險控制、部位管理、投資組合優化、風險預警""",
+    )

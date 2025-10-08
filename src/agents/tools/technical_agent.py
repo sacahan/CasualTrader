@@ -5,16 +5,20 @@
 
 from __future__ import annotations
 
-import logging
 from datetime import datetime
 from typing import Any
 
+# Logger
+from ..utils.logger import get_agent_logger
+
 # Agent SDK
 try:
-    from agents import Agent, Tool
+    from agents import Agent, CodeInterpreterTool, Tool, WebSearchTool
 except ImportError:
     Agent = Any
     Tool = Any
+    WebSearchTool = Any
+    CodeInterpreterTool = Any
 
 
 def technical_agent_instructions() -> str:
@@ -49,12 +53,41 @@ def technical_agent_instructions() -> str:
 
 ## 可用工具
 
+### 專業分析工具
 - calculate_technical_indicators: 計算 MA、RSI、MACD 等指標
 - identify_chart_patterns: 識別圖表型態
 - analyze_trend: 分析趨勢
 - analyze_support_resistance: 找支撐壓力位
 - generate_trading_signals: 產生交易訊號
 - Casual Market MCP Server: 獲取市場數據
+
+### 增強能力工具
+- WebSearchTool: 主動搜尋最新的技術分析報告、專家觀點、市場評論
+- CodeInterpreterTool: 執行自訂的技術指標計算、統計分析、回測驗證
+
+## CodeInterpreterTool 使用準則 ⚠️
+
+為了控制成本和執行時間，請遵守以下原則：
+
+1. **優先使用自訂工具**
+   - 先嘗試使用提供的專業分析工具
+   - 只有當自訂工具無法滿足需求時才使用 CodeInterpreterTool
+
+2. **適用場景**
+   - ✅ 複雜的自訂指標計算（如改良版 RSI、特殊加權均線）
+   - ✅ 統計檢定（如相關性分析、顯著性測試）
+   - ✅ 簡短的回測驗證（< 100 行程式碼）
+   - ❌ 不要用於簡單的數學計算（加減乘除）
+   - ❌ 不要用於可以用自訂工具完成的任務
+
+3. **程式碼效率要求**
+   - 保持程式碼簡潔（< 100 行）
+   - 避免不必要的迴圈和複雜邏輯
+   - 使用向量化操作（numpy, pandas）
+
+4. **執行頻率限制**
+   - 每次分析最多使用 2 次 CodeInterpreterTool
+   - 必要時將多個計算合併為一次執行
 
 ## 輸出格式
 
@@ -84,10 +117,10 @@ class TechnicalAnalysisTools:
     """
 
     def __init__(self) -> None:
-        self.logger = logging.getLogger("technical_analysis_tools")
+        self.logger = get_agent_logger("technical_analysis_tools")
 
-    @staticmethod
     def calculate_technical_indicators(
+        self,
         symbol: str,
         price_data: list[dict[str, Any]],
         indicators: list[str] | None = None,
@@ -111,12 +144,21 @@ class TechnicalAnalysisTools:
                     }
                 }
         """
+        self.logger.info(
+            f"開始計算技術指標 | 股票: {symbol} | 數據點數: {len(price_data)}"
+        )
+
         if not price_data:
+            self.logger.warning(f"缺少價格數據 | 股票: {symbol}")
             return {"error": "缺少價格數據", "symbol": symbol}
 
         indicators = indicators or ["ma", "rsi", "macd", "bollinger", "kd"]
         result = {"symbol": symbol, "indicators": {}}
         latest_close = price_data[-1]["close"]
+
+        self.logger.debug(
+            f"計算指標: {', '.join(indicators)} | 最新收盤: {latest_close}"
+        )
 
         if "ma" in indicators:
             result["indicators"]["ma"] = {
@@ -155,10 +197,14 @@ class TechnicalAnalysisTools:
                 "status": "偏強",
             }
 
+        self.logger.info(
+            f"技術指標計算完成 | 股票: {symbol} | 指標數: {len(result['indicators'])}"
+        )
+
         return result
 
-    @staticmethod
     def identify_chart_patterns(
+        self,
         symbol: str,
         price_data: list[dict[str, Any]],
         lookback_days: int = 60,
@@ -185,7 +231,14 @@ class TechnicalAnalysisTools:
                     "pattern_count": int
                 }
         """
+        self.logger.info(
+            f"開始識別圖表型態 | 股票: {symbol} | 數據點數: {len(price_data)} | 回溯: {lookback_days}天"
+        )
+
         if not price_data or len(price_data) < 20:
+            self.logger.warning(
+                f"數據不足 | 股票: {symbol} | 數據點數: {len(price_data)}"
+            )
             return {"error": "數據不足", "symbol": symbol}
 
         patterns = []
@@ -212,14 +265,18 @@ class TechnicalAnalysisTools:
                     }
                 )
 
+        self.logger.info(
+            f"圖表型態識別完成 | 股票: {symbol} | 發現型態: {len(patterns)}"
+        )
+
         return {
             "symbol": symbol,
             "patterns": patterns,
             "pattern_count": len(patterns),
         }
 
-    @staticmethod
     def analyze_trend(
+        self,
         symbol: str,
         price_data: list[dict[str, Any]],
     ) -> dict[str, Any]:
@@ -239,11 +296,18 @@ class TechnicalAnalysisTools:
                     "mid_term_momentum": float     # 中期動能
                 }
         """
+        self.logger.info(f"開始分析趨勢 | 股票: {symbol} | 數據點數: {len(price_data)}")
+
         if len(price_data) < 20:
+            self.logger.warning(
+                f"數據不足 | 股票: {symbol} | 數據點數: {len(price_data)}"
+            )
             return {"error": "數據不足", "symbol": symbol}
 
         short_term = price_data[-5]["close"] / price_data[-10]["close"] - 1.0
         mid_term = price_data[-10]["close"] / price_data[-20]["close"] - 1.0
+
+        self.logger.debug(f"動能指標 | 短期: {short_term:.2%} | 中期: {mid_term:.2%}")
 
         if short_term > 0.02 and mid_term > 0.05:
             direction, strength = "上升", 0.8
@@ -251,6 +315,10 @@ class TechnicalAnalysisTools:
             direction, strength = "下降", 0.8
         else:
             direction, strength = "盤整", 0.4
+
+        self.logger.info(
+            f"趨勢分析完成 | 股票: {symbol} | 方向: {direction} | 強度: {strength:.2f}"
+        )
 
         return {
             "symbol": symbol,
@@ -260,8 +328,8 @@ class TechnicalAnalysisTools:
             "mid_term_momentum": mid_term,
         }
 
-    @staticmethod
     def analyze_support_resistance(
+        self,
         symbol: str,
         price_data: list[dict[str, Any]],
     ) -> dict[str, Any]:
@@ -280,7 +348,12 @@ class TechnicalAnalysisTools:
                     "resistance_levels": [float, ...] # 壓力位列表 (由近到遠)
                 }
         """
+        self.logger.info(
+            f"開始分析支撐壓力 | 股票: {symbol} | 數據點數: {len(price_data)}"
+        )
+
         if not price_data:
+            self.logger.warning(f"缺少數據 | 股票: {symbol}")
             return {"error": "缺少數據", "symbol": symbol}
 
         current_price = price_data[-1]["close"]
@@ -297,6 +370,11 @@ class TechnicalAnalysisTools:
             current_price * 1.10,
         ]
 
+        self.logger.info(
+            f"支撐壓力分析完成 | 股票: {symbol} | 當前價: {current_price:.2f} | "
+            f"支撐位: {len(support_levels)} | 壓力位: {len(resistance_levels)}"
+        )
+
         return {
             "symbol": symbol,
             "current_price": current_price,
@@ -304,8 +382,8 @@ class TechnicalAnalysisTools:
             "resistance_levels": resistance_levels,
         }
 
-    @staticmethod
     def generate_trading_signals(
+        self,
         symbol: str,
         technical_indicators: dict[str, Any],
         trend_analysis: dict[str, Any],
@@ -331,6 +409,11 @@ class TechnicalAnalysisTools:
                     "timestamp": str           # ISO 格式時間戳
                 }
         """
+        self.logger.info(
+            f"開始產生交易訊號 | 股票: {symbol} | "
+            f"趨勢方向: {trend_analysis.get('direction', 'unknown')}"
+        )
+
         signals = []
         overall_signal = "觀望"
         confidence = 0.5
@@ -349,6 +432,11 @@ class TechnicalAnalysisTools:
         if len(signals) >= 2:
             overall_signal = "買進"
             confidence = min(0.85, confidence)
+
+        self.logger.info(
+            f"交易訊號產生完成 | 股票: {symbol} | 訊號: {overall_signal} | "
+            f"信心度: {confidence:.1%} | 訊號數: {len(signals)}"
+        )
 
         return {
             "symbol": symbol,
@@ -403,12 +491,18 @@ async def get_technical_agent(
         ),
     ]
 
+    # 添加 OpenAI Hosted Tools
+    hosted_tools = [
+        WebSearchTool(),  # 網路搜尋能力
+        CodeInterpreterTool(),  # Python 程式碼執行能力
+    ]
+
     analyst = Agent(
         name="Technical Analyst",
         instructions=technical_agent_instructions(),
         model=model_name,
         mcp_servers=mcp_servers,
-        tools=custom_tools,
+        tools=custom_tools + hosted_tools,  # 合併自訂工具和 hosted tools
     )
 
     return analyst

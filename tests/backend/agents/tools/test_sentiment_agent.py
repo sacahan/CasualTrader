@@ -19,41 +19,50 @@ sys.path.insert(0, str(project_root / "src"))
 class TestSentimentAgent:
     """SentimentAgent 測試類"""
 
-    def test_as_tool_method_exists(self):
-        """測試 as_tool 方法存在"""
+    def test_tools_class_exists(self):
+        """測試工具類別存在"""
         try:
-            from src.agents.tools.sentiment_agent import SentimentAgent
+            from src.agents.tools.sentiment_agent import SentimentAnalysisTools
 
-            agent = SentimentAgent()
-            tool_config = agent.as_tool("test_tool", "Test description")
-
-            assert isinstance(tool_config, dict)
-            assert tool_config["type"] == "function"
-            assert "function" in tool_config
-            assert tool_config["function"]["name"] == "test_tool"
+            tools = SentimentAnalysisTools()
+            assert tools is not None
+            assert hasattr(tools, "logger")
 
         except ImportError:
-            pytest.skip("SentimentAgent not available")
+            pytest.skip("SentimentAnalysisTools not available")
 
-    def test_tool_configuration_parameters(self):
-        """測試工具配置參數"""
+    def test_calculate_fear_greed_index(self):
+        """測試恐懼貪婪指數計算"""
         try:
-            from src.agents.tools.sentiment_agent import SentimentAgent
+            from src.agents.tools.sentiment_agent import SentimentAnalysisTools
 
-            agent = SentimentAgent()
-            tool_config = agent.as_tool("market_sentiment", "市場情緒分析")
+            tools = SentimentAnalysisTools()
 
-            parameters = tool_config["function"]["parameters"]
-            properties = parameters["properties"]
+            # 模擬市場數據
+            market_data = {
+                "price_momentum": 70,
+                "market_breadth": 65,
+                "volatility": 30,
+                "put_call_ratio": 20,
+            }
 
-            # 檢查參數
-            assert "symbol" in properties
-            assert "market_scope" in properties
-            assert "include_news" in properties
-            assert "include_social" in properties
+            result = tools.calculate_fear_greed_index(market_data)
+
+            # 檢查結果結構
+            assert "index_value" in result
+            assert "level" in result
+            assert "components" in result
+            assert "interpretation" in result
+
+            # 檢查指數範圍
+            assert 0 <= result["index_value"] <= 100
+
+            # 檢查等級有效性
+            valid_levels = ["極度恐慌", "恐懼", "中性", "貪婪", "極度貪婪"]
+            assert result["level"] in valid_levels
 
         except ImportError:
-            pytest.skip("SentimentAgent not available")
+            pytest.skip("SentimentAnalysisTools not available")
 
 
 if __name__ == "__main__":

@@ -1,602 +1,566 @@
-"""
-基本面分析工具
-專門化的公司基本面和財務分析工具
-使用 Python 3.12+ 語法
+"""Fundamental Agent - 基本面分析自主型 Agent
+
+這個模組實作具有自主分析能力的基本面分析 Agent。
 """
 
 from __future__ import annotations
 
-import logging
 from datetime import datetime
 from typing import Any
 
-from pydantic import BaseModel
+# Logger
+from ..utils.logger import get_agent_logger
+
+# Agent SDK
+try:
+    from agents import Agent, CodeInterpreterTool, Tool, WebSearchTool
+except ImportError:
+    Agent = Any
+    Tool = Any
+    WebSearchTool = Any
+    CodeInterpreterTool = Any
 
 
-class CompanyFundamentals(BaseModel):
-    """公司基本面數據結構"""
+def fundamental_agent_instructions() -> str:
+    """基本面分析 Agent 的指令定義"""
+    return f"""你是一位資深的基本面分析師,專精於公司財務分析和價值評估。
 
-    symbol: str
-    company_name: str
-    market_cap: float | None = None
-    pe_ratio: float | None = None
-    pb_ratio: float | None = None
-    roe: float | None = None
-    debt_to_equity: float | None = None
-    current_ratio: float | None = None
-    revenue_growth: float | None = None
-    eps_growth: float | None = None
-    dividend_yield: float | None = None
-    analysis_timestamp: datetime
-    quality_score: float | None = None
-    valuation_score: float | None = None
-    growth_score: float | None = None
+## 你的專業能力
+
+1. 財務報表分析
+   - 資產負債表: 財務結構、償債能力
+   - 損益表: 獲利能力、營運效率
+   - 現金流量表: 現金創造能力
+
+2. 財務比率分析
+   - 獲利能力: ROE、ROA、毛利率、淨利率
+   - 償債能力: 負債比、流動比率
+   - 效率指標: 存貨周轉率、應收帳款周轉率
+   - 成長指標: 營收成長率、EPS 成長率
+
+3. 價值評估
+   - 本益比 (P/E)、股價淨值比 (P/B)
+   - 股利殖利率分析
+   - 相對估值與絕對估值
+
+4. 質化分析
+   - 產業地位與競爭優勢
+   - 經營團隊評估
+   - 商業模式分析
+
+## 分析方法
+
+1. 收集數據: 使用 MCP Server 獲取財務報表
+2. 計算比率: 使用工具計算財務指標
+3. 評估質量: 分析財務體質
+4. 估值分析: 評估股價合理性
+5. 成長評估: 分析成長潛力
+6. 綜合建議: 產生投資建議
+
+## 可用工具
+
+### 專業分析工具
+- calculate_financial_ratios: 計算財務比率
+- analyze_financial_health: 分析財務體質
+- evaluate_valuation: 評估估值水準
+- analyze_growth_potential: 分析成長潛力
+- generate_investment_rating: 產生投資評級
+- Casual Market MCP Server: 獲取財報數據
+
+### 增強能力工具
+- WebSearchTool: 搜尋產業研究報告、競爭對手分析、法說會資訊
+- CodeInterpreterTool: 執行財務模型計算、DCF 估值、敏感度分析
+
+## CodeInterpreterTool 使用準則 ⚠️
+
+為了控制成本和執行時間，請遵守以下原則：
+
+1. **優先使用自訂工具**
+   - 先嘗試使用提供的財務分析工具
+   - 只有當需要複雜模型時才使用 CodeInterpreterTool
+
+2. **適用場景**
+   - ✅ DCF（現金流折現）估值計算
+   - ✅ 敏感度分析（不同假設下的估值變化）
+   - ✅ 三表財務模型建構
+   - ❌ 不要用於簡單的財務比率計算
+   - ❌ 不要用於已有自訂工具的功能
+
+3. **程式碼效率要求**
+   - 保持程式碼簡潔（< 150 行）
+   - 避免過度複雜的模型
+   - 使用 pandas 進行高效數據處理
+
+4. **執行頻率限制**
+   - 每次分析最多使用 2 次 CodeInterpreterTool
+   - 優先執行最關鍵的估值計算
+
+## 輸出格式
+
+1. 財務體質: 健康度評分、關鍵指標
+2. 估值分析: 合理價、便宜價、昂貴價
+3. 成長潛力: 營收/獲利成長評估
+4. 投資評級: 買進/持有/賣出建議
+5. 關鍵優勢: 公司亮點
+6. 風險提示: 需注意的風險因素
+7. 信心評估: 0-100% 信心度
+
+## 分析原則
+
+- 重視長期價值而非短期波動
+- 注重安全邊際
+- 考慮產業特性差異
+- 承認分析的侷限性
+
+當前時間: {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
+"""
 
 
-class FundamentalAnalysisResult(BaseModel):
-    """基本面分析結果"""
+class FundamentalAnalysisTools:
+    """基本面分析輔助工具集合
 
-    symbol: str
-    analysis_type: str
-    summary: str
-    recommendation: str
-    confidence_level: float
-    key_strengths: list[str]
-    key_concerns: list[str]
-    target_price_range: tuple[float, float] | None = None
-    risk_level: str
-    investment_horizon: str
-    detailed_analysis: dict[str, Any]
-    data_sources: list[str]
-    analysis_timestamp: datetime
-
-
-class FundamentalAgent:
-    """
-    基本面分析工具 - 提供深度的公司財務和基本面分析
+    提供各種財務分析和估值評估功能。
+    Agent 根據需求靈活組合使用。
     """
 
     def __init__(self) -> None:
-        self.logger = logging.getLogger("fundamental_agent")
+        self.logger = get_agent_logger("fundamental_analysis_tools")
 
-    async def analyze_company_fundamentals(
+    def calculate_financial_ratios(
         self,
         symbol: str,
-        analysis_depth: str = "standard",
-        focus_areas: list[str] | None = None,
-    ) -> FundamentalAnalysisResult:
-        """
-        分析公司基本面
+        financial_data: dict[str, Any],
+    ) -> dict[str, Any]:
+        """計算財務比率
 
         Args:
-            symbol: 股票代碼
-            analysis_depth: 分析深度 ("basic", "standard", "comprehensive")
-            focus_areas: 重點分析領域 (可選)
+            symbol: 股票代碼 (例如: "2330")
+            financial_data: 財務數據,包含 revenue, net_income, total_assets 等
 
         Returns:
-            基本面分析結果
+            dict: 財務比率 (ROE, ROA, 負債比, 流動比率等)
         """
-        try:
-            # 獲取公司基本面數據
-            fundamentals = await self._fetch_company_data(symbol)
+        self.logger.info(f"開始計算財務比率 | 股票: {symbol}")
 
-            # 執行分析
-            analysis_result = await self._perform_fundamental_analysis(
-                fundamentals, analysis_depth, focus_areas or []
+        if not financial_data:
+            self.logger.warning(f"缺少財務數據 | 股票: {symbol}")
+            return {"error": "缺少財務數據", "symbol": symbol}
+
+        result = {
+            "symbol": symbol,
+            "profitability": {},
+            "solvency": {},
+            "valuation": {},
+        }
+
+        equity = financial_data.get("total_equity", 1)
+        assets = financial_data.get("total_assets", 1)
+        revenue = financial_data.get("revenue", 0)
+        net_income = financial_data.get("net_income", 0)
+
+        result["profitability"] = {
+            "roe": net_income / equity if equity > 0 else 0,
+            "roa": net_income / assets if assets > 0 else 0,
+            "net_margin": net_income / revenue if revenue > 0 else 0,
+        }
+
+        self.logger.debug(
+            f"獲利能力指標 | ROE: {result['profitability']['roe']:.2%}, "
+            f"ROA: {result['profitability']['roa']:.2%}, "
+            f"淨利率: {result['profitability']['net_margin']:.2%}"
+        )
+
+        total_liabilities = financial_data.get("total_liabilities", 0)
+        current_assets = financial_data.get("current_assets", 0)
+        current_liabilities = financial_data.get("current_liabilities", 1)
+
+        result["solvency"] = {
+            "debt_ratio": total_liabilities / assets if assets > 0 else 0,
+            "current_ratio": current_assets / current_liabilities
+            if current_liabilities > 0
+            else 0,
+        }
+
+        self.logger.debug(
+            f"償債能力指標 | 負債比: {result['solvency']['debt_ratio']:.2%}, "
+            f"流動比率: {result['solvency']['current_ratio']:.2f}"
+        )
+
+        market_cap = financial_data.get("market_cap", 0)
+        result["valuation"] = {
+            "pe_ratio": market_cap / net_income if net_income > 0 else 0,
+            "pb_ratio": market_cap / equity if equity > 0 else 0,
+        }
+
+        self.logger.info(f"財務比率計算完成 | 股票: {symbol}")
+        return result
+
+    def analyze_financial_health(
+        self,
+        symbol: str,
+        financial_ratios: dict[str, Any],
+    ) -> dict[str, Any]:
+        """分析財務體質
+
+        Args:
+            symbol: 股票代碼 (例如: "2330")
+            financial_ratios: 財務比率 (來自 calculate_financial_ratios)
+
+        Returns:
+            dict: 財務體質分析 (健康度評分、評級、優勢、弱點)
+        """
+        self.logger.info(f"開始分析財務體質 | 股票: {symbol}")
+
+        if "error" in financial_ratios:
+            self.logger.error(
+                f"無法分析財務體質 | 股票: {symbol} | 原因: {financial_ratios.get('error')}"
             )
+            return {"error": "無法分析財務體質", "symbol": symbol}
 
-            self.logger.info(f"Fundamental analysis completed for {symbol}")
-            return analysis_result
+        score = 0
+        strengths = []
+        weaknesses = []
 
-        except Exception as e:
-            self.logger.error(f"Fundamental analysis failed for {symbol}: {e}")
-            raise
+        roe = financial_ratios.get("profitability", {}).get("roe", 0)
+        if roe > 0.15:
+            score += 25
+            strengths.append(f"優異的 ROE ({roe:.1%})")
+        elif roe > 0.10:
+            score += 15
+            strengths.append(f"良好的 ROE ({roe:.1%})")
+        elif roe < 0.05:
+            weaknesses.append(f"偏低的 ROE ({roe:.1%})")
 
-    async def _fetch_company_data(self, symbol: str) -> CompanyFundamentals:
-        """獲取公司基本面數據"""
-        # 這裡將整合 CasualMarket MCP 工具獲取實際數據
-        # 目前返回模擬數據結構
+        debt_ratio = financial_ratios.get("solvency", {}).get("debt_ratio", 0)
+        if debt_ratio < 0.3:
+            score += 25
+            strengths.append(f"低負債比 ({debt_ratio:.1%})")
+        elif debt_ratio < 0.5:
+            score += 15
+        elif debt_ratio > 0.7:
+            weaknesses.append(f"高負債比 ({debt_ratio:.1%})")
 
-        return CompanyFundamentals(
-            symbol=symbol,
-            company_name=f"Company {symbol}",
-            analysis_timestamp=datetime.now(),
-            # 實際實作時會從 MCP 工具獲取真實數據
-            pe_ratio=15.5,
-            pb_ratio=1.8,
-            roe=0.15,
-            debt_to_equity=0.4,
-            current_ratio=2.1,
-            revenue_growth=0.08,
-            eps_growth=0.12,
-            dividend_yield=0.025,
+        current_ratio = financial_ratios.get("solvency", {}).get("current_ratio", 0)
+        if current_ratio > 2.0:
+            score += 25
+            strengths.append(f"優異的流動比率 ({current_ratio:.2f})")
+        elif current_ratio > 1.5:
+            score += 15
+        elif current_ratio < 1.0:
+            weaknesses.append(f"流動比率偏低 ({current_ratio:.2f})")
+
+        net_margin = financial_ratios.get("profitability", {}).get("net_margin", 0)
+        if net_margin > 0.15:
+            score += 25
+            strengths.append(f"高淨利率 ({net_margin:.1%})")
+        elif net_margin > 0.08:
+            score += 15
+        elif net_margin < 0.03:
+            weaknesses.append(f"淨利率偏低 ({net_margin:.1%})")
+
+        if score >= 80:
+            grade, assessment = "A", "財務體質優異"
+        elif score >= 60:
+            grade, assessment = "B", "財務體質良好"
+        elif score >= 40:
+            grade, assessment = "C", "財務體質普通"
+        elif score >= 20:
+            grade, assessment = "D", "財務體質偏弱"
+        else:
+            grade, assessment = "F", "財務體質堪憂"
+
+        self.logger.info(
+            f"財務體質分析完成 | 股票: {symbol} | 評級: {grade} | "
+            f"得分: {score} | 優勢: {len(strengths)} | 弱點: {len(weaknesses)}"
         )
 
-    async def _perform_fundamental_analysis(
+        return {
+            "symbol": symbol,
+            "health_score": score,
+            "health_grade": grade,
+            "strengths": strengths,
+            "weaknesses": weaknesses,
+            "assessment": assessment,
+        }
+
+    def evaluate_valuation(
         self,
-        fundamentals: CompanyFundamentals,
-        depth: str,
-        focus_areas: list[str],
-    ) -> FundamentalAnalysisResult:
-        """執行基本面分析"""
+        symbol: str,
+        current_price: float,
+        financial_ratios: dict[str, Any],
+        industry_avg: dict[str, float] | None = None,
+    ) -> dict[str, Any]:
+        """評估估值水準
 
-        # 財務體質分析
-        financial_health = self._analyze_financial_health(fundamentals)
+        Args:
+            symbol: 股票代碼 (例如: "2330")
+            current_price: 當前股價
+            financial_ratios: 財務比率 (來自 calculate_financial_ratios)
+            industry_avg: 產業平均值 (可選)
 
-        # 估值分析
-        valuation_analysis = self._analyze_valuation(fundamentals)
+        Returns:
+            dict: 估值分析 (估值水準、合理價、折溢價率)
+        """
+        self.logger.info(f"開始評估估值 | 股票: {symbol} | 當前價: {current_price}")
 
-        # 成長性分析
-        growth_analysis = self._analyze_growth_potential(fundamentals)
+        if "error" in financial_ratios:
+            self.logger.error(f"無法評估估值 | 股票: {symbol} | 原因: 財務比率錯誤")
+            return {"error": "無法評估估值", "symbol": symbol}
 
-        # 股利政策分析
-        dividend_analysis = self._analyze_dividend_policy(fundamentals)
+        pe_ratio = financial_ratios.get("valuation", {}).get("pe_ratio", 0)
+        pb_ratio = financial_ratios.get("valuation", {}).get("pb_ratio", 0)
 
-        # 綜合評分
-        overall_score = self._calculate_overall_score(
-            financial_health, valuation_analysis, growth_analysis, dividend_analysis
+        industry_pe = industry_avg.get("pe", 15.0) if industry_avg else 15.0
+        industry_pb = industry_avg.get("pb", 1.8) if industry_avg else 1.8
+
+        self.logger.debug(
+            f"估值指標 | P/E: {pe_ratio:.2f} (產業: {industry_pe:.2f}) | "
+            f"P/B: {pb_ratio:.2f} (產業: {industry_pb:.2f})"
         )
 
-        # 投資建議
-        recommendation = self._generate_investment_recommendation(
-            overall_score, fundamentals
+        pe_assessment = (
+            "低估"
+            if pe_ratio < industry_pe * 0.8
+            else "高估"
+            if pe_ratio > industry_pe * 1.2
+            else "合理"
+        )
+        pb_assessment = (
+            "低估"
+            if pb_ratio < industry_pb * 0.8
+            else "高估"
+            if pb_ratio > industry_pb * 1.2
+            else "合理"
         )
 
-        # 風險評估
-        risk_assessment = self._assess_investment_risk(fundamentals)
+        if pe_assessment == "低估" and pb_assessment == "低估":
+            valuation_level, fair_value = "便宜", current_price * 1.2
+        elif pe_assessment == "高估" or pb_assessment == "高估":
+            valuation_level, fair_value = "昂貴", current_price * 0.85
+        else:
+            valuation_level, fair_value = "合理", current_price
 
-        return FundamentalAnalysisResult(
-            symbol=fundamentals.symbol,
-            analysis_type="comprehensive_fundamental",
-            summary=self._generate_analysis_summary(
-                fundamentals, overall_score, recommendation
-            ),
-            recommendation=recommendation["action"],
-            confidence_level=recommendation["confidence"],
-            key_strengths=self._identify_key_strengths(fundamentals),
-            key_concerns=self._identify_key_concerns(fundamentals),
-            target_price_range=recommendation.get("target_price_range"),
-            risk_level=risk_assessment["level"],
-            investment_horizon=self._suggest_investment_horizon(fundamentals),
-            detailed_analysis={
-                "financial_health": financial_health,
-                "valuation": valuation_analysis,
-                "growth": growth_analysis,
-                "dividend": dividend_analysis,
-                "risk": risk_assessment,
-                "overall_score": overall_score,
-            },
-            data_sources=["CasualMarket MCP", "Company Filings", "Market Data"],
-            analysis_timestamp=datetime.now(),
+        discount_rate = (
+            (fair_value - current_price) / current_price if current_price > 0 else 0
         )
 
-    def _analyze_financial_health(
-        self, fundamentals: CompanyFundamentals
-    ) -> dict[str, Any]:
-        """分析財務體質"""
-        health_score = 0
-        analysis = {
-            "debt_management": "良好",
-            "liquidity": "充足",
-            "profitability": "穩定",
-            "efficiency": "高效",
-            "score": 0,
-            "concerns": [],
-            "strengths": [],
+        self.logger.info(
+            f"估值評估完成 | 股票: {symbol} | 等級: {valuation_level} | "
+            f"合理價: {fair_value:.2f} | 折溢價率: {discount_rate:.1%}"
+        )
+
+        return {
+            "symbol": symbol,
+            "current_price": current_price,
+            "valuation_level": valuation_level,
+            "fair_value": fair_value,
+            "discount_rate": discount_rate,
+            "pe_assessment": pe_assessment,
+            "pb_assessment": pb_assessment,
         }
 
-        # 負債管理評估
-        if fundamentals.debt_to_equity and fundamentals.debt_to_equity < 0.3:
-            health_score += 25
-            analysis["strengths"].append("負債比率低，財務結構穩健")
-        elif fundamentals.debt_to_equity and fundamentals.debt_to_equity > 0.6:
-            analysis["concerns"].append("負債比率偏高，需關注償債能力")
-            analysis["debt_management"] = "需關注"
-
-        # 流動性評估
-        if fundamentals.current_ratio and fundamentals.current_ratio > 2.0:
-            health_score += 25
-            analysis["strengths"].append("流動比率充足，短期償債能力強")
-        elif fundamentals.current_ratio and fundamentals.current_ratio < 1.2:
-            analysis["concerns"].append("流動比率偏低，短期流動性不足")
-            analysis["liquidity"] = "不足"
-
-        # 獲利能力評估
-        if fundamentals.roe and fundamentals.roe > 0.15:
-            health_score += 25
-            analysis["strengths"].append("ROE 表現優異，獲利能力強")
-        elif fundamentals.roe and fundamentals.roe < 0.08:
-            analysis["concerns"].append("ROE 偏低，獲利能力待改善")
-            analysis["profitability"] = "待改善"
-
-        analysis["score"] = health_score
-        return analysis
-
-    def _analyze_valuation(self, fundamentals: CompanyFundamentals) -> dict[str, Any]:
-        """分析估值水準"""
-        valuation_score = 0
-        analysis = {
-            "pe_assessment": "合理",
-            "pb_assessment": "合理",
-            "overall_valuation": "合理",
-            "score": 0,
-            "relative_value": "中性",
-        }
-
-        # P/E 比評估
-        if fundamentals.pe_ratio:
-            if fundamentals.pe_ratio < 12:
-                valuation_score += 40
-                analysis["pe_assessment"] = "低估"
-                analysis["relative_value"] = "便宜"
-            elif fundamentals.pe_ratio > 25:
-                analysis["pe_assessment"] = "高估"
-                analysis["relative_value"] = "昂貴"
-            else:
-                valuation_score += 20
-
-        # P/B 比評估
-        if fundamentals.pb_ratio:
-            if fundamentals.pb_ratio < 1.5:
-                valuation_score += 30
-                analysis["pb_assessment"] = "低估"
-            elif fundamentals.pb_ratio > 3.0:
-                analysis["pb_assessment"] = "高估"
-            else:
-                valuation_score += 15
-
-        # 綜合估值判斷
-        if valuation_score >= 60:
-            analysis["overall_valuation"] = "低估"
-        elif valuation_score <= 20:
-            analysis["overall_valuation"] = "高估"
-
-        analysis["score"] = valuation_score
-        return analysis
-
-    def _analyze_growth_potential(
-        self, fundamentals: CompanyFundamentals
-    ) -> dict[str, Any]:
-        """分析成長潛力"""
-        growth_score = 0
-        analysis = {
-            "revenue_trend": "平穩",
-            "earnings_trend": "平穩",
-            "growth_quality": "中等",
-            "score": 0,
-            "growth_drivers": [],
-        }
-
-        # 營收成長評估
-        if fundamentals.revenue_growth:
-            if fundamentals.revenue_growth > 0.15:
-                growth_score += 40
-                analysis["revenue_trend"] = "強勁"
-                analysis["growth_drivers"].append("營收高速成長")
-            elif fundamentals.revenue_growth > 0.05:
-                growth_score += 20
-                analysis["growth_drivers"].append("營收穩定成長")
-            elif fundamentals.revenue_growth < 0:
-                analysis["revenue_trend"] = "衰退"
-
-        # 獲利成長評估
-        if fundamentals.eps_growth:
-            if fundamentals.eps_growth > 0.20:
-                growth_score += 40
-                analysis["earnings_trend"] = "優異"
-                analysis["growth_drivers"].append("獲利大幅成長")
-            elif fundamentals.eps_growth > 0.08:
-                growth_score += 20
-                analysis["growth_drivers"].append("獲利穩定成長")
-            elif fundamentals.eps_growth < 0:
-                analysis["earnings_trend"] = "衰退"
-
-        # 成長品質評估
-        if growth_score >= 60:
-            analysis["growth_quality"] = "優異"
-        elif growth_score >= 30:
-            analysis["growth_quality"] = "良好"
-        elif growth_score < 15:
-            analysis["growth_quality"] = "疲弱"
-
-        analysis["score"] = growth_score
-        return analysis
-
-    def _analyze_dividend_policy(
-        self, fundamentals: CompanyFundamentals
-    ) -> dict[str, Any]:
-        """分析股利政策"""
-        dividend_score = 0
-        analysis = {
-            "yield_level": "中等",
-            "sustainability": "穩定",
-            "policy_assessment": "合理",
-            "score": 0,
-        }
-
-        if fundamentals.dividend_yield:
-            if fundamentals.dividend_yield > 0.04:
-                dividend_score += 30
-                analysis["yield_level"] = "高"
-            elif fundamentals.dividend_yield > 0.02:
-                dividend_score += 20
-                analysis["yield_level"] = "適中"
-            else:
-                dividend_score += 10
-                analysis["yield_level"] = "低"
-
-            # 股利可持續性評估（基於獲利能力）
-            if fundamentals.roe and fundamentals.roe > 0.12:
-                dividend_score += 20
-                analysis["sustainability"] = "良好"
-            elif fundamentals.roe and fundamentals.roe < 0.08:
-                analysis["sustainability"] = "需關注"
-
-        analysis["score"] = dividend_score
-        return analysis
-
-    def _calculate_overall_score(
+    def analyze_growth_potential(
         self,
+        symbol: str,
+        historical_data: dict[str, Any],
+    ) -> dict[str, Any]:
+        """分析成長潛力
+
+        Args:
+            symbol: 股票代碼 (例如: "2330")
+            historical_data: 歷史財務數據 (營收成長率、EPS 成長率)
+
+        Returns:
+            dict: 成長潛力分析 (成長評分、成長趨勢)
+        """
+        self.logger.info(f"開始分析成長潛力 | 股票: {symbol}")
+
+        if not historical_data:
+            self.logger.warning(f"缺少歷史數據 | 股票: {symbol}")
+            return {"error": "缺少歷史數據", "symbol": symbol}
+
+        score = 0
+        revenue_growth = historical_data.get("latest_revenue_growth", 0)
+        eps_growth = historical_data.get("latest_eps_growth", 0)
+
+        self.logger.debug(
+            f"成長數據 | 營收成長: {revenue_growth:.1%} | EPS成長: {eps_growth:.1%}"
+        )
+
+        if revenue_growth > 0.15:
+            score += 40
+            growth_assessment = "高成長"
+        elif revenue_growth > 0.08:
+            score += 25
+            growth_assessment = "穩健成長"
+        elif revenue_growth > 0:
+            score += 10
+            growth_assessment = "低速成長"
+        else:
+            growth_assessment = "負成長"
+
+        if eps_growth > 0.20:
+            score += 40
+        elif eps_growth > 0.10:
+            score += 25
+        elif eps_growth > 0:
+            score += 10
+
+        if revenue_growth > 0.10 and eps_growth > 0.15:
+            growth_trend = "加速"
+        elif revenue_growth > 0.05 and eps_growth > 0.05:
+            growth_trend = "穩定"
+        else:
+            growth_trend = "趨緩"
+
+        self.logger.info(
+            f"成長潛力分析完成 | 股票: {symbol} | 評估: {growth_assessment} | "
+            f"趨勢: {growth_trend} | 分數: {min(score, 100)}"
+        )
+
+        return {
+            "symbol": symbol,
+            "growth_score": min(score, 100),
+            "growth_trend": growth_trend,
+            "revenue_growth": revenue_growth,
+            "eps_growth": eps_growth,
+            "assessment": growth_assessment,
+        }
+
+    def generate_investment_rating(
+        self,
+        symbol: str,
         financial_health: dict[str, Any],
         valuation: dict[str, Any],
         growth: dict[str, Any],
-        dividend: dict[str, Any],
     ) -> dict[str, Any]:
-        """計算綜合評分"""
-
-        # 加權評分
-        weights = {
-            "financial_health": 0.3,
-            "valuation": 0.3,
-            "growth": 0.25,
-            "dividend": 0.15,
-        }
-
-        overall_score = (
-            financial_health["score"] * weights["financial_health"]
-            + valuation["score"] * weights["valuation"]
-            + growth["score"] * weights["growth"]
-            + dividend["score"] * weights["dividend"]
-        )
-
-        # 評級判定
-        if overall_score >= 75:
-            rating = "A"
-            description = "優質投資標的"
-        elif overall_score >= 60:
-            rating = "B"
-            description = "良好投資標的"
-        elif overall_score >= 45:
-            rating = "C"
-            description = "中性投資標的"
-        elif overall_score >= 30:
-            rating = "D"
-            description = "較弱投資標的"
-        else:
-            rating = "E"
-            description = "不建議投資"
-
-        return {
-            "score": overall_score,
-            "rating": rating,
-            "description": description,
-            "component_scores": {
-                "financial_health": financial_health["score"],
-                "valuation": valuation["score"],
-                "growth": growth["score"],
-                "dividend": dividend["score"],
-            },
-        }
-
-    def _generate_investment_recommendation(
-        self, overall_score: dict[str, Any], fundamentals: CompanyFundamentals
-    ) -> dict[str, Any]:
-        """生成投資建議"""
-
-        score = overall_score["score"]
-        rating = overall_score["rating"]
-
-        if score >= 75:
-            action = "強力買進"
-            confidence = 0.9
-        elif score >= 60:
-            action = "買進"
-            confidence = 0.75
-        elif score >= 45:
-            action = "持有"
-            confidence = 0.6
-        elif score >= 30:
-            action = "減持"
-            confidence = 0.7
-        else:
-            action = "賣出"
-            confidence = 0.8
-
-        return {
-            "action": action,
-            "confidence": confidence,
-            "rating": rating,
-            "reasoning": f"基於綜合評分 {score:.1f} 分的分析結果",
-        }
-
-    def _identify_key_strengths(self, fundamentals: CompanyFundamentals) -> list[str]:
-        """識別關鍵優勢"""
-        strengths = []
-
-        if fundamentals.roe and fundamentals.roe > 0.15:
-            strengths.append("卓越的股東權益報酬率")
-
-        if fundamentals.debt_to_equity and fundamentals.debt_to_equity < 0.3:
-            strengths.append("穩健的財務結構")
-
-        if fundamentals.revenue_growth and fundamentals.revenue_growth > 0.10:
-            strengths.append("營收快速成長")
-
-        if fundamentals.current_ratio and fundamentals.current_ratio > 2.0:
-            strengths.append("充足的短期流動性")
-
-        if fundamentals.pe_ratio and fundamentals.pe_ratio < 15:
-            strengths.append("具吸引力的估值水準")
-
-        return strengths
-
-    def _identify_key_concerns(self, fundamentals: CompanyFundamentals) -> list[str]:
-        """識別關鍵風險"""
-        concerns = []
-
-        if fundamentals.debt_to_equity and fundamentals.debt_to_equity > 0.6:
-            concerns.append("負債比率偏高")
-
-        if fundamentals.current_ratio and fundamentals.current_ratio < 1.2:
-            concerns.append("短期流動性不足")
-
-        if fundamentals.roe and fundamentals.roe < 0.08:
-            concerns.append("獲利能力偏弱")
-
-        if fundamentals.revenue_growth and fundamentals.revenue_growth < 0:
-            concerns.append("營收呈現衰退")
-
-        if fundamentals.pe_ratio and fundamentals.pe_ratio > 30:
-            concerns.append("估值可能過高")
-
-        return concerns
-
-    def _assess_investment_risk(
-        self, fundamentals: CompanyFundamentals
-    ) -> dict[str, Any]:
-        """評估投資風險"""
-        risk_factors = 0
-
-        # 財務風險
-        if fundamentals.debt_to_equity and fundamentals.debt_to_equity > 0.5:
-            risk_factors += 1
-
-        if fundamentals.current_ratio and fundamentals.current_ratio < 1.5:
-            risk_factors += 1
-
-        # 獲利風險
-        if fundamentals.roe and fundamentals.roe < 0.10:
-            risk_factors += 1
-
-        # 成長風險
-        if fundamentals.revenue_growth and fundamentals.revenue_growth < 0:
-            risk_factors += 1
-
-        # 估值風險
-        if fundamentals.pe_ratio and fundamentals.pe_ratio > 25:
-            risk_factors += 1
-
-        if risk_factors <= 1:
-            risk_level = "低"
-        elif risk_factors <= 2:
-            risk_level = "中"
-        elif risk_factors <= 3:
-            risk_level = "中高"
-        else:
-            risk_level = "高"
-
-        return {
-            "level": risk_level,
-            "risk_factors": risk_factors,
-            "max_position_size_suggestion": max(1.0, 6.0 - risk_factors),
-        }
-
-    def _suggest_investment_horizon(self, fundamentals: CompanyFundamentals) -> str:
-        """建議投資期間"""
-        if (
-            fundamentals.revenue_growth
-            and fundamentals.revenue_growth > 0.15
-            and fundamentals.roe
-            and fundamentals.roe > 0.18
-        ):
-            return "長期 (2年以上)"
-        elif fundamentals.pe_ratio and fundamentals.pe_ratio < 12:
-            return "中長期 (1-2年)"
-        else:
-            return "中期 (6個月-1年)"
-
-    def _generate_analysis_summary(
-        self,
-        fundamentals: CompanyFundamentals,
-        overall_score: dict[str, Any],
-        recommendation: dict[str, Any],
-    ) -> str:
-        """生成分析摘要"""
-        return f"""
-{fundamentals.company_name} ({fundamentals.symbol}) 基本面分析摘要：
-
-綜合評分：{overall_score["score"]:.1f} 分 (評級: {overall_score["rating"]})
-投資建議：{recommendation["action"]} (信心度: {recommendation["confidence"]:.0%})
-
-關鍵指標：
-- P/E 比：{fundamentals.pe_ratio or "N/A"}
-- P/B 比：{fundamentals.pb_ratio or "N/A"}
-- ROE：{(fundamentals.roe or 0) * 100:.1f}%
-- 負債股權比：{(fundamentals.debt_to_equity or 0) * 100:.1f}%
-- 營收成長率：{(fundamentals.revenue_growth or 0) * 100:.1f}%
-
-{overall_score["description"]}，建議{self._suggest_investment_horizon(fundamentals)}持有。
-        """.strip()
-
-    def get_analysis_template(self, symbol: str) -> dict[str, Any]:
-        """獲取分析模板"""
-        return {
-            "symbol": symbol,
-            "analysis_sections": [
-                "財務體質分析",
-                "估值水準評估",
-                "成長潛力分析",
-                "股利政策評估",
-                "風險因子分析",
-                "投資建議",
-            ],
-            "required_data": [
-                "income_statement",
-                "balance_sheet",
-                "cash_flow",
-                "key_ratios",
-                "market_data",
-            ],
-            "output_format": "comprehensive_report",
-        }
-
-    def as_tool(self, tool_name: str, tool_description: str) -> dict[str, Any]:
-        """
-        將 FundamentalAgent 轉換為可供 OpenAI Agent 使用的工具
+        """產生投資評級
 
         Args:
-            tool_name: 工具名稱
-            tool_description: 工具描述
+            symbol: 股票代碼 (例如: "2330")
+            financial_health: 財務體質分析
+            valuation: 估值分析
+            growth: 成長分析
 
         Returns:
-            工具配置字典
+            dict: 投資評級 (買進/持有/賣出建議)
         """
+        health_score = financial_health.get("health_score", 0)
+        valuation_level = valuation.get("valuation_level", "合理")
+        growth_score = growth.get("growth_score", 0)
+
+        self.logger.info(
+            f"開始產生投資評級 | 股票: {symbol} | 體質分數: {health_score} | "
+            f"估值: {valuation_level} | 成長分數: {growth_score}"
+        )
+
+        overall_score = (health_score * 0.4 + growth_score * 0.35) * (
+            1.2
+            if valuation_level == "便宜"
+            else 0.9
+            if valuation_level == "昂貴"
+            else 1.0
+        )
+
+        key_reasons = []
+
+        if overall_score >= 75 and valuation_level == "便宜":
+            rating, confidence = "強力買進", 0.85
+            recommendation = "優質公司且估值便宜,建議積極買進"
+            key_reasons.extend(financial_health.get("strengths", []))
+        elif overall_score >= 60:
+            rating, confidence = "買進", 0.70
+            recommendation = "基本面穩健,建議逢低買進"
+            key_reasons.extend(financial_health.get("strengths", [])[:2])
+        elif overall_score >= 40:
+            rating, confidence = "持有", 0.60
+            recommendation = "基本面普通,建議持有觀望"
+        else:
+            rating, confidence = "賣出", 0.75
+            recommendation = "基本面轉弱,建議減碼"
+            key_reasons.extend(financial_health.get("weaknesses", []))
+
+        target_price = valuation.get("fair_value", 0)
+
+        self.logger.info(
+            f"投資評級產生完成 | 股票: {symbol} | 評級: {rating} | "
+            f"目標價: {target_price:.2f} | 信心度: {confidence:.1%}"
+        )
+
         return {
-            "type": "function",
-            "function": {
-                "name": tool_name,
-                "description": tool_description,
-                "parameters": {
-                    "type": "object",
-                    "properties": {
-                        "symbol": {
-                            "type": "string",
-                            "description": "股票代碼 (例如: 2330)",
-                        },
-                        "analysis_depth": {
-                            "type": "string",
-                            "enum": ["basic", "standard", "comprehensive"],
-                            "description": "分析深度",
-                            "default": "standard",
-                        },
-                        "focus_areas": {
-                            "type": "array",
-                            "items": {"type": "string"},
-                            "description": "重點分析領域 (可選)",
-                        },
-                    },
-                    "required": ["symbol"],
-                },
-            },
-            "implementation": self.analyze_company_fundamentals,
+            "symbol": symbol,
+            "rating": rating,
+            "target_price": target_price,
+            "confidence": confidence,
+            "recommendation": recommendation,
+            "key_reasons": key_reasons,
+            "timestamp": datetime.now().isoformat(),
         }
+
+
+async def get_fundamental_agent(
+    mcp_servers: list[Any],
+    model_name: str = "gpt-4o-mini",
+) -> Agent:
+    """創建基本面分析 Agent"""
+    tools_instance = FundamentalAnalysisTools()
+
+    custom_tools = [
+        Tool.from_function(
+            tools_instance.calculate_financial_ratios,
+            name="calculate_financial_ratios",
+            description="計算財務比率 (ROE, ROA, 負債比, 流動比率, P/E, P/B)",
+        ),
+        Tool.from_function(
+            tools_instance.analyze_financial_health,
+            name="analyze_financial_health",
+            description="分析財務體質健康度並給予評級 (A-F)",
+        ),
+        Tool.from_function(
+            tools_instance.evaluate_valuation,
+            name="evaluate_valuation",
+            description="評估股價估值水準 (便宜/合理/昂貴)",
+        ),
+        Tool.from_function(
+            tools_instance.analyze_growth_potential,
+            name="analyze_growth_potential",
+            description="分析公司成長潛力 (營收/EPS 成長趨勢)",
+        ),
+        Tool.from_function(
+            tools_instance.generate_investment_rating,
+            name="generate_investment_rating",
+            description="綜合產生投資評級 (強力買進/買進/持有/賣出)",
+        ),
+    ]
+
+    # 添加 OpenAI Hosted Tools
+    hosted_tools = [
+        WebSearchTool(),  # 網路搜尋能力
+        CodeInterpreterTool(),  # Python 程式碼執行能力
+    ]
+
+    analyst = Agent(
+        name="Fundamental Analyst",
+        instructions=fundamental_agent_instructions(),
+        model=model_name,
+        mcp_servers=mcp_servers,
+        tools=custom_tools + hosted_tools,  # 合併自訂工具和 hosted tools
+    )
+
+    return analyst
+
+
+async def get_fundamental_agent_tool(
+    mcp_servers: list[Any],
+    model_name: str = "gpt-4o-mini",
+) -> Tool:
+    """將基本面分析 Agent 包裝成工具"""
+    analyst = await get_fundamental_agent(mcp_servers, model_name)
+    return analyst.as_tool(
+        tool_name="FundamentalAnalyst",
+        tool_description="""專業基本面分析 Agent,提供深入的財務和價值分析。
+
+功能: 財務比率計算、財務體質評估、估值分析、成長潛力評估、投資評級
+
+適用場景: 價值投資、長期投資決策、公司基本面研究、股票篩選""",
+    )
