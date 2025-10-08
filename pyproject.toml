@@ -41,6 +41,10 @@ dependencies = [
     "aiosqlite>=0.21.0",
     "greenlet>=3.2.4",
     "pytz>=2025.2",
+    "fastapi>=0.115.0",
+    "uvicorn[standard]>=0.34.0",
+    "python-multipart>=0.0.20",
+    "websockets>=14.0",
 ]
 
 [project.optional-dependencies]
