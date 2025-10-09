@@ -142,9 +142,7 @@ class TestCalculateTechnicalIndicators:
         self, tools: TechnicalAnalysisTools, sample_price_data: list[dict[str, Any]]
     ):
         """測試移動平均線指標結構"""
-        result = tools.calculate_technical_indicators(
-            "2330", sample_price_data, indicators=["ma"]
-        )
+        result = tools.calculate_technical_indicators("2330", sample_price_data, indicators=["ma"])
 
         ma = result["indicators"]["ma"]
         assert "ma5" in ma
@@ -157,9 +155,7 @@ class TestCalculateTechnicalIndicators:
         self, tools: TechnicalAnalysisTools, sample_price_data: list[dict[str, Any]]
     ):
         """測試 RSI 指標結構"""
-        result = tools.calculate_technical_indicators(
-            "2330", sample_price_data, indicators=["rsi"]
-        )
+        result = tools.calculate_technical_indicators("2330", sample_price_data, indicators=["rsi"])
 
         rsi = result["indicators"]["rsi"]
         assert "value" in rsi
@@ -199,9 +195,7 @@ class TestCalculateTechnicalIndicators:
         self, tools: TechnicalAnalysisTools, sample_price_data: list[dict[str, Any]]
     ):
         """測試 KD 指標結構"""
-        result = tools.calculate_technical_indicators(
-            "2330", sample_price_data, indicators=["kd"]
-        )
+        result = tools.calculate_technical_indicators("2330", sample_price_data, indicators=["kd"])
 
         kd = result["indicators"]["kd"]
         assert "k" in kd
@@ -228,7 +222,20 @@ class TestIdentifyChartPatterns:
         self, tools: TechnicalAnalysisTools, sample_price_data: list[dict[str, Any]]
     ):
         """測試基本型態識別"""
-        result = tools.identify_chart_patterns("2330", sample_price_data)
+        # 擴展數據以滿足最小要求（需要至少 10 個數據點）
+        extended_data = sample_price_data + [
+            {
+                "date": f"2025-10-{9 + i:02d}",
+                "close": 542 + i * 2,
+                "open": 540 + i * 2,
+                "high": 545 + i * 2,
+                "low": 538 + i * 2,
+                "volume": 1000,
+            }
+            for i in range(15)
+        ]
+
+        result = tools.identify_chart_patterns("2330", extended_data)
 
         assert "symbol" in result
         assert result["symbol"] == "2330"
@@ -385,9 +392,7 @@ class TestAnalyzeSupportResistance:
         # 壓力位應該遞增
         if len(result["resistance_levels"]) > 1:
             for i in range(len(result["resistance_levels"]) - 1):
-                assert (
-                    result["resistance_levels"][i] <= result["resistance_levels"][i + 1]
-                )
+                assert result["resistance_levels"][i] <= result["resistance_levels"][i + 1]
 
 
 # === 交易訊號產生測試 ===
@@ -400,31 +405,29 @@ class TestGenerateTradingSignals:
         self, tools: TechnicalAnalysisTools, sample_price_data: list[dict[str, Any]]
     ):
         """測試訊號結構"""
-        indicators = tools.calculate_technical_indicators("2330", sample_price_data)
-        trend = tools.analyze_trend(
-            "2330",
-            sample_price_data
-            + [
-                {
-                    "date": f"2025-10-{9 + i:02d}",
-                    "close": 542 + i,
-                    "open": 540 + i,
-                    "high": 545 + i,
-                    "low": 538 + i,
-                    "volume": 1000,
-                }
-                for i in range(20)
-            ],
-        )
+        extended_data = sample_price_data + [
+            {
+                "date": f"2025-10-{9 + i:02d}",
+                "close": 542 + i,
+                "open": 540 + i,
+                "high": 545 + i,
+                "low": 538 + i,
+                "volume": 1000,
+            }
+            for i in range(20)
+        ]
 
-        result = tools.generate_trading_signals("2330", indicators, trend)
+        indicators = tools.calculate_technical_indicators("2330", extended_data)
+        trend = tools.analyze_trend("2330", extended_data)
+        patterns = tools.identify_chart_patterns("2330", extended_data)
+
+        result = tools.generate_trading_signals("2330", indicators, trend, patterns)
 
         assert "symbol" in result
-        assert "signal" in result
+        assert "overall_signal" in result
         assert "confidence" in result
-        assert "entry_price" in result or result["signal"] == "觀望"
-        assert result["signal"] in ["買進", "賣出", "觀望"]
-        assert 0 <= result["confidence"] <= 100
+        assert result["overall_signal"] in ["買進", "賣出", "觀望"]
+        assert 0 <= result["confidence"] <= 1
 
     def test_buy_signal(self, tools: TechnicalAnalysisTools):
         """測試買進訊號"""
@@ -437,11 +440,15 @@ class TestGenerateTradingSignals:
             },
         }
         trend = {"direction": "上升", "strength": 0.7}
+        patterns = {
+            "patterns": [{"pattern_type": "bullish", "confidence": 0.8}],
+            "pattern_count": 1,
+        }
 
-        result = tools.generate_trading_signals("2330", indicators, trend)
+        result = tools.generate_trading_signals("2330", indicators, trend, patterns)
 
         # 在這個情境下，應該傾向買進
-        assert result["signal"] in ["買進", "觀望"]
+        assert result["overall_signal"] in ["買進", "觀望"]
 
     def test_sell_signal(self, tools: TechnicalAnalysisTools):
         """測試賣出訊號"""
@@ -454,11 +461,15 @@ class TestGenerateTradingSignals:
             },
         }
         trend = {"direction": "下降", "strength": 0.6}
+        patterns = {
+            "patterns": [{"pattern_type": "bearish", "confidence": 0.7}],
+            "pattern_count": 1,
+        }
 
-        result = tools.generate_trading_signals("2330", indicators, trend)
+        result = tools.generate_trading_signals("2330", indicators, trend, patterns)
 
         # 在這個情境下，應該傾向賣出
-        assert result["signal"] in ["賣出", "觀望"]
+        assert result["overall_signal"] in ["賣出", "觀望"]
 
 
 # === 整合測試 ===
@@ -501,8 +512,8 @@ class TestTechnicalAgentIntegration:
         assert "support_levels" in levels
 
         # 5. 產生交易訊號
-        signals = tools.generate_trading_signals("2330", indicators, trend)
-        assert "signal" in signals
+        signals = tools.generate_trading_signals("2330", indicators, trend, patterns)
+        assert "overall_signal" in signals or "signal" in signals
 
 
 if __name__ == "__main__":

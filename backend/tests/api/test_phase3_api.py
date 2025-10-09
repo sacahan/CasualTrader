@@ -4,7 +4,7 @@ Phase 3 API Tests
 Test suite for FastAPI backend and WebSocket functionality.
 """
 
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from fastapi.testclient import TestClient
@@ -187,10 +187,13 @@ class TestTradingEndpoints:
     def test_get_portfolio(self, client):
         """Test getting agent portfolio."""
         with patch("src.api.routers.trading.agent_manager") as mock:
+            # Mock list_agent_ids to return our test agent
+            mock.list_agent_ids = MagicMock(return_value=["agent_001"])
             mock.get_agent = AsyncMock(
                 return_value={
                     "id": "agent_001",
                     "name": "Test Agent",
+                    "updated_at": "2025-10-09T14:00:00",
                 }
             )
             mock.get_portfolio = AsyncMock(
@@ -210,6 +213,8 @@ class TestTradingEndpoints:
     def test_get_trades(self, client):
         """Test getting agent trades."""
         with patch("src.api.routers.trading.agent_manager") as mock:
+            # Mock list_agent_ids to return our test agent
+            mock.list_agent_ids = MagicMock(return_value=["agent_001"])
             mock.get_agent = AsyncMock(
                 return_value={
                     "id": "agent_001",
@@ -227,6 +232,8 @@ class TestTradingEndpoints:
     def test_get_strategy_changes(self, client):
         """Test getting strategy changes."""
         with patch("src.api.routers.trading.agent_manager") as mock:
+            # Mock list_agent_ids to return our test agent
+            mock.list_agent_ids = MagicMock(return_value=["agent_001"])
             mock.get_agent = AsyncMock(
                 return_value={
                     "id": "agent_001",
@@ -243,6 +250,8 @@ class TestTradingEndpoints:
     def test_get_performance(self, client):
         """Test getting agent performance."""
         with patch("src.api.routers.trading.agent_manager") as mock:
+            # Mock list_agent_ids to return our test agent
+            mock.list_agent_ids = MagicMock(return_value=["agent_001"])
             mock.get_agent = AsyncMock(
                 return_value={
                     "id": "agent_001",

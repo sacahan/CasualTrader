@@ -1,4 +1,5 @@
 # .pre-commit-config.yaml
+# Monorepo structure: backend/ and frontend/ directories
 repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v4.6.0
@@ -9,12 +10,16 @@ repos:
       - id: check-added-large-files
         args: ["--maxkb=5000"]
       - id: check-merge-conflict
+
+  # Python linting for backend
   - repo: https://github.com/astral-sh/ruff-pre-commit
     rev: v0.5.5
     hooks:
       - id: ruff-format
-        args: ["--config=pyproject.toml"]
+        args: ["--config=backend/pyproject.toml"]
+        files: ^backend/.*\.py$
         exclude: '\.backup\.py$'
       - id: ruff
-        args: ["--fix"]
+        args: ["--fix", "--config=backend/pyproject.toml"]
+        files: ^backend/.*\.py$
         exclude: '\.backup\.py$'

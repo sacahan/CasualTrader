@@ -16,13 +16,11 @@
   "chat.editing.confirmEditRequestRemoval": true,
   "chat.editing.confirmEditRequestRetry": true,
   "telemetry.telemetryLevel": "off",
-
   // ***************************************************
   // 以下設定適用於 User Settings 或 Workspace Settings
   // ***************************************************
   "window.commandCenter": true,
   "chat.commandCenter.enabled": true,
-
   // 目前 gpt-4o-copilot 已經是預設值，但明確設定可確保一致性
   "github.copilot.selectedCompletionModel": "gpt-4o-copilot",
   "github.copilot.editor.enableCodeActions": true,
@@ -31,7 +29,6 @@
   "github.copilot.chat.search.semanticTextResults": true,
   "github.copilot.nextEditSuggestions.enabled": true,
   "editor.inlineSuggest.edits.showCollapsed": true,
-
   // GitHub Copilot Chat
   "github.copilot.chat.followUps": "always",
   "github.copilot.chat.localeOverride": "zh-TW",
@@ -94,7 +91,6 @@
   // GitHub Copilot Chat Edit
   "github.copilot.chat.edits.suggestRelatedFilesForTests": true,
   "github.copilot.chat.edits.suggestRelatedFilesFromGitHistory": true,
-
   // GitHub Copilot Chat - Agent Mode
   "chat.agent.enabled": true,
   "chat.agent.maxRequests": 50,
@@ -117,7 +113,6 @@
   "mcp": {
     "servers": {}
   },
-
   // Accessibility
   "accessibility.voice.speechLanguage": "zh-TW",
   "accessibility.voice.autoSynthesize": "off",
@@ -125,11 +120,24 @@
   // "accessibility.voice.keywordActivation": "chatInContext",
   "accessibility.voice.speechTimeout": 10000,
   "accessibility.voice.ignoreCodeBlocks": true,
-
   // Live Preview
   "livePreview.autoRefreshPreview": "On Changes to Saved Files",
-  "python.testing.pytestArgs": ["src"],
+  // Python Testing - Updated for Monorepo structure
+  "python.testing.pytestArgs": [
+    "backend/tests",
+    "-v"
+  ],
   "python.testing.unittestEnabled": false,
   "python.testing.pytestEnabled": true,
+  "python.defaultInterpreterPath": "${workspaceFolder}/backend/.venv/bin/python",
+  "python.analysis.extraPaths": [
+    "${workspaceFolder}/backend/src"
+  ],
+  // Multi-root workspace support
+  "files.associations": {
+    "**/backend/**/*.py": "python",
+    "**/frontend/**/*.ts": "typescript",
+    "**/frontend/**/*.tsx": "typescriptreact"
+  },
   "chat.mcp.access": "all"
 }

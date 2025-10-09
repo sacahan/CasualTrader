@@ -1,19 +1,5 @@
 {
     "servers": {
-        "specpilot": {
-            "command": "npx",
-            "args": [
-                "-y",
-                "--prefix",
-                "/Users/sacahan/Documents/workspace/CasualTrader/.specpilot",
-                "specpilot-mcp-server"
-            ],
-            "env": {
-                "SPECROOT": "/Users/sacahan/Documents/workspace/CasualTrader",
-                "SPECPILOT_SERVER_PATH": "/Users/sacahan/Documents/workspace/CasualTrader",
-                "SPECPILOT_DEBUG": "true"
-            }
-        },
         "casual-market": {
             "command": "uvx",
             "args": [

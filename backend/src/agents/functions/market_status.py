@@ -106,9 +106,7 @@ class MarketStatusChecker:
         # 假日資訊快取 (避免重複 MCP 查詢)
         self._holiday_cache: dict[str, MarketHoliday | None] = {}
 
-    async def get_market_status(
-        self, check_time: datetime | None = None
-    ) -> MarketStatus:
+    async def get_market_status(self, check_time: datetime | None = None) -> MarketStatus:
         """
         獲取市場狀態
 
@@ -133,9 +131,7 @@ class MarketStatusChecker:
             # 確定當前交易時段
             current_session = self._get_current_session(current_time)
             next_session = self._get_next_session(current_time)
-            time_to_next = self._calculate_time_to_next_session(
-                current_time, next_session
-            )
+            time_to_next = self._calculate_time_to_next_session(current_time, next_session)
 
             # 判斷市場是否開盤 (必須是交易日且在交易時段內)
             is_open = (
@@ -174,9 +170,7 @@ class MarketStatusChecker:
         try:
             if self.mcp_check_trading_day is None:
                 # 如果沒有提供 MCP tool,使用基本邏輯判斷 (週末)
-                self.logger.warning(
-                    "MCP tool not provided, falling back to basic weekday check"
-                )
+                self.logger.warning("MCP tool not provided, falling back to basic weekday check")
                 from datetime import datetime as dt
 
                 check_date = dt.strptime(date, "%Y-%m-%d")
@@ -189,9 +183,7 @@ class MarketStatusChecker:
                 data = result.get("data", {})
                 return data.get("is_trading_day", False)
             else:
-                self.logger.warning(
-                    f"MCP check_trading_day failed: {result.get('error')}"
-                )
+                self.logger.warning(f"MCP check_trading_day failed: {result.get('error')}")
                 return False
 
         except Exception as e:
@@ -238,9 +230,7 @@ class MarketStatusChecker:
                     self._holiday_cache[date] = None
                     return None
             else:
-                self.logger.warning(
-                    f"MCP get_holiday_info failed: {result.get('error')}"
-                )
+                self.logger.warning(f"MCP get_holiday_info failed: {result.get('error')}")
                 return None
 
         except Exception as e:
@@ -263,9 +253,7 @@ class MarketStatusChecker:
         current_time_only = current_time.time()
 
         # 按時間順序排序的時段
-        sorted_sessions = sorted(
-            self.trading_sessions.items(), key=lambda x: x[1].start_time
-        )
+        sorted_sessions = sorted(self.trading_sessions.items(), key=lambda x: x[1].start_time)
 
         # 尋找下一個時段
         for session_id, session in sorted_sessions:
@@ -318,9 +306,7 @@ class MarketStatusChecker:
         status = await self.get_market_status(check_time)
         return status.is_open
 
-    async def get_next_trading_session(
-        self, check_time: datetime | None = None
-    ) -> dict[str, Any]:
+    async def get_next_trading_session(self, check_time: datetime | None = None) -> dict[str, Any]:
         """
         獲取下一個交易時段資訊
 
@@ -341,9 +327,7 @@ class MarketStatusChecker:
                 "end_time": session.end_time.strftime("%H:%M"),
                 "is_trading": session.is_trading,
                 "time_to_start": status.time_to_next_session,
-                "time_to_start_formatted": self._format_duration(
-                    status.time_to_next_session
-                ),
+                "time_to_start_formatted": self._format_duration(status.time_to_next_session),
             }
 
         return {}
@@ -366,9 +350,7 @@ class MarketStatusChecker:
             else:
                 return f"{hours} 小時"
 
-    async def get_market_calendar(
-        self, start_date: str, end_date: str
-    ) -> dict[str, Any]:
+    async def get_market_calendar(self, start_date: str, end_date: str) -> dict[str, Any]:
         """
         獲取市場交易日曆
 
@@ -421,9 +403,7 @@ class MarketStatusChecker:
                             "day_of_week": current_date.strftime("%A"),
                             "is_trading_day": False,
                             "reason": ", ".join(reason) if reason else "非交易日",
-                            "holiday_info": (
-                                holiday_info.dict() if holiday_info else None
-                            ),
+                            "holiday_info": (holiday_info.dict() if holiday_info else None),
                         }
                     )
 
@@ -473,8 +453,7 @@ class MarketStatusChecker:
             "total_trading_hours": sum(
                 info["duration_minutes"] / 60
                 for info in sessions_info.values()
-                if sessions_info[session_id]["is_trading"]
-                for session_id in sessions_info
+                if info["is_trading"]
             ),
         }
 
