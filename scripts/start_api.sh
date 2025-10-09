@@ -1,32 +1,27 @@
-#!/usr/bin/env zsh
-# CasualTrader API Server Startup Script
+#!/bin/zsh
+# CasualTrader Backend API Starter
+# 切換到 backend 目錄並啟動 API 服務
 
-# Get the project root directory (parent of scripts directory)
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)"
-PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+set -e
 
-# Change to project root
-cd "$PROJECT_ROOT" || exit 1
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
+BACKEND_DIR="$PROJECT_ROOT/backend"
 
-echo "🚀 Starting CasualTrader API Server..."
-echo "📁 Project root: $PROJECT_ROOT"
-echo ""
+echo "🚀 Starting CasualTrader Backend API..."
+echo "📁 Backend directory: $BACKEND_DIR"
 
-# Check if virtual environment is activated
-if [[ -z "$VIRTUAL_ENV" ]]; then
-	echo "⚠️  Virtual environment not activated"
-	echo "Activating .venv..."
-	source .venv/bin/activate
+cd "$BACKEND_DIR"
+
+# 檢查 pyproject.toml 是否存在
+if [ ! -f "pyproject.toml" ]; then
+	echo "❌ Error: pyproject.toml not found in backend/"
+	exit 1
 fi
 
-# Set PYTHONPATH to project root
-export PYTHONPATH="$PROJECT_ROOT"
-
-# Check if FastAPI is installed
-if ! python -c "import fastapi" 2>/dev/null; then
-	echo "📦 Installing dependencies..."
-	uv pip install fastapi 'uvicorn[standard]' python-multipart websockets
-fi
+# 同步依賴
+echo "📦 Syncing dependencies..."
+uv sync
 
 # Start the server
 echo ""
