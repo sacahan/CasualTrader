@@ -45,6 +45,7 @@ dependencies = [
     "uvicorn[standard]>=0.34.0",
     "python-multipart>=0.0.20",
     "websockets>=14.0",
+    "yfinance>=0.2.0",
 ]
 
 [project.optional-dependencies]

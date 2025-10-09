@@ -25,6 +25,13 @@
 - `FRONTEND_IMPLEMENTATION.md` - 前端介面詳細實作規格
 - `DEPLOYMENT_GUIDE.md` - 部署和配置詳細指南
 
+### **架構說明文檔**
+
+- `AGENTS_ARCHITECTURE.md` - Agent 模組架構詳細說明
+- `API_ARCHITECTURE.md` - API 模組架構詳細說明
+- `FRONTEND_ARCHITECTURE.md` - Frontend 模組架構詳細說明
+- `PROJECT_STRUCTURE.md` - 專案結構規範
+
 ### **補充文檔**
 
 - `API_DEPENDENCIES.md` - API 套件依賴清單和配置指南
@@ -36,6 +43,7 @@
 ✅ **易於維護** - 更新時不需要同步多個文檔
 ✅ **便於查找** - 根據需求直接找到對應文檔
 ✅ **閱讀指南** - 提供針對不同角色的文檔閱讀建議
+✅ **架構透明** - 詳細的模組架構說明文檔
 
 ---
 

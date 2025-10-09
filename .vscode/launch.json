@@ -12,6 +12,28 @@
                 "PYTHONPATH": "${workspaceFolder}"
             },
             "justMyCode": false
+        },
+        {
+            "name": "啟動 API Server",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "uvicorn",
+            "args": [
+                "src.api.app:create_app",
+                "--factory",
+                "--host",
+                "0.0.0.0",
+                "--port",
+                "8000",
+                "--reload"
+            ],
+            "cwd": "${workspaceFolder}",
+            "console": "integratedTerminal",
+            "python": "${workspaceFolder}/.venv/bin/python3",
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}"
+            },
+            "justMyCode": false
         }
     ]
 }
