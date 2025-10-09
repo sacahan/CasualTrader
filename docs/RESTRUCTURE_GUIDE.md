@@ -136,36 +136,40 @@ testpaths = ["tests"]
 ### Checkpoint 0: 準備工作 ✅
 
 **目標**: 確保當前狀態穩定且可回滾
+**狀態**: ✅ 已完成 (2025-10-09 13:09)
 
 #### 任務清單
 
-- [ ] **C0.1**: 運行所有測試確認通過
+- [x] **C0.1**: 運行所有測試確認通過 (部分測試有 import 錯誤,已修復)
 
   ```bash
   cd /Users/sacahan/Documents/workspace/CasualTrader
   uv run pytest tests/ -v
   ```
 
-- [ ] **C0.2**: 提交所有未提交的變更
+- [x] **C0.2**: 提交所有未提交的變更 ✅
 
   ```bash
   git status
   git add .
   git commit -m "chore: commit before monorepo restructure"
+  # 已完成: 提交了文檔和測試修復
   ```
 
-- [ ] **C0.3**: 創建備份分支
+- [x] **C0.3**: 創建備份分支 ✅
 
   ```bash
   git branch backup-pre-monorepo-$(date +%Y%m%d-%H%M%S)
   git branch
+  # 已完成: backup-pre-monorepo-20251009-130950
   ```
 
-- [ ] **C0.4**: 標記當前 commit
+- [x] **C0.4**: 標記當前 commit ✅
 
   ```bash
   git tag pre-monorepo-restructure
   git tag
+  # 已完成: pre-monorepo-restructure
   ```
 
 #### 驗證
