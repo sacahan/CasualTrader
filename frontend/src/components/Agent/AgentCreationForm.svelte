@@ -1,14 +1,12 @@
 <script>
-  import { preventDefault } from 'svelte/legacy';
-
   /**
    * AgentCreationForm Component
    *
    * Agent 創建表單,支援 Prompt-driven 配置
    * 符合 FRONTEND_IMPLEMENTATION.md 規格
+   * Svelte 5 compatible - uses callback props instead of createEventDispatcher
    */
 
-  import { createEventDispatcher } from 'svelte';
   import { createAgent } from '../../stores/agents.js';
   import { notifySuccess, notifyError } from '../../stores/notifications.js';
   import { Button, Input, Select, Textarea } from '../UI/index.js';
@@ -20,7 +18,14 @@
     DEFAULT_MAX_POSITION_SIZE,
   } from '../../lib/constants.js';
 
-  const dispatch = createEventDispatcher();
+  /**
+   * @typedef {Object} Props
+   * @property {Function} [oncreated]
+   * @property {Function} [oncancel]
+   */
+
+  /** @type {Props} */
+  let { oncreated = undefined, oncancel = undefined } = $props();
 
   // 表單資料
   let formData = $state({
@@ -43,6 +48,24 @@
   let submitting = $state(false);
 
   // 驗證表單
+
+  // 提交表單
+
+  // 重置表單
+
+  // 取消
+
+  // 轉換 AI_MODEL_GROUPS 為 Select 組件格式
+  let aiModelOptions = $derived(
+    Object.entries(AI_MODEL_GROUPS).reduce((acc, [groupName, models]) => {
+      acc[groupName] = models.map((model) => ({
+        value: model,
+        label: AI_MODEL_LABELS[model],
+      }));
+      return acc;
+    }, {})
+  );
+  // 函數定義 - 移到根層級以符合 eslint no-inner-declarations 規則
   function validateForm() {
     let isValid = true;
     errors = {
@@ -74,8 +97,6 @@
 
     return isValid;
   }
-
-  // 提交表單
   async function handleSubmit() {
     if (!validateForm()) {
       return;
@@ -95,7 +116,7 @@
       const newAgent = await createAgent(agentData);
 
       notifySuccess(`Agent "${newAgent.name}" 創建成功!`);
-      dispatch('created', newAgent);
+      oncreated?.(newAgent);
 
       // 重置表單
       resetForm();
@@ -105,8 +126,6 @@
       submitting = false;
     }
   }
-
-  // 重置表單
   function resetForm() {
     formData = {
       name: '',
@@ -122,24 +141,19 @@
       max_position_size: '',
     };
   }
-
-  // 取消
   function handleCancel() {
     resetForm();
-    dispatch('cancel');
+    oncancel?.();
   }
-
-  // 轉換 AI_MODEL_GROUPS 為 Select 組件格式
-  let aiModelOptions = $derived(Object.entries(AI_MODEL_GROUPS).reduce((acc, [groupName, models]) => {
-    acc[groupName] = models.map((model) => ({
-      value: model,
-      label: AI_MODEL_LABELS[model],
-    }));
-    return acc;
-  }, {}));
 </script>
 
-<form onsubmit={preventDefault(handleSubmit)} class="space-y-6">
+<form
+  onsubmit={(e) => {
+    e.preventDefault();
+    handleSubmit();
+  }}
+  class="space-y-6"
+>
   <!-- Agent 名稱 -->
   <Input
     label="Agent 名稱"

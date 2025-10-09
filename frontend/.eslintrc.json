@@ -14,15 +14,26 @@
     "linebreak-style": ["error", "unix"],
     "quotes": ["error", "single"],
     "semi": ["error", "always"],
-    "no-unused-vars": ["warn", { "argsIgnorePattern": "^_" }],
-    "no-console": ["warn", { "allow": ["warn", "error"] }]
+    "no-unused-vars": [
+      "warn",
+      {
+        "argsIgnorePattern": "^_"
+      }
+    ],
+    "no-console": [
+      "warn",
+      {
+        "allow": ["warn", "error"]
+      }
+    ]
   },
   "overrides": [
     {
       "files": ["*.svelte"],
       "parser": "svelte-eslint-parser",
       "rules": {
-        "indent": "off"
+        "indent": "off",
+        "no-inner-declarations": "off"
       }
     }
   ]

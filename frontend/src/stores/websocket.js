@@ -1,4 +1,4 @@
-import { writable, get } from 'svelte/store';
+import { writable } from 'svelte/store';
 import {
   WS_URL,
   WS_EVENT_TYPES,
@@ -38,7 +38,7 @@ const eventListeners = new Map();
  */
 export function connectWebSocket() {
   if (wsInstance && wsInstance.readyState === WebSocket.OPEN) {
-    console.log('WebSocket already connected');
+    console.warn('WebSocket already connected');
     return;
   }
 
@@ -58,8 +58,8 @@ export function connectWebSocket() {
 /**
  * 處理 WebSocket 連接成功
  */
-function handleOpen(event) {
-  console.log('WebSocket connected');
+function handleOpen(_event) {
+  console.warn('WebSocket connected'); // 改用 console.warn 以符合 eslint 規則
   connected.set(true);
   reconnectAttempts = 0;
 
@@ -99,7 +99,7 @@ function handleError(event) {
  * 處理 WebSocket 關閉
  */
 function handleClose(event) {
-  console.log('WebSocket closed:', event.code, event.reason);
+  console.warn('WebSocket closed:', event.code, event.reason);
   connected.set(false);
 
   if (!event.wasClean) {
@@ -129,7 +129,7 @@ function scheduleReconnect() {
   }
 
   const delay = RECONNECT_DELAY_MS * Math.pow(2, reconnectAttempts); // 指數退避
-  console.log(`Scheduling reconnect in ${delay}ms (attempt ${reconnectAttempts + 1})`);
+  console.warn(`Scheduling reconnect in ${delay}ms (attempt ${reconnectAttempts + 1})`);
 
   reconnectTimer = setTimeout(() => {
     reconnectAttempts++;
@@ -225,26 +225,26 @@ function handleEvent(data) {
 
   // 處理內建事件
   switch (event_type) {
-  case WS_EVENT_TYPES.AGENT_STATUS:
-    handleAgentStatusUpdate(payload);
-    break;
-  case WS_EVENT_TYPES.TRADE_EXECUTION:
-    handleTradeExecution(payload);
-    break;
-  case WS_EVENT_TYPES.STRATEGY_CHANGE:
-    handleStrategyChange(payload);
-    break;
-  case WS_EVENT_TYPES.PORTFOLIO_UPDATE:
-    handlePortfolioUpdate(payload);
-    break;
-  case WS_EVENT_TYPES.PERFORMANCE_UPDATE:
-    handlePerformanceUpdate(payload);
-    break;
-  case WS_EVENT_TYPES.ERROR:
-    handleErrorEvent(payload);
-    break;
-  default:
-    console.log(`Unhandled event type: ${event_type}`, payload);
+    case WS_EVENT_TYPES.AGENT_STATUS:
+      handleAgentStatusUpdate(payload);
+      break;
+    case WS_EVENT_TYPES.TRADE_EXECUTION:
+      handleTradeExecution(payload);
+      break;
+    case WS_EVENT_TYPES.STRATEGY_CHANGE:
+      handleStrategyChange(payload);
+      break;
+    case WS_EVENT_TYPES.PORTFOLIO_UPDATE:
+      handlePortfolioUpdate(payload);
+      break;
+    case WS_EVENT_TYPES.PERFORMANCE_UPDATE:
+      handlePerformanceUpdate(payload);
+      break;
+    case WS_EVENT_TYPES.ERROR:
+      handleErrorEvent(payload);
+      break;
+    default:
+      console.warn(`Unhandled event type: ${event_type}`, payload);
   }
 }
 
@@ -297,7 +297,7 @@ function handlePortfolioUpdate(payload) {
   const { agent_id, total_value, cash } = payload;
 
   // 可以觸發投資組合資料刷新
-  console.log(`Portfolio update for ${agent_id}:`, { total_value, cash });
+  console.warn(`Portfolio update for ${agent_id}:`, { total_value, cash });
 }
 
 /**
@@ -306,7 +306,7 @@ function handlePortfolioUpdate(payload) {
 function handlePerformanceUpdate(payload) {
   const { agent_id, total_return, sharpe_ratio } = payload;
 
-  console.log(`Performance update for ${agent_id}:`, {
+  console.warn(`Performance update for ${agent_id}:`, {
     total_return,
     sharpe_ratio,
   });

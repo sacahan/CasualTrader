@@ -7,6 +7,7 @@
 
   import { notifications, removeNotification } from '../../stores/notifications.js';
 
+  // 函數定義 - 移到根層級以符合 eslint no-inner-declarations 規則
   function getTypeClasses(type) {
     switch (type) {
       case 'success':
@@ -21,7 +22,6 @@
         return 'bg-gray-50 text-gray-800 border-gray-200';
     }
   }
-
   function getTypeIcon(type) {
     switch (type) {
       case 'success':

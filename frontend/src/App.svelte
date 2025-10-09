@@ -1,21 +1,15 @@
 <script>
-  import { run } from 'svelte/legacy';
-
   /**
    * App Component
    *
    * 主應用程式組件
    * 符合 FRONTEND_IMPLEMENTATION.md 規格
+   * Svelte 5 compatible - uses runes instead of legacy APIs
    */
 
   import { onMount, onDestroy } from 'svelte';
   import { Navbar, NotificationToast } from './components/Layout/index.js';
-  import {
-    AgentCreationForm,
-    AgentCard,
-    AgentGrid,
-    StrategyHistoryView,
-  } from './components/Agent/index.js';
+  import { AgentCreationForm, AgentGrid, StrategyHistoryView } from './components/Agent/index.js';
   import { PerformanceChart } from './components/Chart/index.js';
   import { Button, Modal } from './components/UI/index.js';
   import {
@@ -56,17 +50,7 @@
     stopMarketPolling = startMarketDataPolling(30000); // 30 秒刷新一次
   });
 
-  onDestroy(() => {
-    // 斷開 WebSocket
-    disconnectWebSocket();
-
-    // 停止市場資料刷新
-    if (stopMarketPolling) {
-      stopMarketPolling();
-    }
-  });
-
-
+  // 函數定義 - 移到根層級以符合 eslint no-inner-declarations 規則
   async function loadPerformanceData(agentId) {
     try {
       const data = await apiClient.getPerformance(agentId);
@@ -77,41 +61,41 @@
     }
   }
 
-  // Agent 事件處理
-  function handleAgentSelect(event) {
-    selectAgent(event.detail.agent_id);
+  // Agent 事件處理 - updated for Svelte 5 callback props
+  function handleAgentSelect(agent) {
+    selectAgent(agent.agent_id);
   }
 
-  async function handleStartAgent(event) {
+  async function handleStartAgent(agent) {
     try {
-      await startAgent(event.detail.agent_id);
-      notifySuccess(`Agent ${event.detail.name} 已啟動`);
+      await startAgent(agent.agent_id);
+      notifySuccess(`Agent ${agent.name} 已啟動`);
     } catch (error) {
       notifyError(`啟動失敗: ${error.message}`);
     }
   }
 
-  async function handleStopAgent(event) {
+  async function handleStopAgent(agent) {
     try {
-      await stopAgent(event.detail.agent_id);
-      notifySuccess(`Agent ${event.detail.name} 已停止`);
+      await stopAgent(agent.agent_id);
+      notifySuccess(`Agent ${agent.name} 已停止`);
     } catch (error) {
       notifyError(`停止失敗: ${error.message}`);
     }
   }
 
-  async function handleDeleteAgent(event) {
+  async function handleDeleteAgent(agent) {
     if (
       !confirm(
-        `確定要刪除 Agent "${event.detail.name}"?\n\n此操作無法復原,所有相關資料(持倉、交易記錄、策略變更)將被永久刪除。`
+        `確定要刪除 Agent "${agent.name}"?\n\n此操作無法復原,所有相關資料(持倉、交易記錄、策略變更)將被永久刪除。`
       )
     ) {
       return;
     }
 
     try {
-      await deleteAgent(event.detail.agent_id);
-      notifySuccess(`Agent ${event.detail.name} 已刪除`);
+      await deleteAgent(agent.agent_id);
+      notifySuccess(`Agent ${agent.name} 已刪除`);
     } catch (error) {
       notifyError(`刪除失敗: ${error.message}`);
     }
@@ -127,25 +111,36 @@
       showStrategyModal = true;
     }
   }
+
+  onDestroy(() => {
+    // 斷開 WebSocket
+    disconnectWebSocket();
+
+    // 停止市場資料刷新
+    if (stopMarketPolling) {
+      stopMarketPolling();
+    }
+  });
+
   // 監聽選中的 Agent,載入績效資料
-  run(() => {
+  $effect(() => {
     if ($selectedAgent) {
       loadPerformanceData($selectedAgent.agent_id);
     }
   });
 </script>
 
-<div class="min-h-screen bg-gray-50">
+<div class="min-h-screen bg-gray-900">
   <!-- Navbar -->
-  <Navbar title="CasualTrader - AI 股票交易模擬器" />
+  <Navbar title="CasualTrader - 股票代理人交易模擬" />
 
   <!-- Main Content -->
   <main class="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
     <!-- Header & Actions -->
     <div class="mb-8 flex items-center justify-between">
       <div>
-        <h2 class="text-2xl font-bold text-gray-900">我的 AI Agents</h2>
-        <p class="mt-1 text-sm text-gray-600">管理您的 AI 交易助手,監控策略演進與績效表現</p>
+        <h2 class="text-2xl font-bold text-white">我的 AI Agents</h2>
+        <p class="mt-1 text-sm text-gray-400">管理您的 AI 交易助手,監控策略演進與績效表現</p>
       </div>
       <Button on:click={() => (showCreateModal = true)}>
         <svg class="mr-2 h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -166,10 +161,10 @@
         agents={$agents}
         selectedAgentId={$selectedAgentId}
         loading={$agentsLoading}
-        on:select={handleAgentSelect}
-        on:start={handleStartAgent}
-        on:stop={handleStopAgent}
-        on:delete={handleDeleteAgent}
+        onselect={handleAgentSelect}
+        onstart={handleStartAgent}
+        onstop={handleStopAgent}
+        ondelete={handleDeleteAgent}
       />
     </div>
 
@@ -177,20 +172,20 @@
     {#if $selectedAgent}
       <div class="grid grid-cols-1 gap-8 lg:grid-cols-2">
         <!-- Performance Chart -->
-        <div class="rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
+        <div class="rounded-2xl border border-gray-700 bg-gray-800 p-6 shadow-lg">
           <div class="mb-4 flex items-center justify-between">
-            <h3 class="text-lg font-semibold text-gray-900">績效走勢</h3>
+            <h3 class="text-lg font-semibold text-white">績效走勢</h3>
           </div>
           <PerformanceChart agentId={$selectedAgent.agent_id} {performanceData} height={350} />
         </div>
 
         <!-- Strategy History -->
-        <div class="rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
+        <div class="rounded-2xl border border-gray-700 bg-gray-800 p-6 shadow-lg">
           <div class="mb-4 flex items-center justify-between">
-            <h3 class="text-lg font-semibold text-gray-900">策略演進</h3>
+            <h3 class="text-lg font-semibold text-white">策略演進</h3>
             <Button variant="ghost" size="sm" on:click={handleShowStrategy}>查看完整歷史</Button>
           </div>
-          <div class="max-h-96 overflow-y-auto">
+          <div class="custom-scrollbar max-h-96 overflow-y-auto">
             <StrategyHistoryView agentId={$selectedAgent.agent_id} limit={5} />
           </div>
         </div>
@@ -200,10 +195,7 @@
 
   <!-- Create Agent Modal -->
   <Modal bind:open={showCreateModal} title="創建新 Agent" size="lg">
-    <AgentCreationForm
-      on:created={handleAgentCreated}
-      on:cancel={() => (showCreateModal = false)}
-    />
+    <AgentCreationForm oncreated={handleAgentCreated} oncancel={() => (showCreateModal = false)} />
   </Modal>
 
   <!-- Strategy History Modal -->

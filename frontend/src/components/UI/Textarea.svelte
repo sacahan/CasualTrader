@@ -1,13 +1,12 @@
 <script>
-  import { createBubbler } from 'svelte/legacy';
-
-  const bubble = createBubbler();
-  
-
   /**
+   * Textarea Component
+   *
+   * 可重用的多行文字輸入組件
+   * Svelte 5 compatible - removes legacy createBubbler
+   *
    * @typedef {Object} Props
-   * @property {string} [value] - Textarea Component
-可重用的多行文字輸入組件
+   * @property {string} [value]
    * @property {string} [placeholder]
    * @property {boolean} [disabled]
    * @property {string} [error]
@@ -15,6 +14,10 @@
    * @property {boolean} [required]
    * @property {number} [rows]
    * @property {string} [id]
+   * @property {Function} [oninput]
+   * @property {Function} [onchange]
+   * @property {Function} [onblur]
+   * @property {Function} [onfocus]
    */
 
   /** @type {Props & { [key: string]: any }} */
@@ -27,6 +30,10 @@
     required = false,
     rows = 4,
     id = '',
+    oninput = undefined,
+    onchange = undefined,
+    onblur = undefined,
+    onfocus = undefined,
     ...rest
   } = $props();
 
@@ -35,10 +42,10 @@
 
 <div class="w-full">
   {#if label}
-    <label for={textareaId} class="mb-1 block text-sm font-medium text-gray-700">
+    <label for={textareaId} class="mb-1 block text-sm font-medium text-gray-300">
       {label}
       {#if required}
-        <span class="text-red-500">*</span>
+        <span class="text-danger-400">*</span>
       {/if}
     </label>
   {/if}
@@ -50,17 +57,17 @@
     {required}
     {rows}
     id={textareaId}
-    class="form-input block w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500 disabled:bg-gray-100 disabled:cursor-not-allowed {error
+    class="form-input block w-full rounded-lg border border-gray-600 bg-gray-700 px-4 py-2 text-white placeholder-gray-400 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500 disabled:bg-gray-800 disabled:cursor-not-allowed {error
       ? 'border-red-500'
       : ''}"
-    oninput={bubble('input')}
-    onchange={bubble('change')}
-    onblur={bubble('blur')}
-    onfocus={bubble('focus')}
+    {oninput}
+    {onchange}
+    {onblur}
+    {onfocus}
     {...rest}
-></textarea>
+  ></textarea>
 
   {#if error}
-    <p class="mt-1 text-sm text-red-600">{error}</p>
+    <p class="mt-1 text-sm text-danger-400">{error}</p>
   {/if}
 </div>

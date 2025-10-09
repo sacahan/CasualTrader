@@ -17,12 +17,12 @@
   let { title = 'CasualTrader' } = $props();
 </script>
 
-<nav class="border-b border-gray-200 bg-white shadow-sm">
+<nav class="border-b border-gray-700 bg-gray-800 shadow-lg">
   <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
     <div class="flex h-16 items-center justify-between">
       <!-- Logo & Title -->
       <div class="flex items-center gap-3">
-        <div class="flex h-10 w-10 items-center justify-center rounded-lg bg-primary-500">
+        <div class="flex h-10 w-10 items-center justify-center rounded-lg bg-primary-600">
           <svg class="h-6 w-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path
               stroke-linecap="round"
@@ -32,25 +32,23 @@
             />
           </svg>
         </div>
-        <h1 class="text-xl font-bold text-gray-900">{title}</h1>
+        <h1 class="text-xl font-bold text-white">{title}</h1>
       </div>
 
       <!-- Status Indicators -->
       <div class="flex items-center gap-4">
         <!-- Market Status -->
         <div class="flex items-center gap-2">
-          <div class="h-2 w-2 rounded-full {$isOpen ? 'bg-green-500' : 'bg-gray-400'}"></div>
-          <span class="text-sm text-gray-600">
+          <div class="status-dot {$isOpen ? 'status-running' : 'bg-gray-500'}"></div>
+          <span class="text-sm text-gray-300">
             {$isOpen ? '市場開盤中' : '市場已收盤'}
           </span>
         </div>
 
         <!-- WebSocket Connection Status -->
         <div class="flex items-center gap-2">
-          <div
-            class="h-2 w-2 rounded-full {$connected ? 'bg-green-500 animate-pulse' : 'bg-red-500'}"
-></div>
-          <span class="text-sm text-gray-600">
+          <div class="status-dot {$connected ? 'status-running blinking' : 'status-stopped'}"></div>
+          <span class="text-sm text-gray-300">
             {$connected ? '即時連線' : '離線'}
           </span>
         </div>

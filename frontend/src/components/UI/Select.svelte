@@ -1,13 +1,12 @@
 <script>
-  import { createBubbler } from 'svelte/legacy';
-
-  const bubble = createBubbler();
-  
-
   /**
+   * Select Component
+   *
+   * 可重用的下拉選擇組件
+   * Svelte 5 compatible - removes legacy createBubbler
+   *
    * @typedef {Object} Props
-   * @property {string} [value] - Select Component
-可重用的下拉選擇組件
+   * @property {string} [value]
    * @property {any} [options] - [{ value, label }]
    * @property {any} [optionGroups] - { groupName: [options] }
    * @property {string} [placeholder]
@@ -16,6 +15,9 @@
    * @property {string} [label]
    * @property {boolean} [required]
    * @property {string} [id]
+   * @property {Function} [onchange]
+   * @property {Function} [onblur]
+   * @property {Function} [onfocus]
    */
 
   /** @type {Props & { [key: string]: any }} */
@@ -29,6 +31,9 @@
     label = '',
     required = false,
     id = '',
+    onchange = undefined,
+    onblur = undefined,
+    onfocus = undefined,
     ...rest
   } = $props();
 
@@ -37,10 +42,10 @@
 
 <div class="w-full">
   {#if label}
-    <label for={selectId} class="mb-1 block text-sm font-medium text-gray-700">
+    <label for={selectId} class="mb-1 block text-sm font-medium text-gray-300">
       {label}
       {#if required}
-        <span class="text-red-500">*</span>
+        <span class="text-danger-400">*</span>
       {/if}
     </label>
   {/if}
@@ -50,12 +55,12 @@
     {disabled}
     {required}
     id={selectId}
-    class="form-input block w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500 disabled:bg-gray-100 disabled:cursor-not-allowed {error
+    class="form-input block w-full rounded-lg border border-gray-600 bg-gray-700 px-4 py-2 text-white focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500 disabled:bg-gray-800 disabled:cursor-not-allowed {error
       ? 'border-red-500'
       : ''}"
-    onchange={bubble('change')}
-    onblur={bubble('blur')}
-    onfocus={bubble('focus')}
+    {onchange}
+    {onblur}
+    {onfocus}
     {...rest}
   >
     {#if placeholder}
@@ -82,6 +87,6 @@
   </select>
 
   {#if error}
-    <p class="mt-1 text-sm text-red-600">{error}</p>
+    <p class="mt-1 text-sm text-danger-400">{error}</p>
   {/if}
 </div>

@@ -1,11 +1,10 @@
 <script>
-  import { run } from 'svelte/legacy';
-
   /**
    * PerformanceChart Component
    *
    * 績效走勢圖表組件,使用 Chart.js 展示 Agent 績效
    * 符合 FRONTEND_IMPLEMENTATION.md 規格
+   * Svelte 5 compatible - uses $effect instead of run
    */
 
   import { onMount, onDestroy } from 'svelte';
@@ -19,22 +18,12 @@
    */
 
   /** @type {Props} */
-  let { agentId, performanceData = [], height = 300 } = $props();
+  let { performanceData = [], height = 300 } = $props();
 
   let canvas = $state();
   let chart = $state(null);
 
-
-  onMount(() => {
-    initChart();
-  });
-
-  onDestroy(() => {
-    if (chart) {
-      chart.destroy();
-    }
-  });
-
+  // 函數定義 - 移到根層級以符合 eslint no-inner-declarations 規則
   function initChart() {
     if (!canvas) return;
 
@@ -168,8 +157,19 @@
 
     chart.update();
   }
+
+  onMount(() => {
+    initChart();
+  });
+
+  onDestroy(() => {
+    if (chart) {
+      chart.destroy();
+    }
+  });
+
   // 當 performanceData 更新時重繪圖表
-  run(() => {
+  $effect(() => {
     if (chart && performanceData) {
       updateChart(performanceData);
     }

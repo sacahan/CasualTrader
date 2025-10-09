@@ -1,19 +1,19 @@
 <script>
-  import { createBubbler } from 'svelte/legacy';
-
-  const bubble = createBubbler();
-  
-
   /**
+   * Button Component
+   *
+   * 可重用的按鈕組件,支援多種樣式和狀態
+   * 符合 FRONTEND_IMPLEMENTATION.md 規格
+   * Svelte 5 compatible - removes legacy createBubbler
+   *
    * @typedef {Object} Props
-   * @property {string} [variant] - Button Component
-可重用的按鈕組件,支援多種樣式和狀態
-符合 FRONTEND_IMPLEMENTATION.md 規格 - primary | secondary | danger | ghost
+   * @property {string} [variant] - primary | secondary | danger | ghost
    * @property {string} [size] - sm | md | lg
    * @property {boolean} [disabled]
    * @property {boolean} [loading]
    * @property {boolean} [fullWidth]
    * @property {string} [type]
+   * @property {Function} [onclick]
    * @property {import('svelte').Snippet} [children]
    */
 
@@ -25,24 +25,27 @@
     loading = false,
     fullWidth = false,
     type = 'button',
+    onclick = undefined,
     children,
     ...rest
   } = $props();
 
   // 計算按鈕 class
-  let buttonClass = $derived([
-    'btn',
-    `btn-${variant}`,
-    `btn-${size}`,
-    fullWidth && 'w-full',
-    disabled && 'opacity-50 cursor-not-allowed',
-    loading && 'cursor-wait',
-  ]
-    .filter(Boolean)
-    .join(' '));
+  let buttonClass = $derived(
+    [
+      'btn',
+      `btn-${variant}`,
+      `btn-${size}`,
+      fullWidth && 'w-full',
+      disabled && 'opacity-50 cursor-not-allowed',
+      loading && 'cursor-wait',
+    ]
+      .filter(Boolean)
+      .join(' ')
+  );
 </script>
 
-<button {type} class={buttonClass} disabled={disabled || loading} onclick={bubble('click')} {...rest}>
+<button {type} class={buttonClass} disabled={disabled || loading} {onclick} {...rest}>
   {#if loading}
     <svg
       class="animate-spin -ml-1 mr-2 h-4 w-4"
@@ -79,20 +82,20 @@
     @apply px-6 py-3 text-lg;
   }
 
-  /* Color variants */
+  /* Color variants - Dark theme */
   .btn-primary {
-    @apply bg-primary-500 text-white hover:bg-primary-600 focus:ring-primary-500;
+    @apply bg-primary-600 text-white hover:bg-primary-700 focus:ring-primary-500;
   }
 
   .btn-secondary {
-    @apply bg-gray-200 text-gray-900 hover:bg-gray-300 focus:ring-gray-500;
+    @apply bg-gray-600 text-white hover:bg-gray-500 focus:ring-gray-500;
   }
 
   .btn-danger {
-    @apply bg-red-500 text-white hover:bg-red-600 focus:ring-red-500;
+    @apply bg-danger-500 text-white hover:bg-danger-600 focus:ring-danger-500;
   }
 
   .btn-ghost {
-    @apply bg-transparent text-primary-600 hover:bg-primary-50 focus:ring-primary-500;
+    @apply bg-transparent text-gray-400 hover:bg-gray-800 hover:text-white focus:ring-primary-500;
   }
 </style>

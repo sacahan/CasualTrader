@@ -25,10 +25,7 @@
   let loading = $state(false);
   let error = $state(null);
 
-  onMount(async () => {
-    await loadStrategyHistory();
-  });
-
+  // 函數定義 - 移到根層級以符合 eslint no-inner-declarations 規則
   async function loadStrategyHistory() {
     if (!agentId) return;
 
@@ -50,6 +47,10 @@
       loading = false;
     }
   }
+
+  onMount(async () => {
+    await loadStrategyHistory();
+  });
 
   // 重新載入
   export function reload() {
@@ -143,7 +144,7 @@
                     class="h-3 w-3 rounded-full border-2 border-white {index === 0
                       ? 'bg-primary-500'
                       : 'bg-gray-400'} shadow"
-></div>
+                  ></div>
                 </div>
 
                 <!-- 變更內容卡片 -->

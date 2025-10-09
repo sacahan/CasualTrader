@@ -39,7 +39,7 @@ repos:
       # ESLint for frontend JavaScript/Svelte
       - id: eslint-frontend
         name: eslint (frontend)
-        entry: bash -c 'cd frontend && for file in "$@"; do node_modules/.bin/eslint --fix "${file#frontend/}"; done' --
+        entry: bash -c 'cd frontend && for file in "$@"; do node_modules/.bin/eslint "${file#frontend/}"; done' --
         language: system
         files: ^frontend/.*\.(js|svelte)$
         exclude: ^frontend/(node_modules|dist|build)/

@@ -27,7 +27,8 @@ export const error = writable(null);
 // 衍生 store: 市場是否開盤
 export const isOpen = derived(marketStatus, ($marketStatus) => {
   if (!$marketStatus) return isMarketOpen(); // 使用本地判斷作為預設
-  return $marketStatus.is_open || false;
+  // 後端 API 返回 is_trading_hours 而非 is_open
+  return $marketStatus.is_trading_hours || false;
 });
 
 // 衍生 store: 下次開盤時間
@@ -149,12 +150,14 @@ export function clearError() {
 export function startMarketDataPolling(interval = 30000) {
   // 立即載入一次
   loadMarketStatus();
-  loadMarketIndices();
+  // TODO: 後端尚未實作 market indices 端點
+  // loadMarketIndices();
 
   // 設定定時刷新
   const timerId = setInterval(() => {
     loadMarketStatus();
-    loadMarketIndices();
+    // TODO: 後端尚未實作 market indices 端點
+    // loadMarketIndices();
   }, interval);
 
   // 返回停止函數

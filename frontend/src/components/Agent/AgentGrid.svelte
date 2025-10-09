@@ -4,9 +4,9 @@
    *
    * Agent 網格佈局組件,展示多個 Agent 卡片
    * 符合 FRONTEND_IMPLEMENTATION.md 規格
+   * Svelte 5 compatible - uses callback props instead of createEventDispatcher
    */
 
-  import { createEventDispatcher } from 'svelte';
   import AgentCard from './AgentCard.svelte';
 
   /**
@@ -14,28 +14,37 @@
    * @property {any} [agents]
    * @property {any} [selectedAgentId]
    * @property {boolean} [loading]
+   * @property {Function} [onselect]
+   * @property {Function} [onstart]
+   * @property {Function} [onstop]
+   * @property {Function} [ondelete]
    */
 
   /** @type {Props} */
-  let { agents = [], selectedAgentId = null, loading = false } = $props();
+  let {
+    agents = [],
+    selectedAgentId = null,
+    loading = false,
+    onselect = undefined,
+    onstart = undefined,
+    onstop = undefined,
+    ondelete = undefined,
+  } = $props();
 
-  const dispatch = createEventDispatcher();
+  // 卡片事件處理 - forward to parent callbacks
 
-  // 卡片事件處理
-  function handleCardClick(event) {
-    dispatch('select', event.detail);
+  // 函數定義 - 移到根層級以符合 eslint no-inner-declarations 規則
+  function handleCardClick(agent) {
+    onselect?.(agent);
   }
-
-  function handleStartAgent(event) {
-    dispatch('start', event.detail);
+  function handleStartAgent(agent) {
+    onstart?.(agent);
   }
-
-  function handleStopAgent(event) {
-    dispatch('stop', event.detail);
+  function handleStopAgent(agent) {
+    onstop?.(agent);
   }
-
-  function handleDeleteAgent(event) {
-    dispatch('delete', event.detail);
+  function handleDeleteAgent(agent) {
+    ondelete?.(agent);
   }
 </script>
 
@@ -94,10 +103,10 @@
       <AgentCard
         {agent}
         selected={agent.agent_id === selectedAgentId}
-        on:click={handleCardClick}
-        on:start={handleStartAgent}
-        on:stop={handleStopAgent}
-        on:delete={handleDeleteAgent}
+        onclick={handleCardClick}
+        onstart={handleStartAgent}
+        onstop={handleStopAgent}
+        ondelete={handleDeleteAgent}
       />
     {/each}
   {/if}

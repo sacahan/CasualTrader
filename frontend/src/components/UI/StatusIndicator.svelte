@@ -22,15 +22,26 @@
    */
 
   /** @type {Props} */
-  let {
-    status = null,
-    mode = null,
-    size = 'md',
-    showDot = true
-  } = $props();
+  let { status = null, mode = null, size = 'md', showDot = true } = $props();
 
+  // Size mapping
+  const sizeClasses = {
+    sm: 'text-xs px-2 py-0.5',
+    md: 'text-sm px-2.5 py-1',
+    lg: 'text-base px-3 py-1.5',
+  };
 
-
+  const dotSizeClasses = {
+    sm: 'h-1.5 w-1.5',
+    md: 'h-2 w-2',
+    lg: 'h-2.5 w-2.5',
+  };
+  // 根據 status 或 mode 決定顏色
+  let color = $derived(mode ? AGENT_MODE_COLORS[mode] || 'bg-gray-500' : getStatusColor(status));
+  let label = $derived(
+    mode ? AGENT_MODE_LABELS[mode] || mode : AGENT_STATUS_LABELS[status] || status
+  );
+  // 函數定義 - 移到根層級以符合 eslint no-inner-declarations 規則
   function getStatusColor(status) {
     switch (status) {
       case AGENT_STATUS.IDLE:
@@ -47,22 +58,6 @@
         return 'bg-gray-500';
     }
   }
-
-  // Size mapping
-  const sizeClasses = {
-    sm: 'text-xs px-2 py-0.5',
-    md: 'text-sm px-2.5 py-1',
-    lg: 'text-base px-3 py-1.5',
-  };
-
-  const dotSizeClasses = {
-    sm: 'h-1.5 w-1.5',
-    md: 'h-2 w-2',
-    lg: 'h-2.5 w-2.5',
-  };
-  // 根據 status 或 mode 決定顏色
-  let color = $derived(mode ? AGENT_MODE_COLORS[mode] || 'bg-gray-500' : getStatusColor(status));
-  let label = $derived(mode ? AGENT_MODE_LABELS[mode] || mode : AGENT_STATUS_LABELS[status] || status);
 </script>
 
 <span

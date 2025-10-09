@@ -4,9 +4,10 @@
    *
    * 模態對話框組件,支援關閉按鈕和背景點擊關閉
    * 符合 FRONTEND_IMPLEMENTATION.md 規格
+   * Svelte 5 compatible - uses callback props instead of createEventDispatcher
    */
 
-  import { createEventDispatcher, onMount, onDestroy } from 'svelte';
+  import { onMount, onDestroy } from 'svelte';
 
   /**
    * @typedef {Object} Props
@@ -14,6 +15,7 @@
    * @property {string} [title]
    * @property {string} [size] - sm | md | lg | xl
    * @property {boolean} [closeOnBackdrop]
+   * @property {Function} [onclose]
    * @property {import('svelte').Snippet} [header]
    * @property {import('svelte').Snippet} [children]
    * @property {import('svelte').Snippet} [footer]
@@ -25,25 +27,24 @@
     title = '',
     size = 'md',
     closeOnBackdrop = true,
+    onclose = undefined,
     header,
     children,
-    footer
+    footer,
   } = $props();
 
-  const dispatch = createEventDispatcher();
-
   // 按 ESC 關閉
+
+  // 函數定義 - 移到根層級以符合 eslint no-inner-declarations 規則
   function handleKeydown(event) {
     if (event.key === 'Escape' && open) {
       close();
     }
   }
-
   function close() {
     open = false;
-    dispatch('close');
+    onclose?.();
   }
-
   function handleBackdropClick(event) {
     if (closeOnBackdrop && event.target === event.currentTarget) {
       close();
@@ -76,35 +77,35 @@
   >
     <!-- Backdrop -->
     <div
-      class="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity"
+      class="fixed inset-0 bg-black bg-opacity-75 backdrop-blur-sm transition-opacity"
       onclick={handleBackdropClick}
       onkeydown={handleKeydown}
       role="button"
       tabindex="0"
-></div>
+    ></div>
 
     <!-- Modal container -->
     <div class="flex min-h-full items-center justify-center p-4">
       <div
         class="relative w-full {sizeClasses[
           size
-        ]} transform overflow-hidden rounded-lg bg-white shadow-xl transition-all"
+        ]} transform overflow-hidden rounded-2xl border border-gray-700 bg-gray-900 shadow-xl transition-all"
       >
         <!-- Header -->
         {#if title || header}
-          <div class="flex items-center justify-between border-b border-gray-200 px-6 py-4">
+          <div class="flex items-center justify-between border-b border-gray-700 px-6 py-4">
             <div class="flex-1">
               {#if header}
                 {@render header?.()}
               {:else}
-                <h3 class="text-lg font-semibold text-gray-900" id="modal-title">
+                <h3 class="text-lg font-semibold text-white" id="modal-title">
                   {title}
                 </h3>
               {/if}
             </div>
             <button
               type="button"
-              class="ml-4 rounded-md text-gray-400 hover:text-gray-500 focus:outline-none focus:ring-2 focus:ring-primary-500"
+              class="ml-4 rounded-md text-gray-400 hover:text-white focus:outline-none focus:ring-2 focus:ring-primary-500"
               onclick={close}
             >
               <span class="sr-only">關閉</span>
@@ -127,7 +128,7 @@
 
         <!-- Footer -->
         {#if footer}
-          <div class="flex items-center justify-end gap-3 border-t border-gray-200 px-6 py-4">
+          <div class="flex items-center justify-end gap-3 border-t border-gray-700 px-6 py-4">
             {@render footer?.()}
           </div>
         {/if}

@@ -1,48 +1,51 @@
-<!-- @migration-task Error while migrating Svelte code: Event modifiers other than 'once' can only be used on DOM elements
-https://svelte.dev/e/event_handler_invalid_component_modifier -->
 <script>
   /**
    * AgentCard Component
    *
    * Agent 卡片組件,顯示 Agent 基本資訊、狀態和操作按鈕
    * 符合 FRONTEND_IMPLEMENTATION.md 規格
+   * Svelte 5 compatible - uses callback props instead of createEventDispatcher
    */
 
-  import { createEventDispatcher } from 'svelte';
   import { Button, StatusIndicator } from '../UI/index.js';
   import { AI_MODEL_LABELS, AGENT_STATUS } from '../../lib/constants.js';
   import { formatCurrency, formatDateTime } from '../../lib/utils.js';
 
-  export let agent;
-  export let selected = false;
-
-  const dispatch = createEventDispatcher();
+  // Props
+  let {
+    agent,
+    selected = false,
+    onclick = undefined,
+    onstart = undefined,
+    onstop = undefined,
+    ondelete = undefined,
+  } = $props();
 
   // 卡片操作事件
-  function handleClick() {
-    dispatch('click', agent);
-  }
-
-  function handleStart() {
-    dispatch('start', agent);
-  }
-
-  function handleStop() {
-    dispatch('stop', agent);
-  }
-
-  function handleDelete() {
-    dispatch('delete', agent);
-  }
 
   // 是否可以編輯 (執行中不可編輯 - 配置鎖定)
-  $: isEditable = agent.status !== AGENT_STATUS.RUNNING;
+  let isEditable = $derived(agent.status !== AGENT_STATUS.RUNNING);
 
   // 是否可以啟動
-  $: canStart = agent.status === AGENT_STATUS.IDLE || agent.status === AGENT_STATUS.STOPPED;
+  let canStart = $derived(
+    agent.status === AGENT_STATUS.IDLE || agent.status === AGENT_STATUS.STOPPED
+  );
 
   // 是否可以停止
-  $: canStop = agent.status === AGENT_STATUS.RUNNING;
+  let canStop = $derived(agent.status === AGENT_STATUS.RUNNING);
+  // 函數定義 - 移到根層級以符合 eslint no-inner-declarations 規則
+  function handleClick() {
+    onclick?.(agent);
+  }
+  function handleStart() {
+    onstart?.(agent);
+  }
+  function handleStop() {
+    onstop?.(agent);
+  }
+  function handleDelete() {
+    ondelete?.(agent);
+  }
 </script>
 
 <div
@@ -129,13 +132,29 @@ https://svelte.dev/e/event_handler_invalid_component_modifier -->
   <!-- 操作按鈕 -->
   <div class="flex gap-2">
     {#if canStart}
-      <Button variant="primary" size="sm" fullWidth on:click={(e) => { e.stopPropagation(); handleStart(e); }}>
+      <Button
+        variant="primary"
+        size="sm"
+        fullWidth
+        on:click={(e) => {
+          e.stopPropagation();
+          handleStart(e);
+        }}
+      >
         啟動
       </Button>
     {/if}
 
     {#if canStop}
-      <Button variant="secondary" size="sm" fullWidth on:click={(e) => { e.stopPropagation(); handleStop(e); }}>
+      <Button
+        variant="secondary"
+        size="sm"
+        fullWidth
+        on:click={(e) => {
+          e.stopPropagation();
+          handleStop(e);
+        }}
+      >
         停止
       </Button>
     {/if}
@@ -143,7 +162,10 @@ https://svelte.dev/e/event_handler_invalid_component_modifier -->
     <Button
       variant="danger"
       size="sm"
-      on:click={(e) => { e.stopPropagation(); handleDelete(e); }}
+      on:click={(e) => {
+        e.stopPropagation();
+        handleDelete(e);
+      }}
       disabled={!isEditable}
     >
       刪除
