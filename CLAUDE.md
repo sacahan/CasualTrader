@@ -4,27 +4,38 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## 📊 Project Overview
 
-CasualTrader is a Market MCP Server providing real-time Taiwan stock price data through the Model Context Protocol. The project integrates with Taiwan Stock Exchange (TWSE) APIs and provides a standardized interface for stock price queries via MCP tools.
+CasualTrader is an AI-powered trading simulation platform that combines:
 
-### Architecture Summary
+- **FastAPI Backend**: RESTful API + WebSocket real-time communication
+- **AI Trading Agents**: Multi-model support (GPT-4, Claude, Gemini, DeepSeek) with dynamic strategy evolution
+- **MCP Integration**: Market data via Model Context Protocol
+- **Database Persistence**: SQLAlchemy async ORM with SQLite/PostgreSQL support
+- **Agent Lifecycle Management**: Session-based trading with portfolio tracking and performance analytics
 
-- **MCP Server Core**: Python-based server implementing Model Context Protocol
-- **Taiwan Stock API Integration**: Real-time stock price queries via TWSE APIs
-- **Cache & Rate Limiting**: Multi-tier rate limiting and caching for API protection
-- **SpecPilot Workflow**: AI-driven specification management and task execution system
+### Core Architecture
+
+The system uses a **multi-layered agent architecture**:
+
+- **Agent Manager** (`src/agents/core/agent_manager.py`): Manages multiple AI agents concurrently
+- **Base Agent** (`src/agents/core/base_agent.py`): Abstract base class for all trading agents
+- **Trading Agent** (`src/agents/trading/trading_agent.py`): Concrete implementation with strategy execution
+- **Persistent Agent** (`src/agents/integrations/persistent_agent.py`): Database-backed agent with session management
 
 ## 🔧 Development Commands
 
 ### Environment Setup
 
 ```bash
-# Install dependencies using uv
+# Install dependencies
 uv sync --dev
 
-# Run the MCP server locally for testing
-uvx --from . market-mcp-server
+# Run database migrations
+uv run python -m src.database.migrations
+
+# Start FastAPI server
+uv run python src/api/server.py
 # or
-uv run python -m market_mcp.server
+uv run uvicorn src.api.server:app --reload --host 0.0.0.0 --port 8000
 ```
 
 ### Testing
@@ -33,13 +44,17 @@ uv run python -m market_mcp.server
 # Run all tests
 uv run pytest
 
-# Run specific test categories
-uv run python tests/debug_api.py                 # Debug API functionality
-uv run python tests/test_mcp_tools.py            # Test MCP tool functionality
-uv run python tests/verify_mcp_integration.py    # Verify MCP integration
+# Run specific test suites
+uv run pytest tests/backend/                    # Backend unit tests
+uv run pytest tests/integration/                # Integration tests
+uv run pytest tests/test_e2e_complete_flow.py   # End-to-end flow
+uv run pytest tests/test_e2e_api_integration.py # API integration
 
-# Test uvx execution
-./tests/test_uvx_execution.sh
+# Run with coverage
+uv run pytest --cov=src --cov-report=html
+
+# Run e2e tests (bash script)
+./tests/run_e2e_tests.sh
 ```
 
 ### Code Quality
@@ -50,202 +65,317 @@ uv run ruff check
 uv run ruff format
 
 # Type checking
-uv run mypy market_mcp
-```
-
-### MCP Server Testing
-
-```bash
-# Verify MCP server functionality
-./tests/verify-mcp-server.sh
-
-# Basic functionality test
-uv run python tests/test_basic_functionality.py
+uv run mypy src
 ```
 
 ## 🏗️ Architecture & Code Structure
 
-### Core Components
+### Agent System Core
 
-**MCP Server Implementation** (`market_mcp/server.py`):
+**Agent Lifecycle** (`src/agents/core/`):
 
-- Main MCP protocol handler using official MCP Python SDK
-- Tool registration and dispatch system
-- Stdio-based communication with MCP clients
+- `base_agent.py`: Abstract base defining agent interface and state management
+- `agent_manager.py`: Multi-agent orchestration with concurrent execution control
+- `agent_session.py`: Session-based execution tracking with context management
+- `models.py`: Type-safe data models (AgentConfig, AgentState, AgentMode, etc.)
+- `instruction_generator.py`: Dynamic prompt generation based on agent state
+- `strategy_tracker.py`: Strategy evolution tracking and performance monitoring
+- `strategy_auto_adjuster.py`: Automatic strategy adjustment based on performance
 
-**Stock Price Tool** (`market_mcp/tools/stock_price_tool.py`):
+**Integration Layer** (`src/agents/integrations/`):
 
-- Primary tool implementation for Taiwan stock price queries
-- Integrates validation, API client, error handling, and response formatting
-- Supports both regular stocks (4-digit codes) and ETFs (4-6 digit + letters)
+- `persistent_agent.py`: Main agent implementation with database persistence
+- `database_service.py`: Async database operations wrapper
+- `mcp_client.py`: Market data client using MCP protocol
+- `openai_tools.py`: AI model integration (OpenAI, Claude, etc.)
 
-**API Client Layer** (`market_mcp/api/`):
+**Trading Functions** (`src/agents/functions/`):
 
-- `twse_client.py`: Basic TWSE API integration
-- `enhanced_twse_client.py`: Advanced client with rate limiting and caching
-- Handles HTTP requests, response parsing, and error handling
+- `trading_validation.py`: Pre-trade validation and risk checks
+- `market_status.py`: Market hours and trading day verification
+- `portfolio_queries.py`: Portfolio analytics and position queries
+- `strategy_change_recorder.py`: Strategy change logging and versioning
 
-**Cache & Rate Limiting** (`market_mcp/cache/`):
+**Agent Tools** (`src/agents/tools/`):
 
-- `rate_limiter.py`: Token bucket rate limiting implementation
-- `cache_manager.py`: Memory-based caching with TTL
-- `rate_limited_cache_service.py`: Combined rate limiting and caching service
+- `technical_agent.py`: Technical analysis (indicators, patterns)
+- `fundamental_agent.py`: Fundamental analysis (financials, ratios)
+- `risk_agent.py`: Risk metrics (VaR, Sharpe, drawdown)
+- `sentiment_agent.py`: Market sentiment analysis
 
-### Entry Points
+### API Layer
 
-**uvx Execution** (`market_mcp/main.py`):
+**FastAPI Application** (`src/api/`):
 
-- Primary entry point for `uvx --from . market-mcp-server` command
-- Handles startup, shutdown, and error handling
+- `app.py`: Application factory with lifespan management
+- `server.py`: Server entry point
+- `config.py`: Pydantic settings with environment variables
+- `models.py`: API request/response models
+- `routers/agents.py`: Agent CRUD and execution endpoints
+- `routers/trading.py`: Portfolio, trades, performance endpoints
+- `routers/websocket_router.py`: WebSocket endpoint for real-time updates
+- `websocket.py`: WebSocket connection manager
 
-**Module Execution** (`market_mcp/server.py`):
+### Database Layer
 
-- Alternative entry point for `python -m market_mcp.server`
-- Same functionality as main.py but different invocation path
+**SQLAlchemy Models** (`src/database/`):
+
+- `models.py`: ORM models using Python 3.12+ syntax with AsyncAttrs
+  - `Agent`: Agent metadata and configuration
+  - `AgentSession`: Execution session tracking
+  - `Transaction`: Trade records with full audit trail
+  - `Holding`: Current portfolio positions
+  - `PortfolioSnapshot`: Historical portfolio state
+  - `StrategyChange`: Strategy evolution history
+- `migrations.py`: Database schema initialization and migration logic
 
 ### Data Flow Architecture
 
-1. **MCP Client Request** → `server.py` (protocol handling)
-2. **Tool Dispatch** → `stock_price_tool.py` (business logic)
-3. **Input Validation** → `validators/input_validator.py`
-4. **API Call** → `api/enhanced_twse_client.py` (with caching/rate limiting)
-5. **Response Formatting** → `models/mcp_responses.py`
-6. **Error Handling** → `handlers/error_handler.py`
+**Agent Execution Flow**:
+
+1. API Request → `routers/agents.py` (endpoint handler)
+2. Agent Manager → `agent_manager.py` (lifecycle management)
+3. Trading Agent → `trading_agent.py` (strategy execution)
+4. MCP Client → `mcp_client.py` (market data fetch)
+5. Trading Functions → validation, execution, recording
+6. Database Service → `database_service.py` (persistence)
+7. WebSocket → `websocket.py` (real-time broadcast)
+
+**Agent Modes Cycle**:
+
+```
+OBSERVATION → TRADING → REBALANCING → STRATEGY_REVIEW → OBSERVATION
+```
+
+- **OBSERVATION**: Market analysis and knowledge accumulation
+- **TRADING**: Execute trades based on current strategy
+- **REBALANCING**: Portfolio adjustment to target allocation
+- **STRATEGY_REVIEW**: Performance analysis and strategy evolution
 
 ### Key Design Patterns
 
-- **Layered Architecture**: Clear separation between MCP protocol, business logic, and data access
-- **Dependency Injection**: Components receive dependencies through constructor injection
-- **Error Boundary Pattern**: Centralized error handling with contextual error responses
-- **Cache-Aside Pattern**: Manual cache management with fallback to API calls
+- **Async-First Architecture**: All I/O operations use async/await
+- **Dependency Injection**: Services injected via constructors (database_service, mcp_client)
+- **Session Pattern**: Agent execution wrapped in database sessions for atomicity
+- **Event Broadcasting**: WebSocket manager broadcasts agent state changes
+- **Strategy Evolution**: Performance-driven strategy adjustment with rollback capability
+
+## 🧪 Testing Strategy
+
+### Test Organization
+
+Tests follow the project structure with clear separation:
+
+```
+tests/
+├── backend/              # Backend unit tests
+│   ├── agents/          # Agent system tests
+│   │   ├── functions/   # Trading function tests
+│   │   └── tools/       # Agent tool tests
+│   └── shared/
+│       └── database/    # Database integration tests
+├── integration/         # MCP and multi-component tests
+├── database/           # Database migration tests
+└── test_e2e_*.py       # End-to-end workflow tests
+```
+
+### Test Categories
+
+- **Unit Tests** (`tests/backend/`): Individual component testing with mocks
+- **Integration Tests** (`tests/integration/`): Multi-component interaction
+- **Database Tests** (`tests/database/`): Schema validation and migrations
+- **E2E Tests** (`tests/test_e2e_*.py`): Complete user workflows
+
+### Test Data
+
+- Use real Taiwan stock symbols: 2330 (台積電), 2412 (中華電), 2454 (聯發科)
+- Test accounts start with 1,000,000 TWD initial capital
+- Mock MCP responses for predictable testing
+- Use in-memory SQLite for test isolation
+
+## 🐛 Common Development Patterns
+
+### Adding New Agent Functions
+
+1. Create function in `src/agents/functions/`
+2. Define input/output models in function file
+3. Register in agent's `enabled_functions` list
+4. Add integration tests in `tests/backend/agents/functions/`
+
+Example:
+
+```python
+# src/agents/functions/my_function.py
+async def my_function(agent_id: str, param: str) -> dict:
+    """Function docstring for AI model."""
+    # Implementation
+    return {"result": "success"}
+```
+
+### Adding New API Endpoints
+
+1. Define request/response models in `src/api/models.py`
+2. Add endpoint to appropriate router in `src/api/routers/`
+3. Update OpenAPI tags in `src/api/docs.py`
+4. Add endpoint tests in `tests/test_e2e_api_integration.py`
+
+### Database Schema Changes
+
+1. Modify models in `src/database/models.py`
+2. Update migration logic in `src/database/migrations.py`
+3. Test migration in `tests/database/test_migration.py`
+4. Run migration: `uv run python -m src.database.migrations`
+
+### Adding New Agent Tools
+
+1. Create tool class in `src/agents/tools/`
+2. Inherit from base tool class or define standalone
+3. Register tool in agent's tool registry
+4. Add tool tests in `tests/backend/agents/tools/`
+
+## 🚀 API Documentation
+
+### Running the API Server
+
+```bash
+# Development mode with auto-reload
+uv run uvicorn src.api.server:app --reload --host 0.0.0.0 --port 8000
+
+# Production mode
+uv run uvicorn src.api.server:app --host 0.0.0.0 --port 8000 --workers 4
+```
+
+### API Endpoints
+
+- **API Docs**: http://localhost:8000/api/docs (Swagger UI)
+- **ReDoc**: http://localhost:8000/api/redoc (Alternative documentation)
+- **OpenAPI Schema**: http://localhost:8000/api/openapi.json
+
+### Core Endpoints
+
+**Agent Management**:
+
+- `POST /api/agents` - Create agent
+- `GET /api/agents` - List all agents
+- `GET /api/agents/{agent_id}` - Get agent details
+- `DELETE /api/agents/{agent_id}` - Remove agent
+- `POST /api/agents/{agent_id}/start` - Start agent
+- `POST /api/agents/{agent_id}/stop` - Stop agent
+- `POST /api/agents/{agent_id}/execute` - Execute agent cycle
+
+**Trading Data**:
+
+- `GET /api/trading/agents/{agent_id}/portfolio` - Get portfolio
+- `GET /api/trading/agents/{agent_id}/trades` - Get trade history
+- `GET /api/trading/agents/{agent_id}/performance` - Get performance metrics
+- `GET /api/trading/agents/{agent_id}/strategy-changes` - Get strategy evolution
+
+**WebSocket**:
+
+- `WS /ws` - Real-time agent events and state updates
+
+### Environment Variables
+
+```bash
+# API Configuration
+API_HOST=0.0.0.0
+API_PORT=8000
+ENVIRONMENT=development
+DEBUG=true
+
+# Database
+DATABASE_URL=sqlite+aiosqlite:///./casualtrader.db
+
+# CORS
+CORS_ORIGINS=["http://localhost:3000"]
+CORS_ALLOW_CREDENTIALS=true
+
+# Agent Limits
+MAX_AGENTS=10
+MAX_CONCURRENT_EXECUTIONS=5
+
+# Logging
+LOG_LEVEL=INFO
+```
 
 ## 📋 SpecPilot Workflow Integration
-
-This project uses SpecPilot for AI-driven development workflow management:
 
 ### Workflow Commands
 
 ```bash
-# Check project status and get recommendations
+# Check project status
 ./scripts/specpilot-workflow.sh status
 
-# Start working on a specific task
+# Start task
 ./scripts/specpilot-workflow.sh start-task <task-id>
 
-# Prepare pull request after development
+# Prepare PR
 ./scripts/specpilot-workflow.sh prepare-pr <task-id> [title]
 
-# Complete task (merge PR and cleanup)
+# Close task
 ./scripts/specpilot-workflow.sh close-task <task-id> [merge-method]
 
-# Get next recommended action
+# Next action
 ./scripts/specpilot-workflow.sh next-action
 ```
 
 ### Specification Documents
 
-- **PRD** (`specs/prd/`): Product Requirements Documents
-- **TSD** (`specs/tsd/`): Technical Specification Documents
-- **Epics** (`specs/epics/`): Feature module breakdowns
-- **Tasks** (`specs/tasks/`): Specific development tasks
+- **PRD** (`specs/prd/`): Product Requirements
+- **TSD** (`specs/tsd/`): Technical Specifications
+- **Epics** (`specs/epics/`): Feature breakdowns
+- **Tasks** (`specs/tasks/`): Development tasks
 
-### Development Workflow
+## 🔍 Debugging Tips
 
-1. Tasks are managed in isolated git worktrees (`workspaces/<task-id>/`)
-2. Each task has its own feature branch (`<task-id>-feature`)
-3. Status tracking in spec files (new → in_progress → review → done)
-4. Automated PR creation with generated content from task specifications
+### Agent Execution Debugging
 
-## 🚀 Deployment & Integration
-
-### Claude Desktop Integration
-
-Add to `claude_desktop_config.json`:
-
-```json
-{
-  "mcpServers": {
-    "casualtrader": {
-      "command": "uvx",
-      "args": ["--from", "/path/to/CasualTrader", "market-mcp-server"],
-      "env": { "MARKET_MCP_SERVER_VERSION": "1.0.0" }
-    }
-  }
-}
+```python
+# Enable detailed logging in agent execution
+import logging
+logging.getLogger("agent_manager").setLevel(logging.DEBUG)
+logging.getLogger("trading_agent").setLevel(logging.DEBUG)
 ```
 
-### Environment Variables
+### Database Query Debugging
+
+```python
+# Enable SQLAlchemy query logging
+import logging
+logging.getLogger("sqlalchemy.engine").setLevel(logging.INFO)
+```
+
+### WebSocket Connection Testing
 
 ```bash
-# Server configuration
-export MARKET_MCP_SERVER_VERSION=1.0.0
-export LOG_LEVEL=INFO
-
-# API settings
-export MARKET_MCP_API_TIMEOUT=5
-export MARKET_MCP_API_RETRIES=3
-
-# Rate limiting
-export MARKET_MCP_RATE_LIMIT_PER_SYMBOL=30
-export MARKET_MCP_RATE_LIMIT_GLOBAL_PER_MINUTE=20
-
-# Caching
-export MARKET_MCP_CACHE_TTL=30
-export MARKET_MCP_CACHE_MAXSIZE=1000
+# Test WebSocket endpoint
+wscat -c ws://localhost:8000/ws
 ```
 
-## 🧪 Testing Strategy
+## 📊 Performance Considerations
 
-### Test Categories
+- **Concurrent Agent Execution**: Limited by `MAX_CONCURRENT_EXECUTIONS` semaphore
+- **Database Connection Pool**: Async SQLAlchemy with connection pooling
+- **MCP Client Caching**: Market data cached with TTL to reduce API calls
+- **WebSocket Broadcasting**: Efficient fanout to connected clients
+- **Agent Session Cleanup**: Automatic cleanup of old sessions (configurable retention)
 
-- **Unit Tests**: Individual component testing with minimal mocking
-- **Integration Tests**: MCP server and tool integration testing
-- **API Tests**: TWSE API integration and response parsing
-- **Rate Limiting Tests**: Cache and rate limiting functionality
+## 🎯 Current Implementation Status
 
-### Test Data
+Based on the codebase, the following systems are fully implemented:
 
-- Use real Taiwan stock symbols (2330, 2317, 2454, etc.) for integration tests
-- Mock external API calls for unit tests
-- Test both success and error scenarios
+- ✅ **Agent Core System**: Multi-agent management with lifecycle control
+- ✅ **Database Integration**: SQLAlchemy async ORM with complete schema
+- ✅ **FastAPI Backend**: RESTful API + WebSocket support
+- ✅ **Trading Functions**: Buy/sell validation, market status, portfolio queries
+- ✅ **Strategy Evolution**: Automatic strategy adjustment based on performance
+- ✅ **Agent Tools**: Technical, fundamental, risk, sentiment analysis
+- ✅ **Session Management**: Database-backed execution tracking
+- ✅ **Real-time Events**: WebSocket broadcasting of agent state
 
-### Performance Benchmarks
+## 🔐 Security Notes
 
-- API response time: < 2 seconds under normal conditions
-- uvx startup time: < 10 seconds
-- Memory usage: < 100MB for basic operations
-- Rate limiting: 30 requests per symbol, 20 global per minute
-
-## 🐛 Common Development Patterns
-
-### Adding New Stock Data Fields
-
-1. Update `market_mcp/models/stock_data.py` data model
-2. Modify parser in `market_mcp/parsers/twse_parser.py`
-3. Update response formatter in `market_mcp/models/mcp_responses.py`
-4. Add tests in `tests/test_parser.py`
-
-### Error Handling
-
-- All exceptions should be handled through `MCPErrorHandler`
-- Use `safe_execute` decorator for automatic error boundary handling
-- Provide contextual error messages with suggested fixes
-
-### Adding New Tools
-
-1. Create tool class in `market_mcp/tools/`
-2. Implement required methods: `get_tool_definition()`, main tool function
-3. Register in `market_mcp/server.py`
-4. Add comprehensive tests in `tests/`
-
-## 📊 Development Status Tracking
-
-Current implementation focuses on Task-001 through Task-004:
-
-- ✅ **Task-001**: MCP Server基礎架構 (Complete)
-- 🔧 **Task-002**: 台灣證交所 API 整合 (In Progress)
-- 📋 **Task-003**: API 頻率限制和快取系統 (Planned)
-- 🔧 **Task-004**: MCP 工具介面標準化 (In Progress)
-
-Use SpecPilot workflow commands to check current status and get next recommended actions.
-- 測試相關的 py 檔都收納到 test/ 內
+- API keys for AI models should be set in environment variables
+- Database credentials should not be committed to git
+- CORS origins should be restricted in production
+- WebSocket connections should be authenticated in production
