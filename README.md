@@ -96,25 +96,29 @@ uvx --from . market-mcp-server
 # 使用 uv 管理環境
 uv sync --dev
 
-# 執行測試
-uv run pytest
+# 執行所有測試（推薦）
+./scripts/run_tests.sh
+
+# 或只執行後端測試
+cd backend
+uv run pytest tests/ -v --cov=src --cov-report=term-missing
 
 # 程式碼檢查
 uv run ruff check
-uv run mypy market_mcp
+uv run mypy src
 ```
 
 ### 測試驗證
 
 ```bash
-# 執行基本測試
-uv run python tests/debug_api.py
+# 執行完整測試套件（含覆蓋率報告）
+./scripts/run_tests.sh
 
-# 驗證 MCP 伺服器
-./tests/verify-mcp-server.sh
-
-# uvx 完整測試套件
-./tests/test_uvx_execution.sh
+# 執行特定測試模組
+cd backend
+uv run pytest tests/agents/ -v           # Agent 系統測試
+uv run pytest tests/api/ -v              # API 測試
+uv run pytest tests/database/ -v         # 資料庫測試
 ```
 
 ## MCP 客戶端整合
@@ -399,10 +403,14 @@ market_mcp/
 └── utils/               # 工具函數
     └── logging.py       # 日誌工具
 
-tests/                   # 測試檔案
-├── test_basic_functionality.py
-├── test_mcp_tools.py
-└── verify_mcp_integration.py
+backend/tests/           # 後端測試檔案
+├── agents/              # Agent 系統測試
+│   ├── core/            # 核心架構測試
+│   ├── tools/           # 分析工具測試
+│   ├── functions/       # 交易功能測試
+│   └── integrations/    # MCP 整合測試
+├── api/                 # API 端點測試
+└── database/            # 資料庫測試
 
 specs/                   # 專案規劃文件 (SpecPilot)
 ├── prd/                 # 產品需求文件
