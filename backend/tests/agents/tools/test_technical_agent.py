@@ -20,7 +20,7 @@ import pytest
 project_root = Path(__file__).parent.parent.parent.parent.parent
 sys.path.insert(0, str(project_root / "src"))
 
-from agents.tools.technical_agent import TechnicalAnalysisTools  # noqa: E402
+from src.agents.tools.technical_agent import TechnicalAnalysisTools  # noqa: E402
 
 # === Fixtures ===
 

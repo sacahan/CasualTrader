@@ -12,7 +12,7 @@ src_path = Path(__file__).parent.parent.parent.parent.parent / "src"
 if str(src_path) not in sys.path:
     sys.path.insert(0, str(src_path))
 
-from agents.functions.market_status import MarketStatusChecker  # noqa: E402
+from src.agents.functions.market_status import MarketStatusChecker  # noqa: E402
 
 
 class MockMCPClient:

@@ -6,7 +6,7 @@ MarketStatusChecker MCP 整合測試
 import asyncio
 from datetime import datetime
 
-from agents.functions.market_status import MarketStatusChecker
+from src.agents.functions.market_status import MarketStatusChecker
 
 
 class MockMCPClient:
