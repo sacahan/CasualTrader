@@ -1,8 +1,8 @@
 # CasualTrader 專案結構規範
 
-**版本**: 1.0
-**日期**: 2025-10-06
-**適用於**: API、Agent、Frontend 三大模塊
+**版本**: 2.0
+**日期**: 2025-10-09
+**適用於**: Monorepo 架構 - Backend + Frontend
 
 ---
 
@@ -10,19 +10,25 @@
 
 本文檔定義 CasualTrader 專案的統一檔案結構，採用 **Monorepo** 架構，清楚分離前後端關注點，便於開發、測試和部署。
 
+**重構狀態**:
+
+- ✅ 文檔已更新為 Monorepo 結構
+- ⏳ 代碼重構進行中 (參見 `RESTRUCTURE_GUIDE.md`)
+
 ---
 
 ## 🏗️ 整體架構
 
 ```
-CasualTrader/                  # 專案根目錄
-├── backend/                   # 後端應用 (Python/FastAPI)
-├── frontend/                  # 前端應用 (Vite + Svelte)
-├── tests/                     # 整合測試目錄
-├── docs/                      # 專案文檔
-├── scripts/                   # 開發腳本
-├── docker-compose.yml         # Docker 編排配置
-└── README.md                  # 專案主文檔
+CasualTrader/                  # 專案根目錄 (Monorepo)
+├── backend/                   # 🐍 Python 後端應用
+├── frontend/                  # 🎨 前端應用 (Vite + Svelte)
+├── tests/                     # 🧪 跨模塊整合測試
+├── docs/                      # 📚 專案文檔
+├── scripts/                   # 🔧 開發與部署腳本
+├── .github/                   # ⚙️ GitHub Actions & Copilot
+├── docker-compose.yml         # 🐳 Docker 編排配置
+└── README.md                  # 📖 專案主文檔
 ```
 
 ---
@@ -31,90 +37,118 @@ CasualTrader/                  # 專案根目錄
 
 ```
 backend/
-├── src/
-│   ├── agents/                # Agent 系統模塊
-│   │   ├── core/              # 核心 Agent 實作
-│   │   │   ├── trading_agent.py         # TradingAgent 實作
-│   │   │   ├── instruction_generator.py # Agent指令生成器
-│   │   │   ├── strategy_tracker.py      # 策略變更追蹤
-│   │   │   └── models.py                # Agent 資料模型
-│   │   ├── tools/             # 專門化分析工具（自主型 Agent）
-│   │   │   ├── fundamental_agent.py     # 基本面分析 Agent（自主型）
-│   │   │   ├── technical_agent.py       # 技術分析 Agent（自主型）
-│   │   │   ├── risk_agent.py           # 風險評估 Agent（自主型）
-│   │   │   └── sentiment_agent.py       # 市場情緒分析 Agent（自主型）
-│   │   │   # 每個 Agent 都內建：
-│   │   │   # - 完整的專業領域 instructions
-│   │   │   # - WebSearchTool（搜尋最新資訊）
-│   │   │   # - CodeInterpreterTool（執行進階計算）
-│   │   │   # - 明確的成本控制準則
-│   │   │   # - 標準化的輸出格式
-│   │   ├── functions/         # 交易驗證功能
-│   │   │   ├── trading_validation.py    # 交易參數驗證
-│   │   │   ├── market_status.py         # 市場狀態檢查
-│   │   │   └── portfolio_queries.py     # 投資組合查詢
-│   │   └── integrations/      # 外部服務整合
-│   │       ├── mcp_client.py            # CasualMarket MCP客戶端
-│   │       └── mcp_function_wrappers.py # MCP工具包裝
+├── src/                       # Python 源代碼根目錄
+│   ├── agents/                # ✅ Agent 系統模塊 (Phase 1-2)
+│   │   ├── core/              # 核心 Agent 架構
+│   │   │   ├── base_agent.py              # Agent 抽象基類
+│   │   │   ├── agent_manager.py           # Agent 生命週期管理
+│   │   │   ├── agent_session.py           # Agent 會話管理
+│   │   │   ├── models.py                  # 核心數據模型
+│   │   │   ├── instruction_generator.py   # 動態指令生成
+│   │   │   ├── strategy_tracker.py        # 策略追蹤
+│   │   │   └── strategy_auto_adjuster.py  # 策略自動調整
+│   │   │
+│   │   ├── tools/             # 專業分析工具（自主型 Agent）
+│   │   │   ├── fundamental_agent.py       # 基本面分析 Agent
+│   │   │   ├── technical_agent.py         # 技術分析 Agent
+│   │   │   ├── risk_agent.py              # 風險評估 Agent
+│   │   │   └── sentiment_agent.py         # 市場情緒分析 Agent
+│   │   │   # 每個 Agent 內建：
+│   │   │   # - WebSearchTool (搜尋最新資訊)
+│   │   │   # - CodeInterpreterTool (執行進階計算)
+│   │   │   # - 成本控制準則
+│   │   │
+│   │   ├── functions/         # 業務邏輯函數
+│   │   │   ├── portfolio_queries.py       # 投資組合查詢
+│   │   │   ├── market_status.py           # 市場狀態檢查
+│   │   │   ├── trading_validation.py      # 交易驗證
+│   │   │   └── strategy_change_recorder.py # 策略變更記錄
+│   │   │
+│   │   ├── integrations/      # 外部服務整合
+│   │   │   ├── mcp_client.py              # MCP 工具客戶端
+│   │   │   ├── database_service.py        # 資料庫服務
+│   │   │   ├── persistent_agent.py        # 持久化 Agent
+│   │   │   └── openai_tools.py            # OpenAI 工具定義
+│   │   │
+│   │   ├── trading/           # 交易執行層
+│   │   │   └── trading_agent.py           # 主要交易 Agent
+│   │   │
+│   │   └── utils/             # Agent 工具函數
+│   │       ├── logger.py                  # 日誌工具
+│   │       ├── risk_analytics.py          # 風險計算
+│   │       └── technical_indicators.py    # 技術指標
 │   │
-│   ├── api/                   # FastAPI 應用
-│   │   ├── main.py            # FastAPI 應用主檔案
-│   │   ├── routers/           # API 路由定義
-│   │   │   ├── agents.py              # Agent 管理路由
-│   │   │   ├── portfolio.py           # 投資組合路由
-│   │   │   ├── strategy_changes.py    # 策略變更路由
-│   │   │   ├── traces.py              # 追蹤系統路由
-│   │   │   ├── market.py              # 市場數據路由
-│   │   │   └── system.py              # 系統管理路由
-│   │   ├── services/          # 業務邏輯服務層
-│   │   │   ├── agent_service.py       # Agent 業務邏輯
-│   │   │   ├── portfolio_service.py   # 投資組合服務
-│   │   │   ├── strategy_service.py    # 策略變更服務
-│   │   │   ├── trace_service.py       # 追蹤服務
-│   │   │   ├── websocket_service.py   # 即時通知服務
-│   │   │   └── mcp_client_wrapper.py  # MCP 客戶端包裝
-│   │   ├── models/            # API 資料模型
-│   │   │   ├── requests.py            # API 請求模型
-│   │   │   ├── responses.py           # API 回應模型
-│   │   │   └── websocket_events.py    # WebSocket 事件模型
-│   │   ├── middleware/        # FastAPI 中間件
-│   │   │   ├── auth.py                # 認證中間件
-│   │   │   ├── rate_limit.py          # 頻率限制
-│   │   │   └── logging.py             # 請求日誌
-│   │   └── utils/             # API 工具函數
-│   │       ├── exceptions.py          # 自定義異常
-│   │       ├── validators.py          # 資料驗證
-│   │       └── websocket_manager.py   # WebSocket 管理
+│   ├── api/                   # ✅ FastAPI 應用 (Phase 3)
+│   │   ├── app.py             # FastAPI 應用工廠
+│   │   ├── server.py          # 服務器啟動入口
+│   │   ├── config.py          # 配置管理
+│   │   ├── docs.py            # API 文檔配置
+│   │   ├── models.py          # Pydantic 資料模型
+│   │   ├── websocket.py       # WebSocket 管理器
+│   │   │
+│   │   └── routers/           # API 路由模組
+│   │       ├── __init__.py
+│   │       ├── agents.py              # Agent 管理路由
+│   │       ├── trading.py             # 交易數據路由
+│   │       └── websocket_router.py    # WebSocket 路由
 │   │
-│   └── shared/                # 共享組件
-│       ├── database/          # 資料庫相關
-│       │   ├── models.py              # 資料模型
-│       │   ├── connection.py          # 資料庫連接
-│       │   └── migrations/            # 資料庫遷移
-│       ├── utils/             # 共享工具
-│       │   ├── logging.py             # 統一日誌
-│       │   ├── config.py              # 配置管理
-│       │   └── constants.py           # 常數定義
-│       └── types/             # 共享類型定義
-│           ├── api_types.py           # API 類型
-│           ├── agent_types.py         # Agent 類型
-│           └── market_types.py        # 市場資料類型
+│   └── database/              # ✅ 資料庫層 (Phase 1)
+│       ├── models.py          # SQLAlchemy 資料模型
+│       ├── migrations.py      # 資料庫遷移
+│       └── schema.sql         # 資料庫結構定義
 │
-├── pyproject.toml             # Python 專案配置
-├── requirements.txt           # Python 依賴
+├── tests/                     # 後端單元與整合測試
+│   ├── agents/                # Agent 系統測試
+│   │   ├── core/
+│   │   │   ├── test_base_agent.py
+│   │   │   ├── test_agent_manager.py
+│   │   │   ├── test_agent_session.py
+│   │   │   └── test_models.py
+│   │   ├── tools/
+│   │   │   ├── test_fundamental_agent.py
+│   │   │   ├── test_technical_agent.py
+│   │   │   ├── test_risk_agent.py
+│   │   │   └── test_sentiment_agent.py
+│   │   ├── functions/
+│   │   │   ├── test_portfolio_queries.py
+│   │   │   ├── test_market_status.py
+│   │   │   └── test_trading_validation.py
+│   │   └── integrations/
+│   │       ├── test_mcp_client.py
+│   │       ├── test_database_service.py
+│   │       └── test_persistent_agent.py
+│   │
+│   ├── api/                   # API 測試
+│   │   ├── test_app.py
+│   │   ├── routers/
+│   │   │   ├── test_agents.py
+│   │   │   ├── test_trading.py
+│   │   │   └── test_websocket.py
+│   │   └── test_websocket_manager.py
+│   │
+│   └── database/              # 資料庫測試
+│       ├── test_models.py
+│       └── test_migrations.py
+│
+├── pyproject.toml             # Python 專案配置 (uv)
+├── uv.lock                    # UV 依賴鎖定檔
+├── casualtrader.db            # SQLite 資料庫檔案
 ├── .env.example               # 環境變數範例
 └── README.md                  # 後端說明文檔
 ```
 
 ### Backend 模塊職責
 
-- **agents/**: Agent 系統核心邏輯、工具和外部整合
-- **api/**: REST API 端點、WebSocket、業務邏輯服務
-- **shared/**: 跨模塊共享的資料庫、工具和類型定義
+- **src/agents/**: Agent 系統核心邏輯、專業分析工具、外部整合
+- **src/api/**: REST API 端點、WebSocket 即時通信
+- **src/database/**: SQLAlchemy 資料模型、遷移腳本
+- **tests/**: 完整的單元測試和整合測試覆蓋
 
 ---
 
 ## 🎨 Frontend 結構 (Vite + Svelte)
+
+**狀態**: ⏳ Phase 4 準備中
 
 ```
 frontend/
@@ -201,8 +235,21 @@ frontend/
 ## 🧪 Tests 結構
 
 ```
-tests/
-├── backend/                   # 後端測試
+tests/                         # 跨模塊整合測試（根目錄）
+└── integration/               # 前後端整合測試
+    ├── test_api_agent_integration.py
+    ├── test_websocket_flow.py
+    └── test_end_to_end_workflow.py
+
+# 後端單元測試在 backend/tests/
+# 前端單元測試在 frontend/tests/
+```
+
+### 舊的測試結構 (已重構)
+
+```
+tests/                         # ❌ 舊結構 (已移除)
+├── backend/                   # → 移至 backend/tests/
 │   ├── agents/                # Agent 系統測試
 │   │   ├── core/
 │   │   │   ├── test_trading_agent.py
@@ -292,9 +339,9 @@ tests/
 
 ### Tests 模塊職責
 
-- **tests/backend/**: 後端單元測試和整合測試
-- **tests/frontend/**: 前端單元、整合和 E2E 測試
-- **tests/integration/**: 跨前後端的完整流程測試
+- **backend/tests/**: 後端單元測試和模組內整合測試
+- **frontend/tests/**: 前端單元、整合和 E2E 測試 (Phase 4)
+- **tests/integration/**: 跨前後端的完整流程測試（根目錄）
 
 ---
 
@@ -304,9 +351,16 @@ tests/
 docs/
 ├── SYSTEM_DESIGN.md           # 系統設計總覽
 ├── PROJECT_STRUCTURE.md       # 專案結構規範 (本文檔)
-├── API_IMPLEMENTATION.md      # API 實作規格
+├── RESTRUCTURE_GUIDE.md       # 🆕 Monorepo 重構指南
+│
+├── AGENTS_ARCHITECTURE.md     # Agent 模組架構說明
+├── API_ARCHITECTURE.md        # API 模組架構說明
+├── FRONTEND_ARCHITECTURE.md   # Frontend 模組架構說明
+│
 ├── AGENT_IMPLEMENTATION.md    # Agent 系統實作規格
+├── API_IMPLEMENTATION.md      # API 實作規格
 ├── FRONTEND_IMPLEMENTATION.md # 前端實作規格
+│
 └── DEPLOYMENT_GUIDE.md        # 部署指南
 ```
 
@@ -316,11 +370,13 @@ docs/
 
 ```
 scripts/
-├── start-dev.sh               # 啟動開發環境 (前後端)
-├── run-tests.sh               # 執行所有測試
-├── deploy.sh                  # 部署腳本
-├── setup-backend.sh           # 後端環境設置
-└── setup-frontend.sh          # 前端環境設置
+├── start_api.sh               # ✅ 啟動後端 API 服務
+├── start_frontend.sh          # ⏳ 啟動前端開發服務器 (Phase 4)
+├── start_dev.sh               # 🆕 同時啟動前後端 (開發模式)
+├── run_tests.sh               # 🆕 執行所有測試 (前後端 + 整合)
+├── setup_backend.sh           # 🆕 後端環境設置
+├── setup_frontend.sh          # ⏳ 前端環境設置 (Phase 4)
+└── deploy.sh                  # 🆕 生產部署腳本
 ```
 
 ---
@@ -329,11 +385,15 @@ scripts/
 
 ```
 CasualTrader/
-├── docker-compose.yml         # Docker 編排配置
+├── docker-compose.yml         # Docker 編排配置（前後端）
+│
 ├── backend/
-│   └── Dockerfile             # 後端 Docker 配置
-└── frontend/
-    └── Dockerfile             # 前端 Docker 配置
+│   ├── Dockerfile             # 後端 Docker 配置
+│   └── .dockerignore          # Docker 忽略規則
+│
+└── frontend/                  # ⏳ Phase 4
+    ├── Dockerfile             # 前端 Docker 配置
+    └── .dockerignore          # Docker 忽略規則
 ```
 
 ---
@@ -341,13 +401,32 @@ CasualTrader/
 ## 🔄 模塊間依賴關係
 
 ```
-Frontend (Svelte)
-    ↓ HTTP/WebSocket
-Backend API (FastAPI)
-    ↓ Function Calls
-Agent System (OpenAI Agents)
-    ↓ MCP Protocol
-CasualMarket (External MCP Server)
+┌─────────────────────────────────────────────┐
+│  Frontend (Svelte) - ⏳ Phase 4             │
+│  Location: frontend/src/                    │
+└──────────────────┬──────────────────────────┘
+                   │ HTTP/WebSocket
+┌──────────────────▼──────────────────────────┐
+│  Backend API (FastAPI) - ✅ Phase 3         │
+│  Location: backend/src/api/                 │
+└──────────────────┬──────────────────────────┘
+                   │ Function Calls
+┌──────────────────▼──────────────────────────┐
+│  Agent System - ✅ Phase 1-2                │
+│  Location: backend/src/agents/              │
+└──────────────────┬──────────────────────────┘
+                   │ MCP Protocol
+┌──────────────────▼──────────────────────────┐
+│  CasualMarket MCP Server (External)         │
+│  21 個台灣股市專業工具                        │
+└─────────────────────────────────────────────┘
+
+資料持久化層:
+┌─────────────────────────────────────────────┐
+│  SQLite Database - ✅ Phase 1               │
+│  Location: backend/casualtrader.db          │
+│  Models: backend/src/database/models.py     │
+└─────────────────────────────────────────────┘
 ```
 
 ---
@@ -375,27 +454,53 @@ CasualMarket (External MCP Server)
 
 ---
 
-## ✅ 專案結構檢查清單
+## ✅ Monorepo 結構檢查清單
 
-### Backend 結構驗證
+### 根目錄結構 ✅
 
-- [ ] `backend/src/agents/` 目錄存在且包含核心、工具、函數子目錄
-- [ ] `backend/src/api/` 目錄包含 main.py 和完整的路由結構
-- [ ] `backend/src/shared/` 目錄包含資料庫、工具和類型子目錄
-- [ ] `backend/pyproject.toml` 配置正確的依賴
+- [x] `backend/` 目錄存在並包含完整後端代碼
+- [x] `docs/` 目錄包含所有技術文檔
+- [x] `scripts/` 目錄包含開發與部署腳本
+- [x] `.github/` 目錄包含 CI/CD 和 Copilot 配置
+- [ ] `frontend/` 目錄已創建 (Phase 4)
+- [ ] `tests/integration/` 包含跨模塊測試
+- [ ] `docker-compose.yml` 配置前後端服務
 
-### Frontend 結構驗證
+### Backend 結構驗證 ✅
+
+- [x] `backend/src/agents/` 包含 core, tools, functions, integrations, trading, utils
+- [x] `backend/src/api/` 包含 app.py, server.py, models.py, websocket.py, routers/
+- [x] `backend/src/database/` 包含 models.py, migrations.py, schema.sql
+- [x] `backend/tests/` 鏡像 src/ 結構並包含完整測試
+- [x] `backend/pyproject.toml` 配置正確（uv 管理）
+- [x] `backend/casualtrader.db` SQLite 資料庫
+- [x] `backend/.env` 或 `backend/.env.example` 環境變數配置
+
+### Frontend 結構驗證 ⏳ (Phase 4)
 
 - [ ] `frontend/src/components/` 按功能分類組織
 - [ ] `frontend/src/routes/` 包含 SvelteKit 路由結構
 - [ ] `frontend/src/stores/` 包含狀態管理檔案
+- [ ] `frontend/src/lib/` 包含 API 客戶端和工具函數
 - [ ] `frontend/package.json` 配置正確的依賴
+- [ ] `frontend/vite.config.js` Vite 配置
+- [ ] `frontend/tailwind.config.js` Tailwind CSS 配置
 
-### Tests 結構驗證
+### 整合測試驗證 ⏳
 
-- [ ] `tests/backend/` 鏡像後端源碼結構
-- [ ] `tests/frontend/` 包含單元、整合和 E2E 測試
-- [ ] `tests/integration/` 包含跨模塊整合測試
+- [ ] `tests/integration/` 存在並包含跨模塊測試
+- [ ] 前後端 API 整合測試
+- [ ] WebSocket 通信測試
+- [ ] 端到端工作流程測試
+
+### 腳本與工具驗證 🔧
+
+- [x] `scripts/start_api.sh` 可啟動後端服務
+- [ ] `scripts/start_frontend.sh` 可啟動前端 (Phase 4)
+- [ ] `scripts/start_dev.sh` 可同時啟動前後端
+- [ ] `scripts/run_tests.sh` 可執行所有測試
+- [ ] `scripts/setup_backend.sh` 可配置後端環境
+- [ ] `scripts/setup_frontend.sh` 可配置前端環境 (Phase 4)
 
 ---
 
