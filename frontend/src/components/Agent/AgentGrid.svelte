@@ -6,30 +6,36 @@
    * 符合 FRONTEND_IMPLEMENTATION.md 規格
    */
 
-  import { createEventDispatcher } from "svelte";
-  import AgentCard from "./AgentCard.svelte";
+  import { createEventDispatcher } from 'svelte';
+  import AgentCard from './AgentCard.svelte';
 
-  export let agents = [];
-  export let selectedAgentId = null;
-  export let loading = false;
+  /**
+   * @typedef {Object} Props
+   * @property {any} [agents]
+   * @property {any} [selectedAgentId]
+   * @property {boolean} [loading]
+   */
+
+  /** @type {Props} */
+  let { agents = [], selectedAgentId = null, loading = false } = $props();
 
   const dispatch = createEventDispatcher();
 
   // 卡片事件處理
   function handleCardClick(event) {
-    dispatch("select", event.detail);
+    dispatch('select', event.detail);
   }
 
   function handleStartAgent(event) {
-    dispatch("start", event.detail);
+    dispatch('start', event.detail);
   }
 
   function handleStopAgent(event) {
-    dispatch("stop", event.detail);
+    dispatch('stop', event.detail);
   }
 
   function handleDeleteAgent(event) {
-    dispatch("delete", event.detail);
+    dispatch('delete', event.detail);
   }
 </script>
 
@@ -79,9 +85,7 @@
           />
         </svg>
         <h3 class="mt-4 text-lg font-medium text-gray-900">尚無 Agent</h3>
-        <p class="mt-2 text-sm text-gray-500">
-          點擊「創建新 Agent」開始您的 AI 交易之旅
-        </p>
+        <p class="mt-2 text-sm text-gray-500">點擊「創建新 Agent」開始您的 AI 交易之旅</p>
       </div>
     </div>
   {:else}

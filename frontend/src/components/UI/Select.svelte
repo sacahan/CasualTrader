@@ -1,29 +1,43 @@
 <script>
+  import { createBubbler } from 'svelte/legacy';
+
+  const bubble = createBubbler();
+  
+
   /**
-   * Select Component
-   *
-   * 可重用的下拉選擇組件
+   * @typedef {Object} Props
+   * @property {string} [value] - Select Component
+可重用的下拉選擇組件
+   * @property {any} [options] - [{ value, label }]
+   * @property {any} [optionGroups] - { groupName: [options] }
+   * @property {string} [placeholder]
+   * @property {boolean} [disabled]
+   * @property {string} [error]
+   * @property {string} [label]
+   * @property {boolean} [required]
+   * @property {string} [id]
    */
 
-  export let value = "";
-  export let options = []; // [{ value, label }]
-  export let optionGroups = null; // { groupName: [options] }
-  export let placeholder = "請選擇...";
-  export let disabled = false;
-  export let error = "";
-  export let label = "";
-  export let required = false;
-  export let id = "";
+  /** @type {Props & { [key: string]: any }} */
+  let {
+    value = $bindable(''),
+    options = [],
+    optionGroups = null,
+    placeholder = '請選擇...',
+    disabled = false,
+    error = '',
+    label = '',
+    required = false,
+    id = '',
+    ...rest
+  } = $props();
 
-  $: selectId = id || `select-${Math.random().toString(36).substr(2, 9)}`;
+  let selectId = $derived(id || `select-${Math.random().toString(36).substr(2, 9)}`);
 </script>
 
 <div class="w-full">
   {#if label}
-    <label
-      for={selectId}
-      class="mb-1 block text-sm font-medium text-gray-700"
-    >
+    <label for={selectId} class="mb-1 block text-sm font-medium text-gray-700">
       {label}
       {#if required}
         <span class="text-red-500">*</span>
@@ -39,10 +53,10 @@
     class="form-input block w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500 disabled:bg-gray-100 disabled:cursor-not-allowed {error
       ? 'border-red-500'
       : ''}"
-    on:change
-    on:blur
-    on:focus
-    {...$$restProps}
+    onchange={bubble('change')}
+    onblur={bubble('blur')}
+    onfocus={bubble('focus')}
+    {...rest}
   >
     {#if placeholder}
       <option value="" disabled selected={!value}>{placeholder}</option>

@@ -1,12 +1,12 @@
-import { writable, get } from "svelte/store";
+import { writable, get } from 'svelte/store';
 import {
   WS_URL,
   WS_EVENT_TYPES,
   MAX_RECONNECT_ATTEMPTS,
   RECONNECT_DELAY_MS,
-} from "../lib/constants.js";
-import { agents } from "./agents.js";
-import { addNotification } from "./notifications.js";
+} from '../lib/constants.js';
+import { agents } from './agents.js';
+import { addNotification } from './notifications.js';
 
 /**
  * WebSocket Store
@@ -38,7 +38,7 @@ const eventListeners = new Map();
  */
 export function connectWebSocket() {
   if (wsInstance && wsInstance.readyState === WebSocket.OPEN) {
-    console.log("WebSocket already connected");
+    console.log('WebSocket already connected');
     return;
   }
 
@@ -50,7 +50,7 @@ export function connectWebSocket() {
     wsInstance.onerror = handleError;
     wsInstance.onclose = handleClose;
   } catch (error) {
-    console.error("Failed to create WebSocket:", error);
+    console.error('Failed to create WebSocket:', error);
     scheduleReconnect();
   }
 }
@@ -59,13 +59,13 @@ export function connectWebSocket() {
  * 處理 WebSocket 連接成功
  */
 function handleOpen(event) {
-  console.log("WebSocket connected");
+  console.log('WebSocket connected');
   connected.set(true);
   reconnectAttempts = 0;
 
   addNotification({
-    type: "success",
-    message: "已連接到即時更新伺服器",
+    type: 'success',
+    message: '已連接到即時更新伺服器',
   });
 }
 
@@ -80,7 +80,7 @@ function handleMessage(event) {
     // 根據事件類型分發
     handleEvent(data);
   } catch (error) {
-    console.error("Failed to parse WebSocket message:", error);
+    console.error('Failed to parse WebSocket message:', error);
   }
 }
 
@@ -88,10 +88,10 @@ function handleMessage(event) {
  * 處理 WebSocket 錯誤
  */
 function handleError(event) {
-  console.error("WebSocket error:", event);
+  console.error('WebSocket error:', event);
   addNotification({
-    type: "error",
-    message: "即時連接發生錯誤",
+    type: 'error',
+    message: '即時連接發生錯誤',
   });
 }
 
@@ -99,13 +99,13 @@ function handleError(event) {
  * 處理 WebSocket 關閉
  */
 function handleClose(event) {
-  console.log("WebSocket closed:", event.code, event.reason);
+  console.log('WebSocket closed:', event.code, event.reason);
   connected.set(false);
 
   if (!event.wasClean) {
     addNotification({
-      type: "warning",
-      message: "與伺服器的連接已中斷,正在嘗試重新連接...",
+      type: 'warning',
+      message: '與伺服器的連接已中斷,正在嘗試重新連接...',
     });
     scheduleReconnect();
   }
@@ -116,9 +116,9 @@ function handleClose(event) {
  */
 function scheduleReconnect() {
   if (reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
-    console.error("Max reconnect attempts reached");
+    console.error('Max reconnect attempts reached');
     addNotification({
-      type: "error",
+      type: 'error',
       message: `無法重新連接到伺服器 (已嘗試 ${MAX_RECONNECT_ATTEMPTS} 次)`,
     });
     return;
@@ -129,9 +129,7 @@ function scheduleReconnect() {
   }
 
   const delay = RECONNECT_DELAY_MS * Math.pow(2, reconnectAttempts); // 指數退避
-  console.log(
-    `Scheduling reconnect in ${delay}ms (attempt ${reconnectAttempts + 1})`,
-  );
+  console.log(`Scheduling reconnect in ${delay}ms (attempt ${reconnectAttempts + 1})`);
 
   reconnectTimer = setTimeout(() => {
     reconnectAttempts++;
@@ -149,7 +147,7 @@ export function disconnectWebSocket() {
   }
 
   if (wsInstance) {
-    wsInstance.close(1000, "Client disconnected");
+    wsInstance.close(1000, 'Client disconnected');
     wsInstance = null;
   }
 
@@ -162,7 +160,7 @@ export function disconnectWebSocket() {
  */
 export function sendMessage(data) {
   if (!wsInstance || wsInstance.readyState !== WebSocket.OPEN) {
-    console.error("WebSocket not connected");
+    console.error('WebSocket not connected');
     return false;
   }
 
@@ -170,7 +168,7 @@ export function sendMessage(data) {
     wsInstance.send(JSON.stringify(data));
     return true;
   } catch (error) {
-    console.error("Failed to send WebSocket message:", error);
+    console.error('Failed to send WebSocket message:', error);
     return false;
   }
 }
@@ -227,26 +225,26 @@ function handleEvent(data) {
 
   // 處理內建事件
   switch (event_type) {
-    case WS_EVENT_TYPES.AGENT_STATUS:
-      handleAgentStatusUpdate(payload);
-      break;
-    case WS_EVENT_TYPES.TRADE_EXECUTION:
-      handleTradeExecution(payload);
-      break;
-    case WS_EVENT_TYPES.STRATEGY_CHANGE:
-      handleStrategyChange(payload);
-      break;
-    case WS_EVENT_TYPES.PORTFOLIO_UPDATE:
-      handlePortfolioUpdate(payload);
-      break;
-    case WS_EVENT_TYPES.PERFORMANCE_UPDATE:
-      handlePerformanceUpdate(payload);
-      break;
-    case WS_EVENT_TYPES.ERROR:
-      handleErrorEvent(payload);
-      break;
-    default:
-      console.log(`Unhandled event type: ${event_type}`, payload);
+  case WS_EVENT_TYPES.AGENT_STATUS:
+    handleAgentStatusUpdate(payload);
+    break;
+  case WS_EVENT_TYPES.TRADE_EXECUTION:
+    handleTradeExecution(payload);
+    break;
+  case WS_EVENT_TYPES.STRATEGY_CHANGE:
+    handleStrategyChange(payload);
+    break;
+  case WS_EVENT_TYPES.PORTFOLIO_UPDATE:
+    handlePortfolioUpdate(payload);
+    break;
+  case WS_EVENT_TYPES.PERFORMANCE_UPDATE:
+    handlePerformanceUpdate(payload);
+    break;
+  case WS_EVENT_TYPES.ERROR:
+    handleErrorEvent(payload);
+    break;
+  default:
+    console.log(`Unhandled event type: ${event_type}`, payload);
   }
 }
 
@@ -257,13 +255,11 @@ function handleAgentStatusUpdate(payload) {
   const { agent_id, status, current_mode } = payload;
 
   agents.update((list) =>
-    list.map((agent) =>
-      agent.agent_id === agent_id ? { ...agent, status, current_mode } : agent,
-    ),
+    list.map((agent) => (agent.agent_id === agent_id ? { ...agent, status, current_mode } : agent))
   );
 
   addNotification({
-    type: "info",
+    type: 'info',
     message: `Agent ${agent_id} 狀態更新: ${status}`,
   });
 }
@@ -275,8 +271,8 @@ function handleTradeExecution(payload) {
   const { agent_id, action, symbol, quantity, price } = payload;
 
   addNotification({
-    type: "success",
-    message: `Agent ${agent_id} ${action === "buy" ? "買入" : "賣出"} ${symbol} ${quantity} 股 @ ${price}`,
+    type: 'success',
+    message: `Agent ${agent_id} ${action === 'buy' ? '買入' : '賣出'} ${symbol} ${quantity} 股 @ ${price}`,
   });
 
   // 可以觸發投資組合刷新等後續操作
@@ -289,7 +285,7 @@ function handleStrategyChange(payload) {
   const { agent_id, change_type, reason } = payload;
 
   addNotification({
-    type: "info",
+    type: 'info',
     message: `Agent ${agent_id} 策略已調整 (${change_type}): ${reason}`,
   });
 }
@@ -323,11 +319,11 @@ function handleErrorEvent(payload) {
   const { message, details } = payload;
 
   addNotification({
-    type: "error",
+    type: 'error',
     message: `錯誤: ${message}`,
   });
 
-  console.error("WebSocket error event:", details);
+  console.error('WebSocket error event:', details);
 }
 
 /**

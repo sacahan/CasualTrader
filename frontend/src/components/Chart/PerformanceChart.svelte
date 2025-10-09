@@ -1,4 +1,6 @@
 <script>
+  import { run } from 'svelte/legacy';
+
   /**
    * PerformanceChart Component
    *
@@ -6,20 +8,22 @@
    * 符合 FRONTEND_IMPLEMENTATION.md 規格
    */
 
-  import { onMount, onDestroy } from "svelte";
-  import Chart from "chart.js/auto";
+  import { onMount, onDestroy } from 'svelte';
+  import Chart from 'chart.js/auto';
 
-  export let agentId;
-  export let performanceData = []; // { date, portfolio_value, total_return }
-  export let height = 300;
+  /**
+   * @typedef {Object} Props
+   * @property {any} agentId
+   * @property {any} [performanceData] - { date, portfolio_value, total_return }
+   * @property {number} [height]
+   */
 
-  let canvas;
-  let chart = null;
+  /** @type {Props} */
+  let { agentId, performanceData = [], height = 300 } = $props();
 
-  // 當 performanceData 更新時重繪圖表
-  $: if (chart && performanceData) {
-    updateChart(performanceData);
-  }
+  let canvas = $state();
+  let chart = $state(null);
+
 
   onMount(() => {
     initChart();
@@ -34,32 +38,32 @@
   function initChart() {
     if (!canvas) return;
 
-    const ctx = canvas.getContext("2d");
+    const ctx = canvas.getContext('2d');
 
     chart = new Chart(ctx, {
-      type: "line",
+      type: 'line',
       data: {
         labels: [],
         datasets: [
           {
-            label: "投資組合價值 (TWD)",
+            label: '投資組合價值 (TWD)',
             data: [],
-            borderColor: "rgb(59, 130, 246)",
-            backgroundColor: "rgba(59, 130, 246, 0.1)",
+            borderColor: 'rgb(59, 130, 246)',
+            backgroundColor: 'rgba(59, 130, 246, 0.1)',
             borderWidth: 2,
             fill: true,
             tension: 0.4,
-            yAxisID: "y",
+            yAxisID: 'y',
           },
           {
-            label: "總報酬率 (%)",
+            label: '總報酬率 (%)',
             data: [],
-            borderColor: "rgb(16, 185, 129)",
-            backgroundColor: "rgba(16, 185, 129, 0.1)",
+            borderColor: 'rgb(16, 185, 129)',
+            backgroundColor: 'rgba(16, 185, 129, 0.1)',
             borderWidth: 2,
             fill: true,
             tension: 0.4,
-            yAxisID: "y1",
+            yAxisID: 'y1',
           },
         ],
       },
@@ -67,31 +71,31 @@
         responsive: true,
         maintainAspectRatio: false,
         interaction: {
-          mode: "index",
+          mode: 'index',
           intersect: false,
         },
         plugins: {
           legend: {
-            position: "top",
+            position: 'top',
           },
           tooltip: {
             callbacks: {
               label: function (context) {
-                let label = context.dataset.label || "";
+                let label = context.dataset.label || '';
                 if (label) {
-                  label += ": ";
+                  label += ': ';
                 }
                 if (context.parsed.y !== null) {
                   if (context.datasetIndex === 0) {
                     // 投資組合價值
-                    label += new Intl.NumberFormat("zh-TW", {
-                      style: "currency",
-                      currency: "TWD",
+                    label += new Intl.NumberFormat('zh-TW', {
+                      style: 'currency',
+                      currency: 'TWD',
                       minimumFractionDigits: 0,
                     }).format(context.parsed.y);
                   } else {
                     // 總報酬率
-                    label += context.parsed.y.toFixed(2) + "%";
+                    label += context.parsed.y.toFixed(2) + '%';
                   }
                 }
                 return label;
@@ -104,41 +108,41 @@
             display: true,
             title: {
               display: true,
-              text: "日期",
+              text: '日期',
             },
           },
           y: {
-            type: "linear",
+            type: 'linear',
             display: true,
-            position: "left",
+            position: 'left',
             title: {
               display: true,
-              text: "投資組合價值 (TWD)",
+              text: '投資組合價值 (TWD)',
             },
             ticks: {
               callback: function (value) {
-                return new Intl.NumberFormat("zh-TW", {
-                  style: "currency",
-                  currency: "TWD",
+                return new Intl.NumberFormat('zh-TW', {
+                  style: 'currency',
+                  currency: 'TWD',
                   minimumFractionDigits: 0,
                 }).format(value);
               },
             },
           },
           y1: {
-            type: "linear",
+            type: 'linear',
             display: true,
-            position: "right",
+            position: 'right',
             title: {
               display: true,
-              text: "總報酬率 (%)",
+              text: '總報酬率 (%)',
             },
             grid: {
               drawOnChartArea: false,
             },
             ticks: {
               callback: function (value) {
-                return value.toFixed(2) + "%";
+                return value.toFixed(2) + '%';
               },
             },
           },
@@ -154,9 +158,7 @@
   function updateChart(data) {
     if (!chart || !data) return;
 
-    const labels = data.map((item) =>
-      new Date(item.date).toLocaleDateString("zh-TW"),
-    );
+    const labels = data.map((item) => new Date(item.date).toLocaleDateString('zh-TW'));
     const portfolioValues = data.map((item) => item.portfolio_value);
     const totalReturns = data.map((item) => item.total_return);
 
@@ -166,10 +168,16 @@
 
     chart.update();
   }
+  // 當 performanceData 更新時重繪圖表
+  run(() => {
+    if (chart && performanceData) {
+      updateChart(performanceData);
+    }
+  });
 </script>
 
 <div class="performance-chart" style="height: {height}px">
-  <canvas bind:this={canvas} />
+  <canvas bind:this={canvas}></canvas>
 </div>
 
 <style>

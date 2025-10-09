@@ -1,5 +1,5 @@
-import { defineConfig } from "vite";
-import { svelte } from "@sveltejs/vite-plugin-svelte";
+import { defineConfig } from 'vite';
+import { svelte } from '@sveltejs/vite-plugin-svelte';
 
 export default defineConfig({
   plugins: [svelte()],
@@ -7,23 +7,23 @@ export default defineConfig({
     port: 3000,
     host: true,
     proxy: {
-      "/api": {
-        target: "http://localhost:8000",
+      '/api': {
+        target: 'http://localhost:8000',
         changeOrigin: true,
       },
-      "/ws": {
-        target: "ws://localhost:8000",
+      '/ws': {
+        target: 'ws://localhost:8000',
         ws: true,
       },
     },
   },
   build: {
-    outDir: "dist",
+    outDir: 'dist',
     sourcemap: true,
     rollupOptions: {
       output: {
         manualChunks: {
-          vendor: ["svelte", "chart.js"],
+          vendor: ['svelte', 'chart.js'],
         },
       },
     },

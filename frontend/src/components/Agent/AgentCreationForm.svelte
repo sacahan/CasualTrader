@@ -1,4 +1,6 @@
 <script>
+  import { preventDefault } from 'svelte/legacy';
+
   /**
    * AgentCreationForm Component
    *
@@ -6,70 +8,67 @@
    * 符合 FRONTEND_IMPLEMENTATION.md 規格
    */
 
-  import { createEventDispatcher } from "svelte";
-  import { createAgent } from "../../stores/agents.js";
-  import { notifySuccess, notifyError } from "../../stores/notifications.js";
-  import { Button, Input, Select, Textarea } from "../UI/index.js";
+  import { createEventDispatcher } from 'svelte';
+  import { createAgent } from '../../stores/agents.js';
+  import { notifySuccess, notifyError } from '../../stores/notifications.js';
+  import { Button, Input, Select, Textarea } from '../UI/index.js';
   import {
     AI_MODELS,
     AI_MODEL_LABELS,
     AI_MODEL_GROUPS,
     DEFAULT_INITIAL_FUNDS,
     DEFAULT_MAX_POSITION_SIZE,
-  } from "../../lib/constants.js";
+  } from '../../lib/constants.js';
 
   const dispatch = createEventDispatcher();
 
   // 表單資料
-  let formData = {
-    name: "",
-    description: "",
+  let formData = $state({
+    name: '',
+    description: '',
     initial_funds: DEFAULT_INITIAL_FUNDS,
     max_position_size: DEFAULT_MAX_POSITION_SIZE,
     ai_model: AI_MODELS.GPT_4O,
-  };
+  });
 
   // 表單驗證錯誤
-  let errors = {
-    name: "",
-    description: "",
-    initial_funds: "",
-    max_position_size: "",
-  };
+  let errors = $state({
+    name: '',
+    description: '',
+    initial_funds: '',
+    max_position_size: '',
+  });
 
   // 提交狀態
-  let submitting = false;
+  let submitting = $state(false);
 
   // 驗證表單
   function validateForm() {
     let isValid = true;
     errors = {
-      name: "",
-      description: "",
-      initial_funds: "",
-      max_position_size: "",
+      name: '',
+      description: '',
+      initial_funds: '',
+      max_position_size: '',
     };
 
     if (!formData.name.trim()) {
-      errors.name = "請輸入 Agent 名稱";
+      errors.name = '請輸入 Agent 名稱';
       isValid = false;
     }
 
     if (!formData.description.trim()) {
-      errors.description = "請描述您的投資偏好";
+      errors.description = '請描述您的投資偏好';
       isValid = false;
     }
 
     if (formData.initial_funds <= 0) {
-      errors.initial_funds = "初始資金必須大於 0";
+      errors.initial_funds = '初始資金必須大於 0';
       isValid = false;
     }
 
-    if (
-      formData.max_position_size <= 0 ||
-      formData.max_position_size > 100
-    ) {
-      errors.max_position_size = "單一持股比例須介於 1-100 之間";
+    if (formData.max_position_size <= 0 || formData.max_position_size > 100) {
+      errors.max_position_size = '單一持股比例須介於 1-100 之間';
       isValid = false;
     }
 
@@ -96,7 +95,7 @@
       const newAgent = await createAgent(agentData);
 
       notifySuccess(`Agent "${newAgent.name}" 創建成功!`);
-      dispatch("created", newAgent);
+      dispatch('created', newAgent);
 
       // 重置表單
       resetForm();
@@ -110,40 +109,37 @@
   // 重置表單
   function resetForm() {
     formData = {
-      name: "",
-      description: "",
+      name: '',
+      description: '',
       initial_funds: DEFAULT_INITIAL_FUNDS,
       max_position_size: DEFAULT_MAX_POSITION_SIZE,
       ai_model: AI_MODELS.GPT_4O,
     };
     errors = {
-      name: "",
-      description: "",
-      initial_funds: "",
-      max_position_size: "",
+      name: '',
+      description: '',
+      initial_funds: '',
+      max_position_size: '',
     };
   }
 
   // 取消
   function handleCancel() {
     resetForm();
-    dispatch("cancel");
+    dispatch('cancel');
   }
 
   // 轉換 AI_MODEL_GROUPS 為 Select 組件格式
-  $: aiModelOptions = Object.entries(AI_MODEL_GROUPS).reduce(
-    (acc, [groupName, models]) => {
-      acc[groupName] = models.map((model) => ({
-        value: model,
-        label: AI_MODEL_LABELS[model],
-      }));
-      return acc;
-    },
-    {},
-  );
+  let aiModelOptions = $derived(Object.entries(AI_MODEL_GROUPS).reduce((acc, [groupName, models]) => {
+    acc[groupName] = models.map((model) => ({
+      value: model,
+      label: AI_MODEL_LABELS[model],
+    }));
+    return acc;
+  }, {}));
 </script>
 
-<form on:submit|preventDefault={handleSubmit} class="space-y-6">
+<form onsubmit={preventDefault(handleSubmit)} class="space-y-6">
   <!-- Agent 名稱 -->
   <Input
     label="Agent 名稱"
@@ -193,19 +189,13 @@
   </div>
 
   <!-- AI 模型選擇 -->
-  <Select
-    label="AI 模型"
-    bind:value={formData.ai_model}
-    optionGroups={aiModelOptions}
-  />
+  <Select label="AI 模型" bind:value={formData.ai_model} optionGroups={aiModelOptions} />
 
   <!-- 操作按鈕 -->
   <div class="flex justify-end gap-3">
-    <Button variant="secondary" on:click={handleCancel} disabled={submitting}>
-      取消
-    </Button>
+    <Button variant="secondary" on:click={handleCancel} disabled={submitting}>取消</Button>
     <Button type="submit" loading={submitting}>
-      {submitting ? "創建中..." : "創建 Agent"}
+      {submitting ? '創建中...' : '創建 Agent'}
     </Button>
   </div>
 </form>

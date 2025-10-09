@@ -1,38 +1,48 @@
 <script>
+  import { createBubbler } from 'svelte/legacy';
+
+  const bubble = createBubbler();
+  
+
   /**
-   * Button Component
-   *
-   * 可重用的按鈕組件,支援多種樣式和狀態
-   * 符合 FRONTEND_IMPLEMENTATION.md 規格
+   * @typedef {Object} Props
+   * @property {string} [variant] - Button Component
+可重用的按鈕組件,支援多種樣式和狀態
+符合 FRONTEND_IMPLEMENTATION.md 規格 - primary | secondary | danger | ghost
+   * @property {string} [size] - sm | md | lg
+   * @property {boolean} [disabled]
+   * @property {boolean} [loading]
+   * @property {boolean} [fullWidth]
+   * @property {string} [type]
+   * @property {import('svelte').Snippet} [children]
    */
 
-  export let variant = "primary"; // primary | secondary | danger | ghost
-  export let size = "md"; // sm | md | lg
-  export let disabled = false;
-  export let loading = false;
-  export let fullWidth = false;
-  export let type = "button";
+  /** @type {Props & { [key: string]: any }} */
+  let {
+    variant = 'primary',
+    size = 'md',
+    disabled = false,
+    loading = false,
+    fullWidth = false,
+    type = 'button',
+    children,
+    ...rest
+  } = $props();
 
   // 計算按鈕 class
-  $: buttonClass = [
-    "btn",
+  let buttonClass = $derived([
+    'btn',
     `btn-${variant}`,
     `btn-${size}`,
-    fullWidth && "w-full",
-    disabled && "opacity-50 cursor-not-allowed",
-    loading && "cursor-wait",
+    fullWidth && 'w-full',
+    disabled && 'opacity-50 cursor-not-allowed',
+    loading && 'cursor-wait',
   ]
     .filter(Boolean)
-    .join(" ");
+    .join(' '));
 </script>
 
-<button
-  {type}
-  class={buttonClass}
-  disabled={disabled || loading}
-  on:click
-  {...$$restProps}
->
+<button {type} class={buttonClass} disabled={disabled || loading} onclick={bubble('click')} {...rest}>
   {#if loading}
     <svg
       class="animate-spin -ml-1 mr-2 h-4 w-4"
@@ -40,14 +50,7 @@
       fill="none"
       viewBox="0 0 24 24"
     >
-      <circle
-        class="opacity-25"
-        cx="12"
-        cy="12"
-        r="10"
-        stroke="currentColor"
-        stroke-width="4"
-      />
+      <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
       <path
         class="opacity-75"
         fill="currentColor"
@@ -55,7 +58,7 @@
       />
     </svg>
   {/if}
-  <slot />
+  {@render children?.()}
 </button>
 
 <style>

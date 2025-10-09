@@ -5,10 +5,16 @@
    * 導航列組件
    */
 
-  import { connected } from "../../stores/websocket.js";
-  import { isOpen } from "../../stores/market.js";
+  import { connected } from '../../stores/websocket.js';
+  import { isOpen } from '../../stores/market.js';
 
-  export let title = "CasualTrader";
+  /**
+   * @typedef {Object} Props
+   * @property {string} [title]
+   */
+
+  /** @type {Props} */
+  let { title = 'CasualTrader' } = $props();
 </script>
 
 <nav class="border-b border-gray-200 bg-white shadow-sm">
@@ -17,12 +23,7 @@
       <!-- Logo & Title -->
       <div class="flex items-center gap-3">
         <div class="flex h-10 w-10 items-center justify-center rounded-lg bg-primary-500">
-          <svg
-            class="h-6 w-6 text-white"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-          >
+          <svg class="h-6 w-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path
               stroke-linecap="round"
               stroke-linejoin="round"
@@ -38,25 +39,19 @@
       <div class="flex items-center gap-4">
         <!-- Market Status -->
         <div class="flex items-center gap-2">
-          <div
-            class="h-2 w-2 rounded-full {$isOpen
-              ? 'bg-green-500'
-              : 'bg-gray-400'}"
-          />
+          <div class="h-2 w-2 rounded-full {$isOpen ? 'bg-green-500' : 'bg-gray-400'}"></div>
           <span class="text-sm text-gray-600">
-            {$isOpen ? "市場開盤中" : "市場已收盤"}
+            {$isOpen ? '市場開盤中' : '市場已收盤'}
           </span>
         </div>
 
         <!-- WebSocket Connection Status -->
         <div class="flex items-center gap-2">
           <div
-            class="h-2 w-2 rounded-full {$connected
-              ? 'bg-green-500 animate-pulse'
-              : 'bg-red-500'}"
-          />
+            class="h-2 w-2 rounded-full {$connected ? 'bg-green-500 animate-pulse' : 'bg-red-500'}"
+></div>
           <span class="text-sm text-gray-600">
-            {$connected ? "即時連線" : "離線"}
+            {$connected ? '即時連線' : '離線'}
           </span>
         </div>
       </div>

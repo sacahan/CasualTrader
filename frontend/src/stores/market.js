@@ -1,6 +1,6 @@
-import { writable, derived } from "svelte/store";
-import { apiClient } from "../lib/api.js";
-import { extractErrorMessage, isMarketOpen } from "../lib/utils.js";
+import { writable, derived } from 'svelte/store';
+import { apiClient } from '../lib/api.js';
+import { extractErrorMessage, isMarketOpen } from '../lib/utils.js';
 
 /**
  * Market Store
@@ -49,7 +49,7 @@ export async function loadMarketStatus() {
     return data;
   } catch (err) {
     error.set(extractErrorMessage(err));
-    console.error("Failed to load market status:", err);
+    console.error('Failed to load market status:', err);
     throw err;
   } finally {
     loading.set(false);
@@ -69,7 +69,7 @@ export async function loadMarketIndices() {
     return data;
   } catch (err) {
     error.set(extractErrorMessage(err));
-    console.error("Failed to load market indices:", err);
+    console.error('Failed to load market indices:', err);
     throw err;
   } finally {
     loading.set(false);
@@ -110,11 +110,9 @@ export async function loadStockQuotes(symbols) {
 
   try {
     const quotes = await Promise.allSettled(promises);
-    return quotes
-      .filter((result) => result.status === "fulfilled")
-      .map((result) => result.value);
+    return quotes.filter((result) => result.status === 'fulfilled').map((result) => result.value);
   } catch (err) {
-    console.error("Failed to load stock quotes:", err);
+    console.error('Failed to load stock quotes:', err);
     throw err;
   }
 }

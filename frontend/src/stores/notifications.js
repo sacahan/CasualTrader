@@ -1,5 +1,5 @@
-import { writable } from "svelte/store";
-import { generateId } from "../lib/utils.js";
+import { writable } from 'svelte/store';
+import { generateId } from '../lib/utils.js';
 
 /**
  * Notifications Store
@@ -61,7 +61,7 @@ export function clearAllNotifications() {
  * 便捷方法:添加成功通知
  */
 export function notifySuccess(message, duration = 3000) {
-  return addNotification({ type: "success", message, duration });
+  return addNotification({ type: 'success', message, duration });
 }
 
 /**
@@ -69,19 +69,19 @@ export function notifySuccess(message, duration = 3000) {
  */
 export function notifyError(message, duration = 0) {
   // 錯誤通知預設不自動關閉
-  return addNotification({ type: "error", message, duration });
+  return addNotification({ type: 'error', message, duration });
 }
 
 /**
  * 便捷方法:添加警告通知
  */
 export function notifyWarning(message, duration = 5000) {
-  return addNotification({ type: "warning", message, duration });
+  return addNotification({ type: 'warning', message, duration });
 }
 
 /**
  * 便捷方法:添加資訊通知
  */
 export function notifyInfo(message, duration = 3000) {
-  return addNotification({ type: "info", message, duration });
+  return addNotification({ type: 'info', message, duration });
 }

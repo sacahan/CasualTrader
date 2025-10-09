@@ -1,6 +1,6 @@
-import { writable, derived, get } from "svelte/store";
-import { apiClient } from "../lib/api.js";
-import { extractErrorMessage } from "../lib/utils.js";
+import { writable, derived, get } from 'svelte/store';
+import { apiClient } from '../lib/api.js';
+import { extractErrorMessage } from '../lib/utils.js';
 
 /**
  * Agent Store
@@ -22,22 +22,19 @@ export const loading = writable(false);
 export const error = writable(null);
 
 // 衍生 store: 當前選中的 agent
-export const selectedAgent = derived(
-  [agents, selectedAgentId],
-  ([$agents, $selectedAgentId]) => {
-    if (!$selectedAgentId) return null;
-    return $agents.find((agent) => agent.agent_id === $selectedAgentId);
-  },
-);
+export const selectedAgent = derived([agents, selectedAgentId], ([$agents, $selectedAgentId]) => {
+  if (!$selectedAgentId) return null;
+  return $agents.find((agent) => agent.agent_id === $selectedAgentId);
+});
 
 // 衍生 store: 執行中的 agents
 export const runningAgents = derived(agents, ($agents) =>
-  $agents.filter((agent) => agent.status === "running"),
+  $agents.filter((agent) => agent.status === 'running')
 );
 
 // 衍生 store: 閒置的 agents
 export const idleAgents = derived(agents, ($agents) =>
-  $agents.filter((agent) => agent.status === "idle"),
+  $agents.filter((agent) => agent.status === 'idle')
 );
 
 /**
@@ -52,7 +49,7 @@ export async function loadAgents() {
     agents.set(data.agents || []);
   } catch (err) {
     error.set(extractErrorMessage(err));
-    console.error("Failed to load agents:", err);
+    console.error('Failed to load agents:', err);
   } finally {
     loading.set(false);
   }
@@ -82,7 +79,7 @@ export async function loadAgent(agentId) {
     return agent;
   } catch (err) {
     error.set(extractErrorMessage(err));
-    console.error("Failed to load agent:", err);
+    console.error('Failed to load agent:', err);
     throw err;
   } finally {
     loading.set(false);
@@ -108,7 +105,7 @@ export async function createAgent(agentData) {
     return newAgent;
   } catch (err) {
     error.set(extractErrorMessage(err));
-    console.error("Failed to create agent:", err);
+    console.error('Failed to create agent:', err);
     throw err;
   } finally {
     loading.set(false);
@@ -125,8 +122,8 @@ export async function updateAgent(agentId, updates) {
 
   // 檢查配置鎖定
   const agent = get(agents).find((a) => a.agent_id === agentId);
-  if (agent && agent.status === "running") {
-    const lockError = "無法更新執行中的 Agent 配置。請先停止 Agent。";
+  if (agent && agent.status === 'running') {
+    const lockError = '無法更新執行中的 Agent 配置。請先停止 Agent。';
     error.set(lockError);
     loading.set(false);
     throw new Error(lockError);
@@ -136,14 +133,12 @@ export async function updateAgent(agentId, updates) {
     const updatedAgent = await apiClient.updateAgent(agentId, updates);
 
     // 更新 agents 列表
-    agents.update((list) =>
-      list.map((a) => (a.agent_id === agentId ? updatedAgent : a)),
-    );
+    agents.update((list) => list.map((a) => (a.agent_id === agentId ? updatedAgent : a)));
 
     return updatedAgent;
   } catch (err) {
     error.set(extractErrorMessage(err));
-    console.error("Failed to update agent:", err);
+    console.error('Failed to update agent:', err);
     throw err;
   } finally {
     loading.set(false);
@@ -169,7 +164,7 @@ export async function deleteAgent(agentId) {
     }
   } catch (err) {
     error.set(extractErrorMessage(err));
-    console.error("Failed to delete agent:", err);
+    console.error('Failed to delete agent:', err);
     throw err;
   } finally {
     loading.set(false);
@@ -188,15 +183,13 @@ export async function startAgent(agentId, config = {}) {
 
     // 更新 agent 狀態為 running
     agents.update((list) =>
-      list.map((a) =>
-        a.agent_id === agentId ? { ...a, status: "running" } : a,
-      ),
+      list.map((a) => (a.agent_id === agentId ? { ...a, status: 'running' } : a))
     );
 
     return result;
   } catch (err) {
     error.set(extractErrorMessage(err));
-    console.error("Failed to start agent:", err);
+    console.error('Failed to start agent:', err);
     throw err;
   } finally {
     loading.set(false);
@@ -215,13 +208,13 @@ export async function stopAgent(agentId) {
 
     // 更新 agent 狀態為 idle
     agents.update((list) =>
-      list.map((a) => (a.agent_id === agentId ? { ...a, status: "idle" } : a)),
+      list.map((a) => (a.agent_id === agentId ? { ...a, status: 'idle' } : a))
     );
 
     return result;
   } catch (err) {
     error.set(extractErrorMessage(err));
-    console.error("Failed to stop agent:", err);
+    console.error('Failed to stop agent:', err);
     throw err;
   } finally {
     loading.set(false);
@@ -240,7 +233,7 @@ export async function executeAgent(agentId, mode = null) {
     return result;
   } catch (err) {
     error.set(extractErrorMessage(err));
-    console.error("Failed to execute agent:", err);
+    console.error('Failed to execute agent:', err);
     throw err;
   } finally {
     loading.set(false);
@@ -259,15 +252,13 @@ export async function switchAgentMode(agentId, mode) {
 
     // 更新 agent 的 current_mode
     agents.update((list) =>
-      list.map((a) =>
-        a.agent_id === agentId ? { ...a, current_mode: mode } : a,
-      ),
+      list.map((a) => (a.agent_id === agentId ? { ...a, current_mode: mode } : a))
     );
 
     return result;
   } catch (err) {
     error.set(extractErrorMessage(err));
-    console.error("Failed to switch agent mode:", err);
+    console.error('Failed to switch agent mode:', err);
     throw err;
   } finally {
     loading.set(false);
@@ -290,7 +281,7 @@ export async function resetAgent(agentId) {
     return result;
   } catch (err) {
     error.set(extractErrorMessage(err));
-    console.error("Failed to reset agent:", err);
+    console.error('Failed to reset agent:', err);
     throw err;
   } finally {
     loading.set(false);
@@ -323,5 +314,5 @@ export function clearError() {
  */
 export function isAgentEditable(agentId) {
   const agent = get(agents).find((a) => a.agent_id === agentId);
-  return agent ? agent.status !== "running" : false;
+  return agent ? agent.status !== 'running' : false;
 }

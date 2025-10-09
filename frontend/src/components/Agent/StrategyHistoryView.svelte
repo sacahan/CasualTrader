@@ -6,21 +6,24 @@
    * 符合 FRONTEND_IMPLEMENTATION.md 規格
    */
 
-  import { onMount } from "svelte";
-  import { apiClient } from "../../lib/api.js";
-  import { formatDateTime } from "../../lib/utils.js";
-  import {
-    CHANGE_TYPE_LABELS,
-    CHANGE_TYPE_COLORS,
-  } from "../../lib/constants.js";
+  import { onMount } from 'svelte';
+  import { apiClient } from '../../lib/api.js';
+  import { formatDateTime } from '../../lib/utils.js';
+  import { CHANGE_TYPE_LABELS, CHANGE_TYPE_COLORS } from '../../lib/constants.js';
 
-  export let agentId;
-  export let limit = 20;
+  /**
+   * @typedef {Object} Props
+   * @property {any} agentId
+   * @property {number} [limit]
+   */
 
-  let strategyChanges = [];
-  let latestStrategy = null;
-  let loading = false;
-  let error = null;
+  /** @type {Props} */
+  let { agentId, limit = 20 } = $props();
+
+  let strategyChanges = $state([]);
+  let latestStrategy = $state(null);
+  let loading = $state(false);
+  let error = $state(null);
 
   onMount(async () => {
     await loadStrategyHistory();
@@ -34,12 +37,7 @@
 
     try {
       // 載入策略變更歷史
-      const changesData = await apiClient.getStrategyChanges(
-        agentId,
-        limit,
-        0,
-        null,
-      );
+      const changesData = await apiClient.getStrategyChanges(agentId, limit, 0, null);
       strategyChanges = changesData.strategy_changes || [];
 
       // 載入最新策略
@@ -47,7 +45,7 @@
       latestStrategy = latestData.latest_strategy;
     } catch (err) {
       error = err.message;
-      console.error("Failed to load strategy history:", err);
+      console.error('Failed to load strategy history:', err);
     } finally {
       loading = false;
     }
@@ -89,24 +87,16 @@
     </div>
   {:else if error}
     <!-- 錯誤狀態 -->
-    <div
-      class="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800"
-    >
+    <div class="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800">
       <p class="font-medium">載入失敗</p>
       <p class="mt-1">{error}</p>
     </div>
   {:else}
     <!-- 最新策略卡片 -->
     {#if latestStrategy}
-      <div
-        class="mb-6 rounded-lg border-2 border-primary-500 bg-primary-50 p-4"
-      >
+      <div class="mb-6 rounded-lg border-2 border-primary-500 bg-primary-50 p-4">
         <div class="mb-2 flex items-center gap-2">
-          <svg
-            class="h-5 w-5 text-primary-600"
-            fill="currentColor"
-            viewBox="0 0 20 20"
-          >
+          <svg class="h-5 w-5 text-primary-600" fill="currentColor" viewBox="0 0 20 20">
             <path
               fill-rule="evenodd"
               d="M11.3 1.046A1 1 0 0112 2v5h4a1 1 0 01.82 1.573l-7 10A1 1 0 018 18v-5H4a1 1 0 01-.82-1.573l7-10a1 1 0 011.12-.38z"
@@ -141,10 +131,7 @@
 
         <div class="relative">
           <!-- 時間軸線 -->
-          <div
-            class="absolute left-4 top-0 bottom-0 w-0.5 bg-gray-200"
-            aria-hidden="true"
-          />
+          <div class="absolute left-4 top-0 bottom-0 w-0.5 bg-gray-200" aria-hidden="true"></div>
 
           <!-- 策略變更列表 -->
           <div class="space-y-6">
@@ -156,7 +143,7 @@
                     class="h-3 w-3 rounded-full border-2 border-white {index === 0
                       ? 'bg-primary-500'
                       : 'bg-gray-400'} shadow"
-                  />
+></div>
                 </div>
 
                 <!-- 變更內容卡片 -->
@@ -190,26 +177,21 @@
 
                   <!-- 績效指標 (如果有) -->
                   {#if change.performance_snapshot}
-                    <div
-                      class="mt-3 grid grid-cols-2 gap-4 rounded-md bg-gray-50 p-3 text-xs"
-                    >
+                    <div class="mt-3 grid grid-cols-2 gap-4 rounded-md bg-gray-50 p-3 text-xs">
                       <div>
                         <span class="text-gray-600">當時總報酬:</span>
                         <span
-                          class="ml-1 font-medium {change.performance_snapshot
-                            .total_return >= 0
+                          class="ml-1 font-medium {change.performance_snapshot.total_return >= 0
                             ? 'text-green-600'
                             : 'text-red-600'}"
                         >
-                          {change.performance_snapshot.total_return?.toFixed(2) ||
-                            "N/A"}%
+                          {change.performance_snapshot.total_return?.toFixed(2) || 'N/A'}%
                         </span>
                       </div>
                       <div>
                         <span class="text-gray-600">Sharpe Ratio:</span>
                         <span class="ml-1 font-medium text-gray-900">
-                          {change.performance_snapshot.sharpe_ratio?.toFixed(2) ||
-                            "N/A"}
+                          {change.performance_snapshot.sharpe_ratio?.toFixed(2) || 'N/A'}
                         </span>
                       </div>
                     </div>

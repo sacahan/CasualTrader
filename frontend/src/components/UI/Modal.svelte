@@ -6,25 +6,42 @@
    * 符合 FRONTEND_IMPLEMENTATION.md 規格
    */
 
-  import { createEventDispatcher, onMount, onDestroy } from "svelte";
+  import { createEventDispatcher, onMount, onDestroy } from 'svelte';
 
-  export let open = false;
-  export let title = "";
-  export let size = "md"; // sm | md | lg | xl
-  export let closeOnBackdrop = true;
+  /**
+   * @typedef {Object} Props
+   * @property {boolean} [open]
+   * @property {string} [title]
+   * @property {string} [size] - sm | md | lg | xl
+   * @property {boolean} [closeOnBackdrop]
+   * @property {import('svelte').Snippet} [header]
+   * @property {import('svelte').Snippet} [children]
+   * @property {import('svelte').Snippet} [footer]
+   */
+
+  /** @type {Props} */
+  let {
+    open = $bindable(false),
+    title = '',
+    size = 'md',
+    closeOnBackdrop = true,
+    header,
+    children,
+    footer
+  } = $props();
 
   const dispatch = createEventDispatcher();
 
   // 按 ESC 關閉
   function handleKeydown(event) {
-    if (event.key === "Escape" && open) {
+    if (event.key === 'Escape' && open) {
       close();
     }
   }
 
   function close() {
     open = false;
-    dispatch("close");
+    dispatch('close');
   }
 
   function handleBackdropClick(event) {
@@ -34,19 +51,19 @@
   }
 
   onMount(() => {
-    document.addEventListener("keydown", handleKeydown);
+    document.addEventListener('keydown', handleKeydown);
   });
 
   onDestroy(() => {
-    document.removeEventListener("keydown", handleKeydown);
+    document.removeEventListener('keydown', handleKeydown);
   });
 
   // Size class mapping
   const sizeClasses = {
-    sm: "max-w-sm",
-    md: "max-w-md",
-    lg: "max-w-lg",
-    xl: "max-w-xl",
+    sm: 'max-w-sm',
+    md: 'max-w-md',
+    lg: 'max-w-lg',
+    xl: 'max-w-xl',
   };
 </script>
 
@@ -60,11 +77,11 @@
     <!-- Backdrop -->
     <div
       class="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity"
-      on:click={handleBackdropClick}
-      on:keydown={handleKeydown}
+      onclick={handleBackdropClick}
+      onkeydown={handleKeydown}
       role="button"
       tabindex="0"
-    />
+></div>
 
     <!-- Modal container -->
     <div class="flex min-h-full items-center justify-center p-4">
@@ -74,13 +91,11 @@
         ]} transform overflow-hidden rounded-lg bg-white shadow-xl transition-all"
       >
         <!-- Header -->
-        {#if title || $$slots.header}
-          <div
-            class="flex items-center justify-between border-b border-gray-200 px-6 py-4"
-          >
+        {#if title || header}
+          <div class="flex items-center justify-between border-b border-gray-200 px-6 py-4">
             <div class="flex-1">
-              {#if $$slots.header}
-                <slot name="header" />
+              {#if header}
+                {@render header?.()}
               {:else}
                 <h3 class="text-lg font-semibold text-gray-900" id="modal-title">
                   {title}
@@ -90,15 +105,10 @@
             <button
               type="button"
               class="ml-4 rounded-md text-gray-400 hover:text-gray-500 focus:outline-none focus:ring-2 focus:ring-primary-500"
-              on:click={close}
+              onclick={close}
             >
               <span class="sr-only">關閉</span>
-              <svg
-                class="h-6 w-6"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-              >
+              <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path
                   stroke-linecap="round"
                   stroke-linejoin="round"
@@ -112,15 +122,13 @@
 
         <!-- Body -->
         <div class="px-6 py-4">
-          <slot />
+          {@render children?.()}
         </div>
 
         <!-- Footer -->
-        {#if $$slots.footer}
-          <div
-            class="flex items-center justify-end gap-3 border-t border-gray-200 px-6 py-4"
-          >
-            <slot name="footer" />
+        {#if footer}
+          <div class="flex items-center justify-end gap-3 border-t border-gray-200 px-6 py-4">
+            {@render footer?.()}
           </div>
         {/if}
       </div>

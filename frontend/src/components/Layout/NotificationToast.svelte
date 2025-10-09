@@ -5,42 +5,40 @@
    * 通知提示組件,顯示在畫面右上角
    */
 
-  import { notifications, removeNotification } from "../../stores/notifications.js";
+  import { notifications, removeNotification } from '../../stores/notifications.js';
 
   function getTypeClasses(type) {
     switch (type) {
-      case "success":
-        return "bg-green-50 text-green-800 border-green-200";
-      case "error":
-        return "bg-red-50 text-red-800 border-red-200";
-      case "warning":
-        return "bg-yellow-50 text-yellow-800 border-yellow-200";
-      case "info":
-        return "bg-blue-50 text-blue-800 border-blue-200";
+      case 'success':
+        return 'bg-green-50 text-green-800 border-green-200';
+      case 'error':
+        return 'bg-red-50 text-red-800 border-red-200';
+      case 'warning':
+        return 'bg-yellow-50 text-yellow-800 border-yellow-200';
+      case 'info':
+        return 'bg-blue-50 text-blue-800 border-blue-200';
       default:
-        return "bg-gray-50 text-gray-800 border-gray-200";
+        return 'bg-gray-50 text-gray-800 border-gray-200';
     }
   }
 
   function getTypeIcon(type) {
     switch (type) {
-      case "success":
-        return "M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z";
-      case "error":
-        return "M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z";
-      case "warning":
-        return "M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z";
-      case "info":
-        return "M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z";
+      case 'success':
+        return 'M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z';
+      case 'error':
+        return 'M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z';
+      case 'warning':
+        return 'M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z';
+      case 'info':
+        return 'M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z';
       default:
-        return "M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z";
+        return 'M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z';
     }
   }
 </script>
 
-<div
-  class="pointer-events-none fixed inset-0 z-50 flex flex-col items-end justify-start gap-2 p-4"
->
+<div class="pointer-events-none fixed inset-0 z-50 flex flex-col items-end justify-start gap-2 p-4">
   {#each $notifications as notification (notification.id)}
     <div
       class="pointer-events-auto max-w-sm transform transition-all duration-300 ease-in-out"
@@ -48,16 +46,11 @@
     >
       <div
         class="flex items-start gap-3 rounded-lg border p-4 shadow-lg {getTypeClasses(
-          notification.type,
+          notification.type
         )}"
       >
         <!-- Icon -->
-        <svg
-          class="h-5 w-5 flex-shrink-0"
-          fill="none"
-          viewBox="0 0 24 24"
-          stroke="currentColor"
-        >
+        <svg class="h-5 w-5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path
             stroke-linecap="round"
             stroke-linejoin="round"
@@ -73,7 +66,7 @@
         <button
           type="button"
           class="flex-shrink-0 rounded-md hover:opacity-70 focus:outline-none"
-          on:click={() => removeNotification(notification.id)}
+          onclick={() => removeNotification(notification.id)}
         >
           <span class="sr-only">關閉</span>
           <svg class="h-5 w-5" fill="currentColor" viewBox="0 0 20 20">
