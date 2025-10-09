@@ -18,10 +18,9 @@ import pytest
 sys.path.insert(0, str(Path(__file__).parent.parent.parent / "src"))
 
 from agents.core.instruction_generator import (
-    AgentConfig,
     InstructionGenerator,
-    TradingRules,
 )
+from agents.core.models import AgentConfig, TradingSettings
 from agents.core.strategy_auto_adjuster import (
     StrategyAutoAdjuster,
 )
@@ -54,7 +53,7 @@ class TestPhase2CoreIntegration:
             excluded_sectors=["tobacco"],
             max_position_size=0.15,
             max_portfolio_sectors=8,
-            trading_rules=TradingRules(
+            trading_settings=TradingSettings(
                 max_daily_trades=5,
                 min_trade_amount=50000,
                 stop_loss_percentage=0.08,

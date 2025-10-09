@@ -3,23 +3,16 @@ MarketStatusChecker MCP 整合簡單測試
 """
 
 import asyncio
-import importlib.util
 import sys
 from datetime import datetime
 from pathlib import Path
 
 # 添加 src 到路徑
-src_path = Path(__file__).parent / "src"
-sys.path.insert(0, str(src_path))
+src_path = Path(__file__).parent.parent.parent.parent.parent / "src"
+if str(src_path) not in sys.path:
+    sys.path.insert(0, str(src_path))
 
-# 直接導入 market_status 模組
-spec = importlib.util.spec_from_file_location(
-    "market_status", src_path / "agents" / "functions" / "market_status.py"
-)
-market_status = importlib.util.module_from_spec(spec)
-spec.loader.exec_module(market_status)
-
-MarketStatusChecker = market_status.MarketStatusChecker
+from agents.functions.market_status import MarketStatusChecker  # noqa: E402
 
 
 class MockMCPClient:
