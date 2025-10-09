@@ -147,9 +147,7 @@ class StrategyChangeRecorder:
                 timestamp=datetime.now(),
             )
 
-    def _validate_change_request(
-        self, request: StrategyChangeRequest
-    ) -> dict[str, Any]:
+    def _validate_change_request(self, request: StrategyChangeRequest) -> dict[str, Any]:
         """驗證策略變更請求"""
         warnings = []
 
@@ -191,9 +189,7 @@ class StrategyChangeRecorder:
 
         # 檢查敏感內容
         sensitive_keywords = ["清倉", "全部賣出", "停止交易", "暫停", "緊急"]
-        if any(
-            keyword in request.new_strategy_addition for keyword in sensitive_keywords
-        ):
+        if any(keyword in request.new_strategy_addition for keyword in sensitive_keywords):
             warnings.append("策略變更包含敏感操作，請謹慎確認")
 
         return {"is_valid": True, "error": None, "warnings": warnings}
@@ -207,9 +203,7 @@ class StrategyChangeRecorder:
         # 檢查當日變更次數
         recent_changes = tracker.get_strategy_changes(limit=10)
         today_changes = [
-            change
-            for change in recent_changes
-            if change.timestamp.date() == datetime.now().date()
+            change for change in recent_changes if change.timestamp.date() == datetime.now().date()
         ]
 
         max_daily_changes = 5  # 每日最大變更次數
@@ -223,9 +217,7 @@ class StrategyChangeRecorder:
         # 檢查變更間隔
         if recent_changes:
             latest_change = recent_changes[0]
-            time_since_last = (
-                datetime.now() - latest_change.timestamp
-            ).total_seconds() / 3600
+            time_since_last = (datetime.now() - latest_change.timestamp).total_seconds() / 3600
 
             min_interval_hours = 2  # 最小間隔 2 小時
             if time_since_last < min_interval_hours:
@@ -359,9 +351,7 @@ class StrategyChangeRecorder:
                     f"Updated effectiveness for change {change_id}: {effectiveness_score}"
                 )
             else:
-                self.logger.warning(
-                    f"Failed to update effectiveness for change {change_id}"
-                )
+                self.logger.warning(f"Failed to update effectiveness for change {change_id}")
 
             return success
 
@@ -412,9 +402,7 @@ class StrategyChangeRecorder:
             result = await self.record_strategy_change(rollback_request)
 
             if result.success:
-                self.logger.info(
-                    f"Strategy change {change_id} rolled back successfully"
-                )
+                self.logger.info(f"Strategy change {change_id} rolled back successfully")
                 result.recommendations.append("策略已回滾，建議監控後續表現")
                 result.recommendations.append("分析回滾原因以避免類似問題")
 

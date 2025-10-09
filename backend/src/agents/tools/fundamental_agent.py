@@ -176,9 +176,7 @@ class FundamentalAnalysisTools:
 
         result["solvency"] = {
             "debt_ratio": total_liabilities / assets if assets > 0 else 0,
-            "current_ratio": current_assets / current_liabilities
-            if current_liabilities > 0
-            else 0,
+            "current_ratio": current_assets / current_liabilities if current_liabilities > 0 else 0,
         }
 
         self.logger.debug(
@@ -340,9 +338,7 @@ class FundamentalAnalysisTools:
         else:
             valuation_level, fair_value = "合理", current_price
 
-        discount_rate = (
-            (fair_value - current_price) / current_price if current_price > 0 else 0
-        )
+        discount_rate = (fair_value - current_price) / current_price if current_price > 0 else 0
 
         self.logger.info(
             f"估值評估完成 | 股票: {symbol} | 等級: {valuation_level} | "
@@ -383,9 +379,7 @@ class FundamentalAnalysisTools:
         revenue_growth = historical_data.get("latest_revenue_growth", 0)
         eps_growth = historical_data.get("latest_eps_growth", 0)
 
-        self.logger.debug(
-            f"成長數據 | 營收成長: {revenue_growth:.1%} | EPS成長: {eps_growth:.1%}"
-        )
+        self.logger.debug(f"成長數據 | 營收成長: {revenue_growth:.1%} | EPS成長: {eps_growth:.1%}")
 
         if revenue_growth > 0.15:
             score += 40
@@ -455,11 +449,7 @@ class FundamentalAnalysisTools:
         )
 
         overall_score = (health_score * 0.4 + growth_score * 0.35) * (
-            1.2
-            if valuation_level == "便宜"
-            else 0.9
-            if valuation_level == "昂貴"
-            else 1.0
+            1.2 if valuation_level == "便宜" else 0.9 if valuation_level == "昂貴" else 1.0
         )
 
         key_reasons = []

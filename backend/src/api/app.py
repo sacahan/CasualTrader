@@ -117,9 +117,7 @@ def create_app() -> FastAPI:
         logger.info(f"→ {request.method} {request.url.path}")
         try:
             response = await call_next(request)
-            logger.info(
-                f"← {request.method} {request.url.path} - Status: {response.status_code}"
-            )
+            logger.info(f"← {request.method} {request.url.path} - Status: {response.status_code}")
             return response
         except Exception as e:
             logger.error(f"✗ {request.method} {request.url.path} - Error: {e!s}")
@@ -159,9 +157,7 @@ def create_app() -> FastAPI:
     frontend_dist = Path(__file__).parent.parent.parent / "frontend" / "dist"
     if frontend_dist.exists():
         logger.info(f"Mounting frontend static files from: {frontend_dist}")
-        app.mount(
-            "/", StaticFiles(directory=str(frontend_dist), html=True), name="frontend"
-        )
+        app.mount("/", StaticFiles(directory=str(frontend_dist), html=True), name="frontend")
     else:
         logger.warning(f"Frontend dist directory not found: {frontend_dist}")
 

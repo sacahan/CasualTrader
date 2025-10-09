@@ -116,9 +116,7 @@ class AgentManager:
             self.logger.info(
                 f"Waiting for {len(self._active_executions)} active executions to complete..."
             )
-            await asyncio.gather(
-                *self._active_executions.values(), return_exceptions=True
-            )
+            await asyncio.gather(*self._active_executions.values(), return_exceptions=True)
 
     # ==========================================
     # Agent 管理
@@ -246,9 +244,7 @@ class AgentManager:
             "current_mode": str(agent.state.current_mode.value),
             "status": str(agent.state.status.value),
             "initial_funds": float(agent.config.initial_funds),
-            "current_funds": float(
-                agent.config.current_funds or agent.config.initial_funds
-            ),
+            "current_funds": float(agent.config.current_funds or agent.config.initial_funds),
             "max_turns": agent.config.max_turns,
             "risk_tolerance": agent.config.investment_preferences.risk_tolerance_to_float(
                 agent.config.investment_preferences.risk_tolerance
@@ -319,9 +315,7 @@ class AgentManager:
                 else:
                     # 非同步執行，設定完成回調
                     execution_task.add_done_callback(
-                        lambda task: self._handle_async_execution_completion(
-                            agent_id, task
-                        )
+                        lambda task: self._handle_async_execution_completion(agent_id, task)
                     )
                     return None
 
@@ -342,15 +336,11 @@ class AgentManager:
             else:
                 result = task.result()
                 self._record_execution_result(agent_id, result)
-                self.logger.info(
-                    f"Async execution for agent {agent_id} completed: {result.status}"
-                )
+                self.logger.info(f"Async execution for agent {agent_id} completed: {result.status}")
         except Exception as e:
             self.logger.error(f"Error handling async execution completion: {e}")
 
-    def _record_execution_result(
-        self, agent_id: str, result: AgentExecutionResult
-    ) -> None:
+    def _record_execution_result(self, agent_id: str, result: AgentExecutionResult) -> None:
         """記錄執行結果"""
         if agent_id in self._execution_history:
             self._execution_history[agent_id].append(result)
@@ -358,9 +348,7 @@ class AgentManager:
             # 限制歷史記錄數量
             max_history = 100
             if len(self._execution_history[agent_id]) > max_history:
-                self._execution_history[agent_id] = self._execution_history[agent_id][
-                    -max_history:
-                ]
+                self._execution_history[agent_id] = self._execution_history[agent_id][-max_history:]
 
     async def _cancel_agent_executions(self, agent_id: str) -> None:
         """取消 Agent 的所有執行"""
@@ -383,9 +371,7 @@ class AgentManager:
         self, mode: AgentMode | None = None, wait_for_completion: bool = True
     ) -> dict[str, AgentExecutionResult | None]:
         """執行所有活躍 Agent"""
-        active_agents = [
-            agent_id for agent_id, agent in self._agents.items() if agent.is_active
-        ]
+        active_agents = [agent_id for agent_id, agent in self._agents.items() if agent.is_active]
 
         if not active_agents:
             self.logger.warning("No active agents to execute")
@@ -443,9 +429,7 @@ class AgentManager:
 
                 # 記錄監控資訊
                 if self._active_executions:
-                    self.logger.debug(
-                        f"Active executions: {len(self._active_executions)}"
-                    )
+                    self.logger.debug(f"Active executions: {len(self._active_executions)}")
 
                 # 等待下次檢查
                 await asyncio.sleep(10)
@@ -456,9 +440,7 @@ class AgentManager:
 
     def get_execution_statistics(self) -> dict[str, Any]:
         """獲取執行統計資訊"""
-        total_executions = sum(
-            len(history) for history in self._execution_history.values()
-        )
+        total_executions = sum(len(history) for history in self._execution_history.values())
 
         agent_stats = {}
         for agent_id, agent in self._agents.items():
@@ -487,9 +469,7 @@ class AgentManager:
     # ==========================================
 
     @asynccontextmanager
-    async def agent_execution_context(
-        self, agent_id: str
-    ) -> AsyncIterator[CasualTradingAgent]:
+    async def agent_execution_context(self, agent_id: str) -> AsyncIterator[CasualTradingAgent]:
         """Agent 執行上下文管理器"""
         agent = await self.get_agent(agent_id)
 
@@ -550,9 +530,7 @@ class AgentManager:
         portfolio_data = {
             "cash": float(agent.config.current_funds or agent.config.initial_funds),
             "holdings": [],
-            "total_value": float(
-                agent.config.current_funds or agent.config.initial_funds
-            ),
+            "total_value": float(agent.config.current_funds or agent.config.initial_funds),
             "total_cost": float(agent.config.initial_funds),
             "unrealized_pnl": 0.0,
             "unrealized_pnl_percent": 0.0,
@@ -568,12 +546,9 @@ class AgentManager:
                         "quantity": int(h.quantity),
                         "average_cost": float(h.average_cost),
                         "current_price": float(h.current_price or h.average_cost),
-                        "market_value": float(
-                            h.quantity * (h.current_price or h.average_cost)
-                        ),
+                        "market_value": float(h.quantity * (h.current_price or h.average_cost)),
                         "unrealized_pnl": float(
-                            h.quantity
-                            * ((h.current_price or h.average_cost) - h.average_cost)
+                            h.quantity * ((h.current_price or h.average_cost) - h.average_cost)
                         ),
                         "weight": 0.0,  # Will be calculated
                     }
@@ -581,24 +556,16 @@ class AgentManager:
                 ]
 
                 # Calculate total market value and weights
-                total_market_value = sum(
-                    h["market_value"] for h in portfolio_data["holdings"]
-                )
-                portfolio_data["total_value"] = (
-                    portfolio_data["cash"] + total_market_value
-                )
+                total_market_value = sum(h["market_value"] for h in portfolio_data["holdings"])
+                portfolio_data["total_value"] = portfolio_data["cash"] + total_market_value
 
                 # Calculate weights
                 if portfolio_data["total_value"] > 0:
                     for holding in portfolio_data["holdings"]:
-                        holding["weight"] = (
-                            holding["market_value"] / portfolio_data["total_value"]
-                        )
+                        holding["weight"] = holding["market_value"] / portfolio_data["total_value"]
 
                 # Calculate total unrealized PnL
-                total_unrealized_pnl = sum(
-                    h["unrealized_pnl"] for h in portfolio_data["holdings"]
-                )
+                total_unrealized_pnl = sum(h["unrealized_pnl"] for h in portfolio_data["holdings"])
                 portfolio_data["unrealized_pnl"] = total_unrealized_pnl
                 portfolio_data["unrealized_pnl_percent"] = (
                     (total_unrealized_pnl / portfolio_data["total_cost"] * 100)
@@ -648,9 +615,7 @@ class AgentManager:
                         "fee": float(t.fee or 0),
                         "tax": float(t.tax or 0),
                         "status": t.status,
-                        "executed_at": (
-                            t.executed_at.isoformat() if t.executed_at else None
-                        ),
+                        "executed_at": (t.executed_at.isoformat() if t.executed_at else None),
                         "session_id": t.session_id,
                     }
                     for t in transactions
@@ -698,9 +663,7 @@ class AgentManager:
                         "reason": c.reason,
                         "performance_before": c.performance_before,
                         "performance_after": c.performance_after,
-                        "changed_at": c.changed_at.isoformat()
-                        if c.changed_at
-                        else None,
+                        "changed_at": c.changed_at.isoformat() if c.changed_at else None,
                         "applied": c.applied,
                     }
                     for c in changes

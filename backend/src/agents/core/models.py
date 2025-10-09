@@ -143,9 +143,7 @@ class AgentConfig:
     current_funds: float | None = None
 
     # 投資配置
-    investment_preferences: InvestmentPreferences = field(
-        default_factory=InvestmentPreferences
-    )
+    investment_preferences: InvestmentPreferences = field(default_factory=InvestmentPreferences)
     trading_settings: TradingSettings = field(default_factory=TradingSettings)
     auto_adjust: AutoAdjustSettings = field(default_factory=AutoAdjustSettings)
 

@@ -178,9 +178,7 @@ class AgentLogger:
             dict: 過濾後的參數
         """
         sensitive_keys = {"password", "token", "api_key", "secret"}
-        return {
-            k: "***" if k.lower() in sensitive_keys else v for k, v in params.items()
-        }
+        return {k: "***" if k.lower() in sensitive_keys else v for k, v in params.items()}
 
     @staticmethod
     def _summarize_result(result: dict[str, Any]) -> str:

@@ -92,9 +92,7 @@ async def create_agent(request: CreateAgentRequest):
     - **strategy_prompt**: 交易策略描述
     - **initial_funds**: 初始資金
     """
-    logger.info(
-        f"Creating new agent: {request.name} with model {request.ai_model.value}"
-    )
+    logger.info(f"Creating new agent: {request.name} with model {request.ai_model.value}")
     try:
         # Convert request to AgentConfig
         logger.debug(
@@ -107,9 +105,7 @@ async def create_agent(request: CreateAgentRequest):
         )
 
         # Convert risk_tolerance from float to string category
-        risk_category = AgentInvestmentPreferences.risk_tolerance_from_float(
-            request.risk_tolerance
-        )
+        risk_category = AgentInvestmentPreferences.risk_tolerance_from_float(request.risk_tolerance)
 
         # Create InvestmentPreferences dataclass
         agent_investment_prefs = AgentInvestmentPreferences(
@@ -217,9 +213,7 @@ async def update_agent(agent_id: str, request: UpdateAgentRequest):
         if request.enabled_tools is not None:
             update_data["enabled_tools"] = request.enabled_tools.model_dump()
         if request.investment_preferences is not None:
-            update_data["investment_preferences"] = (
-                request.investment_preferences.model_dump()
-            )
+            update_data["investment_preferences"] = request.investment_preferences.model_dump()
         if request.custom_instructions is not None:
             update_data["custom_instructions"] = request.custom_instructions
 

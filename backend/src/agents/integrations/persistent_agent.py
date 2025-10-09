@@ -124,9 +124,7 @@ class PersistentTradingAgent(TradingAgent):
             # 保存投資組合變更（如果有）
             await self._save_portfolio_if_changed()
 
-            self.logger.debug(
-                f"Post-execution persistence completed for {result.session_id}"
-            )
+            self.logger.debug(f"Post-execution persistence completed for {result.session_id}")
 
         except Exception as e:
             self.logger.error(f"Failed to persist execution data: {e}")
@@ -168,9 +166,7 @@ class PersistentTradingAgent(TradingAgent):
                         performance_at_change=latest_change["performance_at_change"],
                     )
 
-                    await self.db_service.save_strategy_change(
-                        self.agent_id, strategy_change
-                    )
+                    await self.db_service.save_strategy_change(self.agent_id, strategy_change)
 
                     self.logger.info(f"Strategy change persisted: {strategy_change.id}")
 
@@ -227,9 +223,7 @@ class PersistentTradingAgent(TradingAgent):
             current_holdings = self._get_current_holdings()
 
             if current_holdings:
-                await self.db_service.save_agent_holdings(
-                    self.agent_id, current_holdings
-                )
+                await self.db_service.save_agent_holdings(self.agent_id, current_holdings)
                 self.logger.debug(f"Portfolio saved for agent: {self.agent_id}")
 
         except Exception as e:
@@ -239,18 +233,14 @@ class PersistentTradingAgent(TradingAgent):
     # 歷史資料查詢
     # ==========================================
 
-    async def get_execution_history(
-        self, limit: int = 20
-    ) -> list[AgentExecutionResult]:
+    async def get_execution_history(self, limit: int = 20) -> list[AgentExecutionResult]:
         """獲取執行歷史"""
         if not self._db_initialized:
             await self._initialize_database()
 
         return await self.db_service.get_agent_sessions(self.agent_id, limit)
 
-    async def get_strategy_change_history(
-        self, limit: int = 20
-    ) -> list[StrategyChange]:
+    async def get_strategy_change_history(self, limit: int = 20) -> list[StrategyChange]:
         """獲取策略變更歷史"""
         if not self._db_initialized:
             await self._initialize_database()
@@ -281,14 +271,11 @@ class PersistentTradingAgent(TradingAgent):
             )
 
             success_rate = (
-                (successful_executions / total_executions * 100)
-                if total_executions > 0
-                else 0.0
+                (successful_executions / total_executions * 100) if total_executions > 0 else 0.0
             )
 
             avg_execution_time = (
-                sum(result.execution_time_ms for result in execution_history)
-                / total_executions
+                sum(result.execution_time_ms for result in execution_history) / total_executions
                 if total_executions > 0
                 else 0.0
             )
@@ -345,12 +332,10 @@ class PersistentTradingAgent(TradingAgent):
             backup_data = {
                 "agent_state": self.state.model_dump(),
                 "execution_history": [
-                    result.model_dump()
-                    for result in await self.get_execution_history(1000)
+                    result.model_dump() for result in await self.get_execution_history(1000)
                 ],
                 "strategy_changes": [
-                    change.model_dump()
-                    for change in await self.get_strategy_change_history(1000)
+                    change.model_dump() for change in await self.get_strategy_change_history(1000)
                 ],
                 "portfolio": await self.get_portfolio_history(),
                 "performance_analytics": await self.get_performance_analytics(),

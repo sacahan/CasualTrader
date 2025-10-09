@@ -274,9 +274,7 @@ class RiskAnalysisTools:
         total_var = 0.0
 
         for risk in position_risks:
-            weight = (
-                risk.get("position_value", 0) / total_value if total_value > 0 else 0
-            )
+            weight = risk.get("position_value", 0) / total_value if total_value > 0 else 0
             total_volatility += risk.get("volatility", 0) * weight
             total_beta += risk.get("beta", 0) * weight
             total_var += risk.get("var_95", 0)
@@ -346,18 +344,14 @@ class RiskAnalysisTools:
         results = []
         total_value = sum(pos.get("value", 0) for pos in positions)
 
-        self.logger.debug(
-            f"壓力測試設定 | 總值: {total_value:,.0f} | 情境數: {len(scenarios)}"
-        )
+        self.logger.debug(f"壓力測試設定 | 總值: {total_value:,.0f} | 情境數: {len(scenarios)}")
 
         for scenario in scenarios:
             if "market_change" in scenario:
                 impact_percent = scenario["market_change"]
                 loss_amount = total_value * abs(impact_percent)
             elif "stock_change" in scenario:
-                max_position = max(
-                    (pos.get("value", 0) for pos in positions), default=0
-                )
+                max_position = max((pos.get("value", 0) for pos in positions), default=0)
                 impact_percent = scenario["stock_change"]
                 loss_amount = max_position * abs(impact_percent)
             else:
@@ -379,9 +373,7 @@ class RiskAnalysisTools:
             )
 
         max_loss = max((r["loss_amount"] for r in results), default=0)
-        self.logger.info(
-            f"壓力測試完成 | 情境數: {len(results)} | 最大損失: {max_loss:,.0f}"
-        )
+        self.logger.info(f"壓力測試完成 | 情境數: {len(results)} | 最大損失: {max_loss:,.0f}")
 
         return {"scenarios": results, "total_value": total_value}
 

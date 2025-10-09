@@ -36,9 +36,7 @@ class InstructionGenerator:
             instructions += "\n\n" + self._build_investment_preferences_section(
                 config.investment_preferences
             )
-            instructions += "\n\n" + self._build_trading_rules_section(
-                config.trading_settings
-            )
+            instructions += "\n\n" + self._build_trading_rules_section(config.trading_settings)
             instructions += "\n\n" + self._build_strategy_adjustment_section(config)
             instructions += "\n\n" + self._build_risk_management_section(config)
             instructions += "\n\n" + self._build_execution_guidelines(config)
@@ -86,9 +84,7 @@ class InstructionGenerator:
 - 📊 STRATEGY_REVIEW: 策略檢討和調整
 - 👀 OBSERVATION: 市場觀察和分析"""
 
-    def _build_investment_preferences_section(
-        self, prefs: InvestmentPreferences
-    ) -> str:
+    def _build_investment_preferences_section(self, prefs: InvestmentPreferences) -> str:
         """建構投資偏好指令"""
         section = "## 投資偏好與策略\n"
 
@@ -98,9 +94,7 @@ class InstructionGenerator:
             "medium": "平衡型 - 追求適度成長並控制下檔風險",
             "high": "積極型 - 追求高成長機會，可承受較高波動",
         }
-        section += (
-            f"**風險偏好**：{risk_mapping.get(prefs.risk_tolerance, '平衡型')}\n\n"
-        )
+        section += f"**風險偏好**：{risk_mapping.get(prefs.risk_tolerance, '平衡型')}\n\n"
 
         # 投資期間
         horizon_mapping = {
@@ -108,9 +102,7 @@ class InstructionGenerator:
             "medium_term": "中期 (6個月-2年) - 平衡基本面和技術面分析",
             "long_term": "長期 (2年以上) - 重視基本面和企業競爭優勢",
         }
-        section += (
-            f"**投資期間**：{horizon_mapping.get(prefs.investment_horizon, '中期')}\n\n"
-        )
+        section += f"**投資期間**：{horizon_mapping.get(prefs.investment_horizon, '中期')}\n\n"
 
         # 偏好產業
         if prefs.preferred_sectors:

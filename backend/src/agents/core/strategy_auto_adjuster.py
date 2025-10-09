@@ -273,31 +273,27 @@ class StrategyAutoAdjuster:
         for trigger in self.default_performance_triggers:
             value = performance_data.get(trigger.trigger_type, 0)
 
-            is_triggered = (
-                trigger.direction == "above" and value > trigger.threshold
-            ) or (trigger.direction == "below" and value < trigger.threshold)
+            is_triggered = (trigger.direction == "above" and value > trigger.threshold) or (
+                trigger.direction == "below" and value < trigger.threshold
+            )
 
             if is_triggered:
-                action = await self._create_performance_action(
-                    trigger, value, portfolio_data
-                )
+                action = await self._create_performance_action(trigger, value, portfolio_data)
                 if action:
                     actions.append(action)
 
         return actions
 
-    async def _check_market_triggers(
-        self, market_data: dict[str, Any]
-    ) -> list[AdjustmentAction]:
+    async def _check_market_triggers(self, market_data: dict[str, Any]) -> list[AdjustmentAction]:
         """檢查市場觸發條件"""
         actions = []
 
         for trigger in self.default_market_triggers:
             value = market_data.get(trigger.trigger_type, 0)
 
-            is_triggered = (
-                trigger.direction == "above" and value > trigger.threshold
-            ) or (trigger.direction == "below" and value < trigger.threshold)
+            is_triggered = (trigger.direction == "above" and value > trigger.threshold) or (
+                trigger.direction == "below" and value < trigger.threshold
+            )
 
             if is_triggered:
                 action = await self._create_market_action(trigger, value)
@@ -510,9 +506,7 @@ class StrategyAutoAdjuster:
             rationale=merged_rationale,
         )
 
-    async def _resolve_conflicts(
-        self, actions: list[AdjustmentAction]
-    ) -> list[AdjustmentAction]:
+    async def _resolve_conflicts(self, actions: list[AdjustmentAction]) -> list[AdjustmentAction]:
         """解決動作衝突"""
         # 簡化版本：移除相互衝突的動作，保留優先級較高的
 
@@ -541,9 +535,7 @@ class StrategyAutoAdjuster:
 
         return resolved
 
-    async def _generate_strategy_changes(
-        self, actions: list[AdjustmentAction]
-    ) -> list[str]:
+    async def _generate_strategy_changes(self, actions: list[AdjustmentAction]) -> list[str]:
         """生成具體的策略變更內容"""
         changes = []
 
@@ -633,9 +625,7 @@ class StrategyAutoAdjuster:
 系統將持續監控調整效果，並在必要時進行進一步優化。
         """.strip()
 
-    def _capture_performance_snapshot(
-        self, actions: list[AdjustmentAction]
-    ) -> dict[str, Any]:
+    def _capture_performance_snapshot(self, actions: list[AdjustmentAction]) -> dict[str, Any]:
         """捕獲績效快照"""
         return {
             "adjustment_timestamp": datetime.now().isoformat(),

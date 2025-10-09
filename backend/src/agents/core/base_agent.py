@@ -282,15 +282,11 @@ class CasualTradingAgent(ABC):
 
         # 加入額外指令
         if self.config.additional_instructions:
-            base_instructions += (
-                f"\n\n額外指令：\n{self.config.additional_instructions}"
-            )
+            base_instructions += f"\n\n額外指令：\n{self.config.additional_instructions}"
 
         return base_instructions
 
-    async def _execute_agent(
-        self, context: AgentExecutionContext
-    ) -> AgentExecutionResult:
+    async def _execute_agent(self, context: AgentExecutionContext) -> AgentExecutionResult:
         """執行 OpenAI Agent"""
         start_time = datetime.now()
 
@@ -350,9 +346,7 @@ class CasualTradingAgent(ABC):
         """處理執行錯誤"""
         end_time = datetime.now()
 
-        self.logger.error(
-            f"Agent execution failed for session {context.session_id}: {error}"
-        )
+        self.logger.error(f"Agent execution failed for session {context.session_id}: {error}")
 
         return AgentExecutionResult(
             session_id=context.session_id,
@@ -382,9 +376,7 @@ class CasualTradingAgent(ABC):
                     f"in {result.execution_time_ms}ms"
                 )
             case SessionStatus.FAILED:
-                self.logger.error(
-                    f"Session {result.session_id} failed: {result.error_message}"
-                )
+                self.logger.error(f"Session {result.session_id} failed: {result.error_message}")
             case SessionStatus.TIMEOUT:
                 self.logger.warning(
                     f"Session {result.session_id} timed out after {result.execution_time_ms}ms"
@@ -406,9 +398,7 @@ class CasualTradingAgent(ABC):
         if not self._current_session:
             return
 
-        self.logger.info(
-            f"Ending session {self._current_session.session_id} with status {status}"
-        )
+        self.logger.info(f"Ending session {self._current_session.session_id} with status {status}")
 
     # ==========================================
     # 公共 API 方法
@@ -421,8 +411,7 @@ class CasualTradingAgent(ABC):
         self.state.update_activity()
 
         self.logger.info(
-            f"Agent mode changed from {old_mode} to {new_mode}"
-            + (f": {reason}" if reason else "")
+            f"Agent mode changed from {old_mode} to {new_mode}" + (f": {reason}" if reason else "")
         )
 
     async def update_config(self, new_config: AgentConfig) -> None:
@@ -441,15 +430,11 @@ class CasualTradingAgent(ABC):
         """獲取績效摘要"""
         success_rate = 0.0
         if self.state.total_executions > 0:
-            success_rate = (
-                self.state.successful_executions / self.state.total_executions * 100
-            )
+            success_rate = self.state.successful_executions / self.state.total_executions * 100
 
         avg_execution_time = 0.0
         if self.state.total_executions > 0:
-            avg_execution_time = (
-                self.state.total_execution_time / self.state.total_executions
-            )
+            avg_execution_time = self.state.total_execution_time / self.state.total_executions
 
         return {
             "total_executions": self.state.total_executions,
@@ -470,9 +455,7 @@ class CasualTradingAgent(ABC):
             "current_mode": self.state.current_mode,
             "created_at": self.state.created_at.isoformat(),
             "last_active_at": (
-                self.state.last_active_at.isoformat()
-                if self.state.last_active_at
-                else None
+                self.state.last_active_at.isoformat() if self.state.last_active_at else None
             ),
             "performance": self.get_performance_summary(),
             "config": {

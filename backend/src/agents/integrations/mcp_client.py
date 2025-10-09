@@ -107,9 +107,7 @@ class CasualMarketMCPClient:
 
             return {
                 "symbol": symbol,
-                "company_name": info.get(
-                    "shortName", info.get("longName", f"Company {symbol}")
-                ),
+                "company_name": info.get("shortName", info.get("longName", f"Company {symbol}")),
                 "current_price": current_price,
                 "change": change,
                 "change_percent": change_percent,
@@ -139,9 +137,7 @@ class CasualMarketMCPClient:
 
             return {
                 "symbol": symbol,
-                "company_name": info.get(
-                    "longName", info.get("shortName", f"Company {symbol}")
-                ),
+                "company_name": info.get("longName", info.get("shortName", f"Company {symbol}")),
                 "industry": info.get("industry", info.get("sector", "未知")),
                 "sector": info.get("sector", "未知"),
                 "website": info.get("website", ""),
@@ -208,9 +204,7 @@ class CasualMarketMCPClient:
             latest = balance_sheet.iloc[:, 0]
 
             total_assets = float(latest.get("Total Assets", 0))
-            total_liabilities = float(
-                latest.get("Total Liabilities Net Minority Interest", 0)
-            )
+            total_liabilities = float(latest.get("Total Liabilities Net Minority Interest", 0))
             shareholders_equity = float(latest.get("Stockholders Equity", 0))
 
             return {

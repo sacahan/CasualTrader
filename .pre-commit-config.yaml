@@ -23,3 +23,24 @@ repos:
         args: ["--fix", "--config=backend/pyproject.toml"]
         files: ^backend/.*\.py$
         exclude: '\.backup\.py$'
+
+  # Frontend code quality (using local tools)
+  - repo: local
+    hooks:
+      # Prettier formatting for frontend
+      - id: prettier-frontend
+        name: prettier (frontend)
+        entry: bash -c 'cd frontend && for file in "$@"; do node_modules/.bin/prettier --write "${file#frontend/}"; done' --
+        language: system
+        files: ^frontend/.*\.(js|svelte|json|css|html)$
+        exclude: ^frontend/(node_modules|dist|build)/
+        pass_filenames: true
+
+      # ESLint for frontend JavaScript/Svelte
+      - id: eslint-frontend
+        name: eslint (frontend)
+        entry: bash -c 'cd frontend && for file in "$@"; do node_modules/.bin/eslint --fix "${file#frontend/}"; done' --
+        language: system
+        files: ^frontend/.*\.(js|svelte)$
+        exclude: ^frontend/(node_modules|dist|build)/
+        pass_filenames: true

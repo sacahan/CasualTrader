@@ -113,9 +113,7 @@ class AgentDatabaseService:
 
                 if existing_agent:
                     # 更新現有 Agent
-                    await self._update_existing_agent(
-                        session, existing_agent, agent_state
-                    )
+                    await self._update_existing_agent(session, existing_agent, agent_state)
                 else:
                     # 創建新 Agent
                     await self._create_new_agent(session, agent_state)
@@ -128,9 +126,7 @@ class AgentDatabaseService:
                 self.logger.error(f"Failed to save agent state: {e}")
                 raise
 
-    async def _create_new_agent(
-        self, session: AsyncSession, agent_state: AgentState
-    ) -> None:
+    async def _create_new_agent(self, session: AsyncSession, agent_state: AgentState) -> None:
         """創建新的 Agent 記錄"""
         config = agent_state.config
 
@@ -167,9 +163,7 @@ class AgentDatabaseService:
         db_agent.status = agent_state.status.value
         db_agent.current_mode = agent_state.current_mode.value
         db_agent.config = self._serialize_config(config)
-        db_agent.investment_preferences = (
-            config.investment_preferences.preferred_sectors
-        )
+        db_agent.investment_preferences = config.investment_preferences.preferred_sectors
         db_agent.strategy_adjustment_criteria = config.strategy_adjustment_criteria
         db_agent.auto_adjust_settings = self._serialize_auto_adjust(config.auto_adjust)
         db_agent.updated_at = agent_state.updated_at
@@ -368,26 +362,18 @@ class AgentDatabaseService:
             initial_input=(
                 json.loads(db_session.initial_input) if db_session.initial_input else {}
             ),
-            final_output=(
-                json.loads(db_session.final_output) if db_session.final_output else {}
-            ),
-            tools_called=(
-                db_session.tools_called.split(",") if db_session.tools_called else []
-            ),
+            final_output=(json.loads(db_session.final_output) if db_session.final_output else {}),
+            tools_called=(db_session.tools_called.split(",") if db_session.tools_called else []),
             error_message=db_session.error_message,
             error_type=None,  # 需要從 trace_data 解析
-            trace_data=(
-                json.loads(db_session.trace_data) if db_session.trace_data else {}
-            ),
+            trace_data=(json.loads(db_session.trace_data) if db_session.trace_data else {}),
         )
 
     # ==========================================
     # 策略變更管理
     # ==========================================
 
-    async def save_strategy_change(
-        self, agent_id: str, strategy_change: StrategyChange
-    ) -> None:
+    async def save_strategy_change(self, agent_id: str, strategy_change: StrategyChange) -> None:
         """保存策略變更記錄"""
         if not self.session_factory:
             raise RuntimeError("Database service not initialized")
@@ -421,9 +407,7 @@ class AgentDatabaseService:
                 self.logger.error(f"Failed to save strategy change: {e}")
                 raise
 
-    async def get_strategy_changes(
-        self, agent_id: str, limit: int = 20
-    ) -> list[StrategyChange]:
+    async def get_strategy_changes(self, agent_id: str, limit: int = 20) -> list[StrategyChange]:
         """獲取策略變更歷史"""
         if not self.session_factory:
             raise RuntimeError("Database service not initialized")
@@ -471,9 +455,7 @@ class AgentDatabaseService:
     # 投資組合管理
     # ==========================================
 
-    async def save_agent_holdings(
-        self, agent_id: str, holdings: dict[str, Any]
-    ) -> None:
+    async def save_agent_holdings(self, agent_id: str, holdings: dict[str, Any]) -> None:
         """保存 Agent 持倉資料"""
         if not self.session_factory:
             raise RuntimeError("Database service not initialized")
@@ -609,9 +591,7 @@ class AgentDatabaseService:
                 result.fetchone()
 
                 # 統計 Agent 數量
-                agent_count_result = await session.execute(
-                    text("SELECT COUNT(*) FROM agents")
-                )
+                agent_count_result = await session.execute(text("SELECT COUNT(*) FROM agents"))
                 agent_count = agent_count_result.scalar()
 
                 return {

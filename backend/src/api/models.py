@@ -113,9 +113,7 @@ class CreateAgentRequest(BaseModel):
     ai_model: AIModel = Field(default=AIModel.GPT_4O)  # 使用 AI 模型
     strategy_type: StrategyType = Field(default=StrategyType.BALANCED)  # 投資策略類型
     strategy_prompt: str = Field(..., min_length=10)  # 策略提示語
-    color_theme: str = Field(
-        default="#007bff", pattern=r"^#[0-9A-Fa-f]{6}$"
-    )  # 顏色主題
+    color_theme: str = Field(default="#007bff", pattern=r"^#[0-9A-Fa-f]{6}$")  # 顏色主題
     initial_funds: float = Field(default=1000000.0, gt=0)  # 初始資金
     max_turns: int = Field(default=50, ge=1, le=1000)  # 最大回合數
     risk_tolerance: float = Field(default=0.5, ge=0.0, le=1.0)  # 風險容忍度

@@ -322,9 +322,7 @@ class DatabaseMigrationManager:
             async with self.engine.begin() as conn:
                 await conn.execute(sql, {"version": migration.version})
 
-            self.logger.info(
-                f"Rolled back migration {migration.version}: {migration.name}"
-            )
+            self.logger.info(f"Rolled back migration {migration.version}: {migration.name}")
 
         except Exception as e:
             self.logger.error(f"Failed to rollback migration {migration.version}: {e}")

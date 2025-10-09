@@ -182,9 +182,7 @@ class SentimentAnalysisTools:
             level = "極度恐慌"
             interpretation = "市場過度悲觀,可能是買進機會"
 
-        self.logger.info(
-            f"恐懼貪婪指數計算完成 | 指數: {index_value:.2f} | 等級: {level}"
-        )
+        self.logger.info(f"恐懼貪婪指數計算完成 | 指數: {index_value:.2f} | 等級: {level}")
 
         return {
             "index_value": index_value,
@@ -238,9 +236,7 @@ class SentimentAnalysisTools:
 
         net_flow = large_buy - large_sell + foreign_net + institutional_net
         total_volume = large_buy + large_sell
-        large_order_ratio = (
-            (large_buy + large_sell) / total_volume if total_volume > 0 else 0
-        )
+        large_order_ratio = (large_buy + large_sell) / total_volume if total_volume > 0 else 0
 
         # 流向判斷
         if net_flow > 0:
@@ -261,9 +257,7 @@ class SentimentAnalysisTools:
         else:
             foreign_attitude = "觀望"
 
-        interpretation = (
-            f"資金呈{flow_strength}{flow_direction}態勢,外資{foreign_attitude}"
-        )
+        interpretation = f"資金呈{flow_strength}{flow_direction}態勢,外資{foreign_attitude}"
 
         self.logger.info(
             f"資金流向分析完成 | 股票: {symbol} | 淨流: {net_flow:,.0f} | "
@@ -308,9 +302,7 @@ class SentimentAnalysisTools:
                 }
         """
         target = symbol or "市場"
-        self.logger.info(
-            f"開始分析新聞情緒 | 標的: {target} | 新聞數: {len(news_data)}"
-        )
+        self.logger.info(f"開始分析新聞情緒 | 標的: {target} | 新聞數: {len(news_data)}")
 
         if not news_data:
             self.logger.warning(f"無新聞數據 | 標的: {target}")
@@ -485,9 +477,7 @@ class SentimentAnalysisTools:
         )
 
         # 綜合情緒評分
-        overall_sentiment = (
-            (fg_value - 50) * 2 * 0.4 + news_score * 0.3 + social_score * 0.3
-        )
+        overall_sentiment = (fg_value - 50) * 2 * 0.4 + news_score * 0.3 + social_score * 0.3
 
         key_factors = []
         recommendations = []

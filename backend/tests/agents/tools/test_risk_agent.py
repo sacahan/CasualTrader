@@ -133,9 +133,7 @@ class TestRiskAgent:
                 "concentration_level": "中",
             }
 
-            result = tools.calculate_portfolio_risk(
-                position_risks, concentration, total_value
-            )
+            result = tools.calculate_portfolio_risk(position_risks, concentration, total_value)
 
             # 檢查結果結構
             assert "total_value" in result

@@ -141,9 +141,7 @@ async def verify_database_tables(manager: DatabaseMigrationManager) -> bool:
             expected_views = ["agent_overview", "agent_latest_performance"]
             for view_name in expected_views:
                 result = await conn.execute(
-                    text(
-                        f"SELECT name FROM sqlite_master WHERE type='view' AND name='{view_name}'"
-                    )
+                    text(f"SELECT name FROM sqlite_master WHERE type='view' AND name='{view_name}'")
                 )
                 view_exists = result.fetchone() is not None
 

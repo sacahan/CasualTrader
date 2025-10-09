@@ -33,9 +33,7 @@ class Settings(BaseSettings):
         default=["http://localhost:3000", "http://localhost:5173"],
         description="Allowed CORS origins",
     )
-    cors_allow_credentials: bool = Field(
-        default=True, description="Allow credentials in CORS"
-    )
+    cors_allow_credentials: bool = Field(default=True, description="Allow credentials in CORS")
 
     # Logging Settings
     log_level: str = Field(default="INFO", description="Logging level")
@@ -43,9 +41,7 @@ class Settings(BaseSettings):
         default="<green>{time:YYYY-MM-DD HH:mm:ss.SSS}</green> | <level>{level: <8}</level> | <cyan>{name}</cyan>:<cyan>{function}</cyan>:<cyan>{line}</cyan> - <level>{message}</level>",
         description="Log format string",
     )
-    log_file: str = Field(
-        default="logs/api_{time:YYYY-MM-DD}.log", description="Log file path"
-    )
+    log_file: str = Field(default="logs/api_{time:YYYY-MM-DD}.log", description="Log file path")
     log_rotation: str = Field(default="500 MB", description="Log rotation size")
     log_retention: str = Field(default="30 days", description="Log retention period")
     log_compression: str = Field(default="zip", description="Log compression format")
@@ -60,17 +56,13 @@ class Settings(BaseSettings):
     # Agent Settings
     max_agents: int = Field(default=10, description="Maximum number of agents")
     default_ai_model: str = Field(default="gpt-4o-mini", description="Default AI model")
-    default_initial_capital: float = Field(
-        default=1000000.0, description="Default initial capital"
-    )
+    default_initial_capital: float = Field(default=1000000.0, description="Default initial capital")
 
     # WebSocket Settings
     ws_heartbeat_interval: int = Field(
         default=30, description="WebSocket heartbeat interval (seconds)"
     )
-    ws_max_connections: int = Field(
-        default=100, description="Maximum WebSocket connections"
-    )
+    ws_max_connections: int = Field(default=100, description="Maximum WebSocket connections")
 
     # Rate Limiting
     rate_limit_enabled: bool = Field(default=False, description="Enable rate limiting")

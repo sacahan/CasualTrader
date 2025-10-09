@@ -77,9 +77,7 @@ class TradingValidator:
 
         try:
             # 基本參數驗證
-            basic_validation = self._validate_basic_parameters(
-                symbol, action, quantity, price
-            )
+            basic_validation = self._validate_basic_parameters(symbol, action, quantity, price)
             errors.extend(basic_validation["errors"])
             warnings.extend(basic_validation["warnings"])
             risk_score += basic_validation["risk_score"]
@@ -173,9 +171,7 @@ class TradingValidator:
             risk_score += 30
 
         if quantity % self.validation_rules["min_lot_size"] != 0:
-            errors.append(
-                f"交易數量必須是 {self.validation_rules['min_lot_size']} 的倍數"
-            )
+            errors.append(f"交易數量必須是 {self.validation_rules['min_lot_size']} 的倍數")
             risk_score += 15
 
         # 價格驗證
@@ -215,9 +211,7 @@ class TradingValidator:
 
         # 交易單位檢查
         if quantity < self.validation_rules["min_lot_size"]:
-            errors.append(
-                f"交易數量不能少於 {self.validation_rules['min_lot_size']} 股"
-            )
+            errors.append(f"交易數量不能少於 {self.validation_rules['min_lot_size']} 股")
             risk_score += 15
 
         # 大額交易警告
@@ -252,9 +246,7 @@ class TradingValidator:
 
         # 最小交易金額檢查
         if trade_value < self.validation_rules["min_trade_amount"]:
-            errors.append(
-                f"交易金額不能少於 NT${self.validation_rules['min_trade_amount']:,}"
-            )
+            errors.append(f"交易金額不能少於 NT${self.validation_rules['min_trade_amount']:,}")
             risk_score += 15
 
         if action == "buy":
@@ -272,9 +264,7 @@ class TradingValidator:
             current_value = 0
             if symbol in current_positions:
                 current_qty = current_positions[symbol].get("quantity", 0)
-                current_price = current_positions[symbol].get(
-                    "current_price", estimated_price
-                )
+                current_price = current_positions[symbol].get("current_price", estimated_price)
                 current_value = current_qty * current_price
 
             total_value = current_value + trade_value
@@ -299,9 +289,7 @@ class TradingValidator:
             else:
                 current_qty = current_positions[symbol].get("quantity", 0)
                 if quantity > current_qty:
-                    errors.append(
-                        f"賣出數量 ({quantity:,}) 超過持有數量 ({current_qty:,})"
-                    )
+                    errors.append(f"賣出數量 ({quantity:,}) 超過持有數量 ({current_qty:,})")
                     risk_score += 25
 
                 # 部分賣出建議

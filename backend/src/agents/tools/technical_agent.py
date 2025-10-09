@@ -144,9 +144,7 @@ class TechnicalAnalysisTools:
                     }
                 }
         """
-        self.logger.info(
-            f"開始計算技術指標 | 股票: {symbol} | 數據點數: {len(price_data)}"
-        )
+        self.logger.info(f"開始計算技術指標 | 股票: {symbol} | 數據點數: {len(price_data)}")
 
         if not price_data:
             self.logger.warning(f"缺少價格數據 | 股票: {symbol}")
@@ -156,9 +154,7 @@ class TechnicalAnalysisTools:
         result = {"symbol": symbol, "indicators": {}}
         latest_close = price_data[-1]["close"]
 
-        self.logger.debug(
-            f"計算指標: {', '.join(indicators)} | 最新收盤: {latest_close}"
-        )
+        self.logger.debug(f"計算指標: {', '.join(indicators)} | 最新收盤: {latest_close}")
 
         if "ma" in indicators:
             result["indicators"]["ma"] = {
@@ -170,9 +166,7 @@ class TechnicalAnalysisTools:
 
         if "rsi" in indicators:
             rsi_value = 55.0
-            status = (
-                "超買" if rsi_value >= 70 else "超賣" if rsi_value <= 30 else "中性"
-            )
+            status = "超買" if rsi_value >= 70 else "超賣" if rsi_value <= 30 else "中性"
             result["indicators"]["rsi"] = {"value": rsi_value, "status": status}
 
         if "macd" in indicators:
@@ -197,9 +191,7 @@ class TechnicalAnalysisTools:
                 "status": "偏強",
             }
 
-        self.logger.info(
-            f"技術指標計算完成 | 股票: {symbol} | 指標數: {len(result['indicators'])}"
-        )
+        self.logger.info(f"技術指標計算完成 | 股票: {symbol} | 指標數: {len(result['indicators'])}")
 
         return result
 
@@ -236,9 +228,7 @@ class TechnicalAnalysisTools:
         )
 
         if not price_data or len(price_data) < 20:
-            self.logger.warning(
-                f"數據不足 | 股票: {symbol} | 數據點數: {len(price_data)}"
-            )
+            self.logger.warning(f"數據不足 | 股票: {symbol} | 數據點數: {len(price_data)}")
             return {"error": "數據不足", "symbol": symbol}
 
         patterns = []
@@ -265,9 +255,7 @@ class TechnicalAnalysisTools:
                     }
                 )
 
-        self.logger.info(
-            f"圖表型態識別完成 | 股票: {symbol} | 發現型態: {len(patterns)}"
-        )
+        self.logger.info(f"圖表型態識別完成 | 股票: {symbol} | 發現型態: {len(patterns)}")
 
         return {
             "symbol": symbol,
@@ -299,9 +287,7 @@ class TechnicalAnalysisTools:
         self.logger.info(f"開始分析趨勢 | 股票: {symbol} | 數據點數: {len(price_data)}")
 
         if len(price_data) < 20:
-            self.logger.warning(
-                f"數據不足 | 股票: {symbol} | 數據點數: {len(price_data)}"
-            )
+            self.logger.warning(f"數據不足 | 股票: {symbol} | 數據點數: {len(price_data)}")
             return {"error": "數據不足", "symbol": symbol}
 
         short_term = price_data[-5]["close"] / price_data[-10]["close"] - 1.0
@@ -348,9 +334,7 @@ class TechnicalAnalysisTools:
                     "resistance_levels": [float, ...] # 壓力位列表 (由近到遠)
                 }
         """
-        self.logger.info(
-            f"開始分析支撐壓力 | 股票: {symbol} | 數據點數: {len(price_data)}"
-        )
+        self.logger.info(f"開始分析支撐壓力 | 股票: {symbol} | 數據點數: {len(price_data)}")
 
         if not price_data:
             self.logger.warning(f"缺少數據 | 股票: {symbol}")

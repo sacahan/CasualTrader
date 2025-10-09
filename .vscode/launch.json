@@ -1,19 +1,6 @@
 {
     "configurations": [
         {
-            "name": "執行 TWSE Client",
-            "type": "debugpy",
-            "request": "launch",
-            "module": "market_mcp.api.twse_client",
-            "cwd": "${workspaceFolder}",
-            "console": "integratedTerminal",
-            "python": "${workspaceFolder}/.venv/bin/python3",
-            "env": {
-                "PYTHONPATH": "${workspaceFolder}"
-            },
-            "justMyCode": false
-        },
-        {
             "name": "啟動 API Server",
             "type": "debugpy",
             "request": "launch",
@@ -27,13 +14,27 @@
                 "8000",
                 "--reload"
             ],
-            "cwd": "${workspaceFolder}",
+            "cwd": "${workspaceFolder}/backend",
             "console": "integratedTerminal",
             "python": "${workspaceFolder}/.venv/bin/python3",
             "env": {
-                "PYTHONPATH": "${workspaceFolder}"
+                "PYTHONPATH": "${workspaceFolder}/backend"
             },
             "justMyCode": false
+        },
+        {
+            "name": "啟動 Frontend (開發模式)",
+            "type": "node-terminal",
+            "request": "launch",
+            "command": "npm run dev",
+            "cwd": "${workspaceFolder}/frontend"
+        },
+        {
+            "name": "預覽 Frontend (生產模式)",
+            "type": "node-terminal",
+            "request": "launch",
+            "command": "npm run build && npm run preview",
+            "cwd": "${workspaceFolder}/frontend"
         }
     ]
 }

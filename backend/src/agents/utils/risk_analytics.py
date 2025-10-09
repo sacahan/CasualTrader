@@ -42,9 +42,7 @@ class RiskCalculator:
 
         return float(volatility)
 
-    def calculate_returns(
-        self, prices: list[float] | pd.Series
-    ) -> pd.Series | list[float]:
+    def calculate_returns(self, prices: list[float] | pd.Series) -> pd.Series | list[float]:
         """
         計算報酬率序列
 

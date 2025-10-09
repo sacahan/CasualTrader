@@ -102,9 +102,7 @@ class StrategyTracker:
 
             self._changes.append(change)
 
-            self.logger.info(
-                f"Strategy change recorded: {change.id} - {change_summary}"
-            )
+            self.logger.info(f"Strategy change recorded: {change.id} - {change_summary}")
 
             return change
 
@@ -133,16 +131,12 @@ class StrategyTracker:
 
         # 時間篩選
         if since:
-            filtered_changes = [
-                change for change in filtered_changes if change.timestamp >= since
-            ]
+            filtered_changes = [change for change in filtered_changes if change.timestamp >= since]
 
         # 類型篩選
         if change_type:
             filtered_changes = [
-                change
-                for change in filtered_changes
-                if change.change_type == change_type
+                change for change in filtered_changes if change.change_type == change_type
             ]
 
         # 按時間排序（最新的在前）
@@ -182,9 +176,7 @@ class StrategyTracker:
         try:
             for change in self._changes:
                 if change.id == change_id:
-                    change.effectiveness_score = max(
-                        0.0, min(10.0, effectiveness_score)
-                    )
+                    change.effectiveness_score = max(0.0, min(10.0, effectiveness_score))
                     if performance_after:
                         change.performance_after = performance_after
                     if user_feedback:
@@ -219,12 +211,8 @@ class StrategyTracker:
 
         # 統計資訊
         total_changes = len(self._changes)
-        auto_changes = len(
-            [c for c in self._changes if c.change_type == ChangeType.AUTO]
-        )
-        manual_changes = len(
-            [c for c in self._changes if c.change_type == ChangeType.MANUAL]
-        )
+        auto_changes = len([c for c in self._changes if c.change_type == ChangeType.AUTO])
+        manual_changes = len([c for c in self._changes if c.change_type == ChangeType.MANUAL])
         performance_driven = len(
             [c for c in self._changes if c.change_type == ChangeType.PERFORMANCE_DRIVEN]
         )
@@ -298,9 +286,7 @@ class StrategyTracker:
                 improvement = after_return - before_return
                 improvements.append(improvement)
 
-            avg_improvement = (
-                sum(improvements) / len(improvements) if improvements else 0
-            )
+            avg_improvement = sum(improvements) / len(improvements) if improvements else 0
 
             return {
                 "average_improvement": avg_improvement,
@@ -366,12 +352,8 @@ class StrategyTracker:
             return False, "自動調整已停用"
 
         # 檢查調整頻率限制
-        recent_changes = self.get_strategy_changes(
-            limit=config.auto_adjust.max_adjustments_per_day
-        )
-        today_changes = [
-            c for c in recent_changes if c.timestamp.date() == datetime.now().date()
-        ]
+        recent_changes = self.get_strategy_changes(limit=config.auto_adjust.max_adjustments_per_day)
+        today_changes = [c for c in recent_changes if c.timestamp.date() == datetime.now().date()]
 
         if len(today_changes) >= config.auto_adjust.max_adjustments_per_day:
             return False, "已達到每日調整上限"
@@ -379,9 +361,7 @@ class StrategyTracker:
         # 檢查最近調整時間間隔
         latest_change = self.get_latest_change()
         if latest_change:
-            hours_since_last = (
-                datetime.now() - latest_change.timestamp
-            ).total_seconds() / 3600
+            hours_since_last = (datetime.now() - latest_change.timestamp).total_seconds() / 3600
             if hours_since_last < config.auto_adjust.min_hours_between_adjustments:
                 return (
                     False,
@@ -429,9 +409,7 @@ class StrategyTracker:
             return False
 
         except Exception as e:
-            self.logger.error(
-                f"Failed to evaluate trigger condition '{condition}': {e}"
-            )
+            self.logger.error(f"Failed to evaluate trigger condition '{condition}': {e}")
             return False
 
     def clear_history(self) -> None:
@@ -443,6 +421,4 @@ class StrategyTracker:
         return len(self._changes)
 
     def __repr__(self) -> str:
-        return (
-            f"StrategyTracker(agent_id={self.agent_id}, changes={len(self._changes)})"
-        )
+        return f"StrategyTracker(agent_id={self.agent_id}, changes={len(self._changes)})"

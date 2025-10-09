@@ -103,9 +103,7 @@ class TradingAgent(CasualTradingAgent):
         """建構執行提示詞"""
         # 基礎情境資訊
         market_status = "開盤中" if context.market_is_open else "休市中"
-        current_time = datetime.now(pytz.timezone("Asia/Taipei")).strftime(
-            "%Y-%m-%d %H:%M:%S"
-        )
+        current_time = datetime.now(pytz.timezone("Asia/Taipei")).strftime("%Y-%m-%d %H:%M:%S")
 
         # 投資組合摘要
         portfolio_summary = self._build_portfolio_summary(context.current_holdings)
@@ -286,10 +284,7 @@ class TradingAgent(CasualTradingAgent):
         current_time = datetime.now()
 
         # 避免頻繁更新
-        if (
-            self._last_market_check
-            and (current_time - self._last_market_check).seconds < 300
-        ):
+        if self._last_market_check and (current_time - self._last_market_check).seconds < 300:
             return
 
         try:
@@ -344,9 +339,7 @@ class TradingAgent(CasualTradingAgent):
 
         # 計算持倉摘要
         total_positions = len(holdings)
-        total_value = sum(
-            holding.get("market_value", 0) for holding in holdings.values()
-        )
+        total_value = sum(holding.get("market_value", 0) for holding in holdings.values())
 
         summary = f"持股檔數：{total_positions}\n"
         summary += f"總市值：NT${total_value:,.0f}\n"
@@ -535,9 +528,7 @@ class TradingAgent(CasualTradingAgent):
 
         # 根據最後執行時間決定是否需要再平衡
         if self.state.last_active_at:
-            hours_since_last = (
-                datetime.now() - self.state.last_active_at
-            ).total_seconds() / 3600
+            hours_since_last = (datetime.now() - self.state.last_active_at).total_seconds() / 3600
             if hours_since_last > 24:  # 超過 24 小時未執行
                 return AgentMode.REBALANCING
 
@@ -552,9 +543,7 @@ class TradingAgent(CasualTradingAgent):
 
         self.logger.info(f"Auto-selected mode: {optimal_mode}")
 
-        return await self.execute(
-            mode=optimal_mode, user_message=user_message, context=context
-        )
+        return await self.execute(mode=optimal_mode, user_message=user_message, context=context)
 
     def __repr__(self) -> str:
         return (

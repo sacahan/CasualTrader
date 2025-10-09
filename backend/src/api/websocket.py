@@ -57,9 +57,7 @@ class WebSocketManager:
         await websocket.accept()
         async with self._lock:
             self.active_connections.append(websocket)
-        logger.info(
-            f"WebSocket connected. Total connections: {len(self.active_connections)}"
-        )
+        logger.info(f"WebSocket connected. Total connections: {len(self.active_connections)}")
 
     async def disconnect(self, websocket: WebSocket):
         """
@@ -69,9 +67,7 @@ class WebSocketManager:
         async with self._lock:
             if websocket in self.active_connections:
                 self.active_connections.remove(websocket)
-        logger.info(
-            f"WebSocket disconnected. Total connections: {len(self.active_connections)}"
-        )
+        logger.info(f"WebSocket disconnected. Total connections: {len(self.active_connections)}")
 
     async def broadcast(self, message: dict[str, Any]):
         """
@@ -139,9 +135,7 @@ class WebSocketManager:
         }
         await self.broadcast(message)
 
-    async def broadcast_trade_execution(
-        self, agent_id: str, trade_data: dict[str, Any]
-    ):
+    async def broadcast_trade_execution(self, agent_id: str, trade_data: dict[str, Any]):
         """
         廣播代理人交易執行事件。
         會將交易資料廣播給所有客戶端。
@@ -149,9 +143,7 @@ class WebSocketManager:
         message = {"type": "trade_execution", "agent_id": agent_id, "data": trade_data}
         await self.broadcast(message)
 
-    async def broadcast_strategy_change(
-        self, agent_id: str, change_data: dict[str, Any]
-    ):
+    async def broadcast_strategy_change(self, agent_id: str, change_data: dict[str, Any]):
         """
         廣播代理人策略變更事件。
         會將策略變更資料廣播給所有客戶端。
@@ -159,9 +151,7 @@ class WebSocketManager:
         message = {"type": "strategy_change", "agent_id": agent_id, "data": change_data}
         await self.broadcast(message)
 
-    async def broadcast_portfolio_update(
-        self, agent_id: str, portfolio_data: dict[str, Any]
-    ):
+    async def broadcast_portfolio_update(self, agent_id: str, portfolio_data: dict[str, Any]):
         """
         廣播代理人投資組合更新事件。
         會將最新投資組合資料廣播給所有客戶端。
@@ -173,9 +163,7 @@ class WebSocketManager:
         }
         await self.broadcast(message)
 
-    async def broadcast_performance_update(
-        self, agent_id: str, performance_data: dict[str, Any]
-    ):
+    async def broadcast_performance_update(self, agent_id: str, performance_data: dict[str, Any]):
         """
         廣播代理人績效指標更新事件。
         會將最新績效資料廣播給所有客戶端。

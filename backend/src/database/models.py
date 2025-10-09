@@ -140,9 +140,7 @@ class Agent(Base):
     __tablename__ = "agents"
 
     # 主要欄位
-    id: Mapped[str] = mapped_column(
-        String(50), primary_key=True, default=lambda: str(uuid.uuid4())
-    )
+    id: Mapped[str] = mapped_column(String(50), primary_key=True, default=lambda: str(uuid.uuid4()))
     name: Mapped[str] = mapped_column(String(200), nullable=False)
     description: Mapped[str | None] = mapped_column(Text)
     instructions: Mapped[str] = mapped_column(Text, nullable=False)
@@ -150,17 +148,11 @@ class Agent(Base):
 
     # 投資配置
     initial_funds: Mapped[Decimal] = mapped_column(Numeric(15, 2), nullable=False)
-    max_position_size: Mapped[Decimal] = mapped_column(
-        Numeric(5, 2), default=Decimal("5.0")
-    )
+    max_position_size: Mapped[Decimal] = mapped_column(Numeric(5, 2), default=Decimal("5.0"))
 
     # Agent 狀態 (使用 Enum)
-    status: Mapped[AgentStatus] = mapped_column(
-        String(20), default=AgentStatus.INACTIVE
-    )
-    current_mode: Mapped[AgentMode] = mapped_column(
-        String(30), default=AgentMode.OBSERVATION
-    )
+    status: Mapped[AgentStatus] = mapped_column(String(20), default=AgentStatus.INACTIVE)
+    current_mode: Mapped[AgentMode] = mapped_column(String(30), default=AgentMode.OBSERVATION)
 
     # JSON 配置欄位
     config: Mapped[dict[str, Any] | None] = mapped_column(JSON)
@@ -169,9 +161,7 @@ class Agent(Base):
     auto_adjust_settings: Mapped[dict[str, Any] | None] = mapped_column(JSON)
 
     # 時間戳記
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime, default=lambda: datetime.now()
-    )
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now())
     updated_at: Mapped[datetime] = mapped_column(
         DateTime, default=lambda: datetime.now(), onupdate=lambda: datetime.now()
     )
@@ -196,12 +186,8 @@ class Agent(Base):
 
     # 表約束
     __table_args__ = (
-        CheckConstraint(
-            status.in_([s.value for s in AgentStatus]), name="check_agent_status"
-        ),
-        CheckConstraint(
-            current_mode.in_([m.value for m in AgentMode]), name="check_agent_mode"
-        ),
+        CheckConstraint(status.in_([s.value for s in AgentStatus]), name="check_agent_status"),
+        CheckConstraint(current_mode.in_([m.value for m in AgentMode]), name="check_agent_mode"),
         Index("idx_agents_status", "status"),
         Index("idx_agents_created_at", "created_at"),
     )
@@ -212,22 +198,14 @@ class AgentSession(Base):
 
     __tablename__ = "agent_sessions"
 
-    id: Mapped[str] = mapped_column(
-        String(50), primary_key=True, default=lambda: str(uuid.uuid4())
-    )
-    agent_id: Mapped[str] = mapped_column(
-        String(50), ForeignKey("agents.id"), nullable=False
-    )
+    id: Mapped[str] = mapped_column(String(50), primary_key=True, default=lambda: str(uuid.uuid4()))
+    agent_id: Mapped[str] = mapped_column(String(50), ForeignKey("agents.id"), nullable=False)
     session_type: Mapped[str] = mapped_column(String(50), nullable=False)
     mode: Mapped[AgentMode] = mapped_column(String(30), nullable=False)
 
     # 執行狀態
-    status: Mapped[SessionStatus] = mapped_column(
-        String(20), default=SessionStatus.PENDING
-    )
-    start_time: Mapped[datetime] = mapped_column(
-        DateTime, default=lambda: datetime.now()
-    )
+    status: Mapped[SessionStatus] = mapped_column(String(20), default=SessionStatus.PENDING)
+    start_time: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now())
     end_time: Mapped[datetime | None] = mapped_column(DateTime)
     execution_time_ms: Mapped[int | None] = mapped_column(Integer)
 
@@ -242,15 +220,11 @@ class AgentSession(Base):
 
     # 關聯關係
     agent: Mapped[Agent] = relationship("Agent", back_populates="sessions")
-    transactions: Mapped[list[Transaction]] = relationship(
-        "Transaction", back_populates="session"
-    )
+    transactions: Mapped[list[Transaction]] = relationship("Transaction", back_populates="session")
 
     # 表約束
     __table_args__ = (
-        CheckConstraint(
-            status.in_([s.value for s in SessionStatus]), name="check_session_status"
-        ),
+        CheckConstraint(status.in_([s.value for s in SessionStatus]), name="check_session_status"),
         Index("idx_sessions_agent_id", "agent_id"),
         Index("idx_sessions_status", "status"),
         Index("idx_sessions_start_time", "start_time"),
@@ -263,9 +237,7 @@ class AgentHolding(Base):
     __tablename__ = "agent_holdings"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    agent_id: Mapped[str] = mapped_column(
-        String(50), ForeignKey("agents.id"), nullable=False
-    )
+    agent_id: Mapped[str] = mapped_column(String(50), ForeignKey("agents.id"), nullable=False)
     symbol: Mapped[str] = mapped_column(String(10), nullable=False)
     company_name: Mapped[str | None] = mapped_column(String(200))
 
@@ -275,9 +247,7 @@ class AgentHolding(Base):
     total_cost: Mapped[Decimal] = mapped_column(Numeric(15, 2), nullable=False)
 
     # 時間戳記
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime, default=lambda: datetime.now()
-    )
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now())
     updated_at: Mapped[datetime] = mapped_column(
         DateTime, default=lambda: datetime.now(), onupdate=lambda: datetime.now()
     )
@@ -298,15 +268,9 @@ class Transaction(Base):
 
     __tablename__ = "transactions"
 
-    id: Mapped[str] = mapped_column(
-        String(50), primary_key=True, default=lambda: str(uuid.uuid4())
-    )
-    agent_id: Mapped[str] = mapped_column(
-        String(50), ForeignKey("agents.id"), nullable=False
-    )
-    session_id: Mapped[str | None] = mapped_column(
-        String(50), ForeignKey("agent_sessions.id")
-    )
+    id: Mapped[str] = mapped_column(String(50), primary_key=True, default=lambda: str(uuid.uuid4()))
+    agent_id: Mapped[str] = mapped_column(String(50), ForeignKey("agents.id"), nullable=False)
+    session_id: Mapped[str | None] = mapped_column(String(50), ForeignKey("agent_sessions.id"))
 
     # 交易基本資訊
     symbol: Mapped[str] = mapped_column(String(10), nullable=False)
@@ -320,9 +284,7 @@ class Transaction(Base):
     commission: Mapped[Decimal] = mapped_column(Numeric(10, 2), default=Decimal("0"))
 
     # 交易狀態
-    status: Mapped[TransactionStatus] = mapped_column(
-        String(20), default=TransactionStatus.PENDING
-    )
+    status: Mapped[TransactionStatus] = mapped_column(String(20), default=TransactionStatus.PENDING)
     execution_time: Mapped[datetime | None] = mapped_column(DateTime)
 
     # 決策背景
@@ -330,9 +292,7 @@ class Transaction(Base):
     market_data: Mapped[dict[str, Any] | None] = mapped_column(JSON)
 
     # 時間戳記
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime, default=lambda: datetime.now()
-    )
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now())
 
     # 關聯關係
     agent: Mapped[Agent] = relationship("Agent", back_populates="transactions")
@@ -362,12 +322,8 @@ class StrategyChange(Base):
 
     __tablename__ = "strategy_changes"
 
-    id: Mapped[str] = mapped_column(
-        String(50), primary_key=True, default=lambda: str(uuid.uuid4())
-    )
-    agent_id: Mapped[str] = mapped_column(
-        String(50), ForeignKey("agents.id"), nullable=False
-    )
+    id: Mapped[str] = mapped_column(String(50), primary_key=True, default=lambda: str(uuid.uuid4()))
+    agent_id: Mapped[str] = mapped_column(String(50), ForeignKey("agents.id"), nullable=False)
 
     # 變更觸發資訊
     trigger_reason: Mapped[str] = mapped_column(Text, nullable=False)
@@ -385,9 +341,7 @@ class StrategyChange(Base):
     agent_explanation: Mapped[str | None] = mapped_column(Text)
 
     # 時間戳記
-    timestamp: Mapped[datetime] = mapped_column(
-        DateTime, default=lambda: datetime.now()
-    )
+    timestamp: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now())
 
     # 關聯關係
     agent: Mapped[Agent] = relationship("Agent", back_populates="strategy_changes")
@@ -409,17 +363,13 @@ class AgentPerformance(Base):
     __tablename__ = "agent_performance"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    agent_id: Mapped[str] = mapped_column(
-        String(50), ForeignKey("agents.id"), nullable=False
-    )
+    agent_id: Mapped[str] = mapped_column(String(50), ForeignKey("agents.id"), nullable=False)
     date: Mapped[date] = mapped_column(Date, nullable=False)
 
     # 投資組合指標
     total_value: Mapped[Decimal] = mapped_column(Numeric(15, 2), nullable=False)
     cash_balance: Mapped[Decimal] = mapped_column(Numeric(15, 2), nullable=False)
-    unrealized_pnl: Mapped[Decimal] = mapped_column(
-        Numeric(15, 2), default=Decimal("0")
-    )
+    unrealized_pnl: Mapped[Decimal] = mapped_column(Numeric(15, 2), default=Decimal("0"))
     realized_pnl: Mapped[Decimal] = mapped_column(Numeric(15, 2), default=Decimal("0"))
 
     # 績效指標
@@ -452,9 +402,7 @@ class MarketDataCache(Base):
     cache_key: Mapped[str] = mapped_column(String(200), unique=True, nullable=False)
     cache_data: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False)
     expires_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime, default=lambda: datetime.now()
-    )
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now())
 
     # 表約束
     __table_args__ = (
@@ -468,9 +416,7 @@ class AgentConfigCache(Base):
 
     __tablename__ = "agent_config_cache"
 
-    agent_id: Mapped[str] = mapped_column(
-        String(50), ForeignKey("agents.id"), primary_key=True
-    )
+    agent_id: Mapped[str] = mapped_column(String(50), ForeignKey("agents.id"), primary_key=True)
     config_key: Mapped[str] = mapped_column(String(100), primary_key=True)
     config_value: Mapped[str | None] = mapped_column(Text)
     config_type: Mapped[str] = mapped_column(String(20), default="string")

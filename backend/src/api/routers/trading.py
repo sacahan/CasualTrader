@@ -60,9 +60,7 @@ async def get_agent_trades(
                 detail=f"Agent {agent_id} not found",
             )
 
-        trades = await agent_manager.get_trades(
-            agent_id=agent_id, limit=limit, offset=offset
-        )
+        trades = await agent_manager.get_trades(agent_id=agent_id, limit=limit, offset=offset)
 
         return {
             "agent_id": agent_id,

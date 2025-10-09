@@ -35,9 +35,7 @@ class TechnicalIndicatorCalculator:
         ma = prices.rolling(window=period).mean()
         return ma.tolist()
 
-    def calculate_ema(
-        self, prices: list[float] | pd.Series, period: int
-    ) -> list[float]:
+    def calculate_ema(self, prices: list[float] | pd.Series, period: int) -> list[float]:
         """
         計算指數移動平均線 (Exponential Moving Average)
 
@@ -54,9 +52,7 @@ class TechnicalIndicatorCalculator:
         ema = prices.ewm(span=period, adjust=False).mean()
         return ema.tolist()
 
-    def calculate_rsi(
-        self, prices: list[float] | pd.Series, period: int = 14
-    ) -> list[float]:
+    def calculate_rsi(self, prices: list[float] | pd.Series, period: int = 14) -> list[float]:
         """
         計算相對強弱指標 (Relative Strength Index)
 

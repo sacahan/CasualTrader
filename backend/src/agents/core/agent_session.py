@@ -105,9 +105,7 @@ class AgentSession:
         self._start_time = datetime.now()
         self._initial_input = initial_input or {}
 
-        self.logger.info(
-            f"Session started - Mode: {self.mode}, Max turns: {self.max_turns}"
-        )
+        self.logger.info(f"Session started - Mode: {self.mode}, Max turns: {self.max_turns}")
 
         # 記錄初始輸入
         self._log_execution_step(
@@ -120,9 +118,7 @@ class AgentSession:
             }
         )
 
-    async def complete(
-        self, final_output: dict[str, Any] | None = None
-    ) -> AgentExecutionResult:
+    async def complete(self, final_output: dict[str, Any] | None = None) -> AgentExecutionResult:
         """完成會話"""
         if self._status != SessionStatus.RUNNING:
             raise RuntimeError(f"Session {self.session_id} is not running")

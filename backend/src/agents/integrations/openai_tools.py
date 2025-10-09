@@ -182,9 +182,7 @@ class OpenAIToolsIntegrator:
 
         query = " OR ".join(search_terms)
 
-        result = await self.web_search(
-            query=query, max_results=20, search_type="finance"
-        )
+        result = await self.web_search(query=query, max_results=20, search_type="finance")
 
         return result.results
 
@@ -257,9 +255,7 @@ print(f"MA5: {{df['ma5'].iloc[-1]:.2f}}")
 print(f"RSI: {{df['rsi'].iloc[-1]:.2f}}")
             """
         else:
-            code = (
-                code_template or f"# 自定義分析: {data_description}\nprint('分析完成')"
-            )
+            code = code_template or f"# 自定義分析: {data_description}\nprint('分析完成')"
 
         # 執行程式碼
         execution_result = await self.execute_code(code)
