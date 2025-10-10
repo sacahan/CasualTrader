@@ -212,6 +212,38 @@ class AddPerformanceIndexesMigration:
         logging.info("Performance indexes removed successfully")
 
 
+class AddAIModelConfigMigration:
+    """新增 AI 模型配置表和種子資料 (v1.2.0)"""
+
+    version = "1.2.0"
+    name = "add_ai_model_config"
+    description = "Add AI model configuration table and seed data for unified model management"
+
+    async def up(self, engine: AsyncEngine) -> None:
+        """創建 AI 模型配置表並插入種子資料"""
+        logging.info("Creating AI model configuration table...")
+
+        # 表已經通過 Base.metadata.create_all 創建
+        # 現在插入種子資料
+        from .seed_ai_models import seed_ai_models
+
+        from sqlalchemy.ext.asyncio import AsyncSession
+
+        async with AsyncSession(engine) as session:
+            await seed_ai_models(session)
+
+        logging.info("AI model configuration table created and seeded successfully")
+
+    async def down(self, engine: AsyncEngine) -> None:
+        """移除 AI 模型配置表"""
+        logging.info("Dropping AI model configuration table...")
+
+        async with engine.begin() as conn:
+            await conn.execute(text("DROP TABLE IF EXISTS ai_model_configs"))
+
+        logging.info("AI model configuration table dropped successfully")
+
+
 # ==========================================
 # Migration Manager (Python 3.12+ class with type annotations)
 # ==========================================
@@ -226,6 +258,7 @@ class DatabaseMigrationManager:
         self.migrations: list[MigrationStep] = [
             InitialSchemaMigration(),
             AddPerformanceIndexesMigration(),
+            AddAIModelConfigMigration(),
         ]
 
         # Setup logging

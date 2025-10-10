@@ -1,25 +1,72 @@
 # CasualTrader Frontend 模組架構說明
 
+**版本**: 2.0 (實作版)
+**更新日期**: 2025-10-10
+**實作狀態**: Phase 4 完成，核心功能運作中
+**技術棧**: Vite + Svelte 5 (不使用 SvelteKit)
+**相關文件**: [FRONTEND_IMPLEMENTATION.md](./FRONTEND_IMPLEMENTATION.md)
+
+---
+
+## 📌 文檔說明
+
+### 架構文檔 vs 實作規格
+
+本文檔為 **架構設計文檔**，描述 CasualTrader Frontend 的實際實作架構。與 **FRONTEND_IMPLEMENTATION.md**（實作規格文檔）的關係如下：
+
+| 文檔 | 定位 | 內容 |
+|------|------|------|
+| **FRONTEND_IMPLEMENTATION.md** | 實作規格 | 理想狀態的完整設計規範，包含所有計劃功能 |
+| **FRONTEND_ARCHITECTURE.md** (本文檔) | 架構說明 | 實際已實作的架構，標註完成與規劃中的功能 |
+
+### 架構決策：為何不使用 SvelteKit？
+
+雖然 FRONTEND_IMPLEMENTATION.md 規範中提到 SvelteKit 和 `routes/` 目錄，實際實作選擇了更輕量的 **Vite + Svelte** 方案：
+
+**✅ 優勢**:
+
+- **簡化架構**: 無需學習 SvelteKit 特定 API
+- **快速開發**: 減少配置複雜度
+- **輕量級**: SPA 足以滿足當前需求
+- **靈活性**: 未來可彈性遷移至 SvelteKit
+
+**⚠️ 權衡**:
+
+- 無檔案系統路由（使用條件渲染與模態視窗替代）
+- 無 SSR 支援（當前不需要）
+- 需自行管理路由狀態
+
+### 實作完成度
+
+- ✅ **核心功能**: 100% (Agent 創建、監控、策略追蹤)
+- 🔄 **進階功能**: 51.5% (17/33 組件已完成)
+- 📋 **測試覆蓋**: 待實作
+
+---
+
 ## 目錄
 
 1. [總覽](#總覽)
 2. [技術棧](#技術棧)
 3. [專案結構](#專案結構)
 4. [組件層 (components/)](#組件層-components)
-5. [路由層 (routes/)](#路由層-routes)
+5. [應用架構 (單頁應用設計)](#應用架構-單頁應用設計)
 6. [狀態管理 (stores/)](#狀態管理-stores)
 7. [API 層 (lib/api.js)](#api-層-libapijs)
-8. [WebSocket 層 (lib/websocket.js)](#websocket-層-libwebsocketjs)
+8. [WebSocket 層 (stores/websocket.js)](#websocket-層-storeswebsocketjs)
 9. [工具層 (lib/utils.js)](#工具層-libutilsjs)
 10. [模組依賴關係](#模組依賴關係)
 11. [資料流向](#資料流向)
 12. [組件互動](#組件互動)
+13. [實作狀態總覽](#實作狀態總覽)
 
 ---
 
 ## 總覽
 
-`frontend/` 目錄是 CasualTrader 的前端應用，使用 **Vite + Svelte** 構建現代化的單頁應用（SPA），提供即時、響應式的用戶界面。
+`frontend/` 目錄是 CasualTrader 的前端應用，使用 **Vite + Svelte 5** 構建現代化的**單頁應用（SPA）**，提供即時、響應式的用戶界面。
+
+> ⚠️ **架構說明**: 本專案選擇使用 **Vite + Svelte** 而非 SvelteKit，採用單頁應用設計，所有功能整合在 `App.svelte` 主組件中，無檔案系統路由。
 
 ### 設計理念
 
@@ -45,9 +92,9 @@
 
 ### 核心框架
 
-- **Vite 5.x**: 次世代前端構建工具
-- **Svelte 4.x**: 編譯型 UI 框架
-- **SvelteKit**: Svelte 應用框架（可選）
+- **Vite 5.4.4**: 次世代前端構建工具
+- **Svelte 5.0**: 編譯型 UI 框架 (使用 Runes API)
+- **單頁應用 (SPA)**: 不使用 SvelteKit，採用 Vite + Svelte 輕量化方案
 
 ### UI 和樣式
 
@@ -71,84 +118,95 @@
 
 ## 專案結構
 
+> 📋 **圖例**: ✅ 已實作 | 📋 規劃中 | 🔄 部分完成
+
 ```text
 frontend/
 ├── public/                # 靜態資源
-│   ├── vite.svg
-│   └── favicon.ico
+│   └── vite.svg          # ✅
 ├── src/                   # 前端源代碼
-│   ├── App.svelte         # 主應用程式組件
-│   ├── main.js            # Vite 進入點
-│   ├── app.css            # 全域樣式（Tailwind）
+│   ├── App.svelte         # ✅ 主應用程式組件 (單頁應用入口)
+│   ├── main.js            # ✅ Vite 進入點
+│   ├── app.css            # ✅ 全域樣式（Tailwind）
 │   │
 │   ├── components/        # 可重用組件
 │   │   ├── Layout/        # 佈局組件
-│   │   │   ├── Navbar.svelte
-│   │   │   ├── Sidebar.svelte
-│   │   │   └── Footer.svelte
+│   │   │   ├── Navbar.svelte            # ✅
+│   │   │   ├── NotificationToast.svelte # ✅
+│   │   │   ├── Sidebar.svelte           # 📋 規劃中
+│   │   │   └── Footer.svelte            # 📋 規劃中
 │   │   │
 │   │   ├── Agent/         # Agent 相關組件
-│   │   │   ├── AgentCard.svelte           # Agent 基礎卡片
-│   │   │   ├── AgentGrid.svelte           # Agent 網格布局
-│   │   │   ├── AgentModal.svelte          # Agent 彈窗
-│   │   │   ├── AgentCreationForm.svelte   # Agent 創建表單（Prompt驅動）
-│   │   │   ├── AgentDashboard.svelte      # Agent 監控儀表板
-│   │   │   ├── AgentConfigEditor.svelte   # Agent 配置編輯器
-│   │   │   ├── AgentToolsSelector.svelte  # Agent Tools 選擇器
-│   │   │   ├── AgentPerformancePanel.svelte # Agent 績效面板
-│   │   │   ├── StrategyHistoryView.svelte # 策略變更歷史
-│   │   │   └── StrategyChangeModal.svelte # 策略變更詳情彈窗
+│   │   │   ├── AgentCard.svelte           # ✅ Agent 基礎卡片
+│   │   │   ├── AgentGrid.svelte           # ✅ Agent 網格布局
+│   │   │   ├── AgentCreationForm.svelte   # ✅ Agent 創建表單（Prompt驅動）
+│   │   │   ├── StrategyHistoryView.svelte # ✅ 策略變更歷史
+│   │   │   ├── AgentModal.svelte          # 📋 規劃中
+│   │   │   ├── AgentDashboard.svelte      # 📋 規劃中
+│   │   │   ├── AgentConfigEditor.svelte   # 📋 規劃中
+│   │   │   ├── AgentToolsSelector.svelte  # 📋 規劃中
+│   │   │   ├── AgentPerformancePanel.svelte # 📋 規劃中
+│   │   │   └── StrategyChangeModal.svelte # 📋 規劃中
 │   │   │
 │   │   ├── Chart/         # 圖表組件
-│   │   │   ├── PerformanceChart.svelte
-│   │   │   ├── MarketChart.svelte
-│   │   │   └── PortfolioChart.svelte
+│   │   │   ├── PerformanceChart.svelte   # ✅
+│   │   │   ├── MarketChart.svelte        # 📋 規劃中
+│   │   │   └── PortfolioChart.svelte     # 📋 規劃中
 │   │   │
 │   │   ├── Market/        # 市場相關組件
-│   │   │   ├── MarketPanel.svelte
-│   │   │   ├── StockQuote.svelte
-│   │   │   └── IndexDisplay.svelte
+│   │   │   ├── MarketPanel.svelte        # 📋 規劃中
+│   │   │   ├── StockQuote.svelte         # 📋 規劃中
+│   │   │   └── IndexDisplay.svelte       # 📋 規劃中
 │   │   │
 │   │   └── UI/            # 基礎 UI 組件
-│   │       ├── Button.svelte
-│   │       ├── Modal.svelte
-│   │       ├── StatusIndicator.svelte
-│   │       ├── LoadingSpinner.svelte
-│   │       └── Tooltip.svelte
+│   │       ├── Button.svelte             # ✅
+│   │       ├── Modal.svelte              # ✅
+│   │       ├── StatusIndicator.svelte    # ✅
+│   │       ├── Input.svelte              # ✅
+│   │       ├── Textarea.svelte           # ✅
+│   │       ├── Select.svelte             # ✅
+│   │       ├── LoadingSpinner.svelte     # 📋 規劃中
+│   │       └── Tooltip.svelte            # 📋 規劃中
 │   │
-│   ├── routes/            # SvelteKit 路由頁面（如使用 SvelteKit）
-│   │   ├── +layout.svelte
-│   │   ├── +page.svelte   # 主儀表板
-│   │   ├── agents/        # Agent 管理頁面
-│   │   │   ├── +page.svelte
-│   │   │   └── [id]/
-│   │   │       └── +page.svelte
-│   │   └── settings/      # 設定頁面
-│   │       └── +page.svelte
+│   ├── stores/            # ✅ Svelte stores 狀態管理
+│   │   ├── agents.js      # ✅ Agent 狀態管理
+│   │   ├── websocket.js   # ✅ WebSocket 連線狀態
+│   │   ├── market.js      # ✅ 市場數據狀態
+│   │   ├── notifications.js # ✅ 通知系統
+│   │   └── index.js       # ✅ Store 統一匯出
 │   │
-│   ├── stores/            # Svelte stores 狀態管理
-│   │   ├── agents.js      # Agent 狀態管理
-│   │   ├── websocket.js   # WebSocket 連線狀態
-│   │   ├── market.js      # 市場數據狀態
-│   │   └── notifications.js # 通知系統
+│   ├── lib/               # ✅ 前端工具函數
+│   │   ├── api.js         # ✅ API 客戶端
+│   │   ├── utils.js       # ✅ 共用工具（格式化、驗證等）
+│   │   └── constants.js   # ✅ 前端常數
 │   │
-│   ├── lib/               # 前端工具函數
-│   │   ├── api.js         # API 客戶端
-│   │   ├── websocket.js   # WebSocket 管理
-│   │   ├── utils.js       # 共用工具（格式化、驗證等）
-│   │   └── constants.js   # 前端常數
-│   │
-│   └── types/             # TypeScript 類型定義（如使用 TS）
-│       ├── agent.ts       # Agent 類型
-│       ├── api.ts         # API 類型
-│       └── websocket.ts   # WebSocket 類型
+│   └── types/             # 📋 TypeScript 類型定義（未使用 TS）
 │
-├── vite.config.js         # Vite 配置
-├── tailwind.config.js     # Tailwind CSS 配置
-├── postcss.config.js      # PostCSS 配置
-├── package.json           # NPM 配置
-└── tsconfig.json          # TypeScript 配置（可選）
+├── tests/                 # 測試目錄（待實作）
+│   ├── unit/
+│   ├── integration/
+│   └── e2e/
+│
+├── .env                   # ✅ 環境變數
+├── .env.example           # ✅ 環境變數範本
+├── .eslintrc.json         # ✅ ESLint 配置
+├── .prettierrc.json       # ✅ Prettier 配置
+├── vite.config.js         # ✅ Vite 配置
+├── tailwind.config.js     # ✅ Tailwind CSS 配置
+├── postcss.config.js      # ✅ PostCSS 配置
+├── svelte.config.js       # ✅ Svelte 配置
+├── jsconfig.json          # ✅ JavaScript 配置
+└── package.json           # ✅ NPM 配置
 ```
+
+### 架構決策說明
+
+**為何不使用 SvelteKit？**
+
+1. **簡化複雜度**: 專案不需要 SSR、檔案系統路由等 SvelteKit 功能
+2. **快速開發**: Vite + Svelte 提供更輕量的開發體驗
+3. **單頁應用足夠**: 所有功能可在 `App.svelte` 中透過條件渲染管理
+4. **降低學習曲線**: 團隊成員只需熟悉 Svelte，無需學習 SvelteKit API
 
 ---
 
@@ -169,7 +227,7 @@ frontend/
 
 - `websocket` store: 顯示連線狀態
 
-#### Sidebar.svelte - 側邊欄
+#### Sidebar.svelte - 側邊欄 📋 規劃中
 
 **功能**:
 
@@ -184,6 +242,8 @@ frontend/
 ---
 
 ### Agent 組件
+
+> **實作狀態**: ✅ 4/10 組件已完成
 
 #### AgentCard.svelte - Agent 基礎卡片
 
@@ -215,7 +275,7 @@ dispatch('view', { agentId: agent.id });
 
 ---
 
-#### AgentGrid.svelte - Agent 網格布局
+#### AgentGrid.svelte - Agent 網格布局 ✅
 
 **功能**:
 
@@ -229,7 +289,7 @@ dispatch('view', { agentId: agent.id });
 
 ---
 
-#### AgentCreationForm.svelte - Agent 創建表單（Prompt 驅動設計）
+#### AgentCreationForm.svelte - Agent 創建表單（Prompt 驅動設計） ✅
 
 > 參考: AGENT_IMPLEMENTATION.md - 前端 Agent 配置介面
 
@@ -307,9 +367,9 @@ async function handleSubmit() {
 
 ---
 
-#### AgentConfigEditor.svelte - Agent 配置編輯器
+#### AgentConfigEditor.svelte - Agent 配置編輯器 📋 規劃中
 
-> ⚠️ **重要**: 實作配置鎖定機制
+> ⚠️ **重要**: 需實作配置鎖定機制
 
 **功能**:
 
@@ -355,7 +415,7 @@ $: lockReason = isLocked
 
 ---
 
-#### StrategyHistoryView.svelte - 策略變更歷史
+#### StrategyHistoryView.svelte - 策略變更歷史 ✅
 
 > 參考: AGENT_IMPLEMENTATION.md - 策略變更記錄系統
 
@@ -442,7 +502,7 @@ onMount(async () => {
 
 ---
 
-#### StrategyChangeModal.svelte - 策略變更詳情彈窗
+#### StrategyChangeModal.svelte - 策略變更詳情彈窗 📋 規劃中
 
 **功能**:
 
@@ -453,7 +513,7 @@ onMount(async () => {
 
 ---
 
-#### AgentDashboard.svelte - Agent 監控儀表板
+#### AgentDashboard.svelte - Agent 監控儀表板 📋 規劃中
 
 **功能**:
 
@@ -470,7 +530,7 @@ onMount(async () => {
 
 ---
 
-#### AgentPerformancePanel.svelte - Agent 績效面板
+#### AgentPerformancePanel.svelte - Agent 績效面板 📋 規劃中
 
 **功能**:
 
@@ -483,7 +543,9 @@ onMount(async () => {
 
 ### Chart 組件
 
-#### PerformanceChart.svelte - 績效圖表
+> **實作狀態**: ✅ 1/3 組件已完成
+
+#### PerformanceChart.svelte - 績效圖表 ✅
 
 **功能**:
 
@@ -531,59 +593,79 @@ onMount(() => {
 
 ---
 
-## 路由層 (routes/)
+## 應用架構 (單頁應用設計)
 
-> 如使用 SvelteKit，採用檔案系統路由
+### App.svelte - 主應用組件
 
-### +page.svelte - 主儀表板
-
-**功能**:
-
-- 所有 Agents 總覽
-- 系統狀態摘要
-- 市場數據展示
-- 創建 Agent 按鈕
-
----
-
-### agents/+page.svelte - Agent 列表頁
+> ✅ **已實作**: 完整的單頁應用邏輯
 
 **功能**:
 
-- Agent 網格佈局
-- 篩選和排序
-- 批量操作
+- **Agent 管理**: 所有 Agents 總覽、創建、啟動/停止、刪除
+- **即時監控**: WebSocket 連接提供即時狀態更新
+- **策略歷史**: 查看 Agent 策略變更記錄
+- **績效展示**: Chart.js 圖表展示投資組合表現
+- **模態管理**: 創建表單、策略歷史等彈窗組件
 
----
+**架構設計**:
 
-### agents/[id]/+page.svelte - Agent 詳情頁
+```svelte
+<script>
+  // 狀態管理
+  import { agents, selectedAgent } from './stores/agents.js';
+  import { connectWebSocket } from './stores/websocket.js';
+  import { loadMarketStatus } from './stores/market.js';
 
-**功能**:
+  // 組件
+  import { Navbar } from './components/Layout/index.js';
+  import { AgentGrid, AgentCreationForm, StrategyHistoryView } from './components/Agent/index.js';
+  import { PerformanceChart } from './components/Chart/index.js';
 
-- Agent 完整資訊
-- 投資組合詳情
-- 交易歷史
-- 策略變更歷史
-- 配置編輯
+  // 模態狀態
+  let showCreateModal = $state(false);
+  let showStrategyModal = $state(false);
 
-**數據載入**:
+  // 初始化
+  onMount(async () => {
+    connectWebSocket();
+    await loadAgents();
+    await loadMarketStatus();
+  });
+</script>
 
-```javascript
-import { page } from '$app/stores';
+<Navbar />
 
-export async function load({ params }) {
-  const agentId = params.id;
-  const agent = await api.getAgent(agentId);
-  const portfolio = await api.getPortfolio(agentId);
-  const transactions = await api.getTransactions(agentId);
+<main>
+  <!-- Agent 網格 -->
+  <AgentGrid
+    agents={$agents}
+    on:create={() => showCreateModal = true}
+    on:select={handleAgentSelect}
+  />
 
-  return {
-    agent,
-    portfolio,
-    transactions
-  };
-}
+  <!-- 選中 Agent 的績效圖表 -->
+  {#if $selectedAgent}
+    <PerformanceChart agentId={$selectedAgent.agent_id} />
+  {/if}
+</main>
+
+<!-- 模態視窗 -->
+<Modal bind:show={showCreateModal}>
+  <AgentCreationForm on:created={handleAgentCreated} />
+</Modal>
+
+<Modal bind:show={showStrategyModal}>
+  <StrategyHistoryView agentId={$selectedAgent?.agent_id} />
+</Modal>
 ```
+
+**頁面切換方式**:
+
+由於不使用路由系統，所有「頁面」透過以下方式實現：
+
+1. **條件渲染**: 使用 `{#if}` 塊根據狀態顯示不同內容
+2. **模態視窗**: 複雜表單和詳情頁使用 Modal 組件
+3. **選中狀態**: 透過 `selectedAgent` store 管理當前查看的 Agent
 
 ---
 
@@ -853,13 +935,16 @@ export const api = new ApiClient();
 
 ---
 
-## WebSocket 層 (lib/websocket.js)
+## WebSocket 層 (stores/websocket.js)
+
+> ✅ **已實作**: 完整的 WebSocket 狀態管理
 
 **功能**:
 
 - 管理 WebSocket 連接生命週期
 - 自動重連機制
-- 心跳檢測
+- 事件監聽與分發
+- 連接狀態管理
 
 **實作**:
 
@@ -1181,16 +1266,119 @@ npm run build
 
 ---
 
+---
+
+## 實作狀態總覽
+
+### ✅ Phase 4 已完成功能
+
+#### 核心功能
+
+- ✅ **Agent 生命週期管理**: 創建、啟動、停止、刪除
+- ✅ **Prompt 驅動創建**: 自然語言投資偏好輸入
+- ✅ **即時狀態監控**: WebSocket 推送 Agent 狀態變更
+- ✅ **策略歷史追蹤**: 完整的策略變更時間軸
+- ✅ **績效圖表**: Chart.js 展示投資組合價值走勢
+- ✅ **通知系統**: Toast 通知顯示操作結果
+
+#### 已實作組件 (17/33)
+
+- ✅ **Layout**: Navbar, NotificationToast
+- ✅ **Agent**: AgentCard, AgentGrid, AgentCreationForm, StrategyHistoryView
+- ✅ **Chart**: PerformanceChart
+- ✅ **UI**: Button, Modal, StatusIndicator, Input, Textarea, Select
+
+#### 狀態管理
+
+- ✅ **agents.js**: 完整的 Agent CRUD 操作
+- ✅ **websocket.js**: WebSocket 連接與事件處理
+- ✅ **market.js**: 市場數據狀態管理
+- ✅ **notifications.js**: 通知系統
+
+#### API 整合
+
+- ✅ **api.js**: HTTP API 客戶端封裝
+- ✅ **utils.js**: 格式化工具函數
+- ✅ **constants.js**: 前端常數定義
+
+### 📋 待實作功能 (規劃中)
+
+#### Agent 進階組件
+
+- 📋 **AgentModal**: Agent 詳情彈窗
+- 📋 **AgentDashboard**: 完整的 Agent 監控儀表板
+- 📋 **AgentConfigEditor**: 配置編輯器（含執行時鎖定）
+- 📋 **AgentToolsSelector**: Tools 選擇器
+- 📋 **AgentPerformancePanel**: 詳細績效面板
+- 📋 **StrategyChangeModal**: 策略變更詳情對比
+
+#### 市場數據展示
+
+- 📋 **MarketPanel**: 市場狀態面板
+- 📋 **StockQuote**: 即時股價顯示
+- 📋 **IndexDisplay**: 指數展示
+- 📋 **MarketChart**: 市場圖表
+
+#### 圖表視覺化
+
+- 📋 **PortfolioChart**: 投資組合分布圖
+- 📋 **進階績效圖表**: 回撤曲線、勝率分析等
+
+#### UI 組件
+
+- 📋 **LoadingSpinner**: 載入指示器
+- 📋 **Tooltip**: 提示浮窗
+- 📋 **Sidebar**: 側邊欄導航
+- 📋 **Footer**: 頁腳
+
+#### 測試
+
+- 📋 **單元測試**: 組件與 Store 測試
+- 📋 **整合測試**: API 與 WebSocket 測試
+- 📋 **E2E 測試**: 完整用戶流程測試
+
+### 🔄 架構演進路徑
+
+#### 短期目標 (Phase 5)
+
+1. 完成 **AgentConfigEditor** 和配置鎖定機制
+2. 實作 **StrategyChangeModal** 策略對比視圖
+3. 新增 **MarketPanel** 市場數據展示
+4. 完善 **UI 組件庫** (LoadingSpinner, Tooltip)
+
+#### 中期目標 (Phase 6)
+
+1. 實作 **AgentDashboard** 完整監控介面
+2. 新增 **PortfolioChart** 投資組合視覺化
+3. 建立 **單元測試** 覆蓋率 > 70%
+4. 優化 **WebSocket** 訊息批處理
+
+#### 長期目標 (Phase 7+)
+
+1. 考慮遷移至 **SvelteKit** (如需 SSR 或多頁路由)
+2. 引入 **TypeScript** 提升類型安全
+3. 實作 **E2E 測試** 自動化
+4. 建立 **設計系統** 文件
+
+---
+
 ## 總結
 
-CasualTrader Frontend 採用現代化的 Vite + Svelte 架構，提供：
+CasualTrader Frontend 採用現代化的 **Vite + Svelte 5 (單頁應用)** 架構，提供：
 
-- ⚡ **極速開發體驗**: Vite 熱重載 + Svelte 編譯優化
-- 🎨 **優雅 UI**: Tailwind CSS + 自定義組件
+- ⚡ **極速開發體驗**: Vite 熱重載 + Svelte 5 Runes 編譯優化
+- 🎨 **優雅 UI**: Tailwind CSS + 自定義組件系統
 - 🔄 **即時響應**: WebSocket 雙向通訊 + Svelte Store 響應式狀態
 - 📊 **豐富視覺化**: Chart.js 圖表整合
-- 🤖 **Prompt 驅動**: 簡化 Agent 創建流程
+- 🤖 **Prompt 驅動**: 自然語言 Agent 創建流程
 - 📈 **透明追蹤**: 完整展示策略演化和決策過程
-- 🔒 **配置保護**: 執行時配置鎖定機制
+- 🏗️ **輕量架構**: 不使用 SvelteKit，專注於核心功能
 
-這個架構為用戶提供了直觀、高效、即時的 AI 交易模擬器體驗。
+### 當前實作狀態
+
+- ✅ **Phase 4 完成**: 核心功能運作中
+- 📊 **組件完成度**: 51.5% (17/33)
+- 🎯 **功能完整度**: 核心功能 100%，進階功能規劃中
+- � **技術債**: 待補充測試、TypeScript 類型、進階 UI 組件
+
+這個架構為用戶提供了**直觀、高效、即時**的 AI 交易模擬器體驗，並為未來功能擴展預留了清晰的演進路徑。

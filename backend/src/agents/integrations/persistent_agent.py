@@ -84,6 +84,48 @@ class PersistentTradingAgent(TradingAgent):
         self.logger.info(f"Persistent agent {self.agent_id} shutdown")
 
     # ==========================================
+    # 模型配置覆寫
+    # ==========================================
+
+    async def _get_model_config(self, model_key: str) -> dict[str, Any] | None:
+        """
+        從數據庫獲取模型配置
+
+        Args:
+            model_key: 模型 key (例如: "gpt-4o", "claude-sonnet-4.5")
+
+        Returns:
+            模型配置字典,如果找不到則返回 None
+        """
+        try:
+            if not self._db_initialized:
+                await self._initialize_database()
+
+            model_config = await self.db_service.get_ai_model_config(model_key)
+
+            if model_config:
+                self.logger.debug(
+                    f"Model config loaded for {model_key}: {model_config.get('display_name')}"
+                )
+                return {
+                    "model_key": model_config["model_key"],
+                    "display_name": model_config["display_name"],
+                    "provider": model_config["provider"],
+                    "model_type": model_config["model_type"],
+                    "full_model_name": model_config["full_model_name"],
+                    "litellm_prefix": model_config.get("litellm_prefix"),
+                }
+            else:
+                self.logger.warning(
+                    f"No model config found for {model_key}, using default OpenAI model"
+                )
+                return None
+
+        except Exception as e:
+            self.logger.warning(f"Failed to fetch model config for {model_key}: {e}")
+            return None
+
+    # ==========================================
     # 執行方法覆寫
     # ==========================================
 

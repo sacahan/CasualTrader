@@ -142,7 +142,7 @@
         <h2 class="text-2xl font-bold text-white">我的 AI Agents</h2>
         <p class="mt-1 text-sm text-gray-400">管理您的 AI 交易助手,監控策略演進與績效表現</p>
       </div>
-      <Button on:click={() => (showCreateModal = true)}>
+      <Button onclick={() => (showCreateModal = true)}>
         <svg class="mr-2 h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path
             stroke-linecap="round"
@@ -183,7 +183,7 @@
         <div class="rounded-2xl border border-gray-700 bg-gray-800 p-6 shadow-lg">
           <div class="mb-4 flex items-center justify-between">
             <h3 class="text-lg font-semibold text-white">策略演進</h3>
-            <Button variant="ghost" size="sm" on:click={handleShowStrategy}>查看完整歷史</Button>
+            <Button variant="ghost" size="sm" onclick={handleShowStrategy}>查看完整歷史</Button>
           </div>
           <div class="custom-scrollbar max-h-96 overflow-y-auto">
             <StrategyHistoryView agentId={$selectedAgent.agent_id} limit={5} />

@@ -15,6 +15,7 @@ from typing import Any
 # 實際實作時需要替換為正確的 SDK 導入
 try:
     from openai_agents import Agent  # type: ignore[import-untyped]
+    from agents.extensions.models.litellm_model import LitellmModel  # type: ignore[import-untyped]
 
     OPENAI_AGENTS_AVAILABLE = True
 except ImportError:
@@ -48,6 +49,13 @@ except ImportError:
                 "agent": self.name,
                 "model": self.model,
             }
+
+    class LitellmModel:  # type: ignore[no-redef]
+        """LiteLLM Model 模擬類別 (開發期間使用)"""
+
+        def __init__(self, name: str, **kwargs: Any) -> None:
+            self.name = name
+            self._kwargs = kwargs
 
 
 from .models import (
@@ -234,24 +242,61 @@ class CasualTradingAgent(ABC):
         return f"agent_{timestamp}_{id(self):x}"
 
     async def _setup_openai_agent(self) -> None:
-        """設定 OpenAI Agent SDK"""
+        """設定 OpenAI Agent SDK - 支援 OpenAI 和 LiteLLM 模型"""
         tools = await self._setup_tools()
 
         # 生成指令
         instructions = await self._build_agent_instructions()
 
-        # 創建 OpenAI Agent
-        self._openai_agent = Agent(
-            name=self.config.name,
-            instructions=instructions,
-            tools=tools,
-            model=self.config.model,
-            max_turns=self.config.max_turns,
-        )
+        # 獲取模型配置
+        model_config = await self._get_model_config(self.config.model)
 
-        self.logger.info(
-            f"OpenAI Agent created with {len(tools)} tools and model {self.config.model}"
-        )
+        # 根據模型類型創建不同的 model 參數
+        if model_config and model_config.get("model_type") == "litellm":
+            # 使用 LiteLLM 模型
+            model_instance = LitellmModel(
+                name=model_config["full_model_name"],
+            )
+            self._openai_agent = Agent(
+                name=self.config.name,
+                instructions=instructions,
+                tools=tools,
+                model=model_instance,  # type: ignore[arg-type]
+                max_turns=self.config.max_turns,
+            )
+            self.logger.info(
+                f"OpenAI Agent created with {len(tools)} tools and LiteLLM model {model_config['full_model_name']}"
+            )
+        else:
+            # 使用原生 OpenAI 模型
+            self._openai_agent = Agent(
+                name=self.config.name,
+                instructions=instructions,
+                tools=tools,
+                model=self.config.model,
+                max_turns=self.config.max_turns,
+            )
+            self.logger.info(
+                f"OpenAI Agent created with {len(tools)} tools and OpenAI model {self.config.model}"
+            )
+
+    async def _get_model_config(self, model_key: str) -> dict[str, Any] | None:
+        """
+        從數據庫獲取模型配置
+
+        Args:
+            model_key: 模型 key (例如: "gpt-4o", "claude-sonnet-4.5")
+
+        Returns:
+            模型配置字典,如果找不到則返回 None
+        """
+        try:
+            # 這裡需要注入 database_service 依賴
+            # 暫時使用 None,需要在子類別中覆寫或注入
+            return None
+        except Exception as e:
+            self.logger.warning(f"Failed to fetch model config for {model_key}: {e}")
+            return None
 
     async def _build_agent_instructions(self) -> str:
         """建構 Agent 指令"""

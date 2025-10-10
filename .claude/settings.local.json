@@ -1,19 +1,4 @@
 {
-  "permissions": {
-    "allow": [
-      "WebFetch(domain:*)",
-      "mcp__ide",
-      "Read(//Users/sacahan/Documents/workspace/**)",
-      "mcp__casual-market",
-      "Bash(curl:*)",
-      "Bash(osascript:*)",
-      "Bash(claude mcp list-tools:*)",
-      "Bash(npm run check:*)",
-      "Bash(python3:*)"
-    ]
-  },
   "enableAllProjectMcpServers": true,
-  "enabledMcpjsonServers": [
-    "specpilot"
-  ]
+  "enabledMcpjsonServers": ["specpilot"]
 }

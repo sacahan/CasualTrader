@@ -1,7 +1,7 @@
 {
     "configurations": [
         {
-            "name": "啟動 API Server",
+            "name": "啟動 Backend Server",
             "type": "debugpy",
             "request": "launch",
             "module": "uvicorn",
@@ -23,17 +23,10 @@
             "justMyCode": false
         },
         {
-            "name": "啟動 Frontend (開發模式)",
+            "name": "啟動 Frontend Server",
             "type": "node-terminal",
             "request": "launch",
             "command": "npm run dev",
-            "cwd": "${workspaceFolder}/frontend"
-        },
-        {
-            "name": "預覽 Frontend (生產模式)",
-            "type": "node-terminal",
-            "request": "launch",
-            "command": "npm run build && npm run preview",
             "cwd": "${workspaceFolder}/frontend"
         }
     ]

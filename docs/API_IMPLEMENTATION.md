@@ -962,8 +962,9 @@ dev = [
 #### 啟動服務
 
 ```bash
-# 方式 1: 使用啟動腳本
-./scripts/start_api.sh
+# 方式 1: 使用統一啟動腳本 (推薦)
+./scripts/start.sh -b              # 僅啟動後端 API
+./scripts/start.sh                 # 同時啟動前後端
 
 # 方式 2: 直接使用 uvicorn
 uvicorn src.api.server:app --reload --host 0.0.0.0 --port 8000

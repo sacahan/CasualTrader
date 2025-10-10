@@ -21,7 +21,39 @@ The system uses a **multi-layered agent architecture**:
 - **Trading Agent** (`src/agents/trading/trading_agent.py`): Concrete implementation with strategy execution
 - **Persistent Agent** (`src/agents/integrations/persistent_agent.py`): Database-backed agent with session management
 
+### MCP Integration (Model Context Protocol)
+
+**CasualMarket MCP Server** provides Taiwan stock market data:
+
+- **Market Data Tools**: Real-time stock prices, trading info, market indices
+- **Financial Analysis**: Company profiles, financial statements (income/balance sheet)
+- **Portfolio Management**: Simulated trading operations (buy/sell with fee calculation)
+- **Market Analytics**: Margin trading info, dividend schedules, valuation ratios
+
+The MCP client (`src/agents/integrations/mcp_client.py`) connects to the FastMCP-based server for all market operations, providing agents with:
+
+- Real-time Taiwan stock prices and trading data
+- Company financial statements and analysis
+- Simulated trading execution with accurate fee calculation
+- Market calendar and trading day verification
+
 ## 🔧 Development Commands
+
+### Quick Start
+
+```bash
+# Start both frontend and backend (recommended)
+./scripts/start.sh
+
+# Start backend only
+./scripts/start.sh -b
+
+# Start frontend only
+./scripts/start.sh -f
+
+# Show help
+./scripts/start.sh -h
+```
 
 ### Environment Setup
 
@@ -30,9 +62,11 @@ The system uses a **multi-layered agent architecture**:
 uv sync --dev
 
 # Run database migrations
+./scripts/db_migrate.sh up
+# or
 uv run python -m src.database.migrations
 
-# Start FastAPI server
+# Start FastAPI server manually
 uv run python src/api/server.py
 # or
 uv run uvicorn src.api.server:app --reload --host 0.0.0.0 --port 8000
@@ -325,6 +359,23 @@ LOG_LEVEL=INFO
 - **TSD** (`specs/tsd/`): Technical Specifications
 - **Epics** (`specs/epics/`): Feature breakdowns
 - **Tasks** (`specs/tasks/`): Development tasks
+
+## 📚 Documentation Structure
+
+### Core Documentation
+
+- **`CLAUDE.md`**: This file - guidance for Claude Code instances
+- **`README.md`**: Project overview and FastMCP architecture
+- **`docs/PROJECT_STRUCTURE.md`**: Complete project structure reference
+- **`docs/AGENT_IMPLEMENTATION.md`**: Agent system implementation details (includes database migration and AI model management)
+- **`docs/API_IMPLEMENTATION.md`**: API endpoints and usage guide
+- **`docs/FRONTEND_ARCHITECTURE.md`**: Frontend architecture (Svelte)
+
+### Important Notes
+
+- Database migration documentation is consolidated in `docs/AGENT_IMPLEMENTATION.md` under "💾 資料庫管理"
+- AI model configuration management is also in `docs/AGENT_IMPLEMENTATION.md`
+- Scripts have been unified: use `./scripts/start.sh` instead of separate API/dev scripts
 
 ## 🔍 Debugging Tips
 

@@ -27,6 +27,9 @@ from src.database.models import (
 from src.database.models import (
     StrategyChange as DBStrategyChange,
 )
+from src.database.models import (
+    AIModelConfig,
+)
 
 from ..core.models import (
     AgentConfig,
@@ -541,6 +544,111 @@ class AgentDatabaseService:
 
             except Exception as e:
                 self.logger.error(f"Failed to get transactions: {e}")
+                return []
+
+    # ==========================================
+    # AI 模型配置管理
+    # ==========================================
+
+    async def get_ai_model_config(self, model_key: str) -> dict[str, Any] | None:
+        """
+        獲取 AI 模型配置
+
+        Args:
+            model_key: 模型 key (例如: "gpt-4o", "claude-sonnet-4.5")
+
+        Returns:
+            模型配置字典,如果找不到則返回 None
+        """
+        if not self.session_factory:
+            raise RuntimeError("Database service not initialized")
+
+        async with self.session_factory() as session:
+            try:
+                stmt = select(AIModelConfig).where(
+                    AIModelConfig.model_key == model_key,
+                    AIModelConfig.is_enabled == True,  # noqa: E712
+                )
+
+                result = await session.execute(stmt)
+                model_config = result.scalar_one_or_none()
+
+                if not model_config:
+                    return None
+
+                return {
+                    "model_key": model_config.model_key,
+                    "display_name": model_config.display_name,
+                    "provider": model_config.provider,
+                    "group_name": model_config.group_name,
+                    "model_type": (
+                        model_config.model_type.value
+                        if hasattr(model_config.model_type, "value")
+                        else model_config.model_type
+                    ),
+                    "litellm_prefix": model_config.litellm_prefix,
+                    "full_model_name": model_config.full_model_name,
+                    "max_tokens": model_config.max_tokens,
+                    "cost_per_1k_tokens": (
+                        float(model_config.cost_per_1k_tokens)
+                        if model_config.cost_per_1k_tokens
+                        else None
+                    ),
+                    "description": model_config.description,
+                }
+
+            except Exception as e:
+                self.logger.error(f"Failed to get AI model config: {e}")
+                return None
+
+    async def list_ai_models(self, enabled_only: bool = True) -> list[dict[str, Any]]:
+        """
+        列出所有 AI 模型
+
+        Args:
+            enabled_only: 是否只返回啟用的模型
+
+        Returns:
+            模型配置列表
+        """
+        if not self.session_factory:
+            raise RuntimeError("Database service not initialized")
+
+        async with self.session_factory() as session:
+            try:
+                stmt = select(AIModelConfig).order_by(AIModelConfig.display_order)
+
+                if enabled_only:
+                    stmt = stmt.where(AIModelConfig.is_enabled == True)  # noqa: E712
+
+                result = await session.execute(stmt)
+                models = result.scalars().all()
+
+                return [
+                    {
+                        "model_key": model.model_key,
+                        "display_name": model.display_name,
+                        "provider": model.provider,
+                        "group_name": model.group_name,
+                        "model_type": (
+                            model.model_type.value
+                            if hasattr(model.model_type, "value")
+                            else model.model_type
+                        ),
+                        "litellm_prefix": model.litellm_prefix,
+                        "full_model_name": model.full_model_name,
+                        "max_tokens": model.max_tokens,
+                        "cost_per_1k_tokens": (
+                            float(model.cost_per_1k_tokens) if model.cost_per_1k_tokens else None
+                        ),
+                        "description": model.description,
+                        "display_order": model.display_order,
+                    }
+                    for model in models
+                ]
+
+            except Exception as e:
+                self.logger.error(f"Failed to list AI models: {e}")
                 return []
 
     # ==========================================

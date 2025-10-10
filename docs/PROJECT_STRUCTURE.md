@@ -370,12 +370,11 @@ docs/
 
 ```
 scripts/
-├── start_api.sh               # ✅ 啟動後端 API 服務
-├── start_frontend.sh          # ⏳ 啟動前端開發服務器 (Phase 4)
-├── start_dev.sh               # 🆕 同時啟動前後端 (開發模式)
+├── start.sh                   # ✅ 統一啟動腳本 (支援 -b 後端/-f 前端或同時啟動)
 ├── run_tests.sh               # 🆕 執行所有測試 (前後端 + 整合)
 ├── setup_backend.sh           # 🆕 後端環境設置
 ├── setup_frontend.sh          # ⏳ 前端環境設置 (Phase 4)
+├── db_migrate.sh              # ✅ 資料庫遷移管理
 └── deploy.sh                  # 🆕 生產部署腳本
 ```
 
@@ -495,9 +494,8 @@ CasualTrader/
 
 ### 腳本與工具驗證 🔧
 
-- [x] `scripts/start_api.sh` 可啟動後端服務
-- [ ] `scripts/start_frontend.sh` 可啟動前端 (Phase 4)
-- [ ] `scripts/start_dev.sh` 可同時啟動前後端
+- [x] `scripts/start.sh` 統一啟動腳本 (支援 -b/-f/全部啟動)
+- [x] `scripts/db_migrate.sh` 資料庫遷移管理
 - [ ] `scripts/run_tests.sh` 可執行所有測試
 - [ ] `scripts/setup_backend.sh` 可配置後端環境
 - [ ] `scripts/setup_frontend.sh` 可配置前端環境 (Phase 4)

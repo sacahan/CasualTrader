@@ -16,7 +16,7 @@ from loguru import logger
 
 from .config import settings
 from .docs import get_openapi_tags
-from .routers import agents, trading, websocket_router
+from .routers import agents, models, trading, websocket_router
 from .routers.agents import agent_manager
 from .websocket import websocket_manager
 
@@ -150,6 +150,7 @@ def create_app() -> FastAPI:
     logger.info("Registering API routers...")
     app.include_router(agents.router, prefix="/api/agents", tags=["agents"])
     app.include_router(trading.router, prefix="/api/trading", tags=["trading"])
+    app.include_router(models.router, prefix="/api")
     app.include_router(websocket_router.router, tags=["websocket"])
     logger.info("✓ All routers registered")
 

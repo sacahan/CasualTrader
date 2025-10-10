@@ -17,6 +17,8 @@ dependencies = [
     "openai>=1.54.0",
     "yfinance>=0.2.48",
     "pandas>=2.2.3",
+    "openai-agents[litellm]>=0.3.3",
+    "greenlet>=3.2.4",
 ]
 
 [project.optional-dependencies]

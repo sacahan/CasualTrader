@@ -37,6 +37,309 @@
 
 ---
 
+## 💾 資料庫管理
+
+### Database Migration 系統
+
+CasualTrader 使用 Python 的異步 SQLAlchemy 進行資料庫管理，並提供完整的 migration 系統來管理資料庫 schema 變更。
+
+#### 快速開始
+
+```bash
+# 查看 Migration 狀態
+./scripts/db_migrate.sh status
+
+# 執行所有待執行的 Migrations
+./scripts/db_migrate.sh up
+
+# 執行到特定版本
+./scripts/db_migrate.sh up 1.2.0
+
+# 回滾到特定版本
+./scripts/db_migrate.sh down 1.0.0
+
+# 重置資料庫 (危險操作!)
+./scripts/db_migrate.sh reset
+```
+
+#### Migration 版本
+
+**v1.0.0 - Initial Schema**
+
+檔案: `backend/src/database/migrations.py` - `InitialSchemaMigration`
+
+功能:
+
+- 創建所有核心資料表 (agents, agent_sessions, agent_holdings, transactions, etc.)
+- 創建資料庫視圖 (agent_overview, agent_latest_performance)
+- 創建觸發器 (自動更新 updated_at 時間戳)
+
+**v1.1.0 - Performance Indexes**
+
+檔案: `backend/src/database/migrations.py` - `AddPerformanceIndexesMigration`
+
+功能:
+
+- 新增複合索引以優化查詢效能
+- idx_transactions_agent_symbol, idx_performance_agent_date, etc.
+
+**v1.2.0 - AI Model Configuration**
+
+檔案: `backend/src/database/migrations.py` - `AddAIModelConfigMigration`
+
+功能:
+
+- 創建 ai_model_configs 表
+- 插入 AI 模型種子資料 (9 個模型)
+- 支援 LiteLLM 多模型整合
+
+資料表結構:
+
+```sql
+CREATE TABLE ai_model_configs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    model_key TEXT UNIQUE NOT NULL,           -- 模型唯一識別碼
+    display_name TEXT NOT NULL,               -- 顯示名稱
+    provider TEXT NOT NULL,                   -- 提供商
+    group_name TEXT NOT NULL,                 -- 分組名稱
+    model_type TEXT NOT NULL,                 -- openai/litellm
+    litellm_prefix TEXT,                      -- LiteLLM 前綴
+    full_model_name TEXT NOT NULL,            -- 完整模型名稱
+    is_enabled BOOLEAN DEFAULT TRUE,          -- 是否啟用
+    requires_api_key BOOLEAN DEFAULT TRUE,    -- 是否需要 API key
+    api_key_env_var TEXT,                     -- 環境變數名稱
+    api_base_url TEXT,                        -- 自訂 API URL
+    max_tokens INTEGER,                       -- 最大 token 數
+    cost_per_1k_tokens NUMERIC(10,6),        -- 每 1K tokens 成本
+    display_order INTEGER DEFAULT 999,        -- 顯示順序
+    description TEXT,                         -- 描述
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+```
+
+#### 使用場景
+
+**首次部署**:
+
+```bash
+# 1. 查看狀態
+./scripts/db_migrate.sh status
+
+# 2. 執行所有 migrations
+./scripts/db_migrate.sh up
+
+# 3. 驗證結果
+./scripts/db_migrate.sh status
+```
+
+**生產環境**:
+
+```bash
+# 1. 備份現有資料庫
+cp casualtrader.db casualtrader.db.backup
+
+# 2. 查看待執行的 migrations
+./scripts/db_migrate.sh status
+
+# 3. 執行 migrations
+./scripts/db_migrate.sh up
+
+# 4. 驗證
+./scripts/db_migrate.sh status
+```
+
+#### 驗證 Migration
+
+**檢查資料表**:
+
+```bash
+sqlite3 casualtrader.db ".tables"
+```
+
+預期輸出:
+
+```
+agent_config_cache    agent_performance     market_data_cache
+agent_holdings        agent_sessions        schema_migrations
+agent_overview        agents                strategy_changes
+agent_latest_performance  ai_model_configs  transactions
+```
+
+**檢查 AI 模型種子資料**:
+
+```bash
+sqlite3 casualtrader.db "SELECT model_key, display_name, provider FROM ai_model_configs ORDER BY display_order;"
+```
+
+### AI 模型配置管理
+
+#### 概覽
+
+本系統整合了分散在前後端的 AI 模型配置，提供單一資料來源 (Single Source of Truth) 的統一管理方案：
+
+- **後端**: 資料庫驅動的模型配置，支援 OpenAI 原生模型和 LiteLLM 代理模型
+- **前端**: 動態從 API 獲取模型列表，自動分組顯示
+- **API**: RESTful 端點提供模型 CRUD 操作
+
+#### 核心特性
+
+**1. 資料庫驅動配置**
+
+- 所有模型配置儲存在 `ai_model_configs` 表
+- 支援模型啟用/停用狀態管理
+- 包含完整的模型元數據 (tokens, 成本, 描述等)
+- 透過 DB migration 管理 schema 和 seed data
+
+**2. LiteLLM 整合**
+
+根據 [OpenAI Agents Python SDK](https://openai.github.io/openai-agents-python/models/litellm/) 官方文檔整合：
+
+```python
+from agents.extensions.models.litellm_model import LitellmModel
+
+# 使用 LiteLLM 模型
+model = LitellmModel(name="gemini/gemini-2.5-pro-preview-05-06")
+```
+
+**支援的模型類型**:
+
+- **OpenAI Native** (`model_type: openai`): GPT-5 Mini, GPT-4o Mini, GPT-4.1 Mini
+- **LiteLLM Proxy** (`model_type: litellm`): Gemini, Claude, DeepSeek, Grok
+
+**3. 前端動態加載**
+
+- 應用啟動時自動加載模型列表
+- 按 `group_name` 分組顯示 (OpenAI, Google Gemini, Anthropic 等)
+- Svelte 5 Runes 響應式狀態管理
+- 下拉選單自動適配最新模型列表
+
+#### 種子資料
+
+系統預設包含 5 個 AI 模型配置 (`backend/src/database/seed_ai_models.py`):
+
+**OpenAI Models**:
+
+1. **GPT-5 Mini** (`gpt-5-mini`) - Max Tokens: 128K, Cost: $0.01/1K tokens
+2. **GPT-4o Mini** (`gpt-4o-mini`) - Max Tokens: 128K, Cost: $0.003/1K tokens
+3. **GPT-4.1 Mini** (`gpt-4.1-mini`) - Max Tokens: 128K, Cost: $0.008/1K tokens
+
+**Google Gemini Models (via LiteLLM)**:
+
+4. **Gemini 2.5 Pro** (`gemini-2.5-pro`) - Full Name: `gemini/gemini-2.5-pro-preview-05-06`, Max Tokens: 1M
+5. **Gemini 2.0 Flash** (`gemini-2.0-flash`) - Full Name: `gemini/gemini-2.0-flash`, Max Tokens: 1M
+
+#### API 端點
+
+**獲取所有可用模型 (已啟用)**:
+
+```bash
+GET /api/models/available
+```
+
+Response:
+
+```json
+{
+  "total": 5,
+  "models": [
+    {
+      "model_key": "gpt-5-mini",
+      "display_name": "GPT-5 Mini",
+      "provider": "OpenAI",
+      "group_name": "OpenAI",
+      "model_type": "openai",
+      "full_model_name": "gpt-5-mini",
+      "max_tokens": 128000,
+      "cost_per_1k_tokens": 0.01,
+      "description": "Most capable OpenAI model for complex tasks"
+    }
+  ]
+}
+```
+
+**獲取分組模型列表**:
+
+```bash
+GET /api/models/available/grouped
+```
+
+**獲取特定模型**:
+
+```bash
+GET /api/models/{model_key}
+```
+
+#### Agent 配置載入
+
+**基礎 Agent**:
+
+`backend/src/agents/core/base_agent.py` 中的 `_setup_openai_agent()` 方法會根據 `model_type` 自動選擇：
+
+- **OpenAI Native**: 直接使用 model string
+- **LiteLLM**: 創建 `LitellmModel` 實例
+
+```python
+async def _setup_openai_agent(self) -> None:
+    model_config = await self._get_model_config(self.config.model)
+
+    if model_config and model_config.get("model_type") == "litellm":
+        # LiteLLM 模型
+        model_instance = LitellmModel(name=model_config["full_model_name"])
+        self._openai_agent = Agent(model=model_instance, ...)
+    else:
+        # OpenAI 原生模型
+        self._openai_agent = Agent(model=self.config.model, ...)
+```
+
+**Persistent Agent**:
+
+`backend/src/agents/integrations/persistent_agent.py` 覆寫 `_get_model_config()` 方法，從資料庫獲取配置：
+
+```python
+async def _get_model_config(self, model_key: str) -> dict[str, Any] | None:
+    model_config = await self.db_service.get_ai_model_config(model_key)
+    return model_config if model_config else None
+```
+
+#### 新增模型
+
+編輯 `backend/src/database/seed_ai_models.py`，在 `SEED_AI_MODELS` 列表中添加新模型配置：
+
+```python
+{
+    "model_key": "claude-opus-4",
+    "display_name": "Claude Opus 4",
+    "provider": "Anthropic",
+    "group_name": "Anthropic",
+    "model_type": ModelType.LITELLM,
+    "litellm_prefix": "anthropic/",
+    "full_model_name": "anthropic/claude-opus-4",
+    "is_enabled": True,
+    "requires_api_key": True,
+    "api_key_env_var": "ANTHROPIC_API_KEY",
+    "max_tokens": 200000,
+    "cost_per_1k_tokens": Decimal("0.015"),
+    "display_order": 4,
+    "description": "Anthropic's most capable model",
+}
+```
+
+然後重置資料庫: `./scripts/db_migrate.sh reset`
+
+#### 環境變數配置
+
+確保設定相應的 API keys:
+
+```bash
+# .env
+OPENAI_API_KEY=sk-...
+GEMINI_API_KEY=...
+ANTHROPIC_API_KEY=...
+```
+
+---
+
 ## 🤖 TradingAgent 主體架構
 
 ### 設計理念

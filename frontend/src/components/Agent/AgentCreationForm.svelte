@@ -9,14 +9,10 @@
 
   import { createAgent } from '../../stores/agents.js';
   import { notifySuccess, notifyError } from '../../stores/notifications.js';
+  import { modelOptionsForSelect, modelsLoading, loadModels } from '../../stores/models.js';
   import { Button, Input, Select, Textarea } from '../UI/index.js';
-  import {
-    AI_MODELS,
-    AI_MODEL_LABELS,
-    AI_MODEL_GROUPS,
-    DEFAULT_INITIAL_FUNDS,
-    DEFAULT_MAX_POSITION_SIZE,
-  } from '../../lib/constants.js';
+  import { DEFAULT_INITIAL_FUNDS, DEFAULT_MAX_POSITION_SIZE } from '../../lib/constants.js';
+  import { onMount } from 'svelte';
 
   /**
    * @typedef {Object} Props
@@ -33,7 +29,7 @@
     description: '',
     initial_funds: DEFAULT_INITIAL_FUNDS,
     max_position_size: DEFAULT_MAX_POSITION_SIZE,
-    ai_model: AI_MODELS.GPT_4O,
+    ai_model: 'gpt-5-mini', // 默認模型,將在 onMount 中驗證
   });
 
   // 表單驗證錯誤
@@ -55,16 +51,10 @@
 
   // 取消
 
-  // 轉換 AI_MODEL_GROUPS 為 Select 組件格式
-  let aiModelOptions = $derived(
-    Object.entries(AI_MODEL_GROUPS).reduce((acc, [groupName, models]) => {
-      acc[groupName] = models.map((model) => ({
-        value: model,
-        label: AI_MODEL_LABELS[model],
-      }));
-      return acc;
-    }, {})
-  );
+  // 在組件掛載時加載模型列表
+  onMount(async () => {
+    await loadModels();
+  });
   // 函數定義 - 移到根層級以符合 eslint no-inner-declarations 規則
   function validateForm() {
     let isValid = true;
@@ -132,7 +122,7 @@
       description: '',
       initial_funds: DEFAULT_INITIAL_FUNDS,
       max_position_size: DEFAULT_MAX_POSITION_SIZE,
-      ai_model: AI_MODELS.GPT_4O,
+      ai_model: 'gpt-5-mini',
     };
     errors = {
       name: '',
@@ -203,11 +193,16 @@
   </div>
 
   <!-- AI 模型選擇 -->
-  <Select label="AI 模型" bind:value={formData.ai_model} optionGroups={aiModelOptions} />
+  <Select
+    label="AI 模型"
+    bind:value={formData.ai_model}
+    optionGroups={$modelOptionsForSelect}
+    disabled={$modelsLoading}
+  />
 
   <!-- 操作按鈕 -->
   <div class="flex justify-end gap-3">
-    <Button variant="secondary" on:click={handleCancel} disabled={submitting}>取消</Button>
+    <Button variant="secondary" onclick={handleCancel} disabled={submitting}>取消</Button>
     <Button type="submit" loading={submitting}>
       {submitting ? '創建中...' : '創建 Agent'}
     </Button>

@@ -92,6 +92,13 @@ class StrategyChangeType(str, Enum):
     PERFORMANCE_DRIVEN = "performance_driven"
 
 
+class ModelType(str, Enum):
+    """AI 模型類型枚舉"""
+
+    OPENAI = "openai"
+    LITELLM = "litellm"
+
+
 # ==========================================
 # Dataclasses for type-safe data structures
 # ==========================================
@@ -426,6 +433,58 @@ class AgentConfigCache(Base):
     )
 
 
+class AIModelConfig(Base):
+    """AI 模型配置模型 - 統一管理可用的 AI 模型"""
+
+    __tablename__ = "ai_model_configs"
+
+    # 主鍵
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+
+    # 模型識別資訊
+    model_key: Mapped[str] = mapped_column(String(100), unique=True, nullable=False)
+    display_name: Mapped[str] = mapped_column(String(200), nullable=False)
+    provider: Mapped[str] = mapped_column(String(50), nullable=False)
+    group_name: Mapped[str] = mapped_column(String(50), nullable=False)
+
+    # 模型類型和配置
+    model_type: Mapped[ModelType] = mapped_column(String(20), nullable=False)
+    litellm_prefix: Mapped[str | None] = mapped_column(String(100))
+    full_model_name: Mapped[str] = mapped_column(String(200), nullable=False)
+
+    # 啟用和權限
+    is_enabled: Mapped[bool] = mapped_column(default=True, nullable=False)
+    requires_api_key: Mapped[bool] = mapped_column(default=True, nullable=False)
+    api_key_env_var: Mapped[str | None] = mapped_column(String(100))
+
+    # API 配置
+    api_base_url: Mapped[str | None] = mapped_column(String(500))
+    max_tokens: Mapped[int | None] = mapped_column(Integer)
+    cost_per_1k_tokens: Mapped[Decimal | None] = mapped_column(Numeric(10, 6))
+
+    # 顯示和排序
+    display_order: Mapped[int] = mapped_column(Integer, default=999)
+    description: Mapped[str | None] = mapped_column(Text)
+
+    # 時間戳記
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now())
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, default=lambda: datetime.now(), onupdate=lambda: datetime.now()
+    )
+
+    # 表約束
+    __table_args__ = (
+        CheckConstraint(
+            model_type.in_([t.value for t in ModelType]),
+            name="check_model_type",
+        ),
+        Index("idx_ai_models_model_key", "model_key"),
+        Index("idx_ai_models_provider", "provider"),
+        Index("idx_ai_models_is_enabled", "is_enabled"),
+        Index("idx_ai_models_display_order", "display_order"),
+    )
+
+
 # ==========================================
 # Utility functions using Python 3.12+ features
 # ==========================================
@@ -442,6 +501,7 @@ def get_model_by_name(model_name: str) -> type[Base] | None:
         "performance": AgentPerformance,
         "cache": MarketDataCache,
         "config": AgentConfigCache,
+        "ai_model": AIModelConfig,
     }
     return model_mapping.get(model_name.lower())
 

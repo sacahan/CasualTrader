@@ -52,8 +52,8 @@
   class="relative rounded-lg border bg-white p-6 shadow-sm transition-all hover:shadow-md {selected
     ? 'border-primary-500 ring-2 ring-primary-500'
     : 'border-gray-200'}"
-  on:click={handleClick}
-  on:keydown={(e) => e.key === 'Enter' && handleClick()}
+  onclick={handleClick}
+  onkeydown={(e) => e.key === 'Enter' && handleClick()}
   role="button"
   tabindex="0"
 >
@@ -136,7 +136,7 @@
         variant="primary"
         size="sm"
         fullWidth
-        on:click={(e) => {
+        onclick={(e) => {
           e.stopPropagation();
           handleStart(e);
         }}
@@ -150,7 +150,7 @@
         variant="secondary"
         size="sm"
         fullWidth
-        on:click={(e) => {
+        onclick={(e) => {
           e.stopPropagation();
           handleStop(e);
         }}
@@ -162,7 +162,7 @@
     <Button
       variant="danger"
       size="sm"
-      on:click={(e) => {
+      onclick={(e) => {
         e.stopPropagation();
         handleDelete(e);
       }}
