@@ -230,7 +230,7 @@ GET    /api/agents/{id}/performance   # 取得績效數據
   "daily_return": 0.02,
   "holdings": [
     {
-      "symbol": "2330",
+      "ticker": "2330",
       "quantity": 1000,
       "average_cost": 580.0,
       "current_price": 595.0,
@@ -257,7 +257,7 @@ GET    /api/agents/{id}/decisions     # 取得決策歷史
     {
       "id": "tx_001",
       "agent_id": "agent_001",
-      "symbol": "2330",
+      "ticker": "2330",
       "action": "buy",
       "quantity": 1000,
       "price": 580.0,
@@ -315,7 +315,7 @@ GET    /api/traces/stats/{agent_id}           # 取得追蹤統計
 #### 4.1 市場數據代理
 
 ```http
-GET    /api/market/stock/{symbol}            # 取得股票價格
+GET    /api/market/stock/{ticker}            # 取得股票價格
 GET    /api/market/portfolio/value           # 計算投資組合價值
 POST   /api/market/trade/simulate            # 模擬交易
 ```
@@ -326,7 +326,7 @@ POST   /api/market/trade/simulate            # 模擬交易
 {
   "agent_id": "agent_001",
   "action": "buy",
-  "symbol": "2330",
+  "ticker": "2330",
   "quantity": 1000,
   "price_type": "market" // market | limit
 }
@@ -415,7 +415,7 @@ interface TradeExecutedEvent {
   agent_id: string;
   transaction: {
     id: string;
-    symbol: string;
+    ticker: string;
     action: "buy" | "sell";
     quantity: number;
     price: number;
@@ -465,7 +465,7 @@ interface PortfolioUpdateEvent {
     total_return: number;
     daily_change: number;
     holdings: Array<{
-      symbol: string;
+      ticker: string;
       quantity: number;
       market_value: number;
       unrealized_pnl: number;
@@ -656,25 +656,25 @@ class CasualMarketMCPClient:
     def __init__(self):
         self.client = None  # MCP 客戶端實例
 
-    async def get_stock_price(self, symbol: str) -> Dict[str, Any]:
+    async def get_stock_price(self, ticker: str) -> Dict[str, Any]:
         """取得股票價格"""
         try:
-            result = await self.client.call_tool("get_taiwan_stock_price", {"symbol": symbol})
+            result = await self.client.call_tool("get_taiwan_stock_price", {"ticker": ticker})
             return result
         except Exception as e:
             raise APIError(500, f"Failed to get stock price: {str(e)}")
 
-    async def execute_trade(self, agent_id: str, action: str, symbol: str, quantity: int) -> Dict[str, Any]:
+    async def execute_trade(self, agent_id: str, action: str, ticker: str, quantity: int) -> Dict[str, Any]:
         """執行模擬交易"""
         try:
             tool_name = f"{action}_taiwan_stock"
             result = await self.client.call_tool(tool_name, {
-                "symbol": symbol,
+                "ticker": ticker,
                 "quantity": quantity
             })
 
             # 記錄交易到資料庫
-            await self.record_transaction(agent_id, action, symbol, quantity, result)
+            await self.record_transaction(agent_id, action, ticker, quantity, result)
 
             return result
         except Exception as e:
@@ -1238,7 +1238,7 @@ print(f"投資組合: {portfolio}")
 #### 市場數據 API
 
 - [ ] 實作市場數據代理
-  - [ ] `GET /api/market/stock/{symbol}` - 股票價格
+  - [ ] `GET /api/market/stock/{ticker}` - 股票價格
   - [ ] `GET /api/market/portfolio/value` - 組合估值
   - [ ] `POST /api/market/trade/simulate` - 模擬交易
 - [ ] 整合 CasualMarket MCP 服務

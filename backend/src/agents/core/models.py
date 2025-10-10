@@ -75,7 +75,7 @@ class InvestmentPreferences:
     """投資偏好設定"""
 
     preferred_sectors: list[str] = field(default_factory=list)
-    excluded_symbols: list[str] = field(default_factory=list)
+    excluded_tickers: list[str] = field(default_factory=list)
     max_position_size: float = 5.0  # 單筆最大投資比例 (%)
     min_position_size: float = 1.0  # 單筆最小投資比例 (%)
     risk_tolerance: str = "medium"  # low, medium, high
@@ -324,7 +324,7 @@ class AgentCreationRequest(BaseModel):
 
     # 進階設定 (可選)
     max_position_size: float | None = Field(default=None, gt=0, le=20)
-    excluded_symbols: list[str] = Field(default_factory=list)
+    excluded_tickers: list[str] = Field(default_factory=list)
     additional_instructions: str | None = None
 
 

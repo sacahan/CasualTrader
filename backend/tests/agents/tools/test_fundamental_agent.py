@@ -53,8 +53,8 @@ class TestFundamentalAgent:
             result = tools.calculate_financial_ratios("2330", financial_data)
 
             # 檢查結果結構
-            assert "symbol" in result
-            assert result["symbol"] == "2330"
+            assert "ticker" in result
+            assert result["ticker"] == "2330"
             assert "profitability" in result
             assert "solvency" in result
             assert "valuation" in result
@@ -98,7 +98,7 @@ class TestFundamentalAgent:
             result = tools.analyze_financial_health("2330", financial_ratios)
 
             # 檢查結果結構
-            assert "symbol" in result
+            assert "ticker" in result
             assert "health_score" in result
             assert "health_grade" in result
             assert "assessment" in result

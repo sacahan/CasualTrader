@@ -157,7 +157,7 @@ CasualTrader 使用 Python 的異步 SQLAlchemy 進行資料庫管理，並提�
 功能:
 
 - 新增複合索引以優化查詢效能
-- idx_transactions_agent_symbol, idx_performance_agent_date, etc.
+- idx_transactions_agent_ticker, idx_performance_agent_date, etc.
 
 **v1.2.0 - AI Model Configuration**
 
@@ -779,7 +779,7 @@ interface AgentCreationForm {
 
   // 可選的進階設定
   max_position_size?: number;
-  excluded_symbols?: string[];
+  excluded_tickers?: string[];
   additional_instructions?: string;
 }
 
@@ -887,7 +887,7 @@ const AgentCreationForm = () => {
           className="form-input"
         />
         <input
-          placeholder="排除股票代碼 (逗號分隔，如: 2498,2328)"
+          placeholder="排除股票代號 (逗號分隔，如: 2498,2328)"
           className="form-input"
         />
         <textarea
@@ -1254,36 +1254,36 @@ def fundamental_agent_instructions() -> str:
 
 # CasualMarket MCP 工具整合
 @function_tool
-async def get_company_fundamentals(symbol: str) -> dict:
+async def get_company_fundamentals(ticker: str) -> dict:
     """Get comprehensive company fundamental data"""
-    return await mcp_client.call_tool("get_company_profile", {"symbol": symbol})
+    return await mcp_client.call_tool("get_company_profile", {"ticker": symbol})
 
 @function_tool
-async def calculate_financial_ratios(symbol: str, period: str = "latest") -> dict:
+async def calculate_financial_ratios(ticker: str, period: str = "latest") -> dict:
     """Calculate key financial ratios from financial statements"""
     # 實作財務比率計算邏輯
     pass
 
 @function_tool
-async def analyze_financial_health(symbol: str) -> dict:
+async def analyze_financial_health(ticker: str) -> dict:
     """Analyze overall financial health and stability"""
     # 實作財務健康度分析邏輯
     pass
 
 @function_tool
-async def evaluate_valuation(symbol: str) -> dict:
+async def evaluate_valuation(ticker: str) -> dict:
     """Evaluate stock valuation using multiple methods"""
     # 實作估值評估邏輯
     pass
 
 @function_tool
-async def analyze_growth_potential(symbol: str) -> dict:
+async def analyze_growth_potential(ticker: str) -> dict:
     """Analyze company's growth potential and prospects"""
     # 實作成長潛力分析邏輯
     pass
 
 @function_tool
-async def generate_investment_rating(symbol: str) -> dict:
+async def generate_investment_rating(ticker: str) -> dict:
     """Generate investment rating and recommendation"""
     # 實作投資評級生成邏輯
     pass
@@ -1405,31 +1405,31 @@ def technical_agent_instructions() -> str:
 """
 
 @function_tool
-async def calculate_technical_indicators(symbol: str, indicators: list[str]) -> dict:
+async def calculate_technical_indicators(ticker: str, indicators: list[str]) -> dict:
     """Calculate specified technical indicators"""
     # 實作技術指標計算邏輯
     pass
 
 @function_tool
-async def identify_chart_patterns(symbol: str, timeframe: str = "daily") -> dict:
+async def identify_chart_patterns(ticker: str, timeframe: str = "daily") -> dict:
     """Identify chart patterns in price data"""
     # 實作圖表型態識別邏輯
     pass
 
 @function_tool
-async def analyze_trend(symbol: str) -> dict:
+async def analyze_trend(ticker: str) -> dict:
     """Analyze price trend direction and strength"""
     # 實作趨勢分析邏輯
     pass
 
 @function_tool
-async def analyze_support_resistance(symbol: str) -> dict:
+async def analyze_support_resistance(ticker: str) -> dict:
     """Identify key support and resistance levels"""
     # 實作支撐壓力位分析邏輯
     pass
 
 @function_tool
-async def generate_trading_signals(symbol: str) -> dict:
+async def generate_trading_signals(ticker: str) -> dict:
     """Generate trading signals based on technical analysis"""
     # 實作交易訊號生成邏輯
     pass
@@ -1548,7 +1548,7 @@ def risk_agent_instructions() -> str:
 """
 
 @function_tool
-async def calculate_position_risk(symbol: str, quantity: int, entry_price: float) -> dict:
+async def calculate_position_risk(ticker: str, quantity: int, entry_price: float) -> dict:
     """Calculate risk metrics for a single position"""
     # 實作個別部位風險計算邏輯
     pass
@@ -1719,7 +1719,7 @@ async def analyze_social_sentiment(platform: str = "all") -> dict:
     pass
 
 @function_tool
-async def generate_sentiment_signals(symbol: str = None) -> dict:
+async def generate_sentiment_signals(ticker: str = None) -> dict:
     """Generate trading signals based on sentiment analysis"""
     # 實作情緒交易訊號生成邏輯
     pass
@@ -1848,7 +1848,7 @@ async def get_current_holdings(agent_id: str) -> dict:
     return {
         "holdings": [
             {
-                "symbol": holding.symbol,
+                "ticker": holding.ticker,
                 "company_name": holding.company_name,
                 "quantity": holding.quantity,
                 "average_cost": holding.average_cost,
@@ -1863,16 +1863,16 @@ async def get_current_holdings(agent_id: str) -> dict:
 
 @function_tool
 async def validate_trade_parameters(
-    symbol: str,
+    ticker: str,
     action: str,
     quantity: int,
     price: float = None
 ) -> dict:
     """Validate trading parameters before execution"""
 
-    # 股票代碼驗證
-    if not re.match(r'^\d{4}[A-Z]?$', symbol):
-        return {"valid": False, "error": "Invalid stock symbol format"}
+    # 股票代號驗證
+    if not re.match(r'^\d{4}[A-Z]?$', ticker):
+        return {"valid": False, "error": "Invalid stock ticker format"}
 
     # 交易數量驗證 (台股最小單位1000股)
     if quantity % 1000 != 0:
@@ -1883,7 +1883,7 @@ async def validate_trade_parameters(
         return {"valid": False, "error": "Price must be positive"}
 
     # 漲跌停價格檢查
-    current_data = await get_taiwan_stock_price(symbol)
+    current_data = await get_taiwan_stock_price(ticker)
     if price and (price > current_data.limit_up or price < current_data.limit_down):
         return {
             "valid": False,
@@ -1962,7 +1962,7 @@ class TradingAgent(CasualTradingAgent):
             {"date": date}
         )
 
-    async def execute_trade(self, symbol: str, quantity: int):
+    async def execute_trade(self, ticker: str, quantity: int):
         """執行交易前檢查市場狀態"""
         # 檢查市場是否開盤
         status = await self.market_checker.get_market_status()
@@ -1974,7 +1974,7 @@ class TradingAgent(CasualTradingAgent):
             }
 
         # 執行交易...
-        return await self._execute_order(symbol, quantity)
+        return await self._execute_order(ticker, quantity)
 ```
 
 #### 使用的 MCP 工具
@@ -2114,7 +2114,7 @@ casualmarket_mcp = HostedMCPTool(
 # 工具: get_taiwan_stock_price
 # 用途: 獲取即時股票價格和交易資訊
 response = await mcp_client.call_tool("get_taiwan_stock_price", {
-    "symbol": "2330"  # 台積電
+    "ticker": "2330"  # 台積電
 })
 # 返回: 即時價格、漲跌幅、成交量、五檔報價等
 ````
@@ -2125,7 +2125,7 @@ response = await mcp_client.call_tool("get_taiwan_stock_price", {
 # 工具: buy_taiwan_stock
 # 用途: 模擬股票買入操作
 response = await mcp_client.call_tool("buy_taiwan_stock", {
-    "symbol": "2330",
+    "ticker": "2330",
     "quantity": 1000,  # 1張
     "price": None      # 市價單
 })
@@ -2133,7 +2133,7 @@ response = await mcp_client.call_tool("buy_taiwan_stock", {
 # 工具: sell_taiwan_stock
 # 用途: 模擬股票賣出操作
 response = await mcp_client.call_tool("sell_taiwan_stock", {
-    "symbol": "2330",
+    "ticker": "2330",
     "quantity": 1000,
     "price": 520.0     # 限價單
 })
@@ -2147,7 +2147,7 @@ response = await mcp_client.call_tool("sell_taiwan_stock", {
 # 工具: get_company_profile
 # 用途: 獲取公司基本資訊、產業分類、主要業務
 response = await mcp_client.call_tool("get_company_profile", {
-    "symbol": "2330"
+    "ticker": "2330"
 })
 ```
 
@@ -2157,19 +2157,19 @@ response = await mcp_client.call_tool("get_company_profile", {
 # 工具: get_company_income_statement
 # 用途: 獲取綜合損益表數據
 income_data = await mcp_client.call_tool("get_company_income_statement", {
-    "symbol": "2330"
+    "ticker": "2330"
 })
 
 # 工具: get_company_balance_sheet
 # 用途: 獲取資產負債表數據
 balance_data = await mcp_client.call_tool("get_company_balance_sheet", {
-    "symbol": "2330"
+    "ticker": "2330"
 })
 
 # 工具: get_company_monthly_revenue
 # 用途: 獲取月營收資料
 revenue_data = await mcp_client.call_tool("get_company_monthly_revenue", {
-    "symbol": "2330"
+    "ticker": "2330"
 })
 ```
 
@@ -2179,7 +2179,7 @@ revenue_data = await mcp_client.call_tool("get_company_monthly_revenue", {
 # 工具: get_stock_valuation_ratios
 # 用途: 獲取本益比、股價淨值比、殖利率等估值指標
 valuation = await mcp_client.call_tool("get_stock_valuation_ratios", {
-    "symbol": "2330"
+    "ticker": "2330"
 })
 ```
 
@@ -2191,7 +2191,7 @@ valuation = await mcp_client.call_tool("get_stock_valuation_ratios", {
 # 工具: get_stock_daily_trading
 # 用途: 獲取日交易資訊
 daily_stats = await mcp_client.call_tool("get_stock_daily_trading", {
-    "symbol": "2330"
+    "ticker": "2330"
 })
 
 # 工具: get_real_time_trading_stats
@@ -2216,16 +2216,16 @@ market_index = await mcp_client.call_tool("get_market_index_info", {
 
 ```python
 class AnalysisAgent:
-    async def analyze_stock_fundamentals(self, symbol: str):
+    async def analyze_stock_fundamentals(self, ticker: str):
         # 獲取基本資料
-        profile = await self.call_mcp_tool("get_company_profile", {"symbol": symbol})
+        profile = await self.call_mcp_tool("get_company_profile", {"ticker": symbol})
 
         # 獲取財務數據
-        income = await self.call_mcp_tool("get_company_income_statement", {"symbol": symbol})
-        balance = await self.call_mcp_tool("get_company_balance_sheet", {"symbol": symbol})
+        income = await self.call_mcp_tool("get_company_income_statement", {"ticker": symbol})
+        balance = await self.call_mcp_tool("get_company_balance_sheet", {"ticker": symbol})
 
         # 獲取估值指標
-        valuation = await self.call_mcp_tool("get_stock_valuation_ratios", {"symbol": symbol})
+        valuation = await self.call_mcp_tool("get_stock_valuation_ratios", {"ticker": symbol})
 
         # 綜合分析邏輯
         return self._combine_fundamental_analysis(profile, income, balance, valuation)
@@ -2238,19 +2238,19 @@ class ExecutionAgent:
     async def execute_trade_decision(self, decision: TradeDecision):
         # 獲取即時價格
         price_data = await self.call_mcp_tool("get_taiwan_stock_price", {
-            "symbol": decision.symbol
+            "ticker": decision.ticker
         })
 
         # 執行交易
         if decision.action == "BUY":
             result = await self.call_mcp_tool("buy_taiwan_stock", {
-                "symbol": decision.symbol,
+                "ticker": decision.ticker,
                 "quantity": decision.quantity,
                 "price": decision.target_price
             })
         elif decision.action == "SELL":
             result = await self.call_mcp_tool("sell_taiwan_stock", {
-                "symbol": decision.symbol,
+                "ticker": decision.ticker,
                 "quantity": decision.quantity,
                 "price": decision.target_price
             })

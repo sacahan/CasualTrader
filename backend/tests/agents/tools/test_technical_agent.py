@@ -114,8 +114,8 @@ class TestCalculateTechnicalIndicators:
         """測試計算所有技術指標"""
         result = tools.calculate_technical_indicators("2330", sample_price_data)
 
-        assert "symbol" in result
-        assert result["symbol"] == "2330"
+        assert "ticker" in result
+        assert result["ticker"] == "2330"
         assert "indicators" in result
 
         indicators = result["indicators"]
@@ -209,7 +209,7 @@ class TestCalculateTechnicalIndicators:
         result = tools.calculate_technical_indicators("2330", [])
 
         assert "error" in result
-        assert result["symbol"] == "2330"
+        assert result["ticker"] == "2330"
 
 
 # === 圖表型態識別測試 ===
@@ -237,8 +237,8 @@ class TestIdentifyChartPatterns:
 
         result = tools.identify_chart_patterns("2330", extended_data)
 
-        assert "symbol" in result
-        assert result["symbol"] == "2330"
+        assert "ticker" in result
+        assert result["ticker"] == "2330"
         assert "patterns" in result
         assert "pattern_count" in result
         assert isinstance(result["patterns"], list)
@@ -312,7 +312,7 @@ class TestAnalyzeTrend:
 
         result = tools.analyze_trend("2330", uptrend_data)
 
-        assert "symbol" in result
+        assert "ticker" in result
         assert "direction" in result
         assert "strength" in result
         assert result["direction"] in ["上升", "下降", "盤整"]
@@ -372,7 +372,7 @@ class TestAnalyzeSupportResistance:
         """測試尋找支撐壓力位"""
         result = tools.analyze_support_resistance("2330", sample_price_data)
 
-        assert "symbol" in result
+        assert "ticker" in result
         assert "support_levels" in result
         assert "resistance_levels" in result
         assert isinstance(result["support_levels"], list)
@@ -423,7 +423,7 @@ class TestGenerateTradingSignals:
 
         result = tools.generate_trading_signals("2330", indicators, trend, patterns)
 
-        assert "symbol" in result
+        assert "ticker" in result
         assert "overall_signal" in result
         assert "confidence" in result
         assert result["overall_signal"] in ["買進", "賣出", "觀望"]
@@ -433,7 +433,7 @@ class TestGenerateTradingSignals:
         """測試買進訊號"""
         # 建立買進情境
         indicators = {
-            "symbol": "2330",
+            "ticker": "2330",
             "indicators": {
                 "rsi": {"value": 35, "status": "超賣"},
                 "macd": {"status": "多頭"},
@@ -454,7 +454,7 @@ class TestGenerateTradingSignals:
         """測試賣出訊號"""
         # 建立賣出情境
         indicators = {
-            "symbol": "2330",
+            "ticker": "2330",
             "indicators": {
                 "rsi": {"value": 75, "status": "超買"},
                 "macd": {"status": "空頭"},

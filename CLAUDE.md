@@ -244,7 +244,7 @@ tests/
 
 ### Test Data
 
-- Use real Taiwan stock symbols: 2330 (台積電), 2412 (中華電), 2454 (聯發科)
+- Use real Taiwan stock tickers: 2330 (台積電), 2412 (中華電), 2454 (聯發科)
 - Test accounts start with 1,000,000 TWD initial capital
 - Mock MCP responses for predictable testing
 - Use in-memory SQLite for test isolation

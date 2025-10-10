@@ -321,7 +321,7 @@ class TestWebSocketManager:
 
         # Test different broadcast methods
         await manager.broadcast_trade_execution(
-            agent_id="agent_001", trade_data={"symbol": "2330", "action": "buy"}
+            agent_id="agent_001", trade_data={"ticker": "2330", "action": "buy"}
         )
 
         await manager.broadcast_strategy_change(

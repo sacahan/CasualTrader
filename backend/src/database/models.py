@@ -244,7 +244,7 @@ class AgentHolding(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     agent_id: Mapped[str] = mapped_column(String(50), ForeignKey("agents.id"), nullable=False)
-    symbol: Mapped[str] = mapped_column(String(10), nullable=False)
+    ticker: Mapped[str] = mapped_column(String(10), nullable=False)
     company_name: Mapped[str | None] = mapped_column(String(200))
 
     # 持倉資訊
@@ -263,9 +263,9 @@ class AgentHolding(Base):
 
     # 表約束
     __table_args__ = (
-        UniqueConstraint("agent_id", "symbol", name="uq_agent_symbol"),
+        UniqueConstraint("agent_id", "ticker", name="uq_agent_ticker"),
         Index("idx_holdings_agent_id", "agent_id"),
-        Index("idx_holdings_symbol", "symbol"),
+        Index("idx_holdings_ticker", "ticker"),
     )
 
 
@@ -279,7 +279,7 @@ class Transaction(Base):
     session_id: Mapped[str | None] = mapped_column(String(50), ForeignKey("agent_sessions.id"))
 
     # 交易基本資訊
-    symbol: Mapped[str] = mapped_column(String(10), nullable=False)
+    ticker: Mapped[str] = mapped_column(String(10), nullable=False)
     company_name: Mapped[str | None] = mapped_column(String(200))
     action: Mapped[TransactionAction] = mapped_column(String(10), nullable=False)
 
@@ -317,7 +317,7 @@ class Transaction(Base):
             name="check_transaction_status",
         ),
         Index("idx_transactions_agent_id", "agent_id"),
-        Index("idx_transactions_symbol", "symbol"),
+        Index("idx_transactions_ticker", "ticker"),
         Index("idx_transactions_created_at", "created_at"),
         Index("idx_transactions_status", "status"),
     )

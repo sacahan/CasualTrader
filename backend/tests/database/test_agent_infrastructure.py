@@ -135,7 +135,7 @@ async def test_agent_session() -> None:
     session.log_turn_start({"action": "analyze_market"})
     session.log_tool_call(
         "get_taiwan_stock_price",
-        {"symbol": "2330"},
+        {"ticker": "2330"},
         {"price": 520.0, "change": "+2.5%"},
     )
     session.log_turn_end({"decision": "hold", "reason": "市場穩定"})

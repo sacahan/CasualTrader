@@ -128,26 +128,26 @@ class FundamentalAnalysisTools:
 
     def calculate_financial_ratios(
         self,
-        symbol: str,
+        ticker: str,
         financial_data: dict[str, Any],
     ) -> dict[str, Any]:
         """計算財務比率
 
         Args:
-            symbol: 股票代碼 (例如: "2330")
+            symbol: 股票代號 (例如: "2330")
             financial_data: 財務數據,包含 revenue, net_income, total_assets 等
 
         Returns:
             dict: 財務比率 (ROE, ROA, 負債比, 流動比率等)
         """
-        self.logger.info(f"開始計算財務比率 | 股票: {symbol}")
+        self.logger.info(f"開始計算財務比率 | 股票: {ticker}")
 
         if not financial_data:
-            self.logger.warning(f"缺少財務數據 | 股票: {symbol}")
-            return {"error": "缺少財務數據", "symbol": symbol}
+            self.logger.warning(f"缺少財務數據 | 股票: {ticker}")
+            return {"error": ..., "ticker": ticker}
 
         result = {
-            "symbol": symbol,
+            "ticker": ticker,
             "profitability": {},
             "solvency": {},
             "valuation": {},
@@ -190,30 +190,30 @@ class FundamentalAnalysisTools:
             "pb_ratio": market_cap / equity if equity > 0 else 0,
         }
 
-        self.logger.info(f"財務比率計算完成 | 股票: {symbol}")
+        self.logger.info(f"財務比率計算完成 | 股票: {ticker}")
         return result
 
     def analyze_financial_health(
         self,
-        symbol: str,
+        ticker: str,
         financial_ratios: dict[str, Any],
     ) -> dict[str, Any]:
         """分析財務體質
 
         Args:
-            symbol: 股票代碼 (例如: "2330")
+            symbol: 股票代號 (例如: "2330")
             financial_ratios: 財務比率 (來自 calculate_financial_ratios)
 
         Returns:
             dict: 財務體質分析 (健康度評分、評級、優勢、弱點)
         """
-        self.logger.info(f"開始分析財務體質 | 股票: {symbol}")
+        self.logger.info(f"開始分析財務體質 | 股票: {ticker}")
 
         if "error" in financial_ratios:
             self.logger.error(
-                f"無法分析財務體質 | 股票: {symbol} | 原因: {financial_ratios.get('error')}"
+                f"無法分析財務體質 | 股票: {ticker} | 原因: {financial_ratios.get('error')}"
             )
-            return {"error": "無法分析財務體質", "symbol": symbol}
+            return {"error": ..., "ticker": ticker}
 
         score = 0
         strengths = []
@@ -268,12 +268,12 @@ class FundamentalAnalysisTools:
             grade, assessment = "F", "財務體質堪憂"
 
         self.logger.info(
-            f"財務體質分析完成 | 股票: {symbol} | 評級: {grade} | "
+            f"財務體質分析完成 | 股票: {ticker} | 評級: {grade} | "
             f"得分: {score} | 優勢: {len(strengths)} | 弱點: {len(weaknesses)}"
         )
 
         return {
-            "symbol": symbol,
+            "ticker": ticker,
             "health_score": score,
             "health_grade": grade,
             "strengths": strengths,
@@ -283,7 +283,7 @@ class FundamentalAnalysisTools:
 
     def evaluate_valuation(
         self,
-        symbol: str,
+        ticker: str,
         current_price: float,
         financial_ratios: dict[str, Any],
         industry_avg: dict[str, float] | None = None,
@@ -291,7 +291,7 @@ class FundamentalAnalysisTools:
         """評估估值水準
 
         Args:
-            symbol: 股票代碼 (例如: "2330")
+            symbol: 股票代號 (例如: "2330")
             current_price: 當前股價
             financial_ratios: 財務比率 (來自 calculate_financial_ratios)
             industry_avg: 產業平均值 (可選)
@@ -299,11 +299,11 @@ class FundamentalAnalysisTools:
         Returns:
             dict: 估值分析 (估值水準、合理價、折溢價率)
         """
-        self.logger.info(f"開始評估估值 | 股票: {symbol} | 當前價: {current_price}")
+        self.logger.info(f"開始評估估值 | 股票: {ticker} | 當前價: {current_price}")
 
         if "error" in financial_ratios:
-            self.logger.error(f"無法評估估值 | 股票: {symbol} | 原因: 財務比率錯誤")
-            return {"error": "無法評估估值", "symbol": symbol}
+            self.logger.error(f"無法評估估值 | 股票: {ticker} | 原因: 財務比率錯誤")
+            return {"error": ..., "ticker": ticker}
 
         pe_ratio = financial_ratios.get("valuation", {}).get("pe_ratio", 0)
         pb_ratio = financial_ratios.get("valuation", {}).get("pb_ratio", 0)
@@ -341,12 +341,12 @@ class FundamentalAnalysisTools:
         discount_rate = (fair_value - current_price) / current_price if current_price > 0 else 0
 
         self.logger.info(
-            f"估值評估完成 | 股票: {symbol} | 等級: {valuation_level} | "
+            f"估值評估完成 | 股票: {ticker} | 等級: {valuation_level} | "
             f"合理價: {fair_value:.2f} | 折溢價率: {discount_rate:.1%}"
         )
 
         return {
-            "symbol": symbol,
+            "ticker": ticker,
             "current_price": current_price,
             "valuation_level": valuation_level,
             "fair_value": fair_value,
@@ -357,23 +357,23 @@ class FundamentalAnalysisTools:
 
     def analyze_growth_potential(
         self,
-        symbol: str,
+        ticker: str,
         historical_data: dict[str, Any],
     ) -> dict[str, Any]:
         """分析成長潛力
 
         Args:
-            symbol: 股票代碼 (例如: "2330")
+            symbol: 股票代號 (例如: "2330")
             historical_data: 歷史財務數據 (營收成長率、EPS 成長率)
 
         Returns:
             dict: 成長潛力分析 (成長評分、成長趨勢)
         """
-        self.logger.info(f"開始分析成長潛力 | 股票: {symbol}")
+        self.logger.info(f"開始分析成長潛力 | 股票: {ticker}")
 
         if not historical_data:
-            self.logger.warning(f"缺少歷史數據 | 股票: {symbol}")
-            return {"error": "缺少歷史數據", "symbol": symbol}
+            self.logger.warning(f"缺少歷史數據 | 股票: {ticker}")
+            return {"error": ..., "ticker": ticker}
 
         score = 0
         revenue_growth = historical_data.get("latest_revenue_growth", 0)
@@ -408,12 +408,12 @@ class FundamentalAnalysisTools:
             growth_trend = "趨緩"
 
         self.logger.info(
-            f"成長潛力分析完成 | 股票: {symbol} | 評估: {growth_assessment} | "
+            f"成長潛力分析完成 | 股票: {ticker} | 評估: {growth_assessment} | "
             f"趨勢: {growth_trend} | 分數: {min(score, 100)}"
         )
 
         return {
-            "symbol": symbol,
+            "ticker": ticker,
             "growth_score": min(score, 100),
             "growth_trend": growth_trend,
             "revenue_growth": revenue_growth,
@@ -423,7 +423,7 @@ class FundamentalAnalysisTools:
 
     def generate_investment_rating(
         self,
-        symbol: str,
+        ticker: str,
         financial_health: dict[str, Any],
         valuation: dict[str, Any],
         growth: dict[str, Any],
@@ -431,7 +431,7 @@ class FundamentalAnalysisTools:
         """產生投資評級
 
         Args:
-            symbol: 股票代碼 (例如: "2330")
+            symbol: 股票代號 (例如: "2330")
             financial_health: 財務體質分析
             valuation: 估值分析
             growth: 成長分析
@@ -444,7 +444,7 @@ class FundamentalAnalysisTools:
         growth_score = growth.get("growth_score", 0)
 
         self.logger.info(
-            f"開始產生投資評級 | 股票: {symbol} | 體質分數: {health_score} | "
+            f"開始產生投資評級 | 股票: {ticker} | 體質分數: {health_score} | "
             f"估值: {valuation_level} | 成長分數: {growth_score}"
         )
 
@@ -473,12 +473,12 @@ class FundamentalAnalysisTools:
         target_price = valuation.get("fair_value", 0)
 
         self.logger.info(
-            f"投資評級產生完成 | 股票: {symbol} | 評級: {rating} | "
+            f"投資評級產生完成 | 股票: {ticker} | 評級: {rating} | "
             f"目標價: {target_price:.2f} | 信心度: {confidence:.1%}"
         )
 
         return {
-            "symbol": symbol,
+            "ticker": ticker,
             "rating": rating,
             "target_price": target_price,
             "confidence": confidence,

@@ -111,8 +111,8 @@ class InstructionGenerator:
             section += "**產業配置**：多元化投資，不過度集中特定產業\n\n"
 
         # 排除標的
-        if prefs.excluded_symbols:
-            section += f"**排除標的**：{', '.join(prefs.excluded_symbols)}\n\n"
+        if prefs.excluded_tickers:
+            section += f"**排除標的**：{', '.join(prefs.excluded_tickers)}\n\n"
 
         # 部位大小限制
         section += f"""**部位控制**：
@@ -285,7 +285,7 @@ class InstructionGenerator:
             "max_position_size": config.investment_preferences.max_position_size,
             "auto_adjust_enabled": config.auto_adjust.enabled,
             "preferred_sectors": config.investment_preferences.preferred_sectors,
-            "excluded_symbols": config.investment_preferences.excluded_symbols,
+            "excluded_tickers": config.investment_preferences.excluded_tickers,
             "max_daily_trades": config.trading_settings.max_daily_trades,
             "stop_loss_enabled": config.trading_settings.enable_stop_loss,
             "initial_funds": config.initial_funds,

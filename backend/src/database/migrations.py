@@ -110,7 +110,7 @@ class InitialSchemaMigration:
             a.status,
             a.current_mode,
             a.initial_funds,
-            COUNT(DISTINCT h.symbol) as holdings_count,
+            COUNT(DISTINCT h.ticker) as holdings_count,
             COALESCE(SUM(h.quantity * h.average_cost), 0) as total_invested,
             a.created_at,
             a.last_active_at
@@ -183,7 +183,7 @@ class AddPerformanceIndexesMigration:
         async with engine.begin() as conn:
             # 複合索引用於績效查詢優化
             indexes = [
-                "CREATE INDEX IF NOT EXISTS idx_transactions_agent_symbol ON transactions(agent_id, symbol)",
+                "CREATE INDEX IF NOT EXISTS idx_transactions_agent_ticker ON transactions(agent_id, ticker)",
                 "CREATE INDEX IF NOT EXISTS idx_performance_agent_date ON agent_performance(agent_id, date DESC)",
                 "CREATE INDEX IF NOT EXISTS idx_sessions_agent_mode_time ON agent_sessions(agent_id, mode, start_time DESC)",
                 "CREATE INDEX IF NOT EXISTS idx_strategy_changes_agent_timestamp ON strategy_changes(agent_id, timestamp DESC)",
@@ -200,7 +200,7 @@ class AddPerformanceIndexesMigration:
 
         async with engine.begin() as conn:
             indexes = [
-                "DROP INDEX IF EXISTS idx_transactions_agent_symbol",
+                "DROP INDEX IF EXISTS idx_transactions_agent_ticker",
                 "DROP INDEX IF EXISTS idx_performance_agent_date",
                 "DROP INDEX IF EXISTS idx_sessions_agent_mode_time",
                 "DROP INDEX IF EXISTS idx_strategy_changes_agent_timestamp",

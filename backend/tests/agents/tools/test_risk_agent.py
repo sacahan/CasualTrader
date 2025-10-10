@@ -53,8 +53,8 @@ class TestRiskAgent:
             result = tools.calculate_position_risk("2330", position_data, market_data)
 
             # 檢查結果結構
-            assert "symbol" in result
-            assert result["symbol"] == "2330"
+            assert "ticker" in result
+            assert result["ticker"] == "2330"
             assert "position_value" in result
             assert "unrealized_pnl" in result
             assert "pnl_percent" in result
@@ -112,13 +112,13 @@ class TestRiskAgent:
             # 模擬部位風險
             position_risks = [
                 {
-                    "symbol": "2330",
+                    "ticker": "2330",
                     "position_value": 300000,
                     "risk_score": 40,
                     "var_95": 30000,
                 },
                 {
-                    "symbol": "2317",
+                    "ticker": "2317",
                     "position_value": 200000,
                     "risk_score": 35,
                     "var_95": 20000,

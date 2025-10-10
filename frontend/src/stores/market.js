@@ -15,7 +15,7 @@ export const marketStatus = writable(null);
 // 市場指數資料
 export const marketIndices = writable([]);
 
-// 股票報價快取 { symbol: quote }
+// 股票報價快取 { ticker: quote }
 export const stockQuotes = writable({});
 
 // 載入狀態

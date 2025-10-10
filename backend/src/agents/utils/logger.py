@@ -133,7 +133,7 @@ class AgentLogger:
         cls,
         logger: logging.Logger,
         tool_name: str,
-        symbol: str | None = None,
+        ticker: str | None = None,
         duration: float | None = None,
         success: bool = True,
         message: str = "",
@@ -143,7 +143,7 @@ class AgentLogger:
         Args:
             logger: Logger 實例
             tool_name: 工具名稱
-            symbol: 股票代碼（如適用）
+            symbol: 股票代號（如適用）
             duration: 執行時間（秒）
             success: 是否成功
             message: 附加訊息
@@ -151,8 +151,8 @@ class AgentLogger:
         status = "✓" if success else "✗"
         log_parts = [f"{status} [{tool_name}]"]
 
-        if symbol:
-            log_parts.append(f"股票: {symbol}")
+        if ticker:
+            log_parts.append(f"股票: {ticker}")
 
         if duration is not None:
             log_parts.append(f"耗時: {duration:.3f}s")

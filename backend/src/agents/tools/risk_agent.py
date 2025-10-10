@@ -121,21 +121,21 @@ class RiskAnalysisTools:
 
     def calculate_position_risk(
         self,
-        symbol: str,
+        ticker: str,
         position_data: dict[str, Any],
         market_data: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         """計算個別部位風險
 
         Args:
-            symbol: 股票代碼 (例如: "2330")
+            symbol: 股票代號 (例如: "2330")
             position_data: 部位數據
             market_data: 市場數據 (可選)
 
         Returns:
             dict: 部位風險指標
         """
-        self.logger.info(f"開始計算部位風險 | 股票: {symbol}")
+        self.logger.info(f"開始計算部位風險 | 股票: {ticker}")
 
         quantity = position_data.get("quantity", 0)
         avg_cost = position_data.get("avg_cost", 0)
@@ -146,7 +146,7 @@ class RiskAnalysisTools:
         pnl_percent = unrealized_pnl / (quantity * avg_cost) if avg_cost > 0 else 0
 
         self.logger.debug(
-            f"部位基本資訊 | 股票: {symbol} | 數量: {quantity} | "
+            f"部位基本資訊 | 股票: {ticker} | 數量: {quantity} | "
             f"成本: {avg_cost} | 現價: {current_price} | 未實現損益: {unrealized_pnl:,.0f}"
         )
 
@@ -158,12 +158,12 @@ class RiskAnalysisTools:
         risk_score = min(100, (volatility * 100 + abs(beta - 1) * 30))
 
         self.logger.info(
-            f"部位風險計算完成 | 股票: {symbol} | 風險評分: {risk_score:.1f} | "
+            f"部位風險計算完成 | 股票: {ticker} | 風險評分: {risk_score:.1f} | "
             f"VaR(95%): {var_95:,.0f} | 波動率: {volatility:.2%}"
         )
 
         return {
-            "symbol": symbol,
+            "ticker": ticker,
             "position_value": position_value,
             "unrealized_pnl": unrealized_pnl,
             "pnl_percent": pnl_percent,
@@ -420,12 +420,12 @@ class RiskAnalysisTools:
             recommendations.append("建議降低最大單一持股權重至 15% 以下")
 
         for risk in position_risks:
-            symbol = risk["symbol"]
+            ticker = risk["ticker"]
             risk_score_pos = risk.get("risk_score", 0)
 
             if risk_score_pos > 70:
-                warnings.append(f"{symbol} 風險偏高")
-                position_adjustments[symbol] = "建議減碼"
+                warnings.append(f"{ticker} 風險偏高")
+                position_adjustments[ticker] = "建議減碼"
 
                 current_price = (
                     risk.get("position_value", 0) / risk.get("quantity", 1)
@@ -433,7 +433,7 @@ class RiskAnalysisTools:
                     else 0
                 )
                 stop_loss = current_price * 0.92
-                stop_loss_suggestions[symbol] = stop_loss
+                stop_loss_suggestions[ticker] = stop_loss
 
         sector_conc = concentration.get("sector_concentration", {})
         for sector, weight in sector_conc.items():

@@ -385,7 +385,7 @@ async def get_market_status() -> dict[str, Any]
 ```python
 async def validate_trade_request(
     agent_id: str,
-    symbol: str,
+    ticker: str,
     action: str,
     quantity: int,
     price: float | None
@@ -431,14 +431,14 @@ class CasualMarketMCPClient:
     async def close() -> None
 
     # 市場數據
-    async def get_stock_price(symbol: str) -> dict[str, Any]
-    async def get_company_profile(symbol: str) -> dict[str, Any]
-    async def get_income_statement(symbol: str) -> dict[str, Any]
-    async def get_balance_sheet(symbol: str) -> dict[str, Any]
+    async def get_stock_price(ticker: str) -> dict[str, Any]
+    async def get_company_profile(ticker: str) -> dict[str, Any]
+    async def get_income_statement(ticker: str) -> dict[str, Any]
+    async def get_balance_sheet(ticker: str) -> dict[str, Any]
 
     # 交易執行
-    async def execute_buy(symbol: str, quantity: int, price: float | None) -> dict[str, Any]
-    async def execute_sell(symbol: str, quantity: int, price: float | None) -> dict[str, Any]
+    async def execute_buy(ticker: str, quantity: int, price: float | None) -> dict[str, Any]
+    async def execute_sell(ticker: str, quantity: int, price: float | None) -> dict[str, Any]
 
     # 市場狀態
     async def check_trading_day(date: str) -> dict[str, Any]
@@ -638,11 +638,11 @@ class TradingAgent(CasualTradingAgent):
     # 交易邏輯
     async def analyze_market() -> dict[str, Any]
     async def generate_trading_signal() -> dict[str, Any]
-    async def execute_trade(action: str, symbol: str, quantity: int) -> dict[str, Any]
+    async def execute_trade(action: str, ticker: str, quantity: int) -> dict[str, Any]
 
     # 風險管理
     async def check_risk_limits() -> bool
-    async def calculate_position_size(symbol: str) -> int
+    async def calculate_position_size(ticker: str) -> int
 ```
 
 **依賴**:
@@ -857,13 +857,13 @@ sequenceDiagram
 
     API->>TA: execute(message, context)
 
-    TA->>MCP: get_stock_price(symbol)
+    TA->>MCP: get_stock_price(ticker)
     MCP-->>TA: price_data
 
-    TA->>Tech: analyze(symbol, price_data)
+    TA->>Tech: analyze(ticker, price_data)
     Tech-->>TA: technical_analysis
 
-    TA->>Fund: analyze(symbol)
+    TA->>Fund: analyze(ticker)
     Fund-->>TA: fundamental_analysis
 
     TA->>TA: integrate_analysis()
@@ -877,7 +877,7 @@ sequenceDiagram
     TA->>TA: check_risk_limits()
 
     alt Risk OK
-        TA->>MCP: execute_buy/sell(symbol, quantity, price)
+        TA->>MCP: execute_buy/sell(ticker, quantity, price)
         MCP-->>TA: trade_result
 
         TA->>DB: save_trade(trade)
@@ -907,7 +907,7 @@ sequenceDiagram
     DB-->>PQ: holdings
 
     loop For each holding
-        PQ->>MCP: get_stock_price(symbol)
+        PQ->>MCP: get_stock_price(ticker)
         MCP-->>PQ: current_price
         PQ->>PQ: calculate_unrealized_pnl()
     end
@@ -1092,7 +1092,7 @@ Trade Execution
 
 - MCP Server 狀態
 - yfinance 網絡連接
-- 股票代碼格式（台股需要 .TW 後綴）
+- 股票代號格式（台股需要 .TW 後綴）
 
 #### 3. 資料庫操作失敗
 

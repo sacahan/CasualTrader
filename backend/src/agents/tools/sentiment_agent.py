@@ -198,13 +198,13 @@ class SentimentAnalysisTools:
 
     def analyze_money_flow(
         self,
-        symbol: str,
+        ticker: str,
         trading_data: dict[str, Any],
     ) -> dict[str, Any]:
         """分析資金流向
 
         Args:
-            symbol: 股票代碼 (例如: "2330")
+            symbol: 股票代號 (例如: "2330")
             trading_data: 交易數據,包含:
                 - large_buy: 大單買進
                 - large_sell: 大單賣出
@@ -214,7 +214,7 @@ class SentimentAnalysisTools:
         Returns:
             dict: 資金流向分析
                 {
-                    "symbol": "2330",
+                    "ticker": "2330",
                     "net_flow": float,          # 淨流入金額
                     "flow_direction": str,      # 流入/流出/平衡
                     "large_order_ratio": float, # 大單佔比
@@ -222,7 +222,7 @@ class SentimentAnalysisTools:
                     "interpretation": str
                 }
         """
-        self.logger.info(f"開始分析資金流向 | 股票: {symbol}")
+        self.logger.info(f"開始分析資金流向 | 股票: {ticker}")
 
         large_buy = trading_data.get("large_buy", 0)
         large_sell = trading_data.get("large_sell", 0)
@@ -260,12 +260,12 @@ class SentimentAnalysisTools:
         interpretation = f"資金呈{flow_strength}{flow_direction}態勢,外資{foreign_attitude}"
 
         self.logger.info(
-            f"資金流向分析完成 | 股票: {symbol} | 淨流: {net_flow:,.0f} | "
+            f"資金流向分析完成 | 股票: {ticker} | 淨流: {net_flow:,.0f} | "
             f"方向: {flow_direction} | 外資: {foreign_attitude}"
         )
 
         return {
-            "symbol": symbol,
+            "ticker": ticker,
             "net_flow": net_flow,
             "flow_direction": flow_direction,
             "large_order_ratio": large_order_ratio,
@@ -276,13 +276,13 @@ class SentimentAnalysisTools:
 
     def analyze_news_sentiment(
         self,
-        symbol: str | None,
+        ticker: str | None,
         news_data: list[dict[str, Any]],
     ) -> dict[str, Any]:
         """分析新聞情緒
 
         Args:
-            symbol: 股票代碼 (可選,None 表示整體市場)
+            symbol: 股票代號 (可選,None 表示整體市場)
             news_data: 新聞列表,每筆包含:
                 - title: 標題
                 - content: 內容
@@ -292,7 +292,7 @@ class SentimentAnalysisTools:
         Returns:
             dict: 新聞情緒分析
                 {
-                    "symbol": str,
+                    "ticker": str,
                     "news_count": int,
                     "positive_ratio": float,
                     "negative_ratio": float,
@@ -301,13 +301,13 @@ class SentimentAnalysisTools:
                     "interpretation": str
                 }
         """
-        target = symbol or "市場"
+        target = ticker or "市場"
         self.logger.info(f"開始分析新聞情緒 | 標的: {target} | 新聞數: {len(news_data)}")
 
         if not news_data:
             self.logger.warning(f"無新聞數據 | 標的: {target}")
             return {
-                "symbol": symbol or "市場",
+                "ticker": ticker or "市場",
                 "news_count": 0,
                 "sentiment_score": 0,
                 "interpretation": "無相關新聞數據",
@@ -344,7 +344,7 @@ class SentimentAnalysisTools:
         )
 
         return {
-            "symbol": symbol or "市場",
+            "ticker": ticker or "市場",
             "news_count": news_count,
             "positive_ratio": positive_ratio,
             "negative_ratio": negative_ratio,
@@ -355,13 +355,13 @@ class SentimentAnalysisTools:
 
     def analyze_social_sentiment(
         self,
-        symbol: str,
+        ticker: str,
         social_data: dict[str, Any],
     ) -> dict[str, Any]:
         """分析社群媒體情緒
 
         Args:
-            symbol: 股票代碼 (例如: "2330")
+            symbol: 股票代號 (例如: "2330")
             social_data: 社群數據,包含:
                 - mention_count: 提及次數
                 - positive_mentions: 正面提及
@@ -371,7 +371,7 @@ class SentimentAnalysisTools:
         Returns:
             dict: 社群情緒分析
                 {
-                    "symbol": "2330",
+                    "ticker": "2330",
                     "mention_count": int,
                     "sentiment_distribution": dict,
                     "trending_level": str,
@@ -385,14 +385,14 @@ class SentimentAnalysisTools:
         trending_score = social_data.get("trending_score", 0)
 
         self.logger.info(
-            f"開始分析社群情緒 | 股票: {symbol} | 提及數: {mention_count} | "
+            f"開始分析社群情緒 | 股票: {ticker} | 提及數: {mention_count} | "
             f"熱度: {trending_score:.1f}"
         )
 
         if mention_count == 0:
-            self.logger.warning(f"無社群數據 | 股票: {symbol}")
+            self.logger.warning(f"無社群數據 | 股票: {ticker}")
             return {
-                "symbol": symbol,
+                "ticker": ticker,
                 "mention_count": 0,
                 "sentiment_score": 0,
                 "interpretation": "社群討論度低",
@@ -427,12 +427,12 @@ class SentimentAnalysisTools:
         interpretation = f"社群討論{trending_level},情緒{'偏多' if sentiment_score > 20 else '偏空' if sentiment_score < -20 else '中性'}"
 
         self.logger.info(
-            f"社群情緒分析完成 | 股票: {symbol} | 情緒分數: {sentiment_score:.2f} | "
+            f"社群情緒分析完成 | 股票: {ticker} | 情緒分數: {sentiment_score:.2f} | "
             f"熱度: {trending_level}"
         )
 
         return {
-            "symbol": symbol,
+            "ticker": ticker,
             "mention_count": mention_count,
             "sentiment_distribution": sentiment_distribution,
             "trending_level": trending_level,

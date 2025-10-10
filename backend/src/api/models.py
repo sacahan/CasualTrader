@@ -220,7 +220,7 @@ class TradeRecord(BaseModel):
 
     id: str  # 交易紀錄 ID
     agent_id: str  # 代理人 ID
-    symbol: str  # 股票代碼
+    ticker: str  # 股票代號
     action: str  # 買賣動作
     quantity: int  # 交易股數
     price: float  # 交易價格

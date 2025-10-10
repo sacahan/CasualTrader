@@ -288,7 +288,7 @@ GET    /api/trading/agents/{agent_id}/transactions  # 取得交易歷史
 GET    /api/trading/agents/{agent_id}/decisions     # 取得決策歷史
 
 # 市場數據
-GET    /api/trading/market/stock/{symbol}           # 取得股票價格
+GET    /api/trading/market/stock/{ticker}           # 取得股票價格
 POST   /api/trading/market/trade/simulate           # 模擬交易
 ```
 
@@ -302,7 +302,7 @@ async def get_agent_portfolio(agent_id: str):
 
     返回內容:
     - 現金餘額
-    - 持股明細（股票代碼、數量、成本、市值）
+    - 持股明細（股票代號、數量、成本、市值）
     - 總資產價值
     - 未實現損益
     - 已實現損益
@@ -549,7 +549,7 @@ class WebSocketManager:
     "data": {
         "agent_id": "agent_001",
         "action": "buy",
-        "symbol": "2330",
+        "ticker": "2330",
         "quantity": 1000,
         "price": 500.0,
         "timestamp": "2025-10-09T10:10:00Z"

@@ -50,7 +50,7 @@ class TestCalculateFinancialRatios:
     def test_calculate_ratios_structure(self, tools, sample_financial_data):
         """測試財務比率結構"""
         result = tools.calculate_financial_ratios("2330", sample_financial_data)
-        assert "symbol" in result
+        assert "ticker" in result
         assert "profitability" in result
         assert "solvency" in result
 

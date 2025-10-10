@@ -89,7 +89,7 @@ export async function loadModels(forceRefresh = false) {
   // 如果已有數據且不強制刷新,則跳過
   const currentGroups = get(modelGroups);
   if (!forceRefresh && Object.keys(currentGroups).length > 0) {
-    console.log('Models already loaded, skipping refresh');
+    // 模型已載入，略過重新整理
     return;
   }
 
@@ -112,8 +112,7 @@ export async function loadModels(forceRefresh = false) {
 
     // 更新最後更新時間
     modelsLastUpdated.set(new Date());
-
-    console.log(`Loaded ${Object.keys(groups).length} model groups`);
+    // 成功載入模型群組
   } catch (error) {
     console.error('Failed to load models:', error);
     modelsError.set(error.message);

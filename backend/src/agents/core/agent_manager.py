@@ -252,7 +252,7 @@ class AgentManager:
             "enabled_tools": agent.config.enabled_tools,
             "investment_preferences": {
                 "preferred_sectors": agent.config.investment_preferences.preferred_sectors,
-                "excluded_stocks": agent.config.investment_preferences.excluded_symbols,
+                "excluded_stocks": agent.config.investment_preferences.excluded_tickers,
                 "max_position_size": agent.config.investment_preferences.max_position_size
                 / 100,  # Convert back to 0-1 range
                 "rebalance_frequency": "weekly",  # Default value
@@ -542,7 +542,7 @@ class AgentManager:
                 holdings = await agent.db_service.get_agent_holdings(agent_id)
                 portfolio_data["holdings"] = [
                     {
-                        "symbol": h.symbol,
+                        "ticker": h.ticker,
                         "quantity": int(h.quantity),
                         "average_cost": float(h.average_cost),
                         "current_price": float(h.current_price or h.average_cost),
@@ -607,7 +607,7 @@ class AgentManager:
                 return [
                     {
                         "id": t.id,
-                        "symbol": t.symbol,
+                        "ticker": t.ticker,
                         "action": t.action,
                         "quantity": int(t.quantity),
                         "price": float(t.price),
@@ -663,7 +663,7 @@ class AgentManager:
                         "reason": c.reason,
                         "performance_before": c.performance_before,
                         "performance_after": c.performance_after,
-                        "changed_at": c.changed_at.isoformat() if c.changed_at else None,
+                        "changed_at": (c.changed_at.isoformat() if c.changed_at else None),
                         "applied": c.applied,
                     }
                     for c in changes

@@ -472,10 +472,10 @@ class AgentDatabaseService:
                 )
 
                 # 插入新持倉
-                for symbol, holding_data in holdings.items():
+                for ticker, holding_data in holdings.items():
                     db_holding = AgentHolding(
                         agent_id=agent_id,
-                        symbol=symbol,
+                        ticker=ticker,
                         company_name=holding_data.get("company_name"),
                         quantity=holding_data.get("quantity", 0),
                         average_cost=holding_data.get("average_cost", 0.0),
@@ -664,7 +664,7 @@ class AgentDatabaseService:
             "enabled_tools": config.enabled_tools,
             "investment_preferences": {
                 "preferred_sectors": config.investment_preferences.preferred_sectors,
-                "excluded_symbols": config.investment_preferences.excluded_symbols,
+                "excluded_tickers": config.investment_preferences.excluded_tickers,
                 "max_position_size": config.investment_preferences.max_position_size,
                 "risk_tolerance": config.investment_preferences.risk_tolerance,
             },

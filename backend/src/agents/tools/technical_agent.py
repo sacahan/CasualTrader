@@ -121,14 +121,14 @@ class TechnicalAnalysisTools:
 
     def calculate_technical_indicators(
         self,
-        symbol: str,
+        ticker: str,
         price_data: list[dict[str, Any]],
         indicators: list[str] | None = None,
     ) -> dict[str, Any]:
         """計算技術指標
 
         Args:
-            symbol: 股票代碼 (例如: "2330")
+            symbol: 股票代號 (例如: "2330")
             price_data: 歷史價格數據列表,每筆包含 date, open, high, low, close, volume
             indicators: 要計算的指標列表 ["ma", "rsi", "macd", "bollinger", "kd"],
                        None 表示計算全部指標
@@ -136,7 +136,7 @@ class TechnicalAnalysisTools:
         Returns:
             dict: 包含各項技術指標的計算結果
                 {
-                    "symbol": "2330",
+                    "ticker": "2330",
                     "indicators": {
                         "ma": {"ma5": float, "ma10": float, ...},
                         "rsi": {"value": float, "status": str},
@@ -144,14 +144,14 @@ class TechnicalAnalysisTools:
                     }
                 }
         """
-        self.logger.info(f"開始計算技術指標 | 股票: {symbol} | 數據點數: {len(price_data)}")
+        self.logger.info(f"開始計算技術指標 | 股票: {ticker} | 數據點數: {len(price_data)}")
 
         if not price_data:
-            self.logger.warning(f"缺少價格數據 | 股票: {symbol}")
-            return {"error": "缺少價格數據", "symbol": symbol}
+            self.logger.warning(f"缺少價格數據 | 股票: {ticker}")
+            return {"error": ..., "ticker": ticker}
 
         indicators = indicators or ["ma", "rsi", "macd", "bollinger", "kd"]
-        result = {"symbol": symbol, "indicators": {}}
+        result = {"ticker": ticker, "indicators": {}}
         latest_close = price_data[-1]["close"]
 
         self.logger.debug(f"計算指標: {', '.join(indicators)} | 最新收盤: {latest_close}")
@@ -191,27 +191,27 @@ class TechnicalAnalysisTools:
                 "status": "偏強",
             }
 
-        self.logger.info(f"技術指標計算完成 | 股票: {symbol} | 指標數: {len(result['indicators'])}")
+        self.logger.info(f"技術指標計算完成 | 股票: {ticker} | 指標數: {len(result['indicators'])}")
 
         return result
 
     def identify_chart_patterns(
         self,
-        symbol: str,
+        ticker: str,
         price_data: list[dict[str, Any]],
         lookback_days: int = 60,
     ) -> dict[str, Any]:
         """識別圖表型態
 
         Args:
-            symbol: 股票代碼 (例如: "2330")
+            symbol: 股票代號 (例如: "2330")
             price_data: 歷史價格數據列表
             lookback_days: 回溯分析天數,預設 60 天
 
         Returns:
             dict: 識別到的圖表型態
                 {
-                    "symbol": "2330",
+                    "ticker": "2330",
                     "patterns": [
                         {
                             "pattern_name": str,      # 型態名稱
@@ -224,12 +224,12 @@ class TechnicalAnalysisTools:
                 }
         """
         self.logger.info(
-            f"開始識別圖表型態 | 股票: {symbol} | 數據點數: {len(price_data)} | 回溯: {lookback_days}天"
+            f"開始識別圖表型態 | 股票: {ticker} | 數據點數: {len(price_data)} | 回溯: {lookback_days}天"
         )
 
         if not price_data or len(price_data) < 20:
-            self.logger.warning(f"數據不足 | 股票: {symbol} | 數據點數: {len(price_data)}")
-            return {"error": "數據不足", "symbol": symbol}
+            self.logger.warning(f"數據不足 | 股票: {ticker} | 數據點數: {len(price_data)}")
+            return {"error": ..., "ticker": ticker}
 
         patterns = []
 
@@ -255,40 +255,40 @@ class TechnicalAnalysisTools:
                     }
                 )
 
-        self.logger.info(f"圖表型態識別完成 | 股票: {symbol} | 發現型態: {len(patterns)}")
+        self.logger.info(f"圖表型態識別完成 | 股票: {ticker} | 發現型態: {len(patterns)}")
 
         return {
-            "symbol": symbol,
+            "ticker": ticker,
             "patterns": patterns,
             "pattern_count": len(patterns),
         }
 
     def analyze_trend(
         self,
-        symbol: str,
+        ticker: str,
         price_data: list[dict[str, Any]],
     ) -> dict[str, Any]:
         """分析趨勢方向和強度
 
         Args:
-            symbol: 股票代碼 (例如: "2330")
+            symbol: 股票代號 (例如: "2330")
             price_data: 歷史價格數據列表,至少需要 20 筆數據
 
         Returns:
             dict: 趨勢分析結果
                 {
-                    "symbol": "2330",
+                    "ticker": "2330",
                     "direction": str,              # "上升" | "下降" | "盤整"
                     "strength": float,             # 強度 0-1
                     "short_term_momentum": float,  # 短期動能
                     "mid_term_momentum": float     # 中期動能
                 }
         """
-        self.logger.info(f"開始分析趨勢 | 股票: {symbol} | 數據點數: {len(price_data)}")
+        self.logger.info(f"開始分析趨勢 | 股票: {ticker} | 數據點數: {len(price_data)}")
 
         if len(price_data) < 20:
-            self.logger.warning(f"數據不足 | 股票: {symbol} | 數據點數: {len(price_data)}")
-            return {"error": "數據不足", "symbol": symbol}
+            self.logger.warning(f"數據不足 | 股票: {ticker} | 數據點數: {len(price_data)}")
+            return {"error": ..., "ticker": ticker}
 
         short_term = price_data[-5]["close"] / price_data[-10]["close"] - 1.0
         mid_term = price_data[-10]["close"] / price_data[-20]["close"] - 1.0
@@ -303,11 +303,11 @@ class TechnicalAnalysisTools:
             direction, strength = "盤整", 0.4
 
         self.logger.info(
-            f"趨勢分析完成 | 股票: {symbol} | 方向: {direction} | 強度: {strength:.2f}"
+            f"趨勢分析完成 | 股票: {ticker} | 方向: {direction} | 強度: {strength:.2f}"
         )
 
         return {
-            "symbol": symbol,
+            "ticker": ticker,
             "direction": direction,
             "strength": strength,
             "short_term_momentum": short_term,
@@ -316,29 +316,29 @@ class TechnicalAnalysisTools:
 
     def analyze_support_resistance(
         self,
-        symbol: str,
+        ticker: str,
         price_data: list[dict[str, Any]],
     ) -> dict[str, Any]:
         """分析支撐和壓力位
 
         Args:
-            symbol: 股票代碼 (例如: "2330")
+            symbol: 股票代號 (例如: "2330")
             price_data: 歷史價格數據列表
 
         Returns:
             dict: 支撐壓力位分析結果
                 {
-                    "symbol": "2330",
+                    "ticker": "2330",
                     "current_price": float,          # 當前價格
                     "support_levels": [float, ...],  # 支撐位列表 (由近到遠)
                     "resistance_levels": [float, ...] # 壓力位列表 (由近到遠)
                 }
         """
-        self.logger.info(f"開始分析支撐壓力 | 股票: {symbol} | 數據點數: {len(price_data)}")
+        self.logger.info(f"開始分析支撐壓力 | 股票: {ticker} | 數據點數: {len(price_data)}")
 
         if not price_data:
-            self.logger.warning(f"缺少數據 | 股票: {symbol}")
-            return {"error": "缺少數據", "symbol": symbol}
+            self.logger.warning(f"缺少數據 | 股票: {ticker}")
+            return {"error": ..., "ticker": ticker}
 
         current_price = price_data[-1]["close"]
 
@@ -355,12 +355,12 @@ class TechnicalAnalysisTools:
         ]
 
         self.logger.info(
-            f"支撐壓力分析完成 | 股票: {symbol} | 當前價: {current_price:.2f} | "
+            f"支撐壓力分析完成 | 股票: {ticker} | 當前價: {current_price:.2f} | "
             f"支撐位: {len(support_levels)} | 壓力位: {len(resistance_levels)}"
         )
 
         return {
-            "symbol": symbol,
+            "ticker": ticker,
             "current_price": current_price,
             "support_levels": support_levels,
             "resistance_levels": resistance_levels,
@@ -368,7 +368,7 @@ class TechnicalAnalysisTools:
 
     def generate_trading_signals(
         self,
-        symbol: str,
+        ticker: str,
         technical_indicators: dict[str, Any],
         trend_analysis: dict[str, Any],
         patterns: dict[str, Any],
@@ -376,7 +376,7 @@ class TechnicalAnalysisTools:
         """綜合分析產生交易訊號
 
         Args:
-            symbol: 股票代碼 (例如: "2330")
+            symbol: 股票代號 (例如: "2330")
             technical_indicators: 技術指標計算結果 (來自 calculate_technical_indicators)
             trend_analysis: 趨勢分析結果 (來自 analyze_trend)
             patterns: 圖表型態識別結果 (來自 identify_chart_patterns)
@@ -384,7 +384,7 @@ class TechnicalAnalysisTools:
         Returns:
             dict: 交易訊號
                 {
-                    "symbol": "2330",
+                    "ticker": "2330",
                     "overall_signal": str,     # "買進" | "賣出" | "觀望"
                     "confidence": float,       # 信心度 0-1
                     "signals": [               # 各項訊號明細
@@ -394,7 +394,7 @@ class TechnicalAnalysisTools:
                 }
         """
         self.logger.info(
-            f"開始產生交易訊號 | 股票: {symbol} | "
+            f"開始產生交易訊號 | 股票: {ticker} | "
             f"趨勢方向: {trend_analysis.get('direction', 'unknown')}"
         )
 
@@ -418,12 +418,12 @@ class TechnicalAnalysisTools:
             confidence = min(0.85, confidence)
 
         self.logger.info(
-            f"交易訊號產生完成 | 股票: {symbol} | 訊號: {overall_signal} | "
+            f"交易訊號產生完成 | 股票: {ticker} | 訊號: {overall_signal} | "
             f"信心度: {confidence:.1%} | 訊號數: {len(signals)}"
         )
 
         return {
-            "symbol": symbol,
+            "ticker": ticker,
             "overall_signal": overall_signal,
             "confidence": confidence,
             "signals": signals,

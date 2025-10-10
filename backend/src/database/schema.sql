@@ -68,7 +68,7 @@ CREATE TABLE IF NOT EXISTS agent_sessions (
 CREATE TABLE IF NOT EXISTS agent_holdings (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     agent_id TEXT NOT NULL,                 -- Agent ID
-    symbol TEXT NOT NULL,                   -- 股票代碼
+    ticker TEXT NOT NULL,                   -- 股票代號
     company_name TEXT,                      -- 公司名稱
 
     -- 持倉資訊
@@ -81,7 +81,7 @@ CREATE TABLE IF NOT EXISTS agent_holdings (
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 
     FOREIGN KEY (agent_id) REFERENCES agents(id) ON DELETE CASCADE,
-    UNIQUE(agent_id, symbol)
+    UNIQUE(agent_id, ticker)
 );
 
 -- 交易記錄表
@@ -91,7 +91,7 @@ CREATE TABLE IF NOT EXISTS transactions (
     session_id TEXT,                        -- 關聯的執行會話
 
     -- 交易基本資訊
-    symbol TEXT NOT NULL,                   -- 股票代碼
+    ticker TEXT NOT NULL,                   -- 股票代號
     company_name TEXT,                      -- 公司名稱
     action TEXT NOT NULL CHECK (action IN ('BUY', 'SELL')), -- 交易動作
 
@@ -215,13 +215,13 @@ CREATE INDEX IF NOT EXISTS idx_sessions_start_time ON agent_sessions(start_time)
 
 -- 交易相關索引
 CREATE INDEX IF NOT EXISTS idx_transactions_agent_id ON transactions(agent_id);
-CREATE INDEX IF NOT EXISTS idx_transactions_symbol ON transactions(symbol);
+CREATE INDEX IF NOT EXISTS idx_transactions_ticker ON transactions(ticker);
 CREATE INDEX IF NOT EXISTS idx_transactions_created_at ON transactions(created_at);
 CREATE INDEX IF NOT EXISTS idx_transactions_status ON transactions(status);
 
 -- 持倉相關索引
 CREATE INDEX IF NOT EXISTS idx_holdings_agent_id ON agent_holdings(agent_id);
-CREATE INDEX IF NOT EXISTS idx_holdings_symbol ON agent_holdings(symbol);
+CREATE INDEX IF NOT EXISTS idx_holdings_ticker ON agent_holdings(ticker);
 
 -- 策略變更相關索引
 CREATE INDEX IF NOT EXISTS idx_strategy_changes_agent_id ON strategy_changes(agent_id);
@@ -265,7 +265,7 @@ SELECT
     a.status,
     a.current_mode,
     a.initial_funds,
-    COUNT(DISTINCT h.symbol) as holdings_count,
+    COUNT(DISTINCT h.ticker) as holdings_count,
     COALESCE(SUM(h.quantity * h.average_cost), 0) as total_invested,
     a.created_at,
     a.last_active_at
