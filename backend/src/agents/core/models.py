@@ -155,7 +155,6 @@ class AgentConfig:
     # 執行參數
     max_turns: int = 30
     execution_timeout: int = 300  # 執行超時時間 (秒)
-    enable_tracing: bool = True
 
     # 工具配置
     enabled_tools: dict[str, bool] = field(

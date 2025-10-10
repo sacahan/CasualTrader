@@ -1,6 +1,41 @@
 """
 CasualTrader Base Agent Implementation
 使用 Python 3.12+ 語法和 OpenAI Agent SDK 的基礎 Agent 類別
+
+Tracing 架構說明
+===============
+
+本系統整合兩種互補的執行追蹤機制:
+
+1. OpenAI Agents SDK Trace (自動啟用)
+   - 用途: 即時可視化和調試 Agent 執行流程
+   - 位置: 上傳到 OpenAI Dashboard (https://platform.openai.com/traces)
+   - 啟用方式: trace() context manager 自動記錄
+   - 適用場景: 開發、調試、問題排查
+   - 特點:
+     * 自動記錄所有 Runner.run() 調用
+     * 可視化工具調用和 LLM 響應
+     * 預設使用 OpenAI API key (無需額外配置)
+     * 可用 group_id 將多個 run 關聯為同一工作流
+
+2. 內部執行日誌 (trace_data)
+   - 用途: 業務分析、績效追蹤、審計記錄
+   - 位置: 存儲在資料庫 AgentExecutionResult.trace_data 欄位
+   - 記錄內容:
+     * 執行步驟詳細日誌 (turn_start, turn_end, tool_call, agent_decision)
+     * 會話摘要 (session_summary)
+     * 執行統計資訊
+   - 適用場景: 生產環境、長期數據分析、合規審計
+   - 特點:
+     * 持久化存儲
+     * 可查詢和分析
+     * 包含業務相關的上下文資訊
+
+整合原則
+--------
+- OpenAI trace 專注於技術層面的可觀察性
+- 內部 trace_data 專注於業務層面的可追溯性
+- 兩者互補，不重複記錄相同資訊
 """
 
 from __future__ import annotations
@@ -15,12 +50,22 @@ from typing import Any
 # 實際實作時需要替換為正確的 SDK 導入
 try:
     from openai_agents import Agent  # type: ignore[import-untyped]
+    from agents import trace  # OpenAI Agents SDK trace context manager
     from agents.extensions.models.litellm_model import LitellmModel  # type: ignore[import-untyped]
 
     OPENAI_AGENTS_AVAILABLE = True
 except ImportError:
     # 開發階段的模擬實作
     OPENAI_AGENTS_AVAILABLE = False
+
+    # Mock trace context manager for development
+    from contextlib import contextmanager
+    from typing import Iterator
+
+    @contextmanager
+    def trace(workflow_name: str, group_id: str | None = None) -> Iterator[None]:
+        """Mock trace context manager for development"""
+        yield
 
     class Agent:  # type: ignore[no-redef]
         """OpenAI Agent SDK 模擬類別 (開發期間使用)"""
@@ -136,10 +181,6 @@ class CasualTradingAgent(ABC):
         """關閉 Agent 系統"""
         self.logger.info(f"Shutting down agent {self.agent_id}")
 
-        # 結束當前會話
-        if self._current_session:
-            await self._end_current_session(SessionStatus.COMPLETED)
-
         # 設定為非活躍狀態
         self.state.status = AgentStatus.INACTIVE
         self.state.update_activity()
@@ -188,30 +229,37 @@ class CasualTradingAgent(ABC):
         # 設定當前會話
         self._current_session = execution_context
 
-        try:
-            # 執行前準備
-            await self._prepare_execution(execution_context)
+        # 使用 OpenAI Agents SDK trace context manager 包裹執行過程
+        # - trace_name: 工作流名稱，用於在 OpenAI Dashboard 中識別
+        # - group_id: 將同一 Agent 的多次執行關聯在一起
+        # - 自動記錄所有 Runner.run() 調用和工具使用
+        # - 內部執行日誌 (trace_data) 由子類別在 _prepare_execution 中記錄
+        trace_name = f"{self.config.name}-{execution_mode.value}"
+        with trace(trace_name, group_id=self.agent_id):
+            try:
+                # 執行前準備
+                await self._prepare_execution(execution_context)
 
-            # 執行 Agent
-            result = await self._execute_agent(execution_context)
+                # 執行 Agent
+                result = await self._execute_agent(execution_context)
 
-            # 後處理
-            await self._post_execution(execution_context, result)
+                # 後處理
+                await self._post_execution(execution_context, result)
 
-            # 更新統計資訊
-            self._update_execution_stats(result)
+                # 更新統計資訊
+                self._update_execution_stats(result)
 
-            return result
+                return result
 
-        except Exception as e:
-            # 錯誤處理
-            error_result = await self._handle_execution_error(execution_context, e)
-            self._update_execution_stats(error_result)
-            return error_result
+            except Exception as e:
+                # 錯誤處理
+                error_result = await self._handle_execution_error(execution_context, e)
+                self._update_execution_stats(error_result)
+                return error_result
 
-        finally:
-            # 清理會話
-            self._current_session = None
+            finally:
+                # 清理會話
+                self._current_session = None
 
     # ==========================================
     # 抽象方法 - 子類別必須實作
@@ -248,37 +296,17 @@ class CasualTradingAgent(ABC):
         # 生成指令
         instructions = await self._build_agent_instructions()
 
-        # 獲取模型配置
-        model_config = await self._get_model_config(self.config.model)
-
-        # 根據模型類型創建不同的 model 參數
-        if model_config and model_config.get("model_type") == "litellm":
-            # 使用 LiteLLM 模型
-            model_instance = LitellmModel(
-                name=model_config["full_model_name"],
-            )
-            self._openai_agent = Agent(
-                name=self.config.name,
-                instructions=instructions,
-                tools=tools,
-                model=model_instance,  # type: ignore[arg-type]
-                max_turns=self.config.max_turns,
-            )
-            self.logger.info(
-                f"OpenAI Agent created with {len(tools)} tools and LiteLLM model {model_config['full_model_name']}"
-            )
-        else:
-            # 使用原生 OpenAI 模型
-            self._openai_agent = Agent(
-                name=self.config.name,
-                instructions=instructions,
-                tools=tools,
-                model=self.config.model,
-                max_turns=self.config.max_turns,
-            )
-            self.logger.info(
-                f"OpenAI Agent created with {len(tools)} tools and OpenAI model {self.config.model}"
-            )
+        # 使用配置中的模型創建 Agent
+        self._openai_agent = Agent(
+            name=self.config.name,
+            instructions=instructions,
+            tools=tools,
+            model=self.config.model,
+            max_turns=self.config.max_turns,
+        )
+        self.logger.info(
+            f"OpenAI Agent created with {len(tools)} tools and model {self.config.model}"
+        )
 
     async def _get_model_config(self, model_key: str) -> dict[str, Any] | None:
         """
@@ -437,13 +465,6 @@ class CasualTradingAgent(ABC):
                 self.state.successful_executions += 1
             case SessionStatus.FAILED | SessionStatus.TIMEOUT:
                 self.state.failed_executions += 1
-
-    async def _end_current_session(self, status: SessionStatus) -> None:
-        """結束當前會話"""
-        if not self._current_session:
-            return
-
-        self.logger.info(f"Ending session {self._current_session.session_id} with status {status}")
 
     # ==========================================
     # 公共 API 方法

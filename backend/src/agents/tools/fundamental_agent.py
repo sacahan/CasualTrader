@@ -526,7 +526,9 @@ async def get_fundamental_agent(
     # 添加 OpenAI Hosted Tools
     hosted_tools = [
         WebSearchTool(),  # 網路搜尋能力
-        CodeInterpreterTool(),  # Python 程式碼執行能力
+        CodeInterpreterTool(
+            tool_config={"type": "code_interpreter", "container": {"type": "auto"}}
+        ),  # Python 程式碼執行能力
     ]
 
     analyst = Agent(

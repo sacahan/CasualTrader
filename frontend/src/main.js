@@ -2,6 +2,10 @@ import './app.css';
 import App from './App.svelte';
 import { mount } from 'svelte';
 import { initializeModels } from './stores/models.js';
+import { initTheme } from './stores/theme.js';
+
+// 初始化主題
+initTheme();
 
 // 初始化 AI 模型數據
 initializeModels();

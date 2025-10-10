@@ -1,9 +1,16 @@
 # Agent 系統實作規格
 
-**版本**: 3.1
-**日期**: 2025-10-07
+**版本**: 3.2
+**日期**: 2025-10-10
 **相關設計**: SYSTEM_DESIGN.md
 **基於**: OpenAI Agents SDK + Prompt-Based Strategy Management
+
+> **⚠️ 重要架構變更 (v3.2)**
+>
+> - **移除**: `src/agents/integrations/mcp_client.py` (包裝層已移除)
+> - **移動**: `database_service.py` → `src/database/agent_database_service.py`
+> - **改用**: Trading Agent 直接透過 OpenAI SDK 的 `mcp_servers` 參數連接 Casual Market MCP
+> - **簡化**: 移除中間包裝層,降低複雜度,直接使用 MCP protocol
 
 ---
 
@@ -34,6 +41,75 @@
 - **模式選擇**: Agent 根據交易時間、市場條件和策略需求自主選擇
 - **交易限制**: 僅在開盤時間執行實際買賣操作
 - **非交易時間**: 進行觀察分析和策略檢討
+
+---
+
+## 🔌 MCP 整合架構 (v3.2 更新)
+
+### 整合方式說明
+
+CasualTrader v3.2 採用**直接 MCP 整合**,Trading Agent 透過 OpenAI Agent SDK 的 `mcp_servers` 參數直接連接 Casual Market MCP server,移除了中間包裝層以降低複雜度。
+
+### 配置方式
+
+```python
+from agents import Agent
+
+# 創建 Trading Agent 時傳入 MCP servers 配置
+trading_agent = Agent(
+    name="Stock Trading Agent",
+    instructions="你是一個專業的台股交易AI Agent...",
+    tools=[...],  # FunctionTool 等自定義工具
+    mcp_servers={
+        "casual-market": {
+            "command": "uvx",
+            "args": ["casual-market-mcp"]
+        }
+    }
+)
+```
+
+### 架構變更對比
+
+**舊架構 (v3.1及之前):**
+
+```
+TradingAgent → mcp_client.py wrapper → Casual Market MCP
+                      ↓
+               yfinance fallback
+```
+
+**新架構 (v3.2+):**
+
+```
+TradingAgent → OpenAI SDK (mcp_servers) → Casual Market MCP (direct)
+```
+
+### 遷移指南
+
+**1. 移除 mcp_client import:**
+
+```python
+# ❌ 舊版
+from src.agents.integrations.mcp_client import get_mcp_client
+mcp_client = get_mcp_client()
+await mcp_client.get_stock_price("2330")
+
+# ✅ 新版: MCP tools 在 Agent 創建時自動可用
+# 工具直接透過 Agent SDK 調用,無需手動 import
+```
+
+**2. database_service 導入路徑變更:**
+
+```python
+# ❌ 舊版
+from src.agents.integrations.database_service import AgentDatabaseService
+
+# ✅ 新版
+from src.database.agent_database_service import AgentDatabaseService
+# 或
+from src.database import AgentDatabaseService
+```
 
 ---
 
@@ -995,8 +1071,7 @@ async def get_latest_strategy(agent_id: str) -> StrategyChange:
 
 - `max_turns`: Agent 最大執行回合數 (預設: 30)
 - `execution_timeout`: 執行超時時間 (預設: 300秒)
-- `enable_tracing`: 是否啟用追蹤 (預設: true)
-- `trace_retention_days`: 追蹤保留天數 (預設: 30天)
+- `trace_retention_days`: 內部執行日誌保留天數 (預設: 30天)
 
 ### 配置操作
 
@@ -1016,28 +1091,58 @@ async def get_latest_strategy(agent_id: str) -> StrategyChange:
 
 ## 📊 執行追蹤
 
-### 輕量級操作記錄
+CasualTrader 整合兩種互補的執行追蹤機制:
 
-**AgentTrace** 表結構:
+### 1. OpenAI Agents SDK Trace (自動啟用)
 
-- trace*id (格式: `{agent_id}*{mode}\_{timestamp}`)
-- agent_id, mode, timestamp, execution_time
-- final_output, tools_called, error_message
-- 保留天數可配置 (預設 30 天)
+**用途**: 即時可視化和調試 Agent 執行流程
 
-### 追蹤操作
+- **位置**: 上傳到 OpenAI Dashboard (https://platform.openai.com/traces)
+- **啟用方式**: 使用 `trace()` context manager 自動記錄
+- **適用場景**: 開發、調試、問題排查
+- **特點**:
+  - 自動記錄所有 `Runner.run()` 調用
+  - 可視化工具調用和 LLM 響應
+  - 預設使用 OpenAI API key (無需額外配置)
+  - 使用 `group_id` 將多個 run 關聯為同一工作流
 
-**基本功能**:
+**實作位置**: `backend/src/agents/core/base_agent.py:238`
 
-- 自動記錄 Agent 執行開始和結束時間
-- 記錄最終輸出和調用的工具列表
-- 錯誤情況下記錄異常訊息
+```python
+# 使用 OpenAI Agents SDK trace context manager 包裹執行過程
+trace_name = f"{self.config.name}-{execution_mode.value}"
+with trace(trace_name, group_id=self.agent_id):
+    # Agent 執行邏輯
+```
+
+### 2. 內部執行日誌 (trace_data)
+
+**用途**: 業務分析、績效追蹤、審計記錄
+
+- **位置**: 存儲在資料庫 `AgentExecutionResult.trace_data` 欄位
+- **記錄內容**:
+  - 執行步驟詳細日誌 (turn_start, turn_end, tool_call, agent_decision)
+  - 會話摘要 (session_summary)
+  - 執行統計資訊
+- **適用場景**: 生產環境、長期數據分析、合規審計
+- **特點**:
+  - 持久化存儲
+  - 可查詢和分析
+  - 包含業務相關的上下文資訊
+
+**實作位置**: `backend/src/agents/core/agent_session.py:386`
 
 **查詢功能**:
 
 - 按 Agent ID 查詢歷史記錄
 - 按模式過濾追蹤記錄
 - 提供統計資訊 (成功率、平均執行時間、最常用工具)
+
+### 整合原則
+
+- **OpenAI trace**: 專注於技術層面的可觀察性 (工具調用、LLM 交互)
+- **內部 trace_data**: 專注於業務層面的可追溯性 (決策歷程、績效分析)
+- **兩者互補**: 不重複記錄相同資訊,各司其職
 
 ---
 

@@ -231,8 +231,7 @@ class RiskAnalysisTools:
             risk_assessment = "投資組合過度集中,風險較高"
 
         self.logger.info(
-            f"集中度分析完成 | 等級: {concentration_level} | "
-            f"產業分布: {len(sector_weights)} 個產業"
+            f"集中度分析完成 | 等級: {concentration_level} | 產業分布: {len(sector_weights)} 個產業"
         )
 
         return {

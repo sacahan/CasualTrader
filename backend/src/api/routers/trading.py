@@ -13,6 +13,14 @@ from .agents import agent_manager
 router = APIRouter()
 
 
+# Note: This router does NOT directly use MCP tools
+# MCP tools are only available within Agent execution context via OpenAI SDK
+# For system-level market status checks, we use simplified logic (weekday check)
+#
+# If accurate holiday detection is needed, Agents use MarketStatusChecker
+# with MCP tools configured via their mcp_servers parameter.
+
+
 @router.get("/agents/{agent_id}/portfolio")
 async def get_agent_portfolio(agent_id: str):
     """Get agent's current portfolio."""
@@ -151,17 +159,21 @@ async def get_agent_performance(agent_id: str):
 
 @router.get("/market/status")
 async def get_market_status():
-    """Get current market status using MCP tools."""
+    """
+    Get current market status using simplified logic.
+
+    Returns Taiwan stock market status including:
+    - Trading day status (weekday check only, NO holiday detection)
+    - Current trading hours status
+    - Market open/close times
+
+    Note: Does NOT detect Taiwan national holidays.
+    For accurate holiday detection, use Agent with MCP tools.
+    """
     try:
-        from datetime import datetime
+        from datetime import datetime, time
 
         import pytz
-
-        from ...agents.integrations.mcp_client import get_mcp_client
-
-        # Initialize MCP client
-        mcp_client = get_mcp_client()
-        await mcp_client.initialize()
 
         # Get current time in Taipei timezone
         tz = pytz.timezone("Asia/Taipei")
@@ -169,46 +181,33 @@ async def get_market_status():
         current_date = now.strftime("%Y-%m-%d")
         current_time = now.strftime("%H:%M")
 
-        # Check if today is a trading day using MCP tool
-        trading_day_info = await mcp_client.check_trading_day(current_date)
+        # Basic weekday check (no holiday detection)
+        is_weekday = now.weekday() < 5
 
-        # Determine if currently in trading hours (9:00-13:30)
+        # Check if in trading hours (9:00-13:30)
         is_trading_hours = False
         market_status = "closed"
 
-        if trading_day_info.get("is_trading_day", False):
-            hour = now.hour
-            minute = now.minute
-
-            # Check if in trading hours (9:00-13:30)
-            if (hour == 9 and minute >= 0) or (hour > 9 and hour < 13):
+        if is_weekday:
+            if time(9, 0) <= now.time() <= time(13, 30):
                 is_trading_hours = True
                 market_status = "open"
-            elif hour == 13 and minute < 30:
-                is_trading_hours = True
-                market_status = "open"
-            elif hour < 9:
+            elif now.hour < 9:
                 market_status = "pre_market"
             else:
                 market_status = "after_market"
         else:
-            # Not a trading day
-            if trading_day_info.get("is_weekend"):
-                market_status = "weekend"
-            elif trading_day_info.get("is_holiday"):
-                market_status = "holiday"
+            market_status = "weekend"
 
         return {
-            "is_trading_day": trading_day_info.get("is_trading_day", False),
+            "is_trading_day": is_weekday,
             "is_trading_hours": is_trading_hours,
             "market_open": "09:00",
             "market_close": "13:30",
             "current_time": current_time,
             "current_date": current_date,
             "status": market_status,
-            "is_weekend": trading_day_info.get("is_weekend", False),
-            "is_holiday": trading_day_info.get("is_holiday", False),
-            "holiday_name": trading_day_info.get("holiday_name"),
+            "is_weekend": not is_weekday,
         }
 
     except Exception as e:

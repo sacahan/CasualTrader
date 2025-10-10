@@ -2,6 +2,44 @@
 Trading Agent Implementation
 基於 OpenAI Agent SDK 的智能交易 Agent
 使用 Python 3.12+ 語法
+
+## MCP 工具整合說明
+
+Trading Agent 使用 Casual Market MCP 提供的台股市場數據工具。
+這些工具應該在創建 Agent 時透過 `mcp_servers` 參數傳入,而不是在代碼中直接包裝。
+
+### 使用方式:
+
+```python
+from agents import Agent
+
+# 創建 Agent 時傳入 MCP servers 配置
+trading_agent = Agent(
+    name="Trading Agent",
+    instructions="...",
+    tools=[...],  # FunctionTool 等自定義工具
+    mcp_servers={
+        "casual-market": {
+            "command": "uvx",
+            "args": ["casual-market-mcp"]
+        }
+    }
+)
+```
+
+### 可用的 MCP 工具:
+
+Casual Market MCP 提供以下台股相關工具:
+- `get_taiwan_stock_price`: 取得股票即時價格
+- `get_company_profile`: 取得公司基本資料
+- `get_income_statement`: 取得綜合損益表
+- `get_balance_sheet`: 取得資產負債表
+- `buy_taiwan_stock`: 執行買入交易(模擬)
+- `sell_taiwan_stock`: 執行賣出交易(模擬)
+- `check_taiwan_trading_day`: 檢查是否為交易日
+- 以及其他財務分析和市場數據工具
+
+詳細的 MCP 工具列表請參考: https://github.com/yourusername/casual-market-mcp
 """
 
 from __future__ import annotations
@@ -19,6 +57,15 @@ from ..core.models import (
     AgentMode,
     generate_session_id,
 )
+
+# OpenAI Agent SDK Tools
+try:
+    from agents import CodeInterpreterTool, FunctionTool, WebSearchTool
+except ImportError:
+    # Fallback for development
+    FunctionTool = Any
+    WebSearchTool = Any
+    CodeInterpreterTool = Any
 
 # ==========================================
 # Trading Agent 主要實作
@@ -67,15 +114,14 @@ class TradingAgent(CasualTradingAgent):
         if self.config.enabled_tools.get("sentiment_analysis", True):
             tools.extend(await self._setup_sentiment_tools())
 
-        # OpenAI 內建工具
+        # OpenAI 內建工具 (WebSearch, CodeInterpreter)
         tools.extend(await self._setup_openai_tools())
-
-        # CasualMarket MCP 工具
-        if self.config.enabled_tools.get("casualmarket_tools", True):
-            tools.extend(await self._setup_casualmarket_tools())
 
         # 交易驗證和執行工具
         tools.extend(await self._setup_trading_tools())
+
+        # Note: CasualMarket MCP tools should be added via mcp_servers parameter
+        # when creating the agent, not through FunctionTool wrappers
 
         self.logger.info(f"Configured {len(tools)} tools for trading agent")
         return tools
@@ -138,131 +184,137 @@ class TradingAgent(CasualTradingAgent):
     # ==========================================
 
     async def _setup_fundamental_tools(self) -> list[Any]:
-        """設定基本面分析工具"""
-        # 這裡將整合 fundamental_agent 作為工具
-        # 暫時返回模擬工具列表
-        return [
-            {
-                "name": "fundamental_analysis",
-                "description": "Analyze company fundamentals and financial health",
-                "type": "function_tool",
-            }
-        ]
+        """設定基本面分析工具 - 整合 Fundamental Agent"""
+        try:
+            from ..tools.fundamental_agent import get_fundamental_agent_tool
+
+            # 獲取基本面分析 Agent 工具
+            # TODO: 需要傳入 MCP servers 參數
+            fundamental_tool = await get_fundamental_agent_tool(
+                mcp_servers=[],  # 將由 Agent 層級的 mcp_servers 參數處理
+                model_name=self.config.model,
+            )
+            return [fundamental_tool]
+        except ImportError as e:
+            self.logger.warning(f"Fundamental agent not available: {e}")
+            return []
 
     async def _setup_technical_tools(self) -> list[Any]:
-        """設定技術分析工具"""
-        # 這裡將整合 technical_agent 作為工具
-        return [
-            {
-                "name": "technical_analysis",
-                "description": "Perform technical analysis and chart patterns",
-                "type": "function_tool",
-            }
-        ]
+        """設定技術分析工具 - 整合 Technical Agent"""
+        try:
+            from ..tools.technical_agent import get_technical_agent_tool
+
+            # 獲取技術分析 Agent 工具
+            technical_tool = await get_technical_agent_tool(
+                mcp_servers=[],  # 將由 Agent 層級的 mcp_servers 參數處理
+                model_name=self.config.model,
+            )
+            return [technical_tool]
+        except ImportError as e:
+            self.logger.warning(f"Technical agent not available: {e}")
+            return []
 
     async def _setup_risk_tools(self) -> list[Any]:
-        """設定風險評估工具"""
-        return [
-            {
-                "name": "risk_assessment",
-                "description": "Evaluate portfolio risk and position sizing",
-                "type": "function_tool",
-            }
-        ]
+        """設定風險評估工具 - 整合 Risk Management Agent"""
+        try:
+            from ..tools.risk_agent import get_risk_agent_tool
+
+            # 獲取風險管理 Agent 工具
+            risk_tool = await get_risk_agent_tool(
+                mcp_servers=[],
+                model_name=self.config.model,
+            )
+            return [risk_tool]
+        except ImportError as e:
+            self.logger.warning(f"Risk agent not available: {e}")
+            return []
 
     async def _setup_sentiment_tools(self) -> list[Any]:
-        """設定市場情緒分析工具"""
-        return [
-            {
-                "name": "market_sentiment",
-                "description": "Analyze market sentiment and news impact",
-                "type": "function_tool",
-            }
-        ]
+        """設定市場情緒分析工具 - 整合 Sentiment Agent"""
+        try:
+            from ..tools.sentiment_agent import get_sentiment_agent_tool
+
+            # 獲取市場情緒分析 Agent 工具
+            sentiment_tool = await get_sentiment_agent_tool(
+                mcp_servers=[],
+                model_name=self.config.model,
+            )
+            return [sentiment_tool]
+        except ImportError as e:
+            self.logger.warning(f"Sentiment agent not available: {e}")
+            return []
 
     async def _setup_openai_tools(self) -> list[Any]:
-        """設定 OpenAI 內建工具"""
+        """設定 OpenAI 內建工具 (WebSearch, CodeInterpreter)"""
         tools = []
 
+        # Web Search Tool - 用於搜尋最新市場新聞和資訊
         if self.config.enabled_tools.get("web_search", True):
-            tools.append(
-                {
-                    "name": "web_search",
-                    "description": "Search for latest market news and information",
-                    "type": "web_search_tool",
-                }
-            )
+            try:
+                tools.append(WebSearchTool())
+                self.logger.debug("Added WebSearchTool")
+            except Exception as e:
+                self.logger.warning(f"Failed to add WebSearchTool: {e}")
 
+        # Code Interpreter Tool - 用於量化分析和計算
         if self.config.enabled_tools.get("code_interpreter", True):
-            tools.append(
-                {
-                    "name": "code_interpreter",
-                    "description": "Perform quantitative analysis and calculations",
-                    "type": "code_interpreter_tool",
-                }
-            )
+            try:
+                tools.append(CodeInterpreterTool())
+                self.logger.debug("Added CodeInterpreterTool")
+            except Exception as e:
+                self.logger.warning(f"Failed to add CodeInterpreterTool: {e}")
 
         return tools
 
-    async def _setup_casualmarket_tools(self) -> list[Any]:
-        """設定 CasualMarket MCP 工具"""
-        return [
-            {
-                "name": "get_taiwan_stock_price",
-                "description": "Get real-time Taiwan stock price data",
-                "type": "mcp_tool",
-            },
-            {
-                "name": "buy_taiwan_stock",
-                "description": "Execute simulated stock purchase",
-                "type": "mcp_tool",
-            },
-            {
-                "name": "sell_taiwan_stock",
-                "description": "Execute simulated stock sale",
-                "type": "mcp_tool",
-            },
-            {
-                "name": "get_company_fundamentals",
-                "description": "Get company fundamental data",
-                "type": "mcp_tool",
-            },
-            {
-                "name": "get_stock_valuation_ratios",
-                "description": "Get stock valuation metrics",
-                "type": "mcp_tool",
-            },
-        ]
-
     async def _setup_trading_tools(self) -> list[Any]:
         """設定交易驗證和執行工具"""
-        return [
-            {
-                "name": "check_trading_hours",
-                "description": "Check if Taiwan stock market is open",
-                "type": "function_tool",
-            },
-            {
-                "name": "get_available_cash",
-                "description": "Get current available cash balance",
-                "type": "function_tool",
-            },
-            {
-                "name": "get_current_holdings",
-                "description": "Get current portfolio holdings",
-                "type": "function_tool",
-            },
-            {
-                "name": "validate_trade_parameters",
-                "description": "Validate trading parameters before execution",
-                "type": "function_tool",
-            },
-            {
-                "name": "record_strategy_change",
-                "description": "Record agent strategy adjustments",
-                "type": "function_tool",
-            },
-        ]
+        tools = []
+
+        # 交易時段檢查工具
+        tools.append(
+            FunctionTool(
+                name="check_market_open",
+                description="檢查台灣股市是否開盤中",
+                callable=self._check_market_hours,
+            )
+        )
+
+        # 可用現金查詢工具
+        tools.append(
+            FunctionTool(
+                name="get_available_cash",
+                description="獲取當前可用現金餘額",
+                callable=lambda: {"available_cash": self._get_available_cash()},
+            )
+        )
+
+        # 持倉查詢工具
+        tools.append(
+            FunctionTool(
+                name="get_current_holdings",
+                description="獲取當前投資組合持倉",
+                callable=lambda: {"holdings": self._get_current_holdings()},
+            )
+        )
+
+        # 策略變更記錄工具
+        tools.append(
+            FunctionTool(
+                name="record_strategy_change",
+                description="""記錄投資策略調整。
+
+參數:
+- trigger_reason (str): 觸發原因
+- new_strategy_addition (str): 新增策略內容
+- change_summary (str): 變更摘要
+- agent_explanation (str): Agent 解釋
+
+用於記錄 Agent 自主學習和策略調整的過程""",
+                callable=self.record_strategy_change,
+            )
+        )
+
+        return tools
 
     # ==========================================
     # 市場狀態管理

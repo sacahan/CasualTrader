@@ -31,7 +31,7 @@ from src.database.models import (
     AIModelConfig,
 )
 
-from ..core.models import (
+from src.agents.core.models import (
     AgentConfig,
     AgentExecutionResult,
     AgentState,
@@ -661,7 +661,6 @@ class AgentDatabaseService:
             "model": config.model,
             "max_turns": config.max_turns,
             "execution_timeout": config.execution_timeout,
-            "enable_tracing": config.enable_tracing,
             "enabled_tools": config.enabled_tools,
             "investment_preferences": {
                 "preferred_sectors": config.investment_preferences.preferred_sectors,

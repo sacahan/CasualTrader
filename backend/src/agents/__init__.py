@@ -27,11 +27,6 @@ from .core.models import (
     generate_agent_id,
     generate_session_id,
 )
-from .integrations import (
-    AgentDatabaseService,
-    DatabaseConfig,
-    PersistentTradingAgent,
-)
 from .trading.trading_agent import TradingAgent
 
 __all__ = [
@@ -40,10 +35,6 @@ __all__ = [
     "AgentManager",
     "AgentSession",
     "TradingAgent",
-    # Integration Classes
-    "AgentDatabaseService",
-    "DatabaseConfig",
-    "PersistentTradingAgent",
     # Models and Enums
     "AgentConfig",
     "AgentState",

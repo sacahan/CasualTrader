@@ -1,5 +1,6 @@
 /** @type {import('tailwindcss').Config} */
 export default {
+  darkMode: 'class', // 使用 class 模式啟用深色模式
   content: ['./src/**/*.{html,js,svelte,ts}', './index.html'],
   theme: {
     extend: {

@@ -110,7 +110,6 @@ class AgentConfig:
 
     max_turns: int = 30
     execution_timeout: int = 300
-    enable_tracing: bool = True
     trace_retention_days: int = 30
     additional_settings: dict[str, Any] = field(default_factory=dict)
 

@@ -201,11 +201,12 @@ PUT    /api/agents/{id}/config        # 更新執行配置
 ```json
 {
   "max_turns": 50,
-  "enable_tracing": true,
   "execution_timeout": 600,
   "risk_tolerance": "moderate"
 }
 ```
+
+**註**: OpenAI Agents SDK trace 預設自動啟用,無需額外配置。詳見 `AGENT_IMPLEMENTATION.md` 的「執行追蹤」章節。
 
 ### 2. 投資組合與交易 API
 

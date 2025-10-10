@@ -30,12 +30,30 @@ The system uses a **multi-layered agent architecture**:
 - **Portfolio Management**: Simulated trading operations (buy/sell with fee calculation)
 - **Market Analytics**: Margin trading info, dividend schedules, valuation ratios
 
-The MCP client (`src/agents/integrations/mcp_client.py`) connects to the FastMCP-based server for all market operations, providing agents with:
+Trading Agents connect to the Casual Market MCP server directly via the OpenAI Agent SDK's `mcp_servers` parameter. This provides access to:
 
 - Real-time Taiwan stock prices and trading data
 - Company financial statements and analysis
 - Simulated trading execution with accurate fee calculation
 - Market calendar and trading day verification
+
+**MCP Server Configuration Example:**
+
+```python
+from agents import Agent
+
+agent = Agent(
+    name="Trading Agent",
+    instructions="...",
+    tools=[...],
+    mcp_servers={
+        "casual-market": {
+            "command": "uvx",
+            "args": ["casual-market-mcp"]
+        }
+    }
+)
+```
 
 ## 🔧 Development Commands
 
@@ -119,9 +137,12 @@ uv run mypy src
 **Integration Layer** (`src/agents/integrations/`):
 
 - `persistent_agent.py`: Main agent implementation with database persistence
-- `database_service.py`: Async database operations wrapper
-- `mcp_client.py`: Market data client using MCP protocol
 - `openai_tools.py`: AI model integration (OpenAI, Claude, etc.)
+
+**Database Layer** (`src/database/`):
+
+- `agent_database_service.py`: Async database operations for agent state persistence
+- `models.py`: SQLAlchemy ORM models for database schema
 
 **Trading Functions** (`src/agents/functions/`):
 
@@ -170,9 +191,9 @@ uv run mypy src
 1. API Request → `routers/agents.py` (endpoint handler)
 2. Agent Manager → `agent_manager.py` (lifecycle management)
 3. Trading Agent → `trading_agent.py` (strategy execution)
-4. MCP Client → `mcp_client.py` (market data fetch)
+4. Casual Market MCP → Direct MCP tool calls via OpenAI SDK (market data)
 5. Trading Functions → validation, execution, recording
-6. Database Service → `database_service.py` (persistence)
+6. Database Service → `agent_database_service.py` (persistence)
 7. WebSocket → `websocket.py` (real-time broadcast)
 
 **Agent Modes Cycle**:
@@ -189,10 +210,11 @@ OBSERVATION → TRADING → REBALANCING → STRATEGY_REVIEW → OBSERVATION
 ### Key Design Patterns
 
 - **Async-First Architecture**: All I/O operations use async/await
-- **Dependency Injection**: Services injected via constructors (database_service, mcp_client)
+- **Dependency Injection**: Services injected via constructors (agent_database_service)
 - **Session Pattern**: Agent execution wrapped in database sessions for atomicity
 - **Event Broadcasting**: WebSocket manager broadcasts agent state changes
 - **Strategy Evolution**: Performance-driven strategy adjustment with rollback capability
+- **MCP Integration**: Direct MCP server integration via OpenAI SDK's mcp_servers parameter
 
 ## 🧪 Testing Strategy
 
