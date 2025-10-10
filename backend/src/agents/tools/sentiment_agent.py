@@ -531,10 +531,20 @@ class SentimentAnalysisTools:
 
 
 async def get_sentiment_agent(
-    mcp_servers: list[Any],
+    mcp_servers: dict[str, Any],
     model_name: str = "gpt-4o-mini",
+    shared_tools: list[Any] | None = None,
 ) -> Agent:
-    """創建市場情緒分析 Agent"""
+    """創建市場情緒分析 Agent
+
+    Args:
+        mcp_servers: MCP servers 配置（從 TradingAgent 傳入）
+        model_name: 使用的 AI 模型名稱
+        shared_tools: 從 TradingAgent 傳入的共用工具（WebSearchTool, CodeInterpreterTool）
+
+    Returns:
+        Agent: 配置好的市場情緒分析 Agent
+    """
     tools_instance = SentimentAnalysisTools()
 
     custom_tools = [
@@ -565,34 +575,15 @@ async def get_sentiment_agent(
         ),
     ]
 
-    # 添加 OpenAI Hosted Tools
-    hosted_tools = [
-        WebSearchTool(),  # 網路搜尋能力
-        CodeInterpreterTool(),  # Python 程式碼執行能力
-    ]
+    # 合併自訂工具和共用工具
+    all_tools = custom_tools + (shared_tools or [])
 
     analyst = Agent(
         name="Sentiment Analyst",
         instructions=sentiment_agent_instructions(),
         model=model_name,
         mcp_servers=mcp_servers,
-        tools=custom_tools + hosted_tools,  # 合併自訂工具和 hosted tools
+        tools=all_tools,
     )
 
     return analyst
-
-
-async def get_sentiment_agent_tool(
-    mcp_servers: list[Any],
-    model_name: str = "gpt-4o-mini",
-) -> Tool:
-    """將市場情緒分析 Agent 包裝成工具"""
-    analyst = await get_sentiment_agent(mcp_servers, model_name)
-    return analyst.as_tool(
-        tool_name="SentimentAnalyst",
-        tool_description="""專業市場情緒分析 Agent,提供全面的心理面和資金面分析。
-
-功能: 恐懼貪婪指數、資金流向追蹤、新聞情緒分析、社群情緒分析、情緒交易訊號
-
-適用場景: 市場時機判斷、反向操作策略、短線交易、情緒面研究""",
-    )

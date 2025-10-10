@@ -209,13 +209,6 @@ async def test_integration() -> None:
 
     agent = TradingAgent(config)
 
-    # 測試自動模式選擇
-    try:
-        optimal_mode = await agent.auto_mode_selection()
-        print(f"✅ 自動模式選擇: {optimal_mode}")
-    except Exception as e:
-        print(f"⚠️  模式選擇失敗: {e}")
-
     # 測試策略變更記錄
     try:
         change_result = await agent.record_strategy_change(

@@ -410,6 +410,49 @@ class AgentManager:
 
         self.logger.info("All agents started")
 
+    async def start_agent(
+        self,
+        agent_id: str,
+        max_cycles: int | None = None,
+        stop_loss_threshold: float | None = None,
+    ) -> None:
+        """
+        啟動並執行指定 Agent
+
+        Args:
+            agent_id: Agent ID
+            max_cycles: 最大執行週期數
+            stop_loss_threshold: 停損閾值
+
+        Raises:
+            ValueError: Agent 不存在
+            RuntimeError: Agent 無法啟動
+        """
+        if agent_id not in self._agents:
+            raise ValueError(f"Agent {agent_id} not found")
+
+        agent = self._agents[agent_id]
+
+        # 確保 Agent 已初始化
+        if not agent.is_active:
+            await agent.initialize()
+
+        # 更新配置（如果提供）
+        if max_cycles is not None:
+            agent.config.max_turns = max_cycles
+
+        # 執行 Agent（非阻塞）
+        await self.execute_agent(
+            agent_id=agent_id,
+            mode=None,  # 使用 Agent 當前模式
+            wait_for_completion=False,  # 非阻塞執行
+        )
+
+        self.logger.info(
+            f"Agent {agent_id} started with max_cycles={max_cycles}, "
+            f"stop_loss_threshold={stop_loss_threshold}"
+        )
+
     # ==========================================
     # 監控和統計
     # ==========================================

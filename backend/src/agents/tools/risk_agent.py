@@ -457,10 +457,20 @@ class RiskAnalysisTools:
 
 
 async def get_risk_agent(
-    mcp_servers: list[Any],
+    mcp_servers: dict[str, Any],
     model_name: str = "gpt-4o-mini",
+    shared_tools: list[Any] | None = None,
 ) -> Agent:
-    """創建風險評估 Agent"""
+    """創建風險評估 Agent
+
+    Args:
+        mcp_servers: MCP servers 配置（從 TradingAgent 傳入）
+        model_name: 使用的 AI 模型名稱
+        shared_tools: 從 TradingAgent 傳入的共用工具（WebSearchTool, CodeInterpreterTool）
+
+    Returns:
+        Agent: 配置好的風險評估 Agent
+    """
     tools_instance = RiskAnalysisTools()
 
     custom_tools = [
@@ -491,34 +501,15 @@ async def get_risk_agent(
         ),
     ]
 
-    # 添加 OpenAI Hosted Tools
-    hosted_tools = [
-        WebSearchTool(),  # 網路搜尋能力
-        CodeInterpreterTool(),  # Python 程式碼執行能力
-    ]
+    # 合併自訂工具和共用工具
+    all_tools = custom_tools + (shared_tools or [])
 
     analyst = Agent(
         name="Risk Manager",
         instructions=risk_agent_instructions(),
         model=model_name,
         mcp_servers=mcp_servers,
-        tools=custom_tools + hosted_tools,  # 合併自訂工具和 hosted tools
+        tools=all_tools,
     )
 
     return analyst
-
-
-async def get_risk_agent_tool(
-    mcp_servers: list[Any],
-    model_name: str = "gpt-4o-mini",
-) -> Tool:
-    """將風險評估 Agent 包裝成工具"""
-    analyst = await get_risk_agent(mcp_servers, model_name)
-    return analyst.as_tool(
-        tool_name="RiskManager",
-        tool_description="""專業風險管理 Agent,提供全面的風險評估和控制建議。
-
-功能: 部位風險計算、集中度分析、投資組合風險評估、壓力測試、風險管理建議
-
-適用場景: 風險控制、部位管理、投資組合優化、風險預警""",
-    )

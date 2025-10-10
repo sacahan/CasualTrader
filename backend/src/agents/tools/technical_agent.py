@@ -432,19 +432,20 @@ class TechnicalAnalysisTools:
 
 
 async def get_technical_agent(
-    mcp_servers: list[Any],
+    mcp_servers: dict[str, Any],
     model_name: str = "gpt-4o-mini",
+    shared_tools: list[Any] | None = None,
 ) -> Agent:
     """創建技術分析 Agent
 
     Args:
-        mcp_servers: MCP Server 列表
-        model_name: LLM 模型名稱
+        mcp_servers: MCP servers 配置（從 TradingAgent 傳入）
+        model_name: 使用的 AI 模型名稱
+        shared_tools: 從 TradingAgent 傳入的共用工具（WebSearchTool, CodeInterpreterTool）
 
     Returns:
         Agent: 配置好的技術分析 Agent
     """
-    # 將 TechnicalAnalysisTools 的方法包裝成 Tool
     tools_instance = TechnicalAnalysisTools()
 
     custom_tools = [
@@ -475,42 +476,15 @@ async def get_technical_agent(
         ),
     ]
 
-    # 添加 OpenAI Hosted Tools
-    hosted_tools = [
-        WebSearchTool(),  # 網路搜尋能力
-        CodeInterpreterTool(),  # Python 程式碼執行能力
-    ]
+    # 合併自訂工具和共用工具
+    all_tools = custom_tools + (shared_tools or [])
 
     analyst = Agent(
         name="Technical Analyst",
         instructions=technical_agent_instructions(),
         model=model_name,
         mcp_servers=mcp_servers,
-        tools=custom_tools + hosted_tools,  # 合併自訂工具和 hosted tools
+        tools=all_tools,
     )
 
     return analyst
-
-
-async def get_technical_agent_tool(
-    mcp_servers: list[Any],
-    model_name: str = "gpt-4o-mini",
-) -> Tool:
-    """將技術分析 Agent 包裝成工具
-
-    Args:
-        mcp_servers: MCP Server 列表
-        model_name: 模型名稱
-
-    Returns:
-        Tool: 技術分析師工具
-    """
-    analyst = await get_technical_agent(mcp_servers, model_name)
-    return analyst.as_tool(
-        tool_name="TechnicalAnalyst",
-        tool_description="""專業技術分析 Agent,提供深入的股票技術面分析。
-
-功能: 圖表型態識別、技術指標分析、趨勢判斷、支撐壓力、交易訊號
-
-適用場景: 技術面分析、進出場時機判斷、趨勢確認、交易策略制定""",
-    )

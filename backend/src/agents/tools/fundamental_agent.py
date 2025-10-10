@@ -489,10 +489,20 @@ class FundamentalAnalysisTools:
 
 
 async def get_fundamental_agent(
-    mcp_servers: list[Any],
+    mcp_servers: dict[str, Any],
     model_name: str = "gpt-4o-mini",
+    shared_tools: list[Any] | None = None,
 ) -> Agent:
-    """創建基本面分析 Agent"""
+    """創建基本面分析 Agent
+
+    Args:
+        mcp_servers: MCP servers 配置（從 TradingAgent 傳入）
+        model_name: 使用的 AI 模型名稱
+        shared_tools: 從 TradingAgent 傳入的共用工具（WebSearchTool, CodeInterpreterTool）
+
+    Returns:
+        Agent: 配置好的基本面分析 Agent
+    """
     tools_instance = FundamentalAnalysisTools()
 
     custom_tools = [
@@ -523,36 +533,15 @@ async def get_fundamental_agent(
         ),
     ]
 
-    # 添加 OpenAI Hosted Tools
-    hosted_tools = [
-        WebSearchTool(),  # 網路搜尋能力
-        CodeInterpreterTool(
-            tool_config={"type": "code_interpreter", "container": {"type": "auto"}}
-        ),  # Python 程式碼執行能力
-    ]
+    # 合併自訂工具和共用工具
+    all_tools = custom_tools + (shared_tools or [])
 
     analyst = Agent(
         name="Fundamental Analyst",
         instructions=fundamental_agent_instructions(),
         model=model_name,
         mcp_servers=mcp_servers,
-        tools=custom_tools + hosted_tools,  # 合併自訂工具和 hosted tools
+        tools=all_tools,
     )
 
     return analyst
-
-
-async def get_fundamental_agent_tool(
-    mcp_servers: list[Any],
-    model_name: str = "gpt-4o-mini",
-) -> Tool:
-    """將基本面分析 Agent 包裝成工具"""
-    analyst = await get_fundamental_agent(mcp_servers, model_name)
-    return analyst.as_tool(
-        tool_name="FundamentalAnalyst",
-        tool_description="""專業基本面分析 Agent,提供深入的財務和價值分析。
-
-功能: 財務比率計算、財務體質評估、估值分析、成長潛力評估、投資評級
-
-適用場景: 價值投資、長期投資決策、公司基本面研究、股票篩選""",
-    )

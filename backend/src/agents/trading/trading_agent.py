@@ -5,31 +5,27 @@ Trading Agent Implementation
 
 ## MCP 工具整合說明
 
-Trading Agent 使用 Casual Market MCP 提供的台股市場數據工具。
-這些工具應該在創建 Agent 時透過 `mcp_servers` 參數傳入,而不是在代碼中直接包裝。
+Trading Agent 內建 Casual Market MCP 配置，無需外部傳入。
 
 ### 使用方式:
 
 ```python
-from agents import Agent
+from agents.trading.trading_agent import TradingAgent
+from agents.core.models import AgentConfig
 
-# 創建 Agent 時傳入 MCP servers 配置
-trading_agent = Agent(
-    name="Trading Agent",
-    instructions="...",
-    tools=[...],  # FunctionTool 等自定義工具
-    mcp_servers={
-        "casual-market": {
-            "command": "uvx",
-            "args": ["casual-market-mcp"]
-        }
-    }
+# 創建 Trading Agent，MCP 工具自動配置
+trading_agent = TradingAgent(
+    config=AgentConfig(
+        name="My Trading Agent",
+        model="gpt-4o-mini",
+        # ... 其他配置
+    )
 )
 ```
 
-### 可用的 MCP 工具:
+### 內建 MCP 工具:
 
-Casual Market MCP 提供以下台股相關工具:
+Casual Market MCP 提供以下台股相關工具（自動配置）:
 - `get_taiwan_stock_price`: 取得股票即時價格
 - `get_company_profile`: 取得公司基本資料
 - `get_income_statement`: 取得綜合損益表
@@ -38,8 +34,6 @@ Casual Market MCP 提供以下台股相關工具:
 - `sell_taiwan_stock`: 執行賣出交易(模擬)
 - `check_taiwan_trading_day`: 檢查是否為交易日
 - 以及其他財務分析和市場數據工具
-
-詳細的 MCP 工具列表請參考: https://github.com/yourusername/casual-market-mcp
 """
 
 from __future__ import annotations
@@ -77,7 +71,14 @@ class TradingAgent(CasualTradingAgent):
     智能交易 Agent - 基於 Prompt 驅動的投資決策系統
     """
 
-    def __init__(self, config: AgentConfig, agent_id: str | None = None) -> None:
+    # 內建 MCP Server 配置
+    MCP_SERVERS = {"casual-market": {"command": "uvx", "args": ["casual-market-mcp"]}}
+
+    def __init__(
+        self,
+        config: AgentConfig,
+        agent_id: str | None = None,
+    ) -> None:
         super().__init__(config, agent_id)
 
         # 交易相關設定
@@ -88,6 +89,10 @@ class TradingAgent(CasualTradingAgent):
         # 策略變更追蹤
         self._strategy_changes: list[dict[str, Any]] = []
 
+        # 統一管理 OpenAI 工具實例
+        self._web_search_tool: WebSearchTool | None = None
+        self._code_interpreter_tool: CodeInterpreterTool | None = None
+
         self.logger = logging.getLogger(f"trading_agent.{self.agent_id}")
 
     # ==========================================
@@ -97,6 +102,9 @@ class TradingAgent(CasualTradingAgent):
     async def _setup_tools(self) -> list[Any]:
         """設定 Trading Agent 工具"""
         tools = []
+
+        # 初始化 OpenAI 工具（供 sub-agents 共用）
+        await self._initialize_openai_tools()
 
         # 基本面分析工具
         if self.config.enabled_tools.get("fundamental_analysis", True):
@@ -114,14 +122,14 @@ class TradingAgent(CasualTradingAgent):
         if self.config.enabled_tools.get("sentiment_analysis", True):
             tools.extend(await self._setup_sentiment_tools())
 
-        # OpenAI 內建工具 (WebSearch, CodeInterpreter)
-        tools.extend(await self._setup_openai_tools())
+        # 加入 OpenAI 內建工具
+        if self._web_search_tool:
+            tools.append(self._web_search_tool)
+        if self._code_interpreter_tool:
+            tools.append(self._code_interpreter_tool)
 
         # 交易驗證和執行工具
         tools.extend(await self._setup_trading_tools())
-
-        # Note: CasualMarket MCP tools should be added via mcp_servers parameter
-        # when creating the agent, not through FunctionTool wrappers
 
         self.logger.info(f"Configured {len(tools)} tools for trading agent")
         return tools
@@ -183,16 +191,55 @@ class TradingAgent(CasualTradingAgent):
     # 工具設定方法
     # ==========================================
 
-    async def _setup_fundamental_tools(self) -> list[Any]:
-        """設定基本面分析工具 - 整合 Fundamental Agent"""
-        try:
-            from ..tools.fundamental_agent import get_fundamental_agent_tool
+    async def _initialize_openai_tools(self) -> None:
+        """初始化 OpenAI 工具實例（統一管理，供所有 sub-agents 使用）"""
+        # Web Search Tool - 用於搜尋最新市場新聞和資訊
+        if self.config.enabled_tools.get("web_search", True):
+            try:
+                self._web_search_tool = WebSearchTool()
+                self.logger.debug("Initialized WebSearchTool")
+            except Exception as e:
+                self.logger.warning(f"Failed to initialize WebSearchTool: {e}")
 
-            # 獲取基本面分析 Agent 工具
-            # TODO: 需要傳入 MCP servers 參數
-            fundamental_tool = await get_fundamental_agent_tool(
-                mcp_servers=[],  # 將由 Agent 層級的 mcp_servers 參數處理
+        # Code Interpreter Tool - 用於量化分析和計算
+        if self.config.enabled_tools.get("code_interpreter", True):
+            try:
+                self._code_interpreter_tool = CodeInterpreterTool(
+                    tool_config={"type": "code_interpreter", "container": {"type": "auto"}}
+                )
+                self.logger.debug("Initialized CodeInterpreterTool")
+            except Exception as e:
+                self.logger.warning(f"Failed to initialize CodeInterpreterTool: {e}")
+
+    def _get_shared_tools(self) -> list[Any]:
+        """獲取共用工具（供 sub-agents 使用）"""
+        shared_tools = []
+        if self._web_search_tool:
+            shared_tools.append(self._web_search_tool)
+        if self._code_interpreter_tool:
+            shared_tools.append(self._code_interpreter_tool)
+        return shared_tools
+
+    async def _setup_fundamental_tools(self) -> list[Any]:
+        """設定基本面分析工具"""
+        try:
+            from ..tools.fundamental_agent import get_fundamental_agent
+
+            # 創建 Agent
+            fundamental_agent = await get_fundamental_agent(
+                mcp_servers=self.MCP_SERVERS,
                 model_name=self.config.model,
+                shared_tools=self._get_shared_tools(),
+            )
+
+            # 轉換為 Tool
+            fundamental_tool = fundamental_agent.as_tool(
+                tool_name="FundamentalAnalyst",
+                tool_description="""專業基本面分析 Agent,提供深入的財務和價值分析。
+
+功能: 財務比率計算、財務體質評估、估值分析、成長潛力評估、投資評級
+
+適用場景: 價值投資、長期投資決策、公司基本面研究、股票篩選""",
             )
             return [fundamental_tool]
         except ImportError as e:
@@ -200,14 +247,25 @@ class TradingAgent(CasualTradingAgent):
             return []
 
     async def _setup_technical_tools(self) -> list[Any]:
-        """設定技術分析工具 - 整合 Technical Agent"""
+        """設定技術分析工具"""
         try:
-            from ..tools.technical_agent import get_technical_agent_tool
+            from ..tools.technical_agent import get_technical_agent
 
-            # 獲取技術分析 Agent 工具
-            technical_tool = await get_technical_agent_tool(
-                mcp_servers=[],  # 將由 Agent 層級的 mcp_servers 參數處理
+            # 創建 Agent
+            technical_agent = await get_technical_agent(
+                mcp_servers=self.MCP_SERVERS,
                 model_name=self.config.model,
+                shared_tools=self._get_shared_tools(),
+            )
+
+            # 轉換為 Tool
+            technical_tool = technical_agent.as_tool(
+                tool_name="TechnicalAnalyst",
+                tool_description="""專業技術分析 Agent,提供深入的股票技術面分析。
+
+功能: 圖表型態識別、技術指標分析、趨勢判斷、支撐壓力、交易訊號
+
+適用場景: 技術面分析、進出場時機判斷、趨勢確認、交易策略制定""",
             )
             return [technical_tool]
         except ImportError as e:
@@ -215,14 +273,25 @@ class TradingAgent(CasualTradingAgent):
             return []
 
     async def _setup_risk_tools(self) -> list[Any]:
-        """設定風險評估工具 - 整合 Risk Management Agent"""
+        """設定風險評估工具"""
         try:
-            from ..tools.risk_agent import get_risk_agent_tool
+            from ..tools.risk_agent import get_risk_agent
 
-            # 獲取風險管理 Agent 工具
-            risk_tool = await get_risk_agent_tool(
-                mcp_servers=[],
+            # 創建 Agent
+            risk_agent = await get_risk_agent(
+                mcp_servers=self.MCP_SERVERS,
                 model_name=self.config.model,
+                shared_tools=self._get_shared_tools(),
+            )
+
+            # 轉換為 Tool
+            risk_tool = risk_agent.as_tool(
+                tool_name="RiskManager",
+                tool_description="""專業風險管理 Agent,提供全面的風險評估和控制建議。
+
+功能: 部位風險計算、集中度分析、投資組合風險評估、壓力測試、風險管理建議
+
+適用場景: 風險控制、部位管理、投資組合優化、風險預警""",
             )
             return [risk_tool]
         except ImportError as e:
@@ -230,41 +299,30 @@ class TradingAgent(CasualTradingAgent):
             return []
 
     async def _setup_sentiment_tools(self) -> list[Any]:
-        """設定市場情緒分析工具 - 整合 Sentiment Agent"""
+        """設定市場情緒分析工具"""
         try:
-            from ..tools.sentiment_agent import get_sentiment_agent_tool
+            from ..tools.sentiment_agent import get_sentiment_agent
 
-            # 獲取市場情緒分析 Agent 工具
-            sentiment_tool = await get_sentiment_agent_tool(
-                mcp_servers=[],
+            # 創建 Agent
+            sentiment_agent = await get_sentiment_agent(
+                mcp_servers=self.MCP_SERVERS,
                 model_name=self.config.model,
+                shared_tools=self._get_shared_tools(),
+            )
+
+            # 轉換為 Tool
+            sentiment_tool = sentiment_agent.as_tool(
+                tool_name="SentimentAnalyst",
+                tool_description="""專業市場情緒分析 Agent,提供全面的心理面和資金面分析。
+
+功能: 恐懼貪婪指數、資金流向追蹤、新聞情緒分析、社群情緒分析、情緒交易訊號
+
+適用場景: 市場時機判斷、反向操作策略、短線交易、情緒面研究""",
             )
             return [sentiment_tool]
         except ImportError as e:
             self.logger.warning(f"Sentiment agent not available: {e}")
             return []
-
-    async def _setup_openai_tools(self) -> list[Any]:
-        """設定 OpenAI 內建工具 (WebSearch, CodeInterpreter)"""
-        tools = []
-
-        # Web Search Tool - 用於搜尋最新市場新聞和資訊
-        if self.config.enabled_tools.get("web_search", True):
-            try:
-                tools.append(WebSearchTool())
-                self.logger.debug("Added WebSearchTool")
-            except Exception as e:
-                self.logger.warning(f"Failed to add WebSearchTool: {e}")
-
-        # Code Interpreter Tool - 用於量化分析和計算
-        if self.config.enabled_tools.get("code_interpreter", True):
-            try:
-                tools.append(CodeInterpreterTool())
-                self.logger.debug("Added CodeInterpreterTool")
-            except Exception as e:
-                self.logger.warning(f"Failed to add CodeInterpreterTool: {e}")
-
-        return tools
 
     async def _setup_trading_tools(self) -> list[Any]:
         """設定交易驗證和執行工具"""
@@ -553,49 +611,13 @@ class TradingAgent(CasualTradingAgent):
         return self._strategy_changes.copy()
 
     # ==========================================
-    # 特殊功能
+    # 屬性和特殊方法
     # ==========================================
 
-    async def auto_mode_selection(self) -> AgentMode:
-        """自動模式選擇邏輯"""
-        current_time = datetime.now(pytz.timezone("Asia/Taipei"))
-        market_open = await self._check_market_hours()
-
-        # 基於時間和市場狀態的模式選擇
-        if not market_open:
-            # 休市時間：觀察或策略檢討
-            if current_time.hour >= 18:  # 晚間時間進行策略檢討
-                return AgentMode.STRATEGY_REVIEW
-            else:
-                return AgentMode.OBSERVATION
-
-        # 開盤時間：根據投資組合狀況選擇
-        portfolio_value = self._get_available_cash()
-        initial_funds = self.config.initial_funds
-
-        # 如果現金比例過高，考慮交易模式
-        cash_ratio = portfolio_value / initial_funds
-        if cash_ratio > 0.3:  # 現金比例超過 30%
-            return AgentMode.TRADING
-
-        # 根據最後執行時間決定是否需要再平衡
-        if self.state.last_active_at:
-            hours_since_last = (datetime.now() - self.state.last_active_at).total_seconds() / 3600
-            if hours_since_last > 24:  # 超過 24 小時未執行
-                return AgentMode.REBALANCING
-
-        # 預設為觀察模式
-        return AgentMode.OBSERVATION
-
-    async def execute_with_auto_mode(
-        self, user_message: str | None = None, context: dict[str, Any] | None = None
-    ) -> Any:
-        """使用自動模式選擇執行"""
-        optimal_mode = await self.auto_mode_selection()
-
-        self.logger.info(f"Auto-selected mode: {optimal_mode}")
-
-        return await self.execute(mode=optimal_mode, user_message=user_message, context=context)
+    @property
+    def mcp_servers(self) -> dict[str, Any]:
+        """獲取 MCP servers 配置（供外部或 base_agent 使用）"""
+        return self.MCP_SERVERS
 
     def __repr__(self) -> str:
         return (
