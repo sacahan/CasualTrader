@@ -78,11 +78,11 @@ from ..core.models import (
 
 # OpenAI Agent SDK Tools
 try:
-    from agents import CodeInterpreterTool, FunctionTool, WebSearchTool
+    from agents import CodeInterpreterTool, WebSearchTool, function_tool
     from agents.mcp import MCPServerStdio
 except ImportError:
     # Fallback for development
-    FunctionTool = Any
+    function_tool = Any
     WebSearchTool = Any
     CodeInterpreterTool = Any
     MCPServerStdio = None
@@ -164,7 +164,11 @@ class TradingAgent(CasualTradingAgent):
         agent_id: str | None = None,
         subagent_max_turns: int = 15,
     ) -> None:
+        self.logger = logging.getLogger(f"trading_agent.{agent_id or 'unknown'}")
+        self.logger.info(f"TradingAgent.__init__ called for agent_id={agent_id}")
+
         super().__init__(config, agent_id)
+        self.logger.debug("TradingAgent: super().__init__ completed")
 
         # 交易相關設定
         self._market_data_cache: dict[str, Any] = {}
@@ -182,7 +186,7 @@ class TradingAgent(CasualTradingAgent):
         # Note: Timeout 由主 Agent 的 execution_timeout 統一控制
         self._subagent_max_turns = subagent_max_turns
 
-        self.logger = logging.getLogger(f"trading_agent.{self.agent_id}")
+        self.logger.info(f"TradingAgent.__init__ completed for {self.agent_id}")
 
     # ==========================================
     # 抽象方法實作
@@ -190,35 +194,50 @@ class TradingAgent(CasualTradingAgent):
 
     async def _setup_tools(self) -> list[Any]:
         """設定 Trading Agent 工具"""
+        self.logger.info(f"_setup_tools() started for {self.agent_id}")
         tools = []
 
         # 初始化 OpenAI 工具（供 sub-agents 共用）
+        self.logger.debug("Calling _initialize_openai_tools()")
         await self._initialize_openai_tools()
+        self.logger.debug("_initialize_openai_tools() completed")
 
         # 基本面分析工具
         if self.config.enabled_tools.get("fundamental_analysis", True):
+            self.logger.debug("Setting up fundamental_analysis tools")
             tools.extend(await self._setup_fundamental_tools())
+            self.logger.debug(f"fundamental_analysis tools added, total tools: {len(tools)}")
 
         # 技術分析工具
         if self.config.enabled_tools.get("technical_analysis", True):
+            self.logger.debug("Setting up technical_analysis tools")
             tools.extend(await self._setup_technical_tools())
+            self.logger.debug(f"technical_analysis tools added, total tools: {len(tools)}")
 
         # 風險評估工具
         if self.config.enabled_tools.get("risk_assessment", True):
+            self.logger.debug("Setting up risk_assessment tools")
             tools.extend(await self._setup_risk_tools())
+            self.logger.debug(f"risk_assessment tools added, total tools: {len(tools)}")
 
         # 市場情緒分析工具
         if self.config.enabled_tools.get("sentiment_analysis", True):
+            self.logger.debug("Setting up sentiment_analysis tools")
             tools.extend(await self._setup_sentiment_tools())
+            self.logger.debug(f"sentiment_analysis tools added, total tools: {len(tools)}")
 
         # 加入 OpenAI 內建工具
         if self._web_search_tool:
             tools.append(self._web_search_tool)
+            self.logger.debug("web_search_tool added")
         if self._code_interpreter_tool:
             tools.append(self._code_interpreter_tool)
+            self.logger.debug("code_interpreter_tool added")
 
         # 交易驗證和執行工具
+        self.logger.debug("Setting up trading tools")
         tools.extend(await self._setup_trading_tools())
+        self.logger.debug(f"trading tools added, total tools: {len(tools)}")
 
         self.logger.info(f"Configured {len(tools)} tools for trading agent")
         return tools
@@ -322,22 +341,29 @@ class TradingAgent(CasualTradingAgent):
 
     async def _setup_fundamental_tools(self) -> list[Any]:
         """設定基本面分析工具"""
+        self.logger.debug("_setup_fundamental_tools() started")
         try:
+            self.logger.debug("Importing get_fundamental_agent")
             from ..tools.fundamental_agent import get_fundamental_agent
 
             # 獲取 MCP Server 實例
+            self.logger.debug("Getting MCP Server instance")
             mcp_server = await self._get_mcp_server_instance()
             mcp_servers = [mcp_server] if mcp_server else []
+            self.logger.debug(f"MCP Server instance: {mcp_server is not None}")
 
             # 創建 Agent
+            self.logger.info(f"Creating fundamental_agent with model={self.config.model}")
             fundamental_agent = await get_fundamental_agent(
                 mcp_servers=mcp_servers,
                 model_name=self.config.model,
                 shared_tools=self._get_shared_tools(),
                 max_turns=self._subagent_max_turns,
             )
+            self.logger.debug("fundamental_agent created successfully")
 
             # 轉換為 Tool
+            self.logger.debug("Converting fundamental_agent to tool")
             fundamental_tool = fundamental_agent.as_tool(
                 tool_name="FundamentalAnalyst",
                 tool_description="""專業基本面分析 Agent,提供深入的財務和價值分析。
@@ -346,10 +372,14 @@ class TradingAgent(CasualTradingAgent):
 
 適用場景: 價值投資、長期投資決策、公司基本面研究、股票篩選""",
             )
+            self.logger.info("Fundamental tools setup completed")
             return [fundamental_tool]
         except ImportError as e:
             self.logger.warning(f"Fundamental agent not available: {e}")
             return []
+        except Exception as e:
+            self.logger.error(f"Error setting up fundamental tools: {e}", exc_info=True)
+            raise
 
     async def _setup_technical_tools(self) -> list[Any]:
         """設定技術分析工具"""
@@ -450,36 +480,40 @@ class TradingAgent(CasualTradingAgent):
 
         # 交易時段檢查工具
         tools.append(
-            FunctionTool(
-                name="check_market_open",
-                description="檢查台灣股市是否開盤中",
-                callable=self._check_market_hours,
+            function_tool(
+                self._check_market_hours,
+                name_override="check_market_open",
+                description_override="檢查台灣股市是否開盤中",
+                strict_mode=False,
             )
         )
 
         # 可用現金查詢工具
         tools.append(
-            FunctionTool(
-                name="get_available_cash",
-                description="獲取當前可用現金餘額",
-                callable=lambda: {"available_cash": self._get_available_cash()},
+            function_tool(
+                lambda: {"available_cash": self._get_available_cash()},
+                name_override="get_available_cash",
+                description_override="獲取當前可用現金餘額",
+                strict_mode=False,
             )
         )
 
         # 持倉查詢工具
         tools.append(
-            FunctionTool(
-                name="get_current_holdings",
-                description="獲取當前投資組合持倉",
-                callable=lambda: {"holdings": self._get_current_holdings()},
+            function_tool(
+                lambda: {"holdings": self._get_current_holdings()},
+                name_override="get_current_holdings",
+                description_override="獲取當前投資組合持倉",
+                strict_mode=False,
             )
         )
 
         # 策略變更記錄工具
         tools.append(
-            FunctionTool(
-                name="record_strategy_change",
-                description="""記錄投資策略調整。
+            function_tool(
+                self.record_strategy_change,
+                name_override="record_strategy_change",
+                description_override="""記錄投資策略調整。
 
 參數:
 - trigger_reason (str): 觸發原因
@@ -488,7 +522,7 @@ class TradingAgent(CasualTradingAgent):
 - agent_explanation (str): Agent 解釋
 
 用於記錄 Agent 自主學習和策略調整的過程""",
-                callable=self.record_strategy_change,
+                strict_mode=False,
             )
         )
 

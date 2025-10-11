@@ -13,10 +13,10 @@ from ..utils.logger import get_agent_logger
 
 # Agent SDK
 try:
-    from agents import Agent, CodeInterpreterTool, Tool, WebSearchTool
+    from agents import Agent, CodeInterpreterTool, WebSearchTool, function_tool
 except ImportError:
     Agent = Any
-    Tool = Any
+    function_tool = Any
     WebSearchTool = Any
     CodeInterpreterTool = Any
 
@@ -455,30 +455,35 @@ async def get_technical_agent(
     tools_instance = TechnicalAnalysisTools()
 
     custom_tools = [
-        Tool.from_function(
+        function_tool(
             tools_instance.calculate_technical_indicators,
-            name="calculate_technical_indicators",
-            description="計算技術指標 (MA, RSI, MACD, 布林通道, KD)",
+            name_override="calculate_technical_indicators",
+            description_override="計算技術指標 (MA, RSI, MACD, 布林通道, KD)",
+            strict_mode=False,
         ),
-        Tool.from_function(
+        function_tool(
             tools_instance.identify_chart_patterns,
-            name="identify_chart_patterns",
-            description="識別圖表型態 (上升趨勢、下降趨勢等經典型態)",
+            name_override="identify_chart_patterns",
+            description_override="識別圖表型態 (上升趨勢、下降趨勢等經典型態)",
+            strict_mode=False,
         ),
-        Tool.from_function(
+        function_tool(
             tools_instance.analyze_trend,
-            name="analyze_trend",
-            description="分析趨勢方向和強度 (上升/下降/盤整)",
+            name_override="analyze_trend",
+            description_override="分析趨勢方向和強度 (上升/下降/盤整)",
+            strict_mode=False,
         ),
-        Tool.from_function(
+        function_tool(
             tools_instance.analyze_support_resistance,
-            name="analyze_support_resistance",
-            description="分析支撐和壓力位",
+            name_override="analyze_support_resistance",
+            description_override="分析支撐和壓力位",
+            strict_mode=False,
         ),
-        Tool.from_function(
+        function_tool(
             tools_instance.generate_trading_signals,
-            name="generate_trading_signals",
-            description="綜合分析產生交易訊號 (買進/賣出/觀望)",
+            name_override="generate_trading_signals",
+            description_override="綜合分析產生交易訊號 (買進/賣出/觀望)",
+            strict_mode=False,
         ),
     ]
 
@@ -491,7 +496,6 @@ async def get_technical_agent(
         model=model_name,
         mcp_servers=mcp_servers,
         tools=all_tools,
-        max_turns=max_turns,
     )
 
     return analyst

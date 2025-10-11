@@ -13,10 +13,10 @@ from ..utils.logger import get_agent_logger
 
 # Agent SDK
 try:
-    from agents import Agent, CodeInterpreterTool, Tool, WebSearchTool
+    from agents import Agent, CodeInterpreterTool, WebSearchTool, function_tool
 except ImportError:
     Agent = Any
-    Tool = Any
+    function_tool = Any
     WebSearchTool = Any
     CodeInterpreterTool = Any
 
@@ -554,30 +554,35 @@ async def get_sentiment_agent(
     tools_instance = SentimentAnalysisTools()
 
     custom_tools = [
-        Tool.from_function(
+        function_tool(
             tools_instance.calculate_fear_greed_index,
-            name="calculate_fear_greed_index",
-            description="計算恐懼貪婪指數 (0-100, 評估市場整體情緒)",
+            name_override="calculate_fear_greed_index",
+            description_override="計算恐懼貪婪指數 (0-100, 評估市場整體情緒)",
+            strict_mode=False,
         ),
-        Tool.from_function(
+        function_tool(
             tools_instance.analyze_money_flow,
-            name="analyze_money_flow",
-            description="分析資金流向 (大單、外資、法人動向)",
+            name_override="analyze_money_flow",
+            description_override="分析資金流向 (大單、外資、法人動向)",
+            strict_mode=False,
         ),
-        Tool.from_function(
+        function_tool(
             tools_instance.analyze_news_sentiment,
-            name="analyze_news_sentiment",
-            description="分析新聞情緒 (正負面新聞比例、關鍵話題)",
+            name_override="analyze_news_sentiment",
+            description_override="分析新聞情緒 (正負面新聞比例、關鍵話題)",
+            strict_mode=False,
         ),
-        Tool.from_function(
+        function_tool(
             tools_instance.analyze_social_sentiment,
-            name="analyze_social_sentiment",
-            description="分析社群媒體情緒 (討論熱度、情緒分布)",
+            name_override="analyze_social_sentiment",
+            description_override="分析社群媒體情緒 (討論熱度、情緒分布)",
+            strict_mode=False,
         ),
-        Tool.from_function(
+        function_tool(
             tools_instance.generate_sentiment_signals,
-            name="generate_sentiment_signals",
-            description="產生情緒交易訊號 (買進/賣出/觀望建議)",
+            name_override="generate_sentiment_signals",
+            description_override="產生情緒交易訊號 (買進/賣出/觀望建議)",
+            strict_mode=False,
         ),
     ]
 
@@ -590,7 +595,6 @@ async def get_sentiment_agent(
         model=model_name,
         mcp_servers=mcp_servers,
         tools=all_tools,
-        max_turns=max_turns,
     )
 
     return analyst

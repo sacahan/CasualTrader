@@ -97,10 +97,15 @@
     try {
       const agentData = {
         name: formData.name.trim(),
-        description: formData.description.trim(),
+        strategy_prompt: formData.description.trim(),
         initial_funds: parseFloat(formData.initial_funds),
-        max_position_size: parseFloat(formData.max_position_size),
         ai_model: formData.ai_model,
+        investment_preferences: {
+          preferred_sectors: [],
+          excluded_tickers: [],
+          max_position_size: parseFloat(formData.max_position_size) / 100, // Convert percentage to decimal
+          rebalance_frequency: 'weekly',
+        },
       };
 
       const newAgent = await createAgent(agentData);
@@ -122,7 +127,7 @@
       description: '',
       initial_funds: DEFAULT_INITIAL_FUNDS,
       max_position_size: DEFAULT_MAX_POSITION_SIZE,
-      ai_model: 'gpt-5-mini',
+      ai_model: 'gpt-5-mini', // 與初始值一致
     };
     errors = {
       name: '',
@@ -172,7 +177,7 @@
       label="初始資金 (TWD)"
       bind:value={formData.initial_funds}
       placeholder={DEFAULT_INITIAL_FUNDS.toString()}
-      min="1"
+      min="1000"
       step="1000"
       error={errors.initial_funds}
       required

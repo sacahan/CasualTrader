@@ -104,11 +104,66 @@ class TestAgentManagement:
             "custom_instructions": "",
         }
 
-        response = client.post("/api/agents", json=request_data)
-        assert response.status_code == 201
-        data = response.json()
-        assert data["id"] == "agent_001"
-        assert data["name"] == "Test Agent"
+        # Mock database service to validate AI model
+        with patch("src.api.routers.agents.AgentDatabaseService") as MockDbService:
+            mock_db = MockDbService.return_value
+            mock_db.initialize = AsyncMock()
+            mock_db.close = AsyncMock()
+            mock_db.get_ai_model_config = AsyncMock(
+                return_value={
+                    "model_key": "gpt-4o",
+                    "display_name": "GPT-4o",
+                    "provider": "openai",
+                }
+            )
+
+            response = client.post("/api/agents", json=request_data)
+            assert response.status_code == 201
+            data = response.json()
+            assert data["id"] == "agent_001"
+            assert data["name"] == "Test Agent"
+
+    def test_create_agent_invalid_model(self, client, mock_agent_manager):
+        """Test creating agent with invalid AI model."""
+        request_data = {
+            "name": "Test Agent",
+            "description": "Test Description",
+            "ai_model": "invalid-model",
+            "strategy_type": "balanced",
+            "strategy_prompt": "Test strategy prompt for agent",
+            "color_theme": "#007bff",
+            "initial_funds": 1000000.0,
+            "max_turns": 50,
+            "risk_tolerance": 0.5,
+            "enabled_tools": {
+                "fundamental_analysis": True,
+                "technical_analysis": True,
+                "risk_assessment": True,
+                "sentiment_analysis": False,
+                "web_search": True,
+                "code_interpreter": False,
+            },
+            "investment_preferences": {
+                "preferred_sectors": ["技術業"],
+                "excluded_tickers": [],
+                "max_position_size": 0.15,
+                "rebalance_frequency": "weekly",
+            },
+            "custom_instructions": "",
+        }
+
+        # Mock database service to return None for invalid model
+        with patch("src.api.routers.agents.AgentDatabaseService") as MockDbService:
+            mock_db = MockDbService.return_value
+            mock_db.initialize = AsyncMock()
+            mock_db.close = AsyncMock()
+            mock_db.get_ai_model_config = AsyncMock(return_value=None)
+
+            response = client.post("/api/agents", json=request_data)
+            assert response.status_code == 400
+            data = response.json()
+            assert "invalid-model" in data["detail"]
+            assert "not found" in data["detail"].lower()
 
     def test_get_agent(self, client, mock_agent_manager):
         """Test getting specific agent."""

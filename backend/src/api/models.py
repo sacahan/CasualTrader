@@ -12,23 +12,6 @@ from typing import Any
 from pydantic import BaseModel, Field
 
 
-class AIModel(str, Enum):
-    """
-    支援的 AI 模型列舉。
-    用於指定交易代理人所使用的 AI 模型。
-    """
-
-    GPT_4O = "gpt-4o"  # GPT-4o 模型
-    GPT_4O_MINI = "gpt-4o-mini"  # GPT-4o Mini 模型
-    GPT_4_TURBO = "gpt-4-turbo"  # GPT-4 Turbo 模型
-    CLAUDE_SONNET_4_5 = "claude-sonnet-4.5"  # Claude Sonnet 4.5
-    CLAUDE_OPUS_4 = "claude-opus-4"  # Claude Opus 4
-    GEMINI_2_5_PRO = "gemini-2.5-pro"  # Gemini 2.5 Pro
-    GEMINI_2_0_FLASH = "gemini-2.0-flash"  # Gemini 2.0 Flash
-    DEEPSEEK_V3 = "deepseek-v3"  # DeepSeek V3
-    GROK_2 = "grok-2"  # Grok 2
-
-
 class StrategyType(str, Enum):
     """
     投資策略類型列舉。
@@ -106,11 +89,19 @@ class CreateAgentRequest(BaseModel):
     """
     建立新交易代理人請求模型。
     用於 API 建立代理人時的資料結構。
+
+    注意：ai_model 的有效值由 ai_model_configs 資料庫表動態決定，
+    不在程式碼中硬編碼。API router 負責驗證模型是否存在於資料庫中。
     """
 
     name: str = Field(..., min_length=1, max_length=100)  # 代理人名稱
     description: str = Field(default="", max_length=500)  # 代理人描述
-    ai_model: AIModel = Field(default=AIModel.GPT_4O)  # 使用 AI 模型
+    ai_model: str = Field(
+        default="gpt-5-mini",
+        min_length=1,
+        max_length=50,
+        description="AI 模型 key，必須存在於 ai_model_configs 表中",
+    )  # 使用 AI 模型（從資料庫動態載入）
     strategy_type: StrategyType = Field(default=StrategyType.BALANCED)  # 投資策略類型
     strategy_prompt: str = Field(..., min_length=10)  # 策略提示語
     color_theme: str = Field(default="#007bff", pattern=r"^#[0-9A-Fa-f]{6}$")  # 顏色主題

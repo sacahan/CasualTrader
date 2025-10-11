@@ -13,10 +13,10 @@ from ..utils.logger import get_agent_logger
 
 # Agent SDK
 try:
-    from agents import Agent, CodeInterpreterTool, Tool, WebSearchTool
+    from agents import Agent, CodeInterpreterTool, WebSearchTool, function_tool
 except ImportError:
     Agent = Any
-    Tool = Any
+    function_tool = Any
     WebSearchTool = Any
     CodeInterpreterTool = Any
 
@@ -480,30 +480,35 @@ async def get_risk_agent(
     tools_instance = RiskAnalysisTools()
 
     custom_tools = [
-        Tool.from_function(
+        function_tool(
             tools_instance.calculate_position_risk,
-            name="calculate_position_risk",
-            description="計算個別部位風險 (波動率, Beta, VaR, 最大回撤)",
+            name_override="calculate_position_risk",
+            description_override="計算個別部位風險 (波動率, Beta, VaR, 最大回撤)",
+            strict_mode=False,
         ),
-        Tool.from_function(
+        function_tool(
             tools_instance.analyze_portfolio_concentration,
-            name="analyze_portfolio_concentration",
-            description="分析投資組合集中度 (HHI 指數、產業曝險)",
+            name_override="analyze_portfolio_concentration",
+            description_override="分析投資組合集中度 (HHI 指數、產業曝險)",
+            strict_mode=False,
         ),
-        Tool.from_function(
+        function_tool(
             tools_instance.calculate_portfolio_risk,
-            name="calculate_portfolio_risk",
-            description="計算整體投資組合風險評分和等級",
+            name_override="calculate_portfolio_risk",
+            description_override="計算整體投資組合風險評分和等級",
+            strict_mode=False,
         ),
-        Tool.from_function(
+        function_tool(
             tools_instance.perform_stress_test,
-            name="perform_stress_test",
-            description="執行壓力測試模擬極端情境",
+            name_override="perform_stress_test",
+            description_override="執行壓力測試模擬極端情境",
+            strict_mode=False,
         ),
-        Tool.from_function(
+        function_tool(
             tools_instance.generate_risk_recommendations,
-            name="generate_risk_recommendations",
-            description="產生風險管理建議 (部位調整、停損點)",
+            name_override="generate_risk_recommendations",
+            description_override="產生風險管理建議 (部位調整、停損點)",
+            strict_mode=False,
         ),
     ]
 
@@ -516,7 +521,6 @@ async def get_risk_agent(
         model=model_name,
         mcp_servers=mcp_servers,
         tools=all_tools,
-        max_turns=max_turns,
     )
 
     return analyst

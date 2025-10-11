@@ -73,18 +73,28 @@ class CasualTradingAgent(ABC):
     """
 
     def __init__(self, config: AgentConfig, agent_id: str | None = None) -> None:
+        # 先設定基本日誌
+        temp_id = agent_id or "temp"
+        self.logger = logging.getLogger(f"agent.{temp_id}")
+        self.logger.setLevel(logging.INFO)
+        self.logger.info(f"CasualTradingAgent.__init__ called with config.name={config.name}")
+
         self.config = config
         self.agent_id = agent_id or self._generate_agent_id()
+        self.logger.info(f"Agent ID assigned: {self.agent_id}")
+
         self.state = AgentState(id=self.agent_id, name=config.name, config=config)
+        self.logger.debug(f"AgentState created for {self.agent_id}")
 
         # 內部狀態管理
         self._openai_agent: Agent | None = None
         self._current_session: AgentExecutionContext | None = None
         self._is_initialized = False
 
-        # 日誌設定
+        # 更新日誌設定為正確的 ID
         self.logger = logging.getLogger(f"agent.{self.agent_id}")
         self.logger.setLevel(logging.INFO)
+        self.logger.info(f"CasualTradingAgent.__init__ completed for {self.agent_id}")
 
     @property
     def is_active(self) -> bool:
@@ -102,15 +112,22 @@ class CasualTradingAgent(ABC):
 
     async def initialize(self) -> None:
         """初始化 Agent 系統"""
+        self.logger.info(f"initialize() called for agent {self.agent_id}")
+
         if self._is_initialized:
+            self.logger.debug(f"Agent {self.agent_id} already initialized, skipping")
             return
 
         try:
             # 初始化 OpenAI Agent
+            self.logger.info(f"Calling _setup_openai_agent() for {self.agent_id}")
             await self._setup_openai_agent()
+            self.logger.info(f"_setup_openai_agent() completed for {self.agent_id}")
 
             # 初始化工具
+            self.logger.info(f"Calling _setup_tools() for {self.agent_id}")
             await self._setup_tools()
+            self.logger.info(f"_setup_tools() completed for {self.agent_id}")
 
             # 設定為活躍狀態
             self.state.status = AgentStatus.ACTIVE
@@ -121,7 +138,7 @@ class CasualTradingAgent(ABC):
 
         except Exception as e:
             self.state.status = AgentStatus.ERROR
-            self.logger.error(f"Agent {self.agent_id} initialization failed: {e}")
+            self.logger.error(f"Agent {self.agent_id} initialization failed: {e}", exc_info=True)
             raise
 
     async def shutdown(self) -> None:
@@ -249,7 +266,6 @@ class CasualTradingAgent(ABC):
             instructions=instructions,
             tools=tools,
             model=self.config.model,
-            max_turns=self.config.max_turns,
         )
         self.logger.info(
             f"OpenAI Agent created with {len(tools)} tools and model {self.config.model}"

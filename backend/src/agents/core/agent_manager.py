@@ -139,6 +139,8 @@ class AgentManager:
         Returns:
             創建的 Agent ID
         """
+        self.logger.info(f"create_agent called for '{config.name}' with model '{config.model}'")
+
         # Auto-start Agent Manager if not running
         if not self._is_running:
             self.logger.warning("Agent Manager not running, starting automatically...")
@@ -146,13 +148,16 @@ class AgentManager:
 
         # 生成或驗證 Agent ID
         final_agent_id = agent_id or generate_agent_id()
+        self.logger.debug(f"Generated agent_id: {final_agent_id}")
 
         if final_agent_id in self._agents:
             raise ValueError(f"Agent with ID {final_agent_id} already exists")
 
         try:
             # 創建 Agent (需要由子類別實作)
+            self.logger.info(f"Calling _create_agent_instance for {final_agent_id}")
             agent = await self._create_agent_instance(config, final_agent_id)
+            self.logger.info(f"_create_agent_instance completed for {final_agent_id}")
 
             # 註冊 Agent
             self._agents[final_agent_id] = agent
@@ -173,11 +178,15 @@ class AgentManager:
         self, config: AgentConfig, agent_id: str
     ) -> CasualTradingAgent:
         """創建 Agent 實例 - 子類別應覆寫此方法"""
+        self.logger.debug(f"_create_agent_instance: Importing TradingAgent for {agent_id}")
         # 這裡需要導入具體的 Agent 實作類別
         # 暫時使用抽象基類，實際使用時需要替換
         from ..trading.trading_agent import TradingAgent
 
-        return TradingAgent(config, agent_id)
+        self.logger.debug(f"_create_agent_instance: Creating TradingAgent instance for {agent_id}")
+        agent = TradingAgent(config, agent_id)
+        self.logger.info(f"_create_agent_instance: TradingAgent instance created for {agent_id}")
+        return agent
 
     async def remove_agent(self, agent_id: str) -> None:
         """移除 Agent"""

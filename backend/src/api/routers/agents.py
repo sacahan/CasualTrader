@@ -12,6 +12,7 @@ from loguru import logger
 
 from ...agents.core.agent_manager import AgentManager
 from ...agents.core.models import AgentConfig, AgentMode
+from ...database.agent_database_service import AgentDatabaseService
 from ..models import (
     AgentListResponse,
     AgentResponse,
@@ -92,8 +93,25 @@ async def create_agent(request: CreateAgentRequest):
     - **strategy_prompt**: 交易策略描述
     - **initial_funds**: 初始資金
     """
-    logger.info(f"Creating new agent: {request.name} with model {request.ai_model.value}")
+    logger.info(f"Creating new agent: {request.name} with model {request.ai_model}")
     try:
+        # Validate ai_model exists in database
+        db_service = AgentDatabaseService()
+        await db_service.initialize()
+
+        model_config = await db_service.get_ai_model_config(request.ai_model)
+        if not model_config:
+            logger.warning(f"Invalid AI model: {request.ai_model}")
+            await db_service.close()
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"AI model '{request.ai_model}' not found or not enabled. "
+                "Please choose from available models.",
+            )
+
+        await db_service.close()
+        logger.debug(f"AI model validated: {request.ai_model} ({model_config['display_name']})")
+
         # Convert request to AgentConfig
         logger.debug(
             f"Agent config: initial_funds={request.initial_funds}, max_turns={request.max_turns}"
@@ -117,10 +135,11 @@ async def create_agent(request: CreateAgentRequest):
             strategy_type=request.strategy_type.value,
         )
 
+        logger.debug(f"Creating AgentConfig with model={request.ai_model}")
         config = AgentConfig(
             name=request.name,
             description=request.description,
-            model=request.ai_model.value,
+            model=request.ai_model,  # 直接使用字串，不再使用 .value
             initial_funds=request.initial_funds,
             max_turns=request.max_turns,
             instructions=request.strategy_prompt,
@@ -128,8 +147,10 @@ async def create_agent(request: CreateAgentRequest):
             enabled_tools=request.enabled_tools.model_dump(),
             investment_preferences=agent_investment_prefs,
         )
+        logger.debug(f"AgentConfig created: {config.name}, enabled_tools={config.enabled_tools}")
 
         # Create agent
+        logger.info(f"Calling agent_manager.create_agent with config for '{config.name}'")
         agent_id = await agent_manager.create_agent(config=config)
         logger.success(f"Agent created successfully: {agent_id}")
 
@@ -144,11 +165,13 @@ async def create_agent(request: CreateAgentRequest):
         await websocket_manager.broadcast_agent_status(
             agent_id=agent_id,
             status="created",
-            details={"name": request.name, "ai_model": request.ai_model.value},
+            details={"name": request.name, "ai_model": request.ai_model},
         )
 
         return _map_agent_to_response(agent_dict)
 
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Error creating agent: {e}")
         logger.exception("Full traceback:")

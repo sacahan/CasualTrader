@@ -13,10 +13,10 @@ from ..utils.logger import get_agent_logger
 
 # Agent SDK
 try:
-    from agents import Agent, CodeInterpreterTool, Tool, WebSearchTool
+    from agents import Agent, CodeInterpreterTool, WebSearchTool, function_tool
 except ImportError:
     Agent = Any
-    Tool = Any
+    function_tool = Any
     WebSearchTool = Any
     CodeInterpreterTool = Any
 
@@ -509,46 +509,66 @@ async def get_fundamental_agent(
         Timeout 由主 TradingAgent 的 execution_timeout 統一控制，
         sub-agent 作為 Tool 執行時會受到主 Agent 的 timeout 限制。
     """
-    tools_instance = FundamentalAnalysisTools()
+    logger = get_agent_logger("fundamental_agent")
+    logger.info(f"get_fundamental_agent() called with model={model_name}")
 
-    custom_tools = [
-        Tool.from_function(
-            tools_instance.calculate_financial_ratios,
-            name="calculate_financial_ratios",
-            description="計算財務比率 (ROE, ROA, 負債比, 流動比率, P/E, P/B)",
-        ),
-        Tool.from_function(
-            tools_instance.analyze_financial_health,
-            name="analyze_financial_health",
-            description="分析財務體質健康度並給予評級 (A-F)",
-        ),
-        Tool.from_function(
-            tools_instance.evaluate_valuation,
-            name="evaluate_valuation",
-            description="評估股價估值水準 (便宜/合理/昂貴)",
-        ),
-        Tool.from_function(
-            tools_instance.analyze_growth_potential,
-            name="analyze_growth_potential",
-            description="分析公司成長潛力 (營收/EPS 成長趨勢)",
-        ),
-        Tool.from_function(
-            tools_instance.generate_investment_rating,
-            name="generate_investment_rating",
-            description="綜合產生投資評級 (強力買進/買進/持有/賣出)",
-        ),
-    ]
+    logger.debug("Creating FundamentalAnalysisTools instance")
+    tools_instance = FundamentalAnalysisTools()
+    logger.debug("FundamentalAnalysisTools instance created")
+
+    logger.debug("Creating custom tools with function_tool")
+    try:
+        custom_tools = [
+            function_tool(
+                tools_instance.calculate_financial_ratios,
+                name_override="calculate_financial_ratios",
+                description_override="計算財務比率 (ROE, ROA, 負債比, 流動比率, P/E, P/B)",
+                strict_mode=False,
+            ),
+            function_tool(
+                tools_instance.analyze_financial_health,
+                name_override="analyze_financial_health",
+                description_override="分析財務體質健康度並給予評級 (A-F)",
+                strict_mode=False,
+            ),
+            function_tool(
+                tools_instance.evaluate_valuation,
+                name_override="evaluate_valuation",
+                description_override="評估股價估值水準 (便宜/合理/昂貴)",
+                strict_mode=False,
+            ),
+            function_tool(
+                tools_instance.analyze_growth_potential,
+                name_override="analyze_growth_potential",
+                description_override="分析公司成長潛力 (營收/EPS 成長趨勢)",
+                strict_mode=False,
+            ),
+            function_tool(
+                tools_instance.generate_investment_rating,
+                name_override="generate_investment_rating",
+                description_override="綜合產生投資評級 (強力買進/買進/持有/賣出)",
+                strict_mode=False,
+            ),
+        ]
+        logger.debug(f"Created {len(custom_tools)} custom tools successfully")
+    except Exception as e:
+        logger.error(f"Error creating custom tools with function_tool: {e}", exc_info=True)
+        raise
 
     # 合併自訂工具和共用工具
     all_tools = custom_tools + (shared_tools or [])
+    logger.debug(f"Total tools (custom + shared): {len(all_tools)}")
 
+    logger.info(
+        f"Creating Agent with model={model_name}, mcp_servers={len(mcp_servers)}, tools={len(all_tools)}"
+    )
     analyst = Agent(
         name="Fundamental Analyst",
         instructions=fundamental_agent_instructions(),
         model=model_name,
         mcp_servers=mcp_servers,
         tools=all_tools,
-        max_turns=max_turns,
     )
+    logger.info("Fundamental Analyst Agent created successfully")
 
     return analyst
