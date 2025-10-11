@@ -265,6 +265,30 @@ class AgentManager:
 
     async def list_agents(self) -> list[dict[str, Any]]:
         """列出所有 Agent 及其狀態信息"""
+        # 如果有資料庫服務，從資料庫載入所有 agents
+        if self._database_service:
+            try:
+                # 從資料庫載入所有 agent 狀態
+                await self._database_service.initialize()
+                agent_states = await self._database_service.list_agents()
+
+                # 為不在記憶體中的 agents 創建實例
+                for agent_state in agent_states:
+                    if agent_state.id not in self._agents:
+                        self.logger.info(f"Restoring agent from database: {agent_state.id}")
+                        # 從資料庫狀態重建 agent 實例
+                        agent = await self._create_agent_instance(
+                            agent_state.config, agent_state.id
+                        )
+                        self._agents[agent_state.id] = agent
+                        self._execution_history[agent_state.id] = []
+                        self.logger.info(f"Agent restored: {agent_state.id}")
+
+            except Exception as e:
+                self.logger.error(f"Error loading agents from database: {e}")
+                # 繼續使用記憶體中的 agents
+
+        # 返回所有 agents (記憶體中的)
         agents_list = []
         for agent in self._agents.values():
             agent_dict = self._agent_to_dict(agent)

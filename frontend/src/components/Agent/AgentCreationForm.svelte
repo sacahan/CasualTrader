@@ -110,11 +110,14 @@
 
       const newAgent = await createAgent(agentData);
 
-      notifySuccess(`Agent "${newAgent.name}" 創建成功!`);
-      oncreated?.(newAgent);
-
       // 重置表單
       resetForm();
+
+      // 顯示成功通知
+      notifySuccess(`Agent "${newAgent.name}" 創建成功!`);
+
+      // 呼叫 oncreated callback (這會關閉對話框並重新載入列表)
+      oncreated?.(newAgent);
     } catch (error) {
       notifyError(`創建 Agent 失敗: ${error.message}`);
     } finally {

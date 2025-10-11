@@ -8,11 +8,12 @@ import uvicorn
 
 from src.api.app import create_app
 
+# Create app instance for uvicorn to import
+app = create_app()
+
 
 def main():
     """Start the FastAPI server."""
-    app = create_app()
-
     uvicorn.run(
         app,
         host="0.0.0.0",
