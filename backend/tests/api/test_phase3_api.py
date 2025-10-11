@@ -97,7 +97,7 @@ class TestAgentManagement:
             },
             "investment_preferences": {
                 "preferred_sectors": ["技術業"],
-                "excluded_stocks": [],
+                "excluded_tickers": [],
                 "max_position_size": 0.15,
                 "rebalance_frequency": "weekly",
             },

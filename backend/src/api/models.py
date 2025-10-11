@@ -97,7 +97,7 @@ class InvestmentPreferences(BaseModel):
     """
 
     preferred_sectors: list[str] = Field(default_factory=list)  # 優先投資產業
-    excluded_stocks: list[str] = Field(default_factory=list)  # 排除股票清單
+    excluded_tickers: list[str] = Field(default_factory=list)  # 排除股票清單
     max_position_size: float = Field(default=0.15, ge=0.0, le=1.0)  # 最大單一持股比例
     rebalance_frequency: str = "weekly"  # 再平衡頻率
 

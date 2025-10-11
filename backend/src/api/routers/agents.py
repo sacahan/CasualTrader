@@ -110,7 +110,7 @@ async def create_agent(request: CreateAgentRequest):
         # Create InvestmentPreferences dataclass
         agent_investment_prefs = AgentInvestmentPreferences(
             preferred_sectors=request.investment_preferences.preferred_sectors,
-            excluded_symbols=request.investment_preferences.excluded_stocks,
+            excluded_tickers=request.investment_preferences.excluded_tickers,
             max_position_size=request.investment_preferences.max_position_size
             * 100,  # Convert to percentage
             risk_tolerance=risk_category,
