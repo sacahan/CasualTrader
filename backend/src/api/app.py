@@ -17,7 +17,7 @@ from loguru import logger
 from .config import settings
 from .docs import get_openapi_tags
 from .routers import agents, models, trading, websocket_router
-from .routers.agents import agent_manager
+from .routers.agents import agent_manager, database_service
 from .websocket import websocket_manager
 
 
@@ -34,6 +34,11 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     logger.info(f"Max Agents: {settings.max_agents}")
     logger.info(f"Database: {settings.database_url}")
     logger.info("=" * 80)
+
+    # Initialize Database Service
+    logger.info("Initializing Database Service...")
+    await database_service.initialize()
+    logger.success("Database Service initialized successfully")
 
     # Initialize Agent Manager
     logger.info("Initializing Agent Manager...")
@@ -56,6 +61,8 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     await websocket_manager.shutdown()
     logger.info("Shutting down Agent Manager...")
     await agent_manager.shutdown()
+    logger.info("Closing Database Service...")
+    await database_service.close()
     logger.success("✅ CasualTrader API Server shut down successfully")
     logger.info("=" * 80)
 

@@ -12,7 +12,7 @@ from loguru import logger
 
 from ...agents.core.agent_manager import AgentManager
 from ...agents.core.models import AgentConfig, AgentMode
-from ...database.agent_database_service import AgentDatabaseService
+from ...database.agent_database_service import AgentDatabaseService, DatabaseConfig
 from ..models import (
     AgentListResponse,
     AgentResponse,
@@ -25,8 +25,11 @@ from ..websocket import websocket_manager
 
 router = APIRouter()
 
-# Global agent manager instance
-agent_manager = AgentManager()
+# Global database service instance
+database_service = AgentDatabaseService(DatabaseConfig())
+
+# Global agent manager instance (注入資料庫服務)
+agent_manager = AgentManager(database_service=database_service)
 
 
 def _map_agent_to_response(agent_data: dict[str, Any]) -> AgentResponse:

@@ -474,66 +474,17 @@ class TradingAgent(CasualTradingAgent):
             self.logger.warning(f"Sentiment agent not available: {e}")
             return []
 
-    async def _setup_trading_tools(self) -> list[Any]:
-        """設定交易驗證和執行工具"""
-        tools = []
-
-        # 交易時段檢查工具
-        tools.append(
-            function_tool(
-                self._check_market_hours,
-                name_override="check_market_open",
-                description_override="檢查台灣股市是否開盤中",
-                strict_mode=False,
-            )
-        )
-
-        # 可用現金查詢工具
-        tools.append(
-            function_tool(
-                lambda: {"available_cash": self._get_available_cash()},
-                name_override="get_available_cash",
-                description_override="獲取當前可用現金餘額",
-                strict_mode=False,
-            )
-        )
-
-        # 持倉查詢工具
-        tools.append(
-            function_tool(
-                lambda: {"holdings": self._get_current_holdings()},
-                name_override="get_current_holdings",
-                description_override="獲取當前投資組合持倉",
-                strict_mode=False,
-            )
-        )
-
-        # 策略變更記錄工具
-        tools.append(
-            function_tool(
-                self.record_strategy_change,
-                name_override="record_strategy_change",
-                description_override="""記錄投資策略調整。
-
-參數:
-- trigger_reason (str): 觸發原因
-- new_strategy_addition (str): 新增策略內容
-- change_summary (str): 變更摘要
-- agent_explanation (str): Agent 解釋
-
-用於記錄 Agent 自主學習和策略調整的過程""",
-                strict_mode=False,
-            )
-        )
-
-        return tools
-
     # ==========================================
-    # 市場狀態管理
+    # Trading Tools (使用 @function_tool decorator)
     # ==========================================
 
-    async def _check_market_hours(self) -> bool:
-        """檢查台股交易時間"""
+    @function_tool(strict_mode=False)
+    async def check_market_open(self) -> bool:
+        """檢查台灣股市是否開盤中
+
+        Returns:
+            bool: True 表示市場開盤中，False 表示市場關閉
+        """
         taiwan_tz = pytz.timezone("Asia/Taipei")
         now = datetime.now(taiwan_tz)
 
@@ -542,6 +493,69 @@ class TradingAgent(CasualTradingAgent):
         is_trading_time = time(9, 0) <= now.time() <= time(13, 30)
 
         return is_weekday and is_trading_time
+
+    @function_tool(strict_mode=False)
+    def get_available_cash(self) -> dict[str, float]:
+        """獲取當前可用現金餘額
+
+        Returns:
+            dict: 包含 available_cash 鍵值的字典
+        """
+        return {"available_cash": self._get_available_cash()}
+
+    @function_tool(strict_mode=False)
+    def get_current_holdings(self) -> dict[str, Any]:
+        """獲取當前投資組合持倉
+
+        Returns:
+            dict: 包含 holdings 鍵值的字典，holdings 為持倉詳情
+        """
+        return {"holdings": self._get_current_holdings()}
+
+    @function_tool(strict_mode=False)
+    async def record_strategy_change_tool(
+        self,
+        trigger_reason: str,
+        new_strategy_addition: str,
+        change_summary: str,
+        agent_explanation: str,
+    ) -> dict[str, str]:
+        """記錄投資策略調整
+
+        用於記錄 Agent 自主學習和策略調整的過程。
+
+        Args:
+            trigger_reason: 觸發原因
+            new_strategy_addition: 新增策略內容
+            change_summary: 變更摘要
+            agent_explanation: Agent 解釋
+
+        Returns:
+            dict: 包含記錄結果的字典
+        """
+        result = await self.record_strategy_change(
+            trigger_reason=trigger_reason,
+            new_strategy_addition=new_strategy_addition,
+            change_summary=change_summary,
+            agent_explanation=agent_explanation,
+        )
+        return {"status": "success", "message": "Strategy change recorded", "result": result}
+
+    async def _setup_trading_tools(self) -> list[Any]:
+        """設定交易驗證和執行工具
+
+        使用 @function_tool decorator 定義的方法，自動從 docstring 和 type hints 生成工具 schema。
+        """
+        return [
+            self.check_market_open,
+            self.get_available_cash,
+            self.get_current_holdings,
+            self.record_strategy_change_tool,
+        ]
+
+    # ==========================================
+    # 市場狀態管理
+    # ==========================================
 
     async def _update_market_status(self) -> None:
         """更新市場狀態資訊"""

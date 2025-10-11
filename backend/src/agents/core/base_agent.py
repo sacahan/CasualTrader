@@ -46,8 +46,24 @@ from abc import ABC, abstractmethod
 from datetime import datetime
 from typing import Any
 
-# OpenAI Agent SDK 導入
-from agents import Agent, trace  # OpenAI Agents SDK
+# OpenAI Agent SDK 導入 (使用絕對導入避免與本地 agents 包衝突)
+try:
+    from agents import Agent as OpenAIAgent
+    from agents import Runner, trace
+except ImportError:
+    # Fallback: 如果在測試環境中無法導入
+    OpenAIAgent = Any  # type: ignore
+    Runner = Any  # type: ignore
+
+    def trace(*args, **kwargs):  # type: ignore
+        """Fallback trace context manager"""
+        from contextlib import contextmanager
+
+        @contextmanager
+        def _trace():
+            yield
+
+        return _trace()
 
 
 from .models import (
@@ -87,7 +103,7 @@ class CasualTradingAgent(ABC):
         self.logger.debug(f"AgentState created for {self.agent_id}")
 
         # 內部狀態管理
-        self._openai_agent: Agent | None = None
+        self._openai_agent: OpenAIAgent | None = None  # type: ignore
         self._current_session: AgentExecutionContext | None = None
         self._is_initialized = False
 
@@ -261,7 +277,7 @@ class CasualTradingAgent(ABC):
         instructions = await self._build_agent_instructions()
 
         # 使用配置中的模型創建 Agent
-        self._openai_agent = Agent(
+        self._openai_agent = OpenAIAgent(  # type: ignore
             name=self.config.name,
             instructions=instructions,
             tools=tools,
@@ -323,16 +339,24 @@ class CasualTradingAgent(ABC):
         return base_instructions
 
     async def _execute_agent(self, context: AgentExecutionContext) -> AgentExecutionResult:
-        """執行 OpenAI Agent"""
+        """執行 OpenAI Agent
+
+        使用 Runner.run() 執行 Agent，並傳入 max_turns 參數控制執行回合數。
+        """
         start_time = datetime.now()
 
         # 建構執行訊息
         execution_prompt = await self._build_execution_prompt(context)
 
         try:
+            # 使用 Runner.run() 執行 Agent，並傳入 max_turns
             # 使用超時機制執行
             result = await asyncio.wait_for(
-                self._openai_agent.run(execution_prompt),  # type: ignore[union-attr]
+                Runner.run(
+                    self._openai_agent,  # type: ignore[arg-type]
+                    input=execution_prompt,
+                    max_turns=context.max_turns,  # ✅ 傳入 max_turns 參數
+                ),
                 timeout=context.timeout,
             )
 

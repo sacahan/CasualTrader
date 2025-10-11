@@ -31,10 +31,13 @@ class AgentManager:
     Agent 管理器 - 負責管理多個 Agent 的生命週期
     """
 
-    def __init__(self) -> None:
+    def __init__(self, database_service: Any = None) -> None:
         self._agents: dict[str, CasualTradingAgent] = {}
         self._active_executions: dict[str, asyncio.Task[AgentExecutionResult]] = {}
         self._execution_history: dict[str, list[AgentExecutionResult]] = {}
+
+        # 資料庫服務（用於持久化 Agent 狀態）
+        self._database_service = database_service
 
         # 配置管理
         self._max_concurrent_executions = 10
@@ -163,6 +166,25 @@ class AgentManager:
             self._agents[final_agent_id] = agent
             self._execution_history[final_agent_id] = []
 
+            # 持久化到資料庫 (關鍵步驟！)
+            if self._database_service:
+                self.logger.info(f"Saving agent state to database for {final_agent_id}")
+                try:
+                    await self._database_service.save_agent_state(agent.state)
+                    self.logger.info(f"Agent state saved to database: {final_agent_id}")
+                except Exception as db_error:
+                    self.logger.error(f"Failed to save agent to database: {db_error}")
+                    # 清理已創建的內存狀態
+                    del self._agents[final_agent_id]
+                    del self._execution_history[final_agent_id]
+                    raise RuntimeError(
+                        f"Agent created in memory but failed to persist to database: {db_error}"
+                    ) from db_error
+            else:
+                self.logger.warning(
+                    f"Database service not configured, agent {final_agent_id} created in-memory only"
+                )
+
             # 自動啟動
             if auto_start:
                 await agent.initialize()
@@ -201,6 +223,23 @@ class AgentManager:
 
         # 取消相關執行
         await self._cancel_agent_executions(agent_id)
+
+        # 從資料庫刪除（包括所有相關資料）
+        if self._database_service:
+            self.logger.info(f"Deleting agent from database: {agent_id}")
+            try:
+                deleted = await self._database_service.delete_agent(agent_id)
+                if deleted:
+                    self.logger.info(f"Agent deleted from database: {agent_id}")
+                else:
+                    self.logger.warning(f"Agent {agent_id} not found in database")
+            except Exception as db_error:
+                self.logger.error(f"Failed to delete agent from database: {db_error}")
+                # 繼續移除內存中的 Agent，但記錄錯誤
+        else:
+            self.logger.warning(
+                f"Database service not configured, agent {agent_id} removed from memory only"
+            )
 
         # 移除 Agent
         del self._agents[agent_id]
@@ -446,6 +485,14 @@ class AgentManager:
         if not agent.is_active:
             await agent.initialize()
 
+            # 同步狀態到資料庫（Agent 已啟動為 ACTIVE）
+            if self._database_service:
+                try:
+                    await self._database_service.save_agent_state(agent.state)
+                    self.logger.info(f"Agent {agent_id} status updated in database: ACTIVE")
+                except Exception as db_error:
+                    self.logger.error(f"Failed to update agent status in database: {db_error}")
+
         # 更新配置（如果提供）
         if max_cycles is not None:
             agent.config.max_turns = max_cycles
@@ -461,6 +508,38 @@ class AgentManager:
             f"Agent {agent_id} started with max_cycles={max_cycles}, "
             f"stop_loss_threshold={stop_loss_threshold}"
         )
+
+    async def stop_agent(self, agent_id: str) -> None:
+        """
+        停止指定 Agent
+
+        Args:
+            agent_id: Agent ID
+
+        Raises:
+            ValueError: Agent 不存在
+        """
+        if agent_id not in self._agents:
+            raise ValueError(f"Agent {agent_id} not found")
+
+        agent = self._agents[agent_id]
+
+        # 取消正在執行的任務
+        await self._cancel_agent_executions(agent_id)
+
+        # 關閉 Agent
+        if agent.is_active:
+            await agent.shutdown()
+
+            # 同步狀態到資料庫（Agent 已停止為 INACTIVE）
+            if self._database_service:
+                try:
+                    await self._database_service.save_agent_state(agent.state)
+                    self.logger.info(f"Agent {agent_id} status updated in database: INACTIVE")
+                except Exception as db_error:
+                    self.logger.error(f"Failed to update agent status in database: {db_error}")
+
+        self.logger.info(f"Agent {agent_id} stopped successfully")
 
     # ==========================================
     # 監控和統計
