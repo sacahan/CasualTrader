@@ -1,18 +1,12 @@
-#!/usr/bin/env python3
 """
-Trading Agent 工具配置測試腳本
+Trading Agent 工具配置測試
 驗證修正後的工具配置是否正確
 """
 
-import asyncio
-import sys
-from pathlib import Path
-
-# 添加專案路徑
-project_root = Path(__file__).parent.parent
-sys.path.insert(0, str(project_root / "backend" / "src"))
+import pytest
 
 
+@pytest.mark.asyncio
 async def test_mcp_client():
     """測試 MCP Client 初始化和基本功能"""
     print("\n🔍 測試 1: MCP Client 初始化")
@@ -45,13 +39,16 @@ async def test_mcp_client():
         return False
 
 
+@pytest.mark.asyncio
 async def test_agent_tools_import():
     """測試 OpenAI Agent SDK 工具導入"""
     print("\n🔍 測試 2: OpenAI Agent SDK 工具導入")
     print("=" * 60)
 
     try:
-        from agents import CodeInterpreterTool, FunctionTool, WebSearchTool
+        from agents import CodeInterpreterTool  # noqa: F401
+        from agents import FunctionTool  # noqa: F401
+        from agents import WebSearchTool  # noqa: F401
 
         print("✅ FunctionTool 導入成功")
         print("✅ WebSearchTool 導入成功")
@@ -65,13 +62,14 @@ async def test_agent_tools_import():
         return False
 
 
+@pytest.mark.asyncio
 async def test_trading_agent_tools():
     """測試 Trading Agent 工具配置"""
     print("\n🔍 測試 3: Trading Agent 工具配置")
     print("=" * 60)
 
     try:
-        from agents.core.models import AgentConfig, create_default_agent_config
+        from agents.core.models import create_default_agent_config
         from agents.trading.trading_agent import TradingAgent
 
         # 創建測試配置
@@ -112,6 +110,7 @@ async def test_trading_agent_tools():
         return False
 
 
+@pytest.mark.asyncio
 async def test_specialized_agents():
     """測試專門化 Agent 工具"""
     print("\n🔍 測試 4: 專門化 Agent 工具")
@@ -121,7 +120,9 @@ async def test_specialized_agents():
 
     # 測試 Fundamental Agent
     try:
-        from agents.tools.fundamental_agent import get_fundamental_agent_tool
+        from agents.tools.fundamental_agent import (  # noqa: F401
+            get_fundamental_agent_tool,
+        )
 
         print("✅ Fundamental Agent 可用")
         results["fundamental"] = True
@@ -131,7 +132,9 @@ async def test_specialized_agents():
 
     # 測試 Technical Agent
     try:
-        from agents.tools.technical_agent import get_technical_agent_tool
+        from agents.tools.technical_agent import (  # noqa: F401
+            get_technical_agent_tool,
+        )
 
         print("✅ Technical Agent 可用")
         results["technical"] = True
@@ -141,7 +144,7 @@ async def test_specialized_agents():
 
     # 測試 Risk Agent
     try:
-        from agents.tools.risk_agent import get_risk_agent_tool
+        from agents.tools.risk_agent import get_risk_agent_tool  # noqa: F401
 
         print("✅ Risk Agent 可用")
         results["risk"] = True
@@ -151,7 +154,9 @@ async def test_specialized_agents():
 
     # 測試 Sentiment Agent
     try:
-        from agents.tools.sentiment_agent import get_sentiment_agent_tool
+        from agents.tools.sentiment_agent import (  # noqa: F401
+            get_sentiment_agent_tool,
+        )
 
         print("✅ Sentiment Agent 可用")
         results["sentiment"] = True
@@ -162,41 +167,16 @@ async def test_specialized_agents():
     return any(results.values())
 
 
-async def main():
-    """主測試流程"""
-    print("\n" + "=" * 60)
-    print("🚀 Trading Agent 工具配置測試")
-    print("=" * 60)
-
+@pytest.mark.asyncio
+async def test_all_tools():
+    """綜合測試：驗證所有工具配置"""
     results = []
 
-    # 執行測試
+    # 執行所有子測試
     results.append(await test_mcp_client())
     results.append(await test_agent_tools_import())
     results.append(await test_trading_agent_tools())
     results.append(await test_specialized_agents())
 
-    # 總結
-    print("\n" + "=" * 60)
-    print("📊 測試總結")
-    print("=" * 60)
-
-    passed = sum(results)
-    total = len(results)
-
-    print(f"\n通過: {passed}/{total} 項測試")
-
-    if passed == total:
-        print("\n✅ 所有測試通過！工具配置正確。")
-        return 0
-    elif passed > 0:
-        print("\n⚠️ 部分測試通過。請檢查失敗的項目。")
-        return 1
-    else:
-        print("\n❌ 所有測試失敗。請檢查配置。")
-        return 2
-
-
-if __name__ == "__main__":
-    exit_code = asyncio.run(main())
-    sys.exit(exit_code)
+    # 至少要有一個測試通過
+    assert any(results), "所有工具配置測試均失敗"

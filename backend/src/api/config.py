@@ -57,6 +57,14 @@ class Settings(BaseSettings):
     max_agents: int = Field(default=10, description="Maximum number of agents")
     default_ai_model: str = Field(default="gpt-4o-mini", description="Default AI model")
     default_initial_capital: float = Field(default=1000000.0, description="Default initial capital")
+    default_max_turns: int = Field(default=30, description="Default max turns for main agent")
+    default_agent_timeout: int = Field(
+        default=300,
+        description="Default execution timeout for main agent (seconds), applies to all sub-agents",
+    )
+    default_subagent_max_turns: int = Field(
+        default=15, description="Default max turns for sub-agents"
+    )
 
     # WebSocket Settings
     ws_heartbeat_interval: int = Field(
@@ -71,6 +79,18 @@ class Settings(BaseSettings):
     # Environment
     environment: str = Field(default="development", description="Environment name")
     debug: bool = Field(default=True, description="Debug mode")
+
+    # MCP Server Settings - Casual Market
+    mcp_casual_market_command: str = Field(
+        default="uvx", description="MCP Casual Market command (uvx or npx)"
+    )
+    mcp_casual_market_args: str = Field(
+        default="casual-market-mcp", description="MCP Casual Market package name"
+    )
+    mcp_casual_market_timeout: int = Field(
+        default=10, description="MCP Casual Market API timeout (seconds)"
+    )
+    mcp_casual_market_retries: int = Field(default=5, description="MCP Casual Market API retries")
 
     @field_validator("cors_origins", mode="before")
     @classmethod

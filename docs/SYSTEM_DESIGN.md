@@ -326,6 +326,268 @@ Monorepo 目錄結構:
 
 ---
 
+## 🔄 Trading Agent 執行週期
+
+### 完整執行流程
+
+```mermaid
+graph TD
+    START([開始執行]) --> SETUP[1. 工具設定階段<br/>_setup_tools]
+
+    SETUP --> SETUP_FUND[基本面分析工具]
+    SETUP --> SETUP_TECH[技術分析工具]
+    SETUP --> SETUP_RISK[風險評估工具]
+    SETUP --> SETUP_SENT[市場情緒工具]
+    SETUP --> SETUP_TRADE[交易執行工具]
+    SETUP --> SETUP_OPENAI[OpenAI 內建工具]
+
+    SETUP_FUND --> PREPARE
+    SETUP_TECH --> PREPARE
+    SETUP_RISK --> PREPARE
+    SETUP_SENT --> PREPARE
+    SETUP_TRADE --> PREPARE
+    SETUP_OPENAI --> PREPARE
+
+    PREPARE[2. 執行前準備<br/>_prepare_execution] --> PREPARE_MARKET[更新市場狀態]
+    PREPARE --> PREPARE_PORT[更新投資組合狀態]
+    PREPARE --> PREPARE_CHECK[檢查市場開盤時間]
+    PREPARE --> PREPARE_CASH[查詢可用現金]
+    PREPARE --> PREPARE_HOLD[查詢當前持倉]
+
+    PREPARE_MARKET --> PROMPT
+    PREPARE_PORT --> PROMPT
+    PREPARE_CHECK --> PROMPT
+    PREPARE_CASH --> PROMPT
+    PREPARE_HOLD --> PROMPT
+
+    PROMPT[3. 建構執行提示詞<br/>_build_execution_prompt] --> PROMPT_TIME[當前時間/市場狀態]
+    PROMPT --> PROMPT_PORT[投資組合摘要]
+    PROMPT --> PROMPT_MODE[模式特定指令]
+    PROMPT --> PROMPT_CONTEXT[市場環境上下文]
+    PROMPT --> PROMPT_STRATEGY[策略指導]
+
+    PROMPT_TIME --> MODE_BRANCH
+    PROMPT_PORT --> MODE_BRANCH
+    PROMPT_MODE --> MODE_BRANCH
+    PROMPT_CONTEXT --> MODE_BRANCH
+    PROMPT_STRATEGY --> MODE_BRANCH
+
+    MODE_BRANCH{4. 模式分支執行<br/>AgentMode}
+
+    MODE_BRANCH -->|TRADING| TRADING[交易模式<br/>• 分析機會<br/>• 執行買賣<br/>• 風險控制<br/>• 記錄決策]
+    MODE_BRANCH -->|REBALANCING| REBALANCE[再平衡模式<br/>• 評估配置<br/>• 調整部位<br/>• 優化組合<br/>• 考慮成本]
+    MODE_BRANCH -->|STRATEGY_REVIEW| REVIEW[策略檢討模式<br/>• 回顧績效<br/>• 分析環境<br/>• 調整策略<br/>• 記錄變更]
+    MODE_BRANCH -->|OBSERVATION| OBSERVE[觀察模式<br/>• 監控市場趨勢<br/>• 分析持股動態<br/>• 評估投資機會<br/>• 準備決策資料]
+
+    TRADING --> POST
+    REBALANCE --> POST
+    REVIEW --> POST
+    OBSERVE --> POST
+
+    POST[5. 執行後處理] --> POST_RECORD[記錄執行結果]
+    POST --> POST_STATE[更新 Agent 狀態]
+    POST --> POST_STRATEGY[儲存策略變更]
+    POST --> POST_WS[WebSocket 廣播]
+
+    POST_RECORD --> END
+    POST_STATE --> END
+    POST_STRATEGY --> END
+    POST_WS --> END
+
+    END([週期結束])
+
+    style START fill:#e1f5fe
+    style END fill:#e1f5fe
+    style MODE_BRANCH fill:#fff3e0
+    style TRADING fill:#c8e6c9
+    style REBALANCE fill:#c8e6c9
+    style REVIEW fill:#c8e6c9
+    style OBSERVE fill:#c8e6c9
+```
+
+### 市場狀態管理（持續監控）
+
+```mermaid
+graph LR
+    MARKET[市場時間檢查<br/>• 週一~週五<br/>• 09:00-13:30<br/>• 台灣時區<br/>• 交易日驗證] <--> PORTFOLIO[投資組合狀態更新<br/>• 總市值<br/>• 現金餘額<br/>• 持倉明細<br/>• 定期更新 5分鐘]
+
+    style MARKET fill:#e3f2fd
+    style PORTFOLIO fill:#e3f2fd
+```
+
+### 策略調整機制（自我學習）
+
+```mermaid
+sequenceDiagram
+    participant Agent as Trading Agent
+    participant Trigger as 觸發系統
+    participant Record as 策略記錄器
+    participant DB as 資料庫
+
+    Agent->>Trigger: 檢查觸發條件
+    Trigger->>Trigger: 評估績效/市場/時間
+    Trigger-->>Agent: 觸發策略調整
+
+    Agent->>Agent: 分析調整需求
+    Agent->>Record: record_strategy_change()
+
+    Record->>Record: 1. 記錄觸發原因
+    Record->>Record: 2. 新增策略內容
+    Record->>Record: 3. 變更摘要
+    Record->>Record: 4. Agent 解釋
+    Record->>Record: 5. 當前績效快照
+    Record->>Record: 6. 更新 Agent 指令
+
+    Record->>DB: 持久化策略變更
+    DB-->>Record: 確認儲存
+    Record-->>Agent: 返回變更 ID
+    Agent->>Agent: 更新執行指令
+```
+
+### MCP 工具整合架構
+
+```mermaid
+graph TB
+    subgraph "Casual Market MCP Server"
+        MCP_PRICE[get_taiwan_stock_price<br/>即時價格]
+        MCP_PROFILE[get_company_profile<br/>公司資料]
+        MCP_INCOME[get_income_statement<br/>損益表]
+        MCP_BALANCE[get_balance_sheet<br/>資產負債表]
+        MCP_BUY[buy_taiwan_stock<br/>買入交易]
+        MCP_SELL[sell_taiwan_stock<br/>賣出交易]
+        MCP_CHECK[check_taiwan_trading_day<br/>交易日檢查]
+    end
+
+    subgraph "OpenAI Agent SDK Integration"
+        SDK[mcp_servers 參數配置]
+    end
+
+    subgraph "Trading Agent"
+        AGENT[TradingAgent<br/>主決策 Agent]
+        FUND[Fundamental Agent<br/>基本面分析]
+        TECH[Technical Agent<br/>技術分析]
+        RISK[Risk Agent<br/>風險評估]
+        SENT[Sentiment Agent<br/>情緒分析]
+    end
+
+    MCP_PRICE --> SDK
+    MCP_PROFILE --> SDK
+    MCP_INCOME --> SDK
+    MCP_BALANCE --> SDK
+    MCP_BUY --> SDK
+    MCP_SELL --> SDK
+    MCP_CHECK --> SDK
+
+    SDK --> AGENT
+    SDK --> FUND
+    SDK --> TECH
+    SDK --> RISK
+    SDK --> SENT
+
+    style MCP_PRICE fill:#bbdefb
+    style MCP_PROFILE fill:#bbdefb
+    style MCP_INCOME fill:#bbdefb
+    style MCP_BALANCE fill:#bbdefb
+    style MCP_BUY fill:#bbdefb
+    style MCP_SELL fill:#bbdefb
+    style MCP_CHECK fill:#bbdefb
+    style SDK fill:#c5e1a5
+    style AGENT fill:#ffe0b2
+    style FUND fill:#f8bbd0
+    style TECH fill:#f8bbd0
+    style RISK fill:#f8bbd0
+    style SENT fill:#f8bbd0
+```
+
+### 模式循環週期
+
+```mermaid
+stateDiagram-v2
+    [*] --> OBSERVATION
+
+    OBSERVATION --> TRADING: 市場開盤<br/>發現機會
+    TRADING --> REBALANCING: 部位調整需求
+    REBALANCING --> STRATEGY_REVIEW: 定期檢討<br/>績效評估
+    STRATEGY_REVIEW --> OBSERVATION: 策略更新完成
+
+    OBSERVATION --> OBSERVATION: 市場休市<br/>持續觀察
+
+    note right of OBSERVATION
+        觀察模式
+        • 監控市場趨勢
+        • 分析持股動態
+        • 評估投資機會
+        • 準備決策資料
+    end note
+
+    note right of TRADING
+        交易模式
+        • 分析機會
+        • 執行買賣
+        • 風險控制
+        • 記錄決策
+    end note
+
+    note right of REBALANCING
+        再平衡模式
+        • 評估配置
+        • 調整部位
+        • 優化組合
+        • 考慮成本
+    end note
+
+    note right of STRATEGY_REVIEW
+        策略檢討模式
+        • 回顧績效
+        • 分析環境
+        • 調整策略
+        • 記錄變更
+    end note
+```
+
+### 關鍵執行特性
+
+**1. 模式循環**
+
+- 標準週期: `OBSERVATION → TRADING → REBALANCING → STRATEGY_REVIEW → OBSERVATION`
+- 靈活切換: 根據市場狀態和策略需求動態調整
+
+**2. 市場感知**
+
+- 自動檢測台股交易時間 (週一~五 09:00-13:30)
+- 每 5 分鐘更新市場和投資組合狀態
+- 即時響應市場變化
+
+**3. 工具整合層次**
+
+- **Sub-agents as Tools**: 專業分析 agent 轉換為 tool
+  - `fundamental_agent`: 基本面分析 (max_turns=15)
+  - `technical_agent`: 技術面分析 (max_turns=15)
+  - `risk_agent`: 風險評估 (max_turns=15)
+  - `sentiment_agent`: 情緒分析 (max_turns=15)
+- **OpenAI 內建工具**: WebSearchTool, CodeInterpreterTool
+- **MCP 工具**: 透過 OpenAI SDK 的 `mcp_servers` 參數整合
+
+**4. 策略自我學習**
+
+- 記錄每次策略調整的原因和效果
+- 自動更新 Agent instructions
+- 追蹤績效變化與策略演化關聯
+
+**5. 即時狀態廣播**
+
+- 執行過程透過 WebSocket 即時推送
+- 前端可監控 Agent 決策過程
+- 支援多客戶端同步更新
+
+**6. Sub-agent 執行控制**
+
+- `subagent_max_turns`: 限制子 agent 最大執行輪數 (預設 15)
+- `execution_timeout`: 主 agent 統一控制超時設定
+- 成本優化: 限制工具使用次數和執行時間
+
+---
+
 ## 🔒 設計原則
 
 ### 1. 關注點分離

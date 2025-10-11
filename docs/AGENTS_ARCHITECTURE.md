@@ -3,16 +3,17 @@
 ## 目錄
 
 1. [總覽](#總覽)
-2. [模組結構](#模組結構)
-3. [核心層 (core/)](#核心層-core)
-4. [功能層 (functions/)](#功能層-functions)
-5. [整合層 (integrations/)](#整合層-integrations)
-6. [工具層 (tools/)](#工具層-tools)
-7. [交易層 (trading/)](#交易層-trading)
-8. [工具層 (utils/)](#工具層-utils)
-9. [模組依賴關係](#模組依賴關係)
-10. [互動流程](#互動流程)
-11. [資料流向](#資料流向)
+2. [執行參數配置](#執行參數配置)
+3. [模組結構](#模組結構)
+4. [核心層 (core/)](#核心層-core)
+5. [功能層 (functions/)](#功能層-functions)
+6. [整合層 (integrations/)](#整合層-integrations)
+7. [工具層 (tools/)](#工具層-tools)
+8. [交易層 (trading/)](#交易層-trading)
+9. [工具層 (utils/)](#工具層-utils)
+10. [模組依賴關係](#模組依賴關係)
+11. [互動流程](#互動流程)
+12. [資料流向](#資料流向)
 
 ---
 
@@ -34,6 +35,45 @@
 - **SQLAlchemy Async**: 異步 ORM
 - **yfinance**: 市場數據來源
 - **MCP Tools**: Model Context Protocol 工具集成
+
+---
+
+## 執行參數配置
+
+### 環境變數
+
+Agent 執行參數在 `backend/.env` 中統一配置：
+
+```bash
+# Agent Execution Settings
+DEFAULT_MAX_TURNS=30              # 主 Agent 最大執行回合數
+DEFAULT_AGENT_TIMEOUT=300         # 主 Agent 執行超時時間（秒）
+DEFAULT_SUBAGENT_MAX_TURNS=15     # Sub-agent 最大執行回合數
+```
+
+### 參數繼承關係
+
+```text
+TradingAgent (主 Agent)
+├── max_turns: 30 (從 config 讀取)
+├── timeout: 300s (統一控制點)
+│
+└── Sub-agents (分析工具)
+    ├── FundamentalAnalyst
+    ├── TechnicalAnalyst
+    ├── RiskManager
+    └── SentimentAnalyst
+        ├── max_turns: 15 (從 TradingAgent 傳入)
+        └── timeout: 繼承主 Agent 的 timeout
+```
+
+### 關鍵設計原則
+
+1. **統一 Timeout 控制**: 主 Agent 使用 `asyncio.wait_for()` 控制整體執行超時，所有 sub-agents 共用此限制
+2. **獨立回合數控制**: 每個 sub-agent 可以有自己的 `max_turns` 設定，控制分析深度
+3. **無額外 Timeout 參數**: Sub-agents 不需要也不支援獨立的 timeout 參數
+
+詳細配置說明請參考 [AGENT_IMPLEMENTATION.md](AGENT_IMPLEMENTATION.md#⚙️-agent-執行參數配置)
 
 ---
 

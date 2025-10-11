@@ -3,9 +3,21 @@ Trading Agent Implementation
 基於 OpenAI Agent SDK 的智能交易 Agent
 使用 Python 3.12+ 語法
 
-## MCP 工具整合說明
+## MCP Server 整合說明
 
-Trading Agent 內建 Casual Market MCP 配置，無需外部傳入。
+Trading Agent 使用 Model Context Protocol (MCP) 來整合外部工具和服務。
+MCP Server 配置從環境變數讀取，支援靈活的部署配置。
+
+### 環境變數配置:
+
+在 `.env` 文件中設定以下變數：
+```env
+# MCP Server 配置
+MCP_CASUAL_MARKET_COMMAND="uvx"              # 執行命令 (uvx 或 npx)
+MCP_CASUAL_MARKET_ARGS="casual-market-mcp"   # MCP Server 套件名稱
+MCP_CASUAL_MARKET_TIMEOUT=10                 # API 請求超時時間（秒）
+MCP_CASUAL_MARKET_RETRIES=5                  # API 重試次數
+```
 
 ### 使用方式:
 
@@ -13,7 +25,7 @@ Trading Agent 內建 Casual Market MCP 配置，無需外部傳入。
 from agents.trading.trading_agent import TradingAgent
 from agents.core.models import AgentConfig
 
-# 創建 Trading Agent，MCP 工具自動配置
+# 創建 Trading Agent，MCP Server 從環境變數自動配置
 trading_agent = TradingAgent(
     config=AgentConfig(
         name="My Trading Agent",
@@ -21,24 +33,36 @@ trading_agent = TradingAgent(
         # ... 其他配置
     )
 )
+
+# MCP Server 會在首次使用時自動創建
 ```
 
-### 內建 MCP 工具:
+### Casual Market MCP 提供的工具:
 
-Casual Market MCP 提供以下台股相關工具（自動配置）:
+透過 stdio MCP Server 提供以下台股相關工具（自動配置）:
 - `get_taiwan_stock_price`: 取得股票即時價格
 - `get_company_profile`: 取得公司基本資料
-- `get_income_statement`: 取得綜合損益表
-- `get_balance_sheet`: 取得資產負債表
+- `get_company_income_statement`: 取得綜合損益表
+- `get_company_balance_sheet`: 取得資產負債表
 - `buy_taiwan_stock`: 執行買入交易(模擬)
 - `sell_taiwan_stock`: 執行賣出交易(模擬)
 - `check_taiwan_trading_day`: 檢查是否為交易日
 - 以及其他財務分析和市場數據工具
+
+### MCP Server 架構:
+
+TradingAgent 使用 `MCPServerStdio` 來啟動本地 MCP Server 子進程：
+- 命令: `uvx casual-market-mcp` (或 `npx casual-market-mcp`)
+- 通訊: stdin/stdout
+- 生命週期: 由 Agent 管理，自動啟動和關閉
+
+參考文檔: https://openai.github.io/openai-agents-python/mcp/#4-stdio-mcp-servers
 """
 
 from __future__ import annotations
 
 import logging
+import os
 from datetime import datetime, time
 from typing import Any
 
@@ -55,11 +79,13 @@ from ..core.models import (
 # OpenAI Agent SDK Tools
 try:
     from agents import CodeInterpreterTool, FunctionTool, WebSearchTool
+    from agents.mcp import MCPServerStdio
 except ImportError:
     # Fallback for development
     FunctionTool = Any
     WebSearchTool = Any
     CodeInterpreterTool = Any
+    MCPServerStdio = None
 
 # ==========================================
 # Trading Agent 主要實作
@@ -71,13 +97,78 @@ class TradingAgent(CasualTradingAgent):
     智能交易 Agent - 基於 Prompt 驅動的投資決策系統
     """
 
-    # 內建 MCP Server 配置
-    MCP_SERVERS = {"casual-market": {"command": "uvx", "args": ["casual-market-mcp"]}}
+    # MCP Server 配置方法（從環境變數讀取）
+    @classmethod
+    def _get_mcp_server_config(cls) -> dict[str, Any]:
+        """
+        獲取 MCP Server 配置（從環境變數或 config.py）
+
+        Returns:
+            包含 MCP Server 參數的字典，用於 MCPServerStdio 的 params 參數
+
+        支援的 args 格式：
+            - 字串: "casual-market-mcp"
+            - JSON 陣列: ["--from", "/path/to/dir", "casual-market-mcp"]
+        """
+        import json
+
+        # 從環境變數讀取，提供預設值
+        command = os.getenv("MCP_CASUAL_MARKET_COMMAND", "uvx")
+        args_str = os.getenv("MCP_CASUAL_MARKET_ARGS", "casual-market-mcp")
+
+        # 解析 args - 支援字串或 JSON 陣列
+        if args_str.startswith("[") and args_str.endswith("]"):
+            try:
+                # 嘗試解析為 JSON 陣列
+                args = json.loads(args_str)
+                if not isinstance(args, list):
+                    logging.warning("MCP_CASUAL_MARKET_ARGS is not a list, using default")
+                    args = ["casual-market-mcp"]
+            except json.JSONDecodeError as e:
+                logging.error(f"Failed to parse MCP_CASUAL_MARKET_ARGS as JSON: {e}")
+                args = ["casual-market-mcp"]
+        else:
+            # 單一字串轉為陣列
+            args = [args_str]
+
+        return {
+            "command": command,
+            "args": args,
+        }
+
+    @classmethod
+    async def create_mcp_server(cls, name: str = "Casual Market MCP Server") -> Any | None:
+        """
+        創建 MCP Server 實例
+
+        Args:
+            name: MCP Server 名稱
+
+        Returns:
+            MCPServerStdio 實例，如果未安裝 SDK 則返回 None
+        """
+        if MCPServerStdio is None:
+            logging.warning("MCPServerStdio not available, please install openai-agents-python")
+            return None
+
+        config = cls._get_mcp_server_config()
+
+        try:
+            # 根據 OpenAI Agents SDK 文檔，MCPServerStdio 的正確用法
+            server = MCPServerStdio(
+                name=name,
+                params=config,
+            )
+            return server
+        except Exception as e:
+            logging.error(f"Failed to create MCP Server: {e}")
+            return None
 
     def __init__(
         self,
         config: AgentConfig,
         agent_id: str | None = None,
+        subagent_max_turns: int = 15,
     ) -> None:
         super().__init__(config, agent_id)
 
@@ -92,6 +183,10 @@ class TradingAgent(CasualTradingAgent):
         # 統一管理 OpenAI 工具實例
         self._web_search_tool: WebSearchTool | None = None
         self._code_interpreter_tool: CodeInterpreterTool | None = None
+
+        # Sub-agent 執行參數
+        # Note: Timeout 由主 Agent 的 execution_timeout 統一控制
+        self._subagent_max_turns = subagent_max_turns
 
         self.logger = logging.getLogger(f"trading_agent.{self.agent_id}")
 
@@ -220,16 +315,32 @@ class TradingAgent(CasualTradingAgent):
             shared_tools.append(self._code_interpreter_tool)
         return shared_tools
 
+    async def _get_mcp_server_instance(self) -> Any | None:
+        """
+        獲取 MCP Server 實例（延遲創建）
+
+        Returns:
+            MCPServerStdio 實例或 None
+        """
+        if not hasattr(self, "_mcp_server_instance"):
+            self._mcp_server_instance = await self.create_mcp_server()
+        return self._mcp_server_instance
+
     async def _setup_fundamental_tools(self) -> list[Any]:
         """設定基本面分析工具"""
         try:
             from ..tools.fundamental_agent import get_fundamental_agent
 
+            # 獲取 MCP Server 實例
+            mcp_server = await self._get_mcp_server_instance()
+            mcp_servers = [mcp_server] if mcp_server else []
+
             # 創建 Agent
             fundamental_agent = await get_fundamental_agent(
-                mcp_servers=self.MCP_SERVERS,
+                mcp_servers=mcp_servers,
                 model_name=self.config.model,
                 shared_tools=self._get_shared_tools(),
+                max_turns=self._subagent_max_turns,
             )
 
             # 轉換為 Tool
@@ -251,11 +362,16 @@ class TradingAgent(CasualTradingAgent):
         try:
             from ..tools.technical_agent import get_technical_agent
 
+            # 獲取 MCP Server 實例
+            mcp_server = await self._get_mcp_server_instance()
+            mcp_servers = [mcp_server] if mcp_server else []
+
             # 創建 Agent
             technical_agent = await get_technical_agent(
-                mcp_servers=self.MCP_SERVERS,
+                mcp_servers=mcp_servers,
                 model_name=self.config.model,
                 shared_tools=self._get_shared_tools(),
+                max_turns=self._subagent_max_turns,
             )
 
             # 轉換為 Tool
@@ -277,11 +393,16 @@ class TradingAgent(CasualTradingAgent):
         try:
             from ..tools.risk_agent import get_risk_agent
 
+            # 獲取 MCP Server 實例
+            mcp_server = await self._get_mcp_server_instance()
+            mcp_servers = [mcp_server] if mcp_server else []
+
             # 創建 Agent
             risk_agent = await get_risk_agent(
-                mcp_servers=self.MCP_SERVERS,
+                mcp_servers=mcp_servers,
                 model_name=self.config.model,
                 shared_tools=self._get_shared_tools(),
+                max_turns=self._subagent_max_turns,
             )
 
             # 轉換為 Tool
@@ -303,11 +424,16 @@ class TradingAgent(CasualTradingAgent):
         try:
             from ..tools.sentiment_agent import get_sentiment_agent
 
+            # 獲取 MCP Server 實例
+            mcp_server = await self._get_mcp_server_instance()
+            mcp_servers = [mcp_server] if mcp_server else []
+
             # 創建 Agent
             sentiment_agent = await get_sentiment_agent(
-                mcp_servers=self.MCP_SERVERS,
+                mcp_servers=mcp_servers,
                 model_name=self.config.model,
                 shared_tools=self._get_shared_tools(),
+                max_turns=self._subagent_max_turns,
             )
 
             # 轉換為 Tool
@@ -614,10 +740,15 @@ class TradingAgent(CasualTradingAgent):
     # 屬性和特殊方法
     # ==========================================
 
-    @property
-    def mcp_servers(self) -> dict[str, Any]:
-        """獲取 MCP servers 配置（供外部或 base_agent 使用）"""
-        return self.MCP_SERVERS
+    async def get_mcp_servers_list(self) -> list[Any]:
+        """
+        獲取 MCP servers 實例列表（供外部使用）
+
+        Returns:
+            MCPServerStdio 實例列表
+        """
+        mcp_server = await self._get_mcp_server_instance()
+        return [mcp_server] if mcp_server else []
 
     def __repr__(self) -> str:
         return (

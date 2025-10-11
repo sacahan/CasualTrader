@@ -120,6 +120,10 @@ ${GREEN}Available Migrations:${NC}
     新增 AI 模型配置表並插入種子資料
     包含 OpenAI, Anthropic, Google Gemini, DeepSeek, xAI 模型
 
+  ${BLUE}v1.3.0${NC} - rename_symbol_to_ticker
+    重命名 symbol 欄位為 ticker (agent_holdings, transactions)
+    統一使用 ticker 命名以保持代碼一致性
+
 EOF
 }
 

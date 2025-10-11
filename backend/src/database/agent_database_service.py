@@ -15,23 +15,15 @@ from sqlalchemy import desc, select, text
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, create_async_engine
 from sqlalchemy.orm import sessionmaker
 
-from src.database.models import (
+from .models import (
     Agent as DBAgent,
-)
-from src.database.models import (
     AgentHolding,
-)
-from src.database.models import (
     AgentSession as DBAgentSession,
-)
-from src.database.models import (
     StrategyChange as DBStrategyChange,
-)
-from src.database.models import (
     AIModelConfig,
 )
 
-from src.agents.core.models import (
+from ..agents.core.models import (
     AgentConfig,
     AgentExecutionResult,
     AgentState,
@@ -527,7 +519,7 @@ class AgentDatabaseService:
 
         async with self.session_factory() as session:
             try:
-                from src.database.models import Transaction
+                from .models import Transaction
 
                 stmt = (
                     select(Transaction)

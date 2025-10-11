@@ -531,19 +531,25 @@ class SentimentAnalysisTools:
 
 
 async def get_sentiment_agent(
-    mcp_servers: dict[str, Any],
+    mcp_servers: list[Any],
     model_name: str = "gpt-4o-mini",
     shared_tools: list[Any] | None = None,
+    max_turns: int = 15,
 ) -> Agent:
     """創建市場情緒分析 Agent
 
     Args:
-        mcp_servers: MCP servers 配置（從 TradingAgent 傳入）
+        mcp_servers: MCP servers 實例列表（MCPServerStdio 對象），從 TradingAgent 傳入
         model_name: 使用的 AI 模型名稱
         shared_tools: 從 TradingAgent 傳入的共用工具（WebSearchTool, CodeInterpreterTool）
+        max_turns: 最大執行回合數（預設 15）
 
     Returns:
         Agent: 配置好的市場情緒分析 Agent
+
+    Note:
+        Timeout 由主 TradingAgent 的 execution_timeout 統一控制，
+        sub-agent 作為 Tool 執行時會受到主 Agent 的 timeout 限制。
     """
     tools_instance = SentimentAnalysisTools()
 
@@ -584,6 +590,7 @@ async def get_sentiment_agent(
         model=model_name,
         mcp_servers=mcp_servers,
         tools=all_tools,
+        max_turns=max_turns,
     )
 
     return analyst

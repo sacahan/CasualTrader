@@ -244,6 +244,323 @@ class AddAIModelConfigMigration:
         logging.info("AI model configuration table dropped successfully")
 
 
+class RenameSymbolToTickerMigration:
+    """重命名 symbol 欄位為 ticker (v1.3.0)"""
+
+    version = "1.3.0"
+    name = "rename_symbol_to_ticker"
+    description = "Rename 'symbol' column to 'ticker' in agent_holdings and transactions tables for consistency"
+
+    async def up(self, engine: AsyncEngine) -> None:
+        """執行欄位重命名"""
+        logging.info("Renaming symbol to ticker in database tables...")
+
+        async with engine.begin() as conn:
+            # 檢查是否為 SQLite
+            dialect_name = engine.dialect.name
+
+            if dialect_name == "sqlite":
+                await self._migrate_sqlite(conn)
+            else:
+                await self._migrate_postgres(conn)
+
+        logging.info("Symbol to ticker migration completed successfully")
+
+    async def _migrate_sqlite(self, conn) -> None:
+        """SQLite 特定的遷移邏輯 (需要重建表)"""
+        logging.info("Executing SQLite migration...")
+
+        # Step 1: 備份現有表
+        await conn.execute(
+            text("CREATE TABLE IF NOT EXISTS agent_holdings_backup AS SELECT * FROM agent_holdings")
+        )
+        await conn.execute(
+            text("CREATE TABLE IF NOT EXISTS transactions_backup AS SELECT * FROM transactions")
+        )
+
+        # Step 2: 重建 agent_holdings 表
+        await conn.execute(text("DROP TABLE IF EXISTS agent_holdings"))
+        await conn.execute(
+            text(
+                """
+            CREATE TABLE agent_holdings (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                agent_id TEXT NOT NULL,
+                ticker TEXT NOT NULL,
+                company_name TEXT,
+                quantity INTEGER NOT NULL,
+                average_cost DECIMAL(10,2) NOT NULL,
+                total_cost DECIMAL(15,2) NOT NULL,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (agent_id) REFERENCES agents(id) ON DELETE CASCADE,
+                UNIQUE(agent_id, ticker)
+            )
+        """
+            )
+        )
+
+        # 遷移 holdings 數據
+        await conn.execute(
+            text(
+                """
+            INSERT INTO agent_holdings (id, agent_id, ticker, company_name, quantity, average_cost, total_cost, created_at, updated_at)
+            SELECT id, agent_id, symbol, company_name, quantity, average_cost, total_cost, created_at, updated_at
+            FROM agent_holdings_backup
+        """
+            )
+        )
+
+        # 重建 holdings 索引和觸發器
+        await conn.execute(text("CREATE INDEX idx_holdings_agent_id ON agent_holdings(agent_id)"))
+        await conn.execute(text("CREATE INDEX idx_holdings_ticker ON agent_holdings(ticker)"))
+        await conn.execute(
+            text(
+                """
+            CREATE TRIGGER holdings_updated_at
+                AFTER UPDATE ON agent_holdings
+            BEGIN
+                UPDATE agent_holdings SET updated_at = CURRENT_TIMESTAMP WHERE id = NEW.id;
+            END
+        """
+            )
+        )
+
+        # Step 3: 重建 transactions 表
+        await conn.execute(text("DROP TABLE IF EXISTS transactions"))
+        await conn.execute(
+            text(
+                """
+            CREATE TABLE transactions (
+                id TEXT PRIMARY KEY,
+                agent_id TEXT NOT NULL,
+                session_id TEXT,
+                ticker TEXT NOT NULL,
+                company_name TEXT,
+                action TEXT NOT NULL CHECK (action IN ('BUY', 'SELL')),
+                quantity INTEGER NOT NULL,
+                price DECIMAL(10,2) NOT NULL,
+                total_amount DECIMAL(15,2) NOT NULL,
+                commission DECIMAL(10,2) DEFAULT 0,
+                status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'executed', 'failed', 'cancelled')),
+                execution_time DATETIME,
+                decision_reason TEXT,
+                market_data JSON,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (agent_id) REFERENCES agents(id) ON DELETE CASCADE,
+                FOREIGN KEY (session_id) REFERENCES agent_sessions(id) ON DELETE SET NULL
+            )
+        """
+            )
+        )
+
+        # 遷移 transactions 數據 (只複製實際存在的欄位)
+        await conn.execute(
+            text(
+                """
+            INSERT INTO transactions (id, agent_id, session_id, ticker, company_name, action, quantity, price, total_amount, commission,
+                   status, execution_time, decision_reason, market_data, created_at)
+            SELECT id, agent_id, session_id, symbol, company_name, action, quantity, price, total_amount, commission,
+                   status, execution_time, decision_reason, market_data, created_at
+            FROM transactions_backup
+        """
+            )
+        )
+
+        # 重建 transactions 索引
+        await conn.execute(text("CREATE INDEX idx_transactions_agent_id ON transactions(agent_id)"))
+        await conn.execute(text("CREATE INDEX idx_transactions_ticker ON transactions(ticker)"))
+        await conn.execute(
+            text("CREATE INDEX idx_transactions_created_at ON transactions(created_at)")
+        )
+        await conn.execute(text("CREATE INDEX idx_transactions_status ON transactions(status)"))
+
+        # Step 4: 更新視圖
+        await conn.execute(text("DROP VIEW IF EXISTS agent_overview"))
+        await conn.execute(
+            text(
+                """
+            CREATE VIEW agent_overview AS
+            SELECT
+                a.id,
+                a.name,
+                a.status,
+                a.current_mode,
+                a.initial_funds,
+                COUNT(DISTINCT h.ticker) as holdings_count,
+                COALESCE(SUM(h.quantity * h.average_cost), 0) as total_invested,
+                a.created_at,
+                a.last_active_at
+            FROM agents a
+            LEFT JOIN agent_holdings h ON a.id = h.agent_id
+            GROUP BY a.id
+        """
+            )
+        )
+
+        # 驗證數據完整性
+        result = await conn.execute(
+            text(
+                """
+            SELECT
+                (SELECT COUNT(*) FROM agent_holdings_backup) as backup_holdings,
+                (SELECT COUNT(*) FROM agent_holdings) as current_holdings,
+                (SELECT COUNT(*) FROM transactions_backup) as backup_transactions,
+                (SELECT COUNT(*) FROM transactions) as current_transactions
+        """
+            )
+        )
+        counts = result.fetchone()
+        logging.info(
+            f"Migration verification - Holdings: {counts[0]} → {counts[1]}, Transactions: {counts[2]} → {counts[3]}"
+        )
+
+        if counts[0] != counts[1] or counts[2] != counts[3]:
+            raise RuntimeError("Data count mismatch after migration!")
+
+        # 清理備份表
+        await conn.execute(text("DROP TABLE agent_holdings_backup"))
+        await conn.execute(text("DROP TABLE transactions_backup"))
+
+    async def _migrate_postgres(self, conn) -> None:
+        """PostgreSQL 特定的遷移邏輯 (使用 ALTER TABLE)"""
+        logging.info("Executing PostgreSQL migration...")
+
+        # PostgreSQL 支持直接重命名欄位
+        await conn.execute(text("ALTER TABLE agent_holdings RENAME COLUMN symbol TO ticker"))
+        await conn.execute(text("ALTER TABLE transactions RENAME COLUMN symbol TO ticker"))
+
+        # 更新視圖
+        await conn.execute(text("DROP VIEW IF EXISTS agent_overview"))
+        await conn.execute(
+            text(
+                """
+            CREATE VIEW agent_overview AS
+            SELECT
+                a.id,
+                a.name,
+                a.status,
+                a.current_mode,
+                a.initial_funds,
+                COUNT(DISTINCT h.ticker) as holdings_count,
+                COALESCE(SUM(h.quantity * h.average_cost), 0) as total_invested,
+                a.created_at,
+                a.last_active_at
+            FROM agents a
+            LEFT JOIN agent_holdings h ON a.id = h.agent_id
+            GROUP BY a.id
+        """
+            )
+        )
+
+    async def down(self, engine: AsyncEngine) -> None:
+        """回滾欄位重命名"""
+        logging.info("Rolling back ticker to symbol...")
+
+        async with engine.begin() as conn:
+            dialect_name = engine.dialect.name
+
+            if dialect_name == "sqlite":
+                await self._rollback_sqlite(conn)
+            else:
+                await self._rollback_postgres(conn)
+
+        logging.info("Rollback completed successfully")
+
+    async def _rollback_sqlite(self, conn) -> None:
+        """SQLite 回滾邏輯"""
+        # 備份當前表
+        await conn.execute(
+            text("CREATE TABLE agent_holdings_backup AS SELECT * FROM agent_holdings")
+        )
+        await conn.execute(text("CREATE TABLE transactions_backup AS SELECT * FROM transactions"))
+
+        # 重建表 (使用 symbol)
+        await conn.execute(text("DROP TABLE agent_holdings"))
+        await conn.execute(
+            text(
+                """
+            CREATE TABLE agent_holdings (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                agent_id TEXT NOT NULL,
+                symbol TEXT NOT NULL,
+                company_name TEXT,
+                quantity INTEGER NOT NULL,
+                average_cost DECIMAL(10,2) NOT NULL,
+                total_cost DECIMAL(15,2) NOT NULL,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (agent_id) REFERENCES agents(id) ON DELETE CASCADE,
+                UNIQUE(agent_id, symbol)
+            )
+        """
+            )
+        )
+
+        # 恢復數據
+        await conn.execute(
+            text(
+                """
+            INSERT INTO agent_holdings (id, agent_id, symbol, company_name, quantity, average_cost, total_cost, created_at, updated_at)
+            SELECT id, agent_id, ticker, company_name, quantity, average_cost, total_cost, created_at, updated_at
+            FROM agent_holdings_backup
+        """
+            )
+        )
+
+        # 重建索引
+        await conn.execute(text("CREATE INDEX idx_holdings_agent_id ON agent_holdings(agent_id)"))
+        await conn.execute(text("CREATE INDEX idx_holdings_symbol ON agent_holdings(symbol)"))
+
+        # 類似處理 transactions 表...
+        await conn.execute(text("DROP TABLE transactions"))
+        await conn.execute(
+            text(
+                """
+            CREATE TABLE transactions (
+                id TEXT PRIMARY KEY,
+                agent_id TEXT NOT NULL,
+                session_id TEXT,
+                symbol TEXT NOT NULL,
+                company_name TEXT,
+                action TEXT NOT NULL CHECK (action IN ('BUY', 'SELL')),
+                quantity INTEGER NOT NULL,
+                price DECIMAL(10,2) NOT NULL,
+                total_amount DECIMAL(15,2) NOT NULL,
+                commission DECIMAL(10,2) DEFAULT 0,
+                status TEXT NOT NULL DEFAULT 'pending',
+                execution_time DATETIME,
+                decision_reason TEXT,
+                market_data JSON,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (agent_id) REFERENCES agents(id) ON DELETE CASCADE
+            )
+        """
+            )
+        )
+
+        await conn.execute(
+            text(
+                """
+            INSERT INTO transactions (id, agent_id, session_id, symbol, company_name, action, quantity, price, total_amount, commission,
+                   status, execution_time, decision_reason, market_data, created_at)
+            SELECT id, agent_id, session_id, ticker, company_name, action, quantity, price, total_amount, commission,
+                   status, execution_time, decision_reason, market_data, created_at
+            FROM transactions_backup
+        """
+            )
+        )
+
+        # 清理
+        await conn.execute(text("DROP TABLE agent_holdings_backup"))
+        await conn.execute(text("DROP TABLE transactions_backup"))
+
+    async def _rollback_postgres(self, conn) -> None:
+        """PostgreSQL 回滾邏輯"""
+        await conn.execute(text("ALTER TABLE agent_holdings RENAME COLUMN ticker TO symbol"))
+        await conn.execute(text("ALTER TABLE transactions RENAME COLUMN ticker TO symbol"))
+
+
 # ==========================================
 # Migration Manager (Python 3.12+ class with type annotations)
 # ==========================================
@@ -259,6 +576,7 @@ class DatabaseMigrationManager:
             InitialSchemaMigration(),
             AddPerformanceIndexesMigration(),
             AddAIModelConfigMigration(),
+            RenameSymbolToTickerMigration(),
         ]
 
         # Setup logging

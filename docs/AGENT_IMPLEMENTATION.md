@@ -416,6 +416,123 @@ ANTHROPIC_API_KEY=...
 
 ---
 
+## ⚙️ Agent 執行參數配置
+
+### 環境變數設定
+
+所有 Agent 執行參數都可以在 `backend/.env` 中配置：
+
+```bash
+# Agent Execution Settings
+DEFAULT_MAX_TURNS=30              # 主 Agent 最大執行回合數
+DEFAULT_AGENT_TIMEOUT=300         # 主 Agent 執行超時時間（秒）
+DEFAULT_SUBAGENT_MAX_TURNS=15     # Sub-agent 最大執行回合數
+```
+
+### 參數說明
+
+#### 主 Agent (TradingAgent)
+
+- **MAX_TURNS**: 控制主 Agent 的執行回合數
+  - 預設值: 30
+  - 建議範圍: 20-50
+  - 說明: 每個回合包含一次 LLM 調用和工具執行
+
+- **AGENT_TIMEOUT**: 控制主 Agent 的執行超時時間（統一控制所有 sub-agents）
+  - 預設值: 300 秒（5 分鐘）
+  - 建議範圍: 180-600 秒
+  - 說明: 使用 `asyncio.wait_for()` 控制整體執行超時
+
+#### Sub-agents（分析工具）
+
+- **SUBAGENT_MAX_TURNS**: 控制 Sub-agent 的執行回合數
+  - 預設值: 15
+  - 建議範圍: 10-25
+  - 說明: Sub-agents 執行較專注的分析任務
+
+> **⚠️ 重要**: Sub-agents 的 timeout 由主 Agent 的 `AGENT_TIMEOUT` 統一控制，無需單獨配置。
+
+### Timeout 架構說明
+
+```text
+┌─────────────────────────────────────────────────┐
+│ TradingAgent                                    │
+│                                                 │
+│ execution_timeout: 300s  ←─ 統一控制點         │
+│ max_turns: 30                                   │
+│                                                 │
+│ ┌─────────────────────────────────────────┐   │
+│ │ asyncio.wait_for(timeout=300s)          │   │
+│ │                                         │   │
+│ │ ┌────────────────────┐                 │   │
+│ │ │ FundamentalAnalyst │                 │   │
+│ │ │ max_turns: 15      │ ←─ 只控制回合數 │   │
+│ │ └────────────────────┘                 │   │
+│ │                                         │   │
+│ │ ┌────────────────────┐                 │   │
+│ │ │ TechnicalAnalyst   │                 │   │
+│ │ │ max_turns: 15      │                 │   │
+│ │ └────────────────────┘                 │   │
+│ └─────────────────────────────────────────┘   │
+└─────────────────────────────────────────────────┘
+```
+
+**核心原則：**
+
+- `max_turns` - Sub-agent 自己控制執行回合數
+- `timeout` - 主 Agent 統一控制，覆蓋所有 sub-agents
+
+### 配置範例
+
+```python
+from api.config import Settings
+from agents.trading.trading_agent import TradingAgent
+from agents.core.models import AgentConfig
+
+settings = Settings()
+
+# 創建配置
+config = AgentConfig(
+    name="My Trading Agent",
+    max_turns=settings.default_max_turns,           # 主 Agent: 30 回合
+    execution_timeout=settings.default_agent_timeout, # 整體超時: 300 秒
+)
+
+# 創建 TradingAgent
+agent = TradingAgent(
+    config=config,
+    subagent_max_turns=settings.default_subagent_max_turns,  # Sub-agents: 15 回合
+)
+```
+
+### 調優建議
+
+**開發環境**（快速測試）:
+
+```bash
+DEFAULT_MAX_TURNS=20
+DEFAULT_AGENT_TIMEOUT=180
+DEFAULT_SUBAGENT_MAX_TURNS=10
+```
+
+**生產環境**（完整分析）:
+
+```bash
+DEFAULT_MAX_TURNS=40
+DEFAULT_AGENT_TIMEOUT=600
+DEFAULT_SUBAGENT_MAX_TURNS=20
+```
+
+**成本控制**（降低 API 調用）:
+
+```bash
+DEFAULT_MAX_TURNS=15
+DEFAULT_AGENT_TIMEOUT=300
+DEFAULT_SUBAGENT_MAX_TURNS=8
+```
+
+---
+
 ## 🤖 TradingAgent 主體架構
 
 ### 設計理念
@@ -1097,7 +1214,7 @@ CasualTrader 整合兩種互補的執行追蹤機制:
 
 **用途**: 即時可視化和調試 Agent 執行流程
 
-- **位置**: 上傳到 OpenAI Dashboard (https://platform.openai.com/traces)
+- **位置**: 上傳到 OpenAI Dashboard (<https://platform.openai.com/traces>)
 - **啟用方式**: 使用 `trace()` context manager 自動記錄
 - **適用場景**: 開發、調試、問題排查
 - **特點**:

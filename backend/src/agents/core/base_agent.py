@@ -46,61 +46,8 @@ from abc import ABC, abstractmethod
 from datetime import datetime
 from typing import Any
 
-# Note: 這些是 OpenAI Agent SDK 的預期導入
-# 實際實作時需要替換為正確的 SDK 導入
-try:
-    from openai_agents import Agent  # type: ignore[import-untyped]
-    from agents import trace  # OpenAI Agents SDK trace context manager
-    from agents.extensions.models.litellm_model import LitellmModel  # type: ignore[import-untyped]
-
-    OPENAI_AGENTS_AVAILABLE = True
-except ImportError:
-    # 開發階段的模擬實作
-    OPENAI_AGENTS_AVAILABLE = False
-
-    # Mock trace context manager for development
-    from contextlib import contextmanager
-    from typing import Iterator
-
-    @contextmanager
-    def trace(workflow_name: str, group_id: str | None = None) -> Iterator[None]:
-        """Mock trace context manager for development"""
-        yield
-
-    class Agent:  # type: ignore[no-redef]
-        """OpenAI Agent SDK 模擬類別 (開發期間使用)"""
-
-        def __init__(
-            self,
-            name: str,
-            instructions: str,
-            tools: list[Any] | None = None,
-            model: str = "gpt-4o-mini",
-            max_turns: int = 30,
-            **kwargs: Any,
-        ) -> None:
-            self.name = name
-            self.instructions = instructions
-            self.tools = tools or []
-            self.model = model
-            self.max_turns = max_turns
-            self._kwargs = kwargs
-
-        async def run(self, message: str, **kwargs: Any) -> dict[str, Any]:
-            """模擬 Agent 執行"""
-            return {
-                "status": "simulated",
-                "message": f"Simulated response for: {message}",
-                "agent": self.name,
-                "model": self.model,
-            }
-
-    class LitellmModel:  # type: ignore[no-redef]
-        """LiteLLM Model 模擬類別 (開發期間使用)"""
-
-        def __init__(self, name: str, **kwargs: Any) -> None:
-            self.name = name
-            self._kwargs = kwargs
+# OpenAI Agent SDK 導入
+from agents import Agent, trace  # OpenAI Agents SDK
 
 
 from .models import (
