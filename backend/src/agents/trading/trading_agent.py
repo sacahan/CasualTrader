@@ -107,29 +107,23 @@ class TradingAgent(CasualTradingAgent):
             包含 MCP Server 參數的字典，用於 MCPServerStdio 的 params 參數
 
         支援的 args 格式：
-            - 字串: "casual-market-mcp"
             - JSON 陣列: ["--from", "/path/to/dir", "casual-market-mcp"]
         """
         import json
 
         # 從環境變數讀取，提供預設值
         command = os.getenv("MCP_CASUAL_MARKET_COMMAND", "uvx")
-        args_str = os.getenv("MCP_CASUAL_MARKET_ARGS", "casual-market-mcp")
+        args_str = os.getenv("MCP_CASUAL_MARKET_ARGS", '["casual-market-mcp"]')
 
-        # 解析 args - 支援字串或 JSON 陣列
-        if args_str.startswith("[") and args_str.endswith("]"):
-            try:
-                # 嘗試解析為 JSON 陣列
-                args = json.loads(args_str)
-                if not isinstance(args, list):
-                    logging.warning("MCP_CASUAL_MARKET_ARGS is not a list, using default")
-                    args = ["casual-market-mcp"]
-            except json.JSONDecodeError as e:
-                logging.error(f"Failed to parse MCP_CASUAL_MARKET_ARGS as JSON: {e}")
+        # 解析 args - 必須是 JSON 陣列格式
+        try:
+            args = json.loads(args_str)
+            if not isinstance(args, list):
+                logging.warning("MCP_CASUAL_MARKET_ARGS is not a list, using default")
                 args = ["casual-market-mcp"]
-        else:
-            # 單一字串轉為陣列
-            args = [args_str]
+        except json.JSONDecodeError as e:
+            logging.error(f"Failed to parse MCP_CASUAL_MARKET_ARGS as JSON: {e}")
+            args = ["casual-market-mcp"]
 
         return {
             "command": command,
