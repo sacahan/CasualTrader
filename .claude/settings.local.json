@@ -1,4 +1,7 @@
 {
+  "permissions": {
+    "allow": ["mcp__chrome-devtools"]
+  },
   "enableAllProjectMcpServers": true,
   "enabledMcpjsonServers": ["specpilot"]
 }

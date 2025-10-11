@@ -136,7 +136,9 @@ class AgentDatabaseService:
             status=agent_state.status.value,
             current_mode=agent_state.current_mode.value,
             config=self._serialize_config(config),
-            investment_preferences=config.investment_preferences.preferred_sectors,
+            investment_preferences=json.dumps(
+                config.investment_preferences.preferred_sectors, ensure_ascii=False
+            ),
             strategy_adjustment_criteria=config.strategy_adjustment_criteria,
             auto_adjust_settings=self._serialize_auto_adjust(config.auto_adjust),
             created_at=agent_state.created_at,
@@ -158,7 +160,9 @@ class AgentDatabaseService:
         db_agent.status = agent_state.status.value
         db_agent.current_mode = agent_state.current_mode.value
         db_agent.config = self._serialize_config(config)
-        db_agent.investment_preferences = config.investment_preferences.preferred_sectors
+        db_agent.investment_preferences = json.dumps(
+            config.investment_preferences.preferred_sectors, ensure_ascii=False
+        )
         db_agent.strategy_adjustment_criteria = config.strategy_adjustment_criteria
         db_agent.auto_adjust_settings = self._serialize_auto_adjust(config.auto_adjust)
         db_agent.updated_at = agent_state.updated_at
@@ -187,6 +191,18 @@ class AgentDatabaseService:
 
     async def _db_agent_to_state(self, db_agent: DBAgent) -> AgentState:
         """將資料庫 Agent 轉換為 AgentState"""
+        from ..agents.core.models import InvestmentPreferences
+
+        # 反序列化 investment_preferences
+        preferred_sectors = []
+        if db_agent.investment_preferences:
+            try:
+                preferred_sectors = json.loads(db_agent.investment_preferences)
+            except json.JSONDecodeError:
+                self.logger.warning(
+                    f"Failed to parse investment_preferences for agent {db_agent.id}"
+                )
+
         # 重建 AgentConfig
         config = AgentConfig(
             name=db_agent.name,
@@ -195,6 +211,12 @@ class AgentDatabaseService:
             model=db_agent.model,
             initial_funds=db_agent.initial_funds,
             strategy_adjustment_criteria=db_agent.strategy_adjustment_criteria or "",
+        )
+
+        # 重建 InvestmentPreferences
+        config.investment_preferences = InvestmentPreferences(
+            preferred_sectors=preferred_sectors,
+            max_position_size=float(db_agent.max_position_size),
         )
 
         # 創建 AgentState
