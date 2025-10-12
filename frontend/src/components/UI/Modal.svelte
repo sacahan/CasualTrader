@@ -64,7 +64,7 @@
     sm: 'max-w-sm',
     md: 'max-w-md',
     lg: 'max-w-lg',
-    xl: 'max-w-xl',
+    xl: 'max-w-2xl',
     full: 'max-w-7xl w-full',
   };
 </script>
@@ -95,30 +95,32 @@
         <!-- Header -->
         {#if title || header}
           <div class="flex items-center justify-between border-b border-gray-700 px-6 py-4">
-            <div class="flex-1">
-              {#if header}
-                {@render header?.()}
-              {:else}
+            {#if header}
+              {@render header?.()}
+            {:else}
+              <div class="flex-1">
                 <h3 class="text-lg font-semibold text-white" id="modal-title">
                   {title}
                 </h3>
-              {/if}
-            </div>
-            <button
-              type="button"
-              class="ml-4 rounded-md text-gray-400 hover:text-white focus:outline-none focus:ring-2 focus:ring-primary-500"
-              onclick={close}
-            >
-              <span class="sr-only">關閉</span>
-              <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  stroke-width="2"
-                  d="M6 18L18 6M6 6l12 12"
-                />
-              </svg>
-            </button>
+              </div>
+            {/if}
+            {#if !header}
+              <button
+                type="button"
+                class="ml-4 rounded-md text-gray-400 hover:text-white focus:outline-none focus:ring-2 focus:ring-primary-500"
+                onclick={close}
+              >
+                <span class="sr-only">關閉</span>
+                <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    stroke-width="2"
+                    d="M6 18L18 6M6 6l12 12"
+                  />
+                </svg>
+              </button>
+            {/if}
           </div>
         {/if}
 

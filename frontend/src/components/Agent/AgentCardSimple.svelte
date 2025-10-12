@@ -24,11 +24,26 @@
   } = $props();
 
   // 計算資產相關數據
-  let totalAssets = $derived(agent.initial_funds || 1000000); // 從 API 獲取
-  let currentCash = $derived(agent.initial_funds || 345020.5); // 從 API 獲取
-  let pnl = $derived(totalAssets - agent.initial_funds);
-  let pnlPercent = $derived((pnl / agent.initial_funds) * 100);
-  let isProfit = $derived(pnl >= 0);
+  // 這些值應該來自 API 或 props，暫時使用默認值
+  let initialFunds = $derived(() => agent.initial_funds || 1000000);
+  let totalAssets = $derived(() => agent.total_assets || agent.initial_funds || 1000000); // 應該從 API 獲取實際總資產
+  let currentCash = $derived(() => agent.current_cash || agent.initial_funds || 1000000); // 應該從 API 獲取實際現金
+  let pnl = $derived(() => {
+    const assets = agent.total_assets || agent.initial_funds || 1000000;
+    const initial = agent.initial_funds || 1000000;
+    return assets - initial;
+  });
+  let pnlPercent = $derived(() => {
+    const initial = agent.initial_funds || 1000000;
+    const assets = agent.total_assets || agent.initial_funds || 1000000;
+    const profit = assets - initial;
+    return initial > 0 ? (profit / initial) * 100 : 0;
+  });
+  let isProfit = $derived(() => {
+    const assets = agent.total_assets || agent.initial_funds || 1000000;
+    const initial = agent.initial_funds || 1000000;
+    return assets >= initial;
+  });
 
   // Agent 顏色 (從設定中取得，預設為綠色或橙色)
   let agentColor = $derived(agent.color || '34, 197, 94');
@@ -53,6 +68,13 @@
         chartInstance.destroy();
       }
     };
+  });
+
+  // 監聽數據變化，重新渲染圖表
+  $effect(() => {
+    if (chartCanvas && performanceData.length > 0) {
+      renderMiniChart();
+    }
   });
 
   function renderMiniChart() {

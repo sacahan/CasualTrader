@@ -33,7 +33,11 @@
 
   // 模態視窗狀態
   let showCreateModal = $state(false);
+  let showEditModal = $state(false);
   let showDetailModal = $state(false);
+
+  // 編輯模式的 Agent
+  let editingAgent = $state(null);
 
   // 每個 Agent 的詳細資料
   let agentPerformanceData = $state({});
@@ -100,9 +104,8 @@
   }
 
   async function handleEditAgent(agent) {
-    selectAgent(agent.agent_id);
-    await loadAgentDetails(agent.agent_id);
-    showDetailModal = true;
+    editingAgent = agent;
+    showEditModal = true;
   }
 
   async function handleDeleteAgent(agent) {
@@ -135,6 +138,17 @@
   function handleAgentCreated() {
     showCreateModal = false;
     loadAgents(); // 重新載入 agents 列表
+  }
+
+  function handleAgentUpdated() {
+    showEditModal = false;
+    editingAgent = null;
+    loadAgents(); // 重新載入 agents 列表
+  }
+
+  function handleEditCancel() {
+    showEditModal = false;
+    editingAgent = null;
   }
 
   function handleDetailModalClose() {
@@ -241,8 +255,17 @@
   </main>
 
   <!-- Create Agent Modal -->
-  <Modal bind:open={showCreateModal} title="創建新 Agent" size="lg">
+  <Modal bind:open={showCreateModal} title="創建新 Agent" size="xl">
     <AgentCreationForm oncreated={handleAgentCreated} oncancel={() => (showCreateModal = false)} />
+  </Modal>
+
+  <!-- Edit Agent Modal -->
+  <Modal bind:open={showEditModal} title="編輯 Agent" size="xl">
+    <AgentCreationForm
+      agent={editingAgent}
+      onupdated={handleAgentUpdated}
+      oncancel={handleEditCancel}
+    />
   </Modal>
 
   <!-- Agent Detail Modal -->
