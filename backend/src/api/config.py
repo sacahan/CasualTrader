@@ -48,8 +48,8 @@ class Settings(BaseSettings):
 
     # Database Settings
     database_url: str = Field(
-        default="sqlite+aiosqlite:///./casualtrader.db",
-        description="Database connection URL",
+        default="sqlite+aiosqlite:///casualtrader.db",
+        description="Database connection URL (relative to backend directory)",
     )
     database_echo: bool = Field(default=False, description="Echo SQL queries")
 

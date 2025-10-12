@@ -102,7 +102,9 @@
     <div class="flex justify-between">
       <span class="text-gray-600">單一持股上限:</span>
       <span class="font-medium text-gray-900">
-        {agent.max_position_size}%
+        {agent.investment_preferences?.max_position_size
+          ? (agent.investment_preferences.max_position_size * 100).toFixed(0)
+          : '15'}%
       </span>
     </div>
     <div class="flex justify-between">

@@ -104,7 +104,11 @@ class CreateAgentRequest(BaseModel):
     )  # 使用 AI 模型（從資料庫動態載入）
     strategy_type: StrategyType = Field(default=StrategyType.BALANCED)  # 投資策略類型
     strategy_prompt: str = Field(..., min_length=10)  # 策略提示語
-    color_theme: str = Field(default="#007bff", pattern=r"^#[0-9A-Fa-f]{6}$")  # 顏色主題
+    color: str = Field(
+        default="34, 197, 94",
+        pattern=r"^\d{1,3},\s*\d{1,3},\s*\d{1,3}$",
+        description="UI 卡片顏色 (RGB 格式，例如: 34, 197, 94)",
+    )  # UI 卡片顏色
     initial_funds: float = Field(default=1000000.0, gt=0)  # 初始資金
     max_turns: int = Field(default=50, ge=1, le=1000)  # 最大回合數
     risk_tolerance: float = Field(default=0.5, ge=0.0, le=1.0)  # 風險容忍度
@@ -124,7 +128,9 @@ class UpdateAgentRequest(BaseModel):
     name: str | None = Field(None, min_length=1, max_length=100)  # 代理人名稱
     description: str | None = Field(None, max_length=500)  # 代理人描述
     strategy_prompt: str | None = Field(None, min_length=10)  # 策略提示語
-    color_theme: str | None = Field(None, pattern=r"^#[0-9A-Fa-f]{6}$")  # 顏色主題
+    color: str | None = Field(
+        None, pattern=r"^\d{1,3},\s*\d{1,3},\s*\d{1,3}$", description="UI 卡片顏色 (RGB 格式)"
+    )  # UI 卡片顏色
     risk_tolerance: float | None = Field(None, ge=0.0, le=1.0)  # 風險容忍度
     enabled_tools: EnabledTools | None = None  # 啟用工具
     investment_preferences: InvestmentPreferences | None = None  # 投資偏好

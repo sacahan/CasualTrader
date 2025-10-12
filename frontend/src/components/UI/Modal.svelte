@@ -13,7 +13,7 @@
    * @typedef {Object} Props
    * @property {boolean} [open]
    * @property {string} [title]
-   * @property {string} [size] - sm | md | lg | xl
+   * @property {string} [size] - sm | md | lg | xl | full
    * @property {boolean} [closeOnBackdrop]
    * @property {Function} [onclose]
    * @property {import('svelte').Snippet} [header]
@@ -65,6 +65,7 @@
     md: 'max-w-md',
     lg: 'max-w-lg',
     xl: 'max-w-xl',
+    full: 'max-w-7xl w-full',
   };
 </script>
 

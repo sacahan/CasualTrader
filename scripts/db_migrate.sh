@@ -35,34 +35,35 @@ NC='\033[0m' # No Color
 # Get script directory
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
+BACKEND_DIR="$PROJECT_DIR/backend"
 
-# Change to project directory
-cd "$PROJECT_DIR"
+# Change to backend directory where the database should be located
+cd "$BACKEND_DIR"
 
 # =============================================================================
 # Helper Functions
 # =============================================================================
 
 print_header() {
-  echo -e "${BLUE}================================================${NC}"
-  echo -e "${BLUE}  $1${NC}"
-  echo -e "${BLUE}================================================${NC}"
+	echo -e "${BLUE}================================================${NC}"
+	echo -e "${BLUE}  $1${NC}"
+	echo -e "${BLUE}================================================${NC}"
 }
 
 print_success() {
-  echo -e "${GREEN}✅ $1${NC}"
+	echo -e "${GREEN}✅ $1${NC}"
 }
 
 print_error() {
-  echo -e "${RED}❌ $1${NC}"
+	echo -e "${RED}❌ $1${NC}"
 }
 
 print_warning() {
-  echo -e "${YELLOW}⚠️  $1${NC}"
+	echo -e "${YELLOW}⚠️  $1${NC}"
 }
 
 print_info() {
-  echo -e "${BLUE}ℹ️  $1${NC}"
+	echo -e "${BLUE}ℹ️  $1${NC}"
 }
 
 # =============================================================================
@@ -70,27 +71,27 @@ print_info() {
 # =============================================================================
 
 run_migration() {
-  local command=$1
-  shift
-  local args=("$@")
+	local command=$1
+	shift
+	local args=("$@")
 
-  print_header "Database Migration: $command"
+	print_header "Database Migration: $command"
 
-  # Execute migration
-  uv run python -m backend.src.database.migrations "$command" "${args[@]}"
+	# Execute migration
+	uv run python -m src.database.migrations "$command" "${args[@]}"
 
-  local exit_code=$?
+	local exit_code=$?
 
-  if [ $exit_code -eq 0 ]; then
-    print_success "Migration command completed successfully"
-  else
-    print_error "Migration command failed with exit code $exit_code"
-    exit $exit_code
-  fi
+	if [ $exit_code -eq 0 ]; then
+		print_success "Migration command completed successfully"
+	else
+		print_error "Migration command failed with exit code $exit_code"
+		exit $exit_code
+	fi
 }
 
 show_usage() {
-  cat <<EOF
+	cat <<EOF
 ${BLUE}Database Migration Script${NC}
 
 ${GREEN}Usage:${NC}
@@ -132,59 +133,59 @@ EOF
 # =============================================================================
 
 main() {
-  # Check if command is provided
-  if [ $# -eq 0 ]; then
-    show_usage
-    exit 1
-  fi
+	# Check if command is provided
+	if [ $# -eq 0 ]; then
+		show_usage
+		exit 1
+	fi
 
-  local command=$1
-  shift
+	local command=$1
+	shift
 
-  case "$command" in
-    status)
-      run_migration "status" "$@"
-      ;;
-    up)
-      if [ $# -eq 0 ]; then
-        print_info "Executing all pending migrations..."
-        run_migration "up"
-      else
-        print_info "Executing migrations up to version: $1"
-        run_migration "up" "$1"
-      fi
-      ;;
-    down)
-      if [ $# -eq 0 ]; then
-        print_error "Target version required for down migration"
-        echo "Usage: ./scripts/db_migrate.sh down <version>"
-        exit 1
-      fi
-      print_warning "Rolling back to version: $1"
-      run_migration "down" "$1"
-      ;;
-    reset)
-      print_warning "This will reset the entire database!"
-      read -p "Are you sure? Type 'YES' to confirm: " -r
-      echo
-      if [[ $REPLY == "YES" ]]; then
-        print_info "Resetting database..."
-        run_migration "reset"
-      else
-        print_info "Reset cancelled"
-        exit 0
-      fi
-      ;;
-    help | --help | -h)
-      show_usage
-      ;;
-    *)
-      print_error "Unknown command: $command"
-      echo
-      show_usage
-      exit 1
-      ;;
-  esac
+	case "$command" in
+	status)
+		run_migration "status" "$@"
+		;;
+	up)
+		if [ $# -eq 0 ]; then
+			print_info "Executing all pending migrations..."
+			run_migration "up"
+		else
+			print_info "Executing migrations up to version: $1"
+			run_migration "up" "$1"
+		fi
+		;;
+	down)
+		if [ $# -eq 0 ]; then
+			print_error "Target version required for down migration"
+			echo "Usage: ./scripts/db_migrate.sh down <version>"
+			exit 1
+		fi
+		print_warning "Rolling back to version: $1"
+		run_migration "down" "$1"
+		;;
+	reset)
+		print_warning "This will reset the entire database!"
+		read -p "Are you sure? Type 'YES' to confirm: " -r
+		echo
+		if [[ $REPLY == "YES" ]]; then
+			print_info "Resetting database..."
+			run_migration "reset"
+		else
+			print_info "Reset cancelled"
+			exit 0
+		fi
+		;;
+	help | --help | -h)
+		show_usage
+		;;
+	*)
+		print_error "Unknown command: $command"
+		echo
+		show_usage
+		exit 1
+		;;
+	esac
 }
 
 # Execute main function

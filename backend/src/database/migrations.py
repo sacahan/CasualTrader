@@ -270,12 +270,28 @@ class RenameSymbolToTickerMigration:
         """SQLite 特定的遷移邏輯 (需要重建表)"""
         logging.info("Executing SQLite migration...")
 
-        # Step 1: 備份現有表
+        # Step 1: 備份現有表（如果還沒有備份的話）
         await conn.execute(
             text("CREATE TABLE IF NOT EXISTS agent_holdings_backup AS SELECT * FROM agent_holdings")
         )
         await conn.execute(
             text("CREATE TABLE IF NOT EXISTS transactions_backup AS SELECT * FROM transactions")
+        )
+
+        # Step 1.5: 檢查備份表的欄位結構
+        # 檢查agent_holdings_backup表是否有symbol欄位還是ticker欄位
+        holdings_columns = await conn.execute(text("PRAGMA table_info(agent_holdings_backup)"))
+        holdings_column_names = [row[1] for row in holdings_columns.fetchall()]
+
+        transactions_columns = await conn.execute(text("PRAGMA table_info(transactions_backup)"))
+        transactions_column_names = [row[1] for row in transactions_columns.fetchall()]
+
+        # 決定使用哪個欄位名稱
+        holdings_symbol_column = "symbol" if "symbol" in holdings_column_names else "ticker"
+        transactions_symbol_column = "symbol" if "symbol" in transactions_column_names else "ticker"
+
+        logging.info(
+            f"Using column '{holdings_symbol_column}' for holdings backup, '{transactions_symbol_column}' for transactions backup"
         )
 
         # Step 2: 重建 agent_holdings 表
@@ -300,16 +316,13 @@ class RenameSymbolToTickerMigration:
             )
         )
 
-        # 遷移 holdings 數據
-        await conn.execute(
-            text(
-                """
+        # 遷移 holdings 數據，使用動態偵測的欄位名稱
+        holdings_insert_query = f"""
             INSERT INTO agent_holdings (id, agent_id, ticker, company_name, quantity, average_cost, total_cost, created_at, updated_at)
-            SELECT id, agent_id, symbol, company_name, quantity, average_cost, total_cost, created_at, updated_at
+            SELECT id, agent_id, {holdings_symbol_column}, company_name, quantity, average_cost, total_cost, created_at, updated_at
             FROM agent_holdings_backup
         """
-            )
-        )
+        await conn.execute(text(holdings_insert_query))
 
         # 重建 holdings 索引和觸發器
         await conn.execute(text("CREATE INDEX idx_holdings_agent_id ON agent_holdings(agent_id)"))
@@ -354,18 +367,15 @@ class RenameSymbolToTickerMigration:
             )
         )
 
-        # 遷移 transactions 數據 (只複製實際存在的欄位)
-        await conn.execute(
-            text(
-                """
+        # 遷移 transactions 數據，使用動態偵測的欄位名稱
+        transactions_insert_query = f"""
             INSERT INTO transactions (id, agent_id, session_id, ticker, company_name, action, quantity, price, total_amount, commission,
                    status, execution_time, decision_reason, market_data, created_at)
-            SELECT id, agent_id, session_id, symbol, company_name, action, quantity, price, total_amount, commission,
+            SELECT id, agent_id, session_id, {transactions_symbol_column}, company_name, action, quantity, price, total_amount, commission,
                    status, execution_time, decision_reason, market_data, created_at
             FROM transactions_backup
         """
-            )
-        )
+        await conn.execute(text(transactions_insert_query))
 
         # 重建 transactions 索引
         await conn.execute(text("CREATE INDEX idx_transactions_agent_id ON transactions(agent_id)"))
@@ -566,6 +576,58 @@ class RenameSymbolToTickerMigration:
 # ==========================================
 
 
+class AddAgentColorMigration:
+    """新增 Agent 顏色欄位 (v1.4.0)"""
+
+    version = "1.4.0"
+    name = "add_agent_color"
+    description = "Add color field to agents table for UI customization"
+
+    async def up(self, engine: AsyncEngine) -> None:
+        """新增 color 欄位"""
+        logging.info("Adding color column to agents table...")
+
+        async with engine.begin() as conn:
+            # 檢查是否為 SQLite
+            if "sqlite" in str(engine.url):
+                # SQLite 不支援 ALTER TABLE ADD COLUMN IF NOT EXISTS
+                # 需要先檢查欄位是否存在
+                result = await conn.execute(text("PRAGMA table_info(agents)"))
+                columns = [row[1] for row in result.fetchall()]
+
+                if "color" not in columns:
+                    await conn.execute(
+                        text("ALTER TABLE agents ADD COLUMN color TEXT DEFAULT '34, 197, 94'")
+                    )
+                    logging.info("Color column added successfully")
+                else:
+                    logging.info("Color column already exists, skipping")
+            else:
+                # PostgreSQL 支援 IF NOT EXISTS
+                await conn.execute(
+                    text(
+                        """
+                    ALTER TABLE agents
+                    ADD COLUMN IF NOT EXISTS color VARCHAR(20) DEFAULT '34, 197, 94'
+                    """
+                    )
+                )
+                logging.info("Color column added successfully")
+
+    async def down(self, engine: AsyncEngine) -> None:
+        """移除 color 欄位"""
+        logging.info("Removing color column from agents table...")
+
+        async with engine.begin() as conn:
+            if "sqlite" in str(engine.url):
+                # SQLite 需要重建表來移除欄位
+                await conn.execute(text("ALTER TABLE agents DROP COLUMN color"))
+            else:
+                await conn.execute(text("ALTER TABLE agents DROP COLUMN IF EXISTS color"))
+
+        logging.info("Color column removed successfully")
+
+
 class DatabaseMigrationManager:
     """資料庫遷移管理器 - 使用 Python 3.12+ 語法"""
 
@@ -577,6 +639,7 @@ class DatabaseMigrationManager:
             AddPerformanceIndexesMigration(),
             AddAIModelConfigMigration(),
             RenameSymbolToTickerMigration(),
+            AddAgentColorMigration(),
         ]
 
         # Setup logging

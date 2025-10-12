@@ -46,7 +46,12 @@ export async function loadAgents() {
 
   try {
     const data = await apiClient.getAgents();
-    agents.set(data.agents || []);
+    // 映射後端的 id 欄位到前端的 agent_id
+    const mappedAgents = (data.agents || []).map((agent) => ({
+      ...agent,
+      agent_id: agent.id || agent.agent_id,
+    }));
+    agents.set(mappedAgents);
   } catch (err) {
     error.set(extractErrorMessage(err));
     console.error('Failed to load agents:', err);
@@ -63,7 +68,12 @@ export async function loadAgent(agentId) {
   error.set(null);
 
   try {
-    const agent = await apiClient.getAgent(agentId);
+    const rawAgent = await apiClient.getAgent(agentId);
+    // 映射後端的 id 欄位到前端的 agent_id
+    const agent = {
+      ...rawAgent,
+      agent_id: rawAgent.id || rawAgent.agent_id,
+    };
 
     // 更新 agents 列表中的對應項目
     agents.update((list) => {
@@ -94,7 +104,12 @@ export async function createAgent(agentData) {
   error.set(null);
 
   try {
-    const newAgent = await apiClient.createAgent(agentData);
+    const rawAgent = await apiClient.createAgent(agentData);
+    // 映射後端的 id 欄位到前端的 agent_id
+    const newAgent = {
+      ...rawAgent,
+      agent_id: rawAgent.id || rawAgent.agent_id,
+    };
 
     // 添加到 agents 列表
     agents.update((list) => [...list, newAgent]);
@@ -130,7 +145,12 @@ export async function updateAgent(agentId, updates) {
   }
 
   try {
-    const updatedAgent = await apiClient.updateAgent(agentId, updates);
+    const rawAgent = await apiClient.updateAgent(agentId, updates);
+    // 映射後端的 id 欄位到前端的 agent_id
+    const updatedAgent = {
+      ...rawAgent,
+      agent_id: rawAgent.id || rawAgent.agent_id,
+    };
 
     // 更新 agents 列表
     agents.update((list) => list.map((a) => (a.agent_id === agentId ? updatedAgent : a)));

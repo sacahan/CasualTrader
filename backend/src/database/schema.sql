@@ -14,6 +14,7 @@ CREATE TABLE IF NOT EXISTS agents (
     description TEXT,                       -- Agent 描述
     instructions TEXT NOT NULL,             -- Agent 完整指令 (Prompt)
     model TEXT NOT NULL DEFAULT 'gpt-4o-mini', -- AI 模型選擇
+    color TEXT DEFAULT '34, 197, 94',       -- UI 卡片顏色 (RGB 格式)
 
     -- 投資配置
     initial_funds DECIMAL(15,2) NOT NULL,   -- 初始資金
