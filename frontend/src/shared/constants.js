@@ -52,38 +52,6 @@ export const AGENT_RUNTIME_STATUS_LABELS = {
   [AGENT_RUNTIME_STATUS.STOPPED]: '已停止',
 };
 
-// AI Models
-export const AI_MODELS = {
-  GPT_4O: 'gpt-4o',
-  GPT_4O_MINI: 'gpt-4o-mini',
-  GPT_4_TURBO: 'gpt-4-turbo',
-  CLAUDE_SONNET_4_5: 'claude-sonnet-4.5',
-  CLAUDE_OPUS_4: 'claude-opus-4',
-  GEMINI_2_5_PRO: 'gemini-2.5-pro',
-  GEMINI_2_0_FLASH: 'gemini-2.0-flash',
-  DEEPSEEK_V3: 'deepseek-v3',
-  GROK_2: 'grok-2',
-};
-
-export const AI_MODEL_LABELS = {
-  [AI_MODELS.GPT_4O]: 'GPT-4o',
-  [AI_MODELS.GPT_4O_MINI]: 'GPT-4o Mini',
-  [AI_MODELS.GPT_4_TURBO]: 'GPT-4 Turbo',
-  [AI_MODELS.CLAUDE_SONNET_4_5]: 'Claude Sonnet 4.5',
-  [AI_MODELS.CLAUDE_OPUS_4]: 'Claude Opus 4',
-  [AI_MODELS.GEMINI_2_5_PRO]: 'Gemini 2.5 Pro',
-  [AI_MODELS.GEMINI_2_0_FLASH]: 'Gemini 2.0 Flash',
-  [AI_MODELS.DEEPSEEK_V3]: 'DeepSeek V3',
-  [AI_MODELS.GROK_2]: 'Grok 2',
-};
-
-export const AI_MODEL_GROUPS = {
-  OpenAI: [AI_MODELS.GPT_4O, AI_MODELS.GPT_4O_MINI, AI_MODELS.GPT_4_TURBO],
-  'Anthropic Claude': [AI_MODELS.CLAUDE_SONNET_4_5, AI_MODELS.CLAUDE_OPUS_4],
-  'Google Gemini': [AI_MODELS.GEMINI_2_5_PRO, AI_MODELS.GEMINI_2_0_FLASH],
-  其他: [AI_MODELS.DEEPSEEK_V3, AI_MODELS.GROK_2],
-};
-
 // Strategy Change Types
 export const CHANGE_TYPES = {
   AUTO: 'auto',
@@ -113,7 +81,7 @@ export const MARKET_HOURS = {
 
 // Default Values
 export const DEFAULT_INITIAL_FUNDS = 1000000;
-export const DEFAULT_MAX_POSITION_SIZE = 5;
+export const DEFAULT_MAX_POSITION_SIZE = 50;
 export const MAX_RECONNECT_ATTEMPTS = 5;
 export const RECONNECT_DELAY_MS = 1000;
 

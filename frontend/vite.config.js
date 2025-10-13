@@ -39,5 +39,8 @@ export default defineConfig(({ mode }) => {
         },
       },
     },
+    esbuild: {
+      sourcemap: true, // ✅ 有時開發中這也可確保 map 保留
+    },
   };
 });

@@ -130,7 +130,8 @@ class AgentDatabaseService:
             name=agent_state.name,
             description=config.description,
             instructions=config.instructions,
-            model=config.model,
+            ai_model=config.ai_model,
+            color_theme=config.color_theme,  # 添加 color_theme 字段
             initial_funds=config.initial_funds,
             max_position_size=config.investment_preferences.max_position_size,
             status=agent_state.status.value,
@@ -157,6 +158,7 @@ class AgentDatabaseService:
         db_agent.name = agent_state.name
         db_agent.description = config.description
         db_agent.instructions = config.instructions
+        db_agent.color_theme = config.color_theme  # 添加 color_theme 字段更新
         db_agent.status = agent_state.status.value
         db_agent.current_mode = agent_state.current_mode.value
         db_agent.config = self._serialize_config(config)
@@ -208,7 +210,8 @@ class AgentDatabaseService:
             name=db_agent.name,
             description=db_agent.description or "",
             instructions=db_agent.instructions,
-            model=db_agent.model,
+            ai_model=db_agent.ai_model,
+            color_theme=db_agent.color_theme or "34, 197, 94",  # 添加 color_theme 字段，提供預設值
             initial_funds=db_agent.initial_funds,
             strategy_adjustment_criteria=db_agent.strategy_adjustment_criteria or "",
         )
@@ -672,7 +675,7 @@ class AgentDatabaseService:
     def _serialize_config(self, config: AgentConfig) -> str:
         """序列化 Agent 配置"""
         config_dict = {
-            "model": config.model,
+            "ai_model": config.ai_model,
             "max_turns": config.max_turns,
             "execution_timeout": config.execution_timeout,
             "enabled_tools": config.enabled_tools,

@@ -40,7 +40,7 @@
     initial_funds: DEFAULT_INITIAL_FUNDS.toString(),
     max_position_size: DEFAULT_MAX_POSITION_SIZE.toString(),
     ai_model: 'gpt-5-mini', // 默認模型,將在 onMount 中驗證
-    color: '34, 197, 94', // 預設綠色
+    color_theme: '34, 197, 94', // 預設綠色
   });
 
   // 預設顏色選項
@@ -84,26 +84,26 @@
   // 處理自定義顏色選擇
   function handleCustomColorChange(event) {
     customColor = event.target.value;
-    formData.color = hexToRgb(customColor);
+    formData.color_theme = hexToRgb(customColor);
   }
 
   // 處理預設顏色選擇
   function handlePresetColorSelect(colorValue) {
-    formData.color = colorValue;
+    formData.color_theme = colorValue;
     // 不自動更新 customColor，讓使用者可以獨立使用兩種選擇方式
   }
 
-  // 同步 customColor 和 formData.color（避免無限迴圈）
+  // 同步 customColor 和 formData.color_theme（避免無限迴圈）
   let lastFormDataColor = $state('');
   $effect(() => {
-    // 只有當 formData.color 真的改變時才處理
-    if (formData.color !== lastFormDataColor) {
-      lastFormDataColor = formData.color;
+    // 只有當 formData.color_theme 真的改變時才處理
+    if (formData.color_theme !== lastFormDataColor) {
+      lastFormDataColor = formData.color_theme;
 
-      const isPresetColor = colorOptions.some((option) => option.value === formData.color);
+      const isPresetColor = colorOptions.some((option) => option.value === formData.color_theme);
       if (!isPresetColor) {
         // 如果當前顏色不是預設選項，則更新 customColor 以匹配
-        const newHex = rgbToHex(formData.color);
+        const newHex = rgbToHex(formData.color_theme);
         if (newHex !== customColor) {
           customColor = newHex;
         }
@@ -117,7 +117,7 @@
     description: '',
     initial_funds: '',
     max_position_size: '',
-    color: '',
+    color_theme: '',
   });
 
   // 提交狀態
@@ -140,35 +140,32 @@
         description: agent.description || agent.strategy_prompt || '',
         initial_funds: (agent.initial_funds || DEFAULT_INITIAL_FUNDS).toString(),
         max_position_size: (
-          (agent.investment_preferences?.max_position_size || DEFAULT_MAX_POSITION_SIZE / 100) * 100
+          agent.investment_preferences?.max_position_size || DEFAULT_MAX_POSITION_SIZE
         ).toString(),
         ai_model: agent.ai_model || 'gpt-5-mini',
-        color: agent.color || '34, 197, 94',
+        color_theme: agent.color_theme || '34, 197, 94',
       };
 
       // 在編輯模式下，同步 customColor
-      customColor = rgbToHex(formData.color);
+      //customColor = rgbToHex(formData.color_theme);
     } else {
       // 創建模式 - 使用預設值
       resetForm();
     }
   }
 
-  // 監聽 agent 屬性變化，重新初始化表單（避免不必要的重新初始化）
-  let lastAgentId = $state(agent?.agent_id);
+  // 只在 agent prop 變化時初始化表單數據
   $effect(() => {
-    // 只有當 agent 真的改變時才重新初始化
-    const currentAgentId = agent?.agent_id;
-    if (currentAgentId !== lastAgentId) {
-      lastAgentId = currentAgentId;
-      initializeFormData();
-    }
+    // 明確依賴 agent，避免因 formData 變化導致無限循環
+    agent;
+    initializeFormData();
   });
 
   // 在組件掛載時加載模型列表
   onMount(async () => {
     await loadModels();
   });
+
   // 函數定義 - 移到根層級以符合 eslint no-inner-declarations 規則
   function validateForm() {
     let isValid = true;
@@ -177,7 +174,7 @@
       description: '',
       initial_funds: '',
       max_position_size: '',
-      color: '',
+      color_theme: '',
     };
 
     if (!formData.name.trim()) {
@@ -203,13 +200,14 @@
     }
 
     // 驗證顏色格式 (R, G, B)
-    if (formData.color && !/^\d{1,3},\s*\d{1,3},\s*\d{1,3}$/.test(formData.color)) {
-      errors.color = '請輸入正確的 RGB 格式，例如: 34, 197, 94';
+    if (formData.color_theme && !/^\d{1,3},\s*\d{1,3},\s*\d{1,3}$/.test(formData.color_theme)) {
+      errors.color_theme = '請輸入正確的 RGB 格式，例如: 34, 197, 94';
       isValid = false;
     }
 
     return isValid;
   }
+
   async function handleSubmit() {
     if (!validateForm()) {
       return;
@@ -224,11 +222,11 @@
         strategy_prompt: formData.description.trim(), // 完整策略指令，用於 Agent 執行
         initial_funds: parseFloat(formData.initial_funds),
         ai_model: formData.ai_model,
-        color: formData.color, // 卡片顏色
+        color_theme: formData.color_theme, // 卡片顏色
         investment_preferences: {
           preferred_sectors: [],
           excluded_tickers: [],
-          max_position_size: parseFloat(formData.max_position_size) / 100, // Convert percentage to decimal
+          max_position_size: parseInt(formData.max_position_size), // Convert to integer percentage
           rebalance_frequency: 'weekly',
         },
       };
@@ -261,6 +259,7 @@
       submitting = false;
     }
   }
+
   function resetForm() {
     formData = {
       name: '',
@@ -268,19 +267,20 @@
       initial_funds: DEFAULT_INITIAL_FUNDS.toString(),
       max_position_size: DEFAULT_MAX_POSITION_SIZE.toString(),
       ai_model: 'gpt-5-mini', // 與初始值一致
-      color: '34, 197, 94', // 預設綠色
+      color_theme: '34, 197, 94', // 預設綠色
     };
     errors = {
       name: '',
       description: '',
       initial_funds: '',
       max_position_size: '',
-      color: '',
+      color_theme: '',
     };
 
     // 重置 customColor 為預設綠色
     customColor = '#22c55e';
   }
+
   function handleCancel() {
     if (!isEditMode) {
       resetForm();
@@ -369,10 +369,10 @@
         <button
           type="button"
           class="flex items-center gap-2 rounded-lg border-2 p-3 transition-all hover:scale-105"
-          class:border-gray-300={formData.color !== option.value}
-          class:border-blue-500={formData.color === option.value}
-          class:ring-2={formData.color === option.value}
-          class:ring-blue-500={formData.color === option.value}
+          class:border-gray-300={formData.color_theme !== option.value}
+          class:border-blue-500={formData.color_theme === option.value}
+          class:ring-2={formData.color_theme === option.value}
+          class:ring-blue-500={formData.color_theme === option.value}
           onclick={() => handlePresetColorSelect(option.value)}
         >
           <div class="h-8 w-8 rounded-full" style="background-color: rgb({option.value});"></div>
@@ -392,13 +392,16 @@
           class="h-8 w-8 rounded border border-gray-300 cursor-pointer"
           title="選擇自定義顏色"
         />
-        <div class="h-8 w-8 rounded-full" style="background-color: rgb({formData.color});"></div>
+        <div
+          class="h-8 w-8 rounded-full"
+          style="background-color: rgb({formData.color_theme});"
+        ></div>
         <span class="text-sm font-medium text-gray-300">自定義顏色</span>
       </div>
     </div>
 
-    {#if errors.color}
-      <p class="mt-1 text-sm text-red-600">{errors.color}</p>
+    {#if errors.color_theme}
+      <p class="mt-1 text-sm text-red-600">{errors.color_theme}</p>
     {/if}
   </fieldset>
 

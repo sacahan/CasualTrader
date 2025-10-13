@@ -277,8 +277,6 @@
       holdings={agentHoldings[$selectedAgent.agent_id] || []}
       transactions={agentTransactions[$selectedAgent.agent_id] || []}
       onclose={handleDetailModalClose}
-      onedit={handleAgentEdit}
-      ondelete={handleDeleteAgent}
     />
   {/if}
 

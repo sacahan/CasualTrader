@@ -10,7 +10,6 @@
   import { Button, Modal } from '../UI/index.js';
   import { PerformanceChart } from '../Chart/index.js';
   import { formatCurrency, formatDateTime } from '../../shared/utils.js';
-  import { AI_MODEL_LABELS } from '../../shared/constants.js';
 
   // Props
   let {
@@ -30,7 +29,7 @@
   let isProfit = $derived(pnl >= 0);
 
   // Agent 顏色
-  let agentColor = $derived(agent?.color || '34, 197, 94');
+  let agentColor = $derived(agent?.color_theme || '34, 197, 94');
 
   function handleClose() {
     onclose?.();
@@ -69,12 +68,14 @@
     <div class="grid grid-cols-1 gap-6 lg:grid-cols-2">
       <!-- 基本資訊 -->
       <div class="rounded-lg border border-gray-700 bg-gray-800 p-4">
-        <h3 class="mb-3 text-lg font-semibold text-white">基本資訊</h3>
+        <h3 class="mb-3 text-lg font-semibold text-white" style="color: rgb({agentColor});">
+          基本資訊
+        </h3>
         <div class="space-y-3 text-sm">
           <div>
             <p class="text-gray-400">AI 模型</p>
             <p class="font-medium text-white">
-              {AI_MODEL_LABELS[agent?.ai_model] || agent?.ai_model}
+              {agent?.ai_model || '未知模型'}
             </p>
           </div>
           <div>
@@ -102,7 +103,9 @@
 
       <!-- 資產概覽 -->
       <div class="rounded-lg border border-gray-700 bg-gray-800 p-4">
-        <h3 class="mb-3 text-lg font-semibold text-white">資產概覽</h3>
+        <h3 class="mb-3 text-lg font-semibold text-white" style="color: rgb({agentColor});">
+          資產概覽
+        </h3>
         <div class="space-y-4">
           <div>
             <p class="text-sm text-gray-400">總資產</p>
@@ -125,13 +128,17 @@
 
     <!-- 績效圖表 -->
     <div class="rounded-lg border border-gray-700 bg-gray-800 p-4">
-      <h3 class="mb-3 text-lg font-semibold text-white">績效走勢</h3>
+      <h3 class="mb-3 text-lg font-semibold text-white" style="color: rgb({agentColor});">
+        績效走勢
+      </h3>
       <PerformanceChart agentId={agent?.agent_id} {performanceData} height={300} />
     </div>
 
     <!-- 持倉詳情 -->
     <div class="rounded-lg border border-gray-700 bg-gray-800 p-4">
-      <h3 class="mb-3 text-lg font-semibold text-white">持倉詳情</h3>
+      <h3 class="mb-3 text-lg font-semibold text-white" style="color: rgb({agentColor});">
+        持倉詳情
+      </h3>
       {#if holdings && holdings.length > 0}
         <div class="space-y-2">
           {#each holdings as holding}
@@ -158,7 +165,9 @@
 
     <!-- 交易歷史 -->
     <div class="rounded-lg border border-gray-700 bg-gray-800 p-4">
-      <h3 class="mb-3 text-lg font-semibold text-white">交易歷史</h3>
+      <h3 class="mb-3 text-lg font-semibold text-white" style="color: rgb({agentColor});">
+        交易歷史
+      </h3>
       {#if transactions && transactions.length > 0}
         <div class="custom-scrollbar max-h-64 space-y-2 overflow-y-auto">
           {#each transactions as tx}

@@ -628,6 +628,283 @@ class AddAgentColorMigration:
         logging.info("Color column removed successfully")
 
 
+class RenameColorToColorThemeMigration:
+    """重命名 color 欄位為 color_theme (v1.5.0)"""
+
+    version = "1.5.0"
+    name = "rename_color_to_color_theme"
+    description = "Rename color column to color_theme for consistency"
+
+    async def up(self, engine: AsyncEngine) -> None:
+        """重命名 color 欄位為 color_theme"""
+        logging.info("Renaming color column to color_theme in agents table...")
+
+        async with engine.begin() as conn:
+            if "sqlite" in str(engine.url):
+                # SQLite 不支援 RENAME COLUMN，需要重建表
+                logging.info("SQLite detected: Recreating table with color_theme column...")
+
+                # 創建新表結構
+                await conn.execute(
+                    text("""
+                    CREATE TABLE agents_new (
+                        id TEXT PRIMARY KEY,
+                        name TEXT NOT NULL,
+                        description TEXT,
+                        instructions TEXT NOT NULL,
+                        model TEXT DEFAULT 'gpt-4o-mini',
+                        color_theme TEXT DEFAULT '34, 197, 94',
+                        initial_funds DECIMAL(15,2) NOT NULL,
+                        max_position_size DECIMAL(5,2) DEFAULT 5.0,
+                        status TEXT DEFAULT 'inactive',
+                        current_mode TEXT DEFAULT 'observation',
+                        config TEXT,
+                        investment_preferences TEXT,
+                        strategy_adjustment_criteria TEXT,
+                        auto_adjust_settings TEXT,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        last_active_at TIMESTAMP
+                    )
+                """)
+                )
+
+                # 複製資料（將 color 映射到 color_theme）
+                await conn.execute(
+                    text("""
+                    INSERT INTO agents_new (
+                        id, name, description, instructions, model, color_theme,
+                        initial_funds, max_position_size, status, current_mode,
+                        config, investment_preferences, strategy_adjustment_criteria,
+                        auto_adjust_settings, created_at, updated_at, last_active_at
+                    )
+                    SELECT
+                        id, name, description, instructions, model, color,
+                        initial_funds, max_position_size, status, current_mode,
+                        config, investment_preferences, strategy_adjustment_criteria,
+                        auto_adjust_settings, created_at, updated_at, last_active_at
+                    FROM agents
+                """)
+                )
+
+                # 刪除舊表，重命名新表
+                await conn.execute(text("DROP TABLE agents"))
+                await conn.execute(text("ALTER TABLE agents_new RENAME TO agents"))
+
+                logging.info("SQLite table recreated with color_theme column")
+            else:
+                # PostgreSQL 支援 RENAME COLUMN
+                await conn.execute(
+                    text("""
+                    ALTER TABLE agents
+                    RENAME COLUMN color TO color_theme
+                """)
+                )
+                logging.info("PostgreSQL column renamed successfully")
+
+        logging.info("Color column renamed to color_theme successfully")
+
+    async def down(self, engine: AsyncEngine) -> None:
+        """回退：將 color_theme 重命名回 color"""
+        logging.info("Renaming color_theme column back to color in agents table...")
+
+        async with engine.begin() as conn:
+            if "sqlite" in str(engine.url):
+                # SQLite 重建表
+                await conn.execute(
+                    text("""
+                    CREATE TABLE agents_new (
+                        id TEXT PRIMARY KEY,
+                        name TEXT NOT NULL,
+                        description TEXT,
+                        instructions TEXT NOT NULL,
+                        model TEXT DEFAULT 'gpt-4o-mini',
+                        color TEXT DEFAULT '34, 197, 94',
+                        initial_funds DECIMAL(15,2) NOT NULL,
+                        max_position_size DECIMAL(5,2) DEFAULT 5.0,
+                        status TEXT DEFAULT 'inactive',
+                        current_mode TEXT DEFAULT 'observation',
+                        config TEXT,
+                        investment_preferences TEXT,
+                        strategy_adjustment_criteria TEXT,
+                        auto_adjust_settings TEXT,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        last_active_at TIMESTAMP
+                    )
+                """)
+                )
+
+                await conn.execute(
+                    text("""
+                    INSERT INTO agents_new (
+                        id, name, description, instructions, model, color,
+                        initial_funds, max_position_size, status, current_mode,
+                        config, investment_preferences, strategy_adjustment_criteria,
+                        auto_adjust_settings, created_at, updated_at, last_active_at
+                    )
+                    SELECT
+                        id, name, description, instructions, model, color_theme,
+                        initial_funds, max_position_size, status, current_mode,
+                        config, investment_preferences, strategy_adjustment_criteria,
+                        auto_adjust_settings, created_at, updated_at, last_active_at
+                    FROM agents
+                """)
+                )
+
+                await conn.execute(text("DROP TABLE agents"))
+                await conn.execute(text("ALTER TABLE agents_new RENAME TO agents"))
+            else:
+                await conn.execute(
+                    text("""
+                    ALTER TABLE agents
+                    RENAME COLUMN color_theme TO color
+                """)
+                )
+
+        logging.info("Color_theme column renamed back to color successfully")
+
+
+class RenameModelToAIModelMigration:
+    """重命名 model 欄位為 ai_model (v1.6.0)"""
+
+    version = "1.6.0"
+    name = "rename_model_to_ai_model"
+    description = "Rename model column to ai_model for consistency with frontend"
+
+    async def up(self, engine: AsyncEngine) -> None:
+        """重命名 model 欄位為 ai_model"""
+        logging.info("Renaming model column to ai_model in agents table...")
+
+        async with engine.begin() as conn:
+            if "sqlite" in str(engine.url):
+                # SQLite 不支援 RENAME COLUMN，需要重建表
+                logging.info("SQLite detected: Recreating table with ai_model column...")
+
+                # 創建新表結構
+                await conn.execute(
+                    text("""
+                    CREATE TABLE agents_new (
+                        id TEXT PRIMARY KEY,
+                        name TEXT NOT NULL,
+                        description TEXT,
+                        instructions TEXT NOT NULL,
+                        ai_model TEXT DEFAULT 'gpt-4o-mini',
+                        color_theme TEXT DEFAULT '34, 197, 94',
+                        initial_funds DECIMAL(15,2) NOT NULL,
+                        max_position_size DECIMAL(5,2) DEFAULT 5.0,
+                        status TEXT DEFAULT 'inactive',
+                        current_mode TEXT DEFAULT 'observation',
+                        config TEXT,
+                        investment_preferences TEXT,
+                        strategy_adjustment_criteria TEXT,
+                        auto_adjust_settings TEXT,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        last_active_at TIMESTAMP
+                    )
+                """)
+                )
+
+                # 複製資料（將 model 映射到 ai_model）
+                await conn.execute(
+                    text("""
+                    INSERT INTO agents_new (
+                        id, name, description, instructions, ai_model, color_theme,
+                        initial_funds, max_position_size, status, current_mode,
+                        config, investment_preferences, strategy_adjustment_criteria,
+                        auto_adjust_settings, created_at, updated_at, last_active_at
+                    )
+                    SELECT
+                        id, name, description, instructions, model, color_theme,
+                        initial_funds, max_position_size, status, current_mode,
+                        config, investment_preferences, strategy_adjustment_criteria,
+                        auto_adjust_settings, created_at, updated_at, last_active_at
+                    FROM agents
+                """)
+                )
+
+                # 刪除舊表並重命名新表
+                await conn.execute(text("DROP TABLE agents"))
+                await conn.execute(text("ALTER TABLE agents_new RENAME TO agents"))
+            else:
+                # 其他資料庫支援 RENAME COLUMN
+                await conn.execute(
+                    text("""
+                    ALTER TABLE agents
+                    RENAME COLUMN model TO ai_model
+                """)
+                )
+
+        logging.info("Model column renamed to ai_model successfully")
+
+    async def down(self, engine: AsyncEngine) -> None:
+        """回滾：重命名 ai_model 欄位為 model"""
+        logging.info("Renaming ai_model column back to model in agents table...")
+
+        async with engine.begin() as conn:
+            if "sqlite" in str(engine.url):
+                # SQLite 不支援 RENAME COLUMN，需要重建表
+                logging.info("SQLite detected: Recreating table with model column...")
+
+                # 創建新表結構
+                await conn.execute(
+                    text("""
+                    CREATE TABLE agents_new (
+                        id TEXT PRIMARY KEY,
+                        name TEXT NOT NULL,
+                        description TEXT,
+                        instructions TEXT NOT NULL,
+                        model TEXT DEFAULT 'gpt-4o-mini',
+                        color_theme TEXT DEFAULT '34, 197, 94',
+                        initial_funds DECIMAL(15,2) NOT NULL,
+                        max_position_size DECIMAL(5,2) DEFAULT 5.0,
+                        status TEXT DEFAULT 'inactive',
+                        current_mode TEXT DEFAULT 'observation',
+                        config TEXT,
+                        investment_preferences TEXT,
+                        strategy_adjustment_criteria TEXT,
+                        auto_adjust_settings TEXT,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        last_active_at TIMESTAMP
+                    )
+                """)
+                )
+
+                # 複製資料（將 ai_model 映射回 model）
+                await conn.execute(
+                    text("""
+                    INSERT INTO agents_new (
+                        id, name, description, instructions, model, color_theme,
+                        initial_funds, max_position_size, status, current_mode,
+                        config, investment_preferences, strategy_adjustment_criteria,
+                        auto_adjust_settings, created_at, updated_at, last_active_at
+                    )
+                    SELECT
+                        id, name, description, instructions, ai_model, color_theme,
+                        initial_funds, max_position_size, status, current_mode,
+                        config, investment_preferences, strategy_adjustment_criteria,
+                        auto_adjust_settings, created_at, updated_at, last_active_at
+                    FROM agents
+                """)
+                )
+
+                # 刪除舊表並重命名新表
+                await conn.execute(text("DROP TABLE agents"))
+                await conn.execute(text("ALTER TABLE agents_new RENAME TO agents"))
+            else:
+                # 其他資料庫支援 RENAME COLUMN
+                await conn.execute(
+                    text("""
+                    ALTER TABLE agents
+                    RENAME COLUMN ai_model TO model
+                """)
+                )
+
+        logging.info("AI_model column renamed back to model successfully")
+
+
 class DatabaseMigrationManager:
     """資料庫遷移管理器 - 使用 Python 3.12+ 語法"""
 
@@ -640,6 +917,8 @@ class DatabaseMigrationManager:
             AddAIModelConfigMigration(),
             RenameSymbolToTickerMigration(),
             AddAgentColorMigration(),
+            RenameColorToColorThemeMigration(),
+            RenameModelToAIModelMigration(),
         ]
 
         # Setup logging

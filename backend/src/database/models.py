@@ -158,8 +158,10 @@ class Agent(Base):
     name: Mapped[str] = mapped_column(String(200), nullable=False)
     description: Mapped[str | None] = mapped_column(Text)
     instructions: Mapped[str] = mapped_column(Text, nullable=False)
-    model: Mapped[str] = mapped_column(String(50), default="gpt-4o-mini")
-    color: Mapped[str] = mapped_column(String(20), default="34, 197, 94")  # RGB 格式，預設綠色
+    ai_model: Mapped[str] = mapped_column(String(50), default="gpt-4o-mini")
+    color_theme: Mapped[str] = mapped_column(
+        String(20), default="34, 197, 94"
+    )  # RGB 格式，預設綠色
 
     # 投資配置
     initial_funds: Mapped[Decimal] = mapped_column(Numeric(15, 2), nullable=False)

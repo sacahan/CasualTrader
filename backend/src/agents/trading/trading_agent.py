@@ -353,10 +353,10 @@ class TradingAgent(CasualTradingAgent):
             self.logger.debug(f"MCP Server instance: {mcp_server is not None}")
 
             # 創建 Agent
-            self.logger.info(f"Creating fundamental_agent with model={self.config.model}")
+            self.logger.info(f"Creating fundamental_agent with ai_model={self.config.ai_model}")
             fundamental_agent = await get_fundamental_agent(
                 mcp_servers=mcp_servers,
-                model_name=self.config.model,
+                model_name=self.config.ai_model,
                 shared_tools=self._get_shared_tools(),
                 max_turns=self._subagent_max_turns,
             )
@@ -393,7 +393,7 @@ class TradingAgent(CasualTradingAgent):
             # 創建 Agent
             technical_agent = await get_technical_agent(
                 mcp_servers=mcp_servers,
-                model_name=self.config.model,
+                model_name=self.config.ai_model,
                 shared_tools=self._get_shared_tools(),
                 max_turns=self._subagent_max_turns,
             )
@@ -424,7 +424,7 @@ class TradingAgent(CasualTradingAgent):
             # 創建 Agent
             risk_agent = await get_risk_agent(
                 mcp_servers=mcp_servers,
-                model_name=self.config.model,
+                model_name=self.config.ai_model,
                 shared_tools=self._get_shared_tools(),
                 max_turns=self._subagent_max_turns,
             )
@@ -455,7 +455,7 @@ class TradingAgent(CasualTradingAgent):
             # 創建 Agent
             sentiment_agent = await get_sentiment_agent(
                 mcp_servers=mcp_servers,
-                model_name=self.config.model,
+                model_name=self.config.ai_model,
                 shared_tools=self._get_shared_tools(),
                 max_turns=self._subagent_max_turns,
             )

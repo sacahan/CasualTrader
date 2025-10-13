@@ -281,10 +281,10 @@ class CasualTradingAgent(ABC):
             name=self.config.name,
             instructions=instructions,
             tools=tools,
-            model=self.config.model,
+            model=self.config.ai_model,
         )
         self.logger.info(
-            f"OpenAI Agent created with {len(tools)} tools and model {self.config.model}"
+            f"OpenAI Agent created with {len(tools)} tools and ai_model {self.config.ai_model}"
         )
 
     async def _get_model_config(self, model_key: str) -> dict[str, Any] | None:
@@ -514,7 +514,7 @@ class CasualTradingAgent(ABC):
             "config": {
                 "description": self.config.description,
                 "initial_funds": self.config.initial_funds,
-                "model": self.config.model,
+                "model": self.config.ai_model,
                 "max_turns": self.config.max_turns,
             },
         }

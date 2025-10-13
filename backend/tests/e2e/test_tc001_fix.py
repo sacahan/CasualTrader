@@ -81,13 +81,13 @@ async def test_agent_creation_with_database():
             print(f"   - ID: {agent_state.id}")
             print(f"   - Name: {agent_state.name}")
             print(f"   - Status: {agent_state.status}")
-            print(f"   - Model: {agent_state.config.model}")
+            print(f"   - AI Model: {agent_state.config.ai_model}")
             print(f"   - Initial Funds: {agent_state.config.initial_funds:,.2f}")
             print(f"   - Created At: {agent_state.created_at}")
 
             # 驗證資料正確性
             assert agent_state.name == config.name, "名稱不一致"
-            assert agent_state.config.model == config.model, "模型不一致"
+            assert agent_state.config.ai_model == config.ai_model, "AI 模型不一致"
             assert agent_state.config.initial_funds == config.initial_funds, "初始資金不一致"
 
             print("\n✅ 所有驗證通過！")

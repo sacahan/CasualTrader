@@ -139,11 +139,12 @@ async def create_agent(request: CreateAgentRequest):
             strategy_type=request.strategy_type.value,
         )
 
-        logger.debug(f"Creating AgentConfig with model={request.ai_model}")
+        logger.debug(f"Creating AgentConfig with ai_model={request.ai_model}")
         config = AgentConfig(
             name=request.name,
             description=request.description,
-            model=request.ai_model,  # 直接使用字串，不再使用 .value
+            ai_model=request.ai_model,  # 直接使用字串，不再使用 .value
+            color_theme=request.color_theme,  # 添加 color_theme 字段
             initial_funds=request.initial_funds,
             max_turns=request.max_turns,
             instructions=request.strategy_prompt,
@@ -160,9 +161,6 @@ async def create_agent(request: CreateAgentRequest):
 
         # Get created agent (now returns dict)
         agent_dict = await agent_manager.get_agent(agent_id)
-
-        # Add color_theme to agent_dict (not stored in agent config)
-        agent_dict["color_theme"] = request.color_theme
 
         # Broadcast creation event
         logger.debug(f"Broadcasting agent creation event for {agent_id}")

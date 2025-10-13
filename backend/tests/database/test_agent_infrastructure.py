@@ -41,7 +41,7 @@ async def test_agent_models() -> None:
 
     print(f"✅ Agent 配置創建成功: {config.name}")
     print(f"   初始資金: NT${config.initial_funds:,.0f}")
-    print(f"   模型: {config.model}")
+    print(f"   AI 模型: {config.ai_model}")
 
     # 測試配置驗證
     from src.agents.core.models import validate_agent_config

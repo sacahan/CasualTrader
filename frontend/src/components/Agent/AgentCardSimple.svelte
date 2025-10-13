@@ -10,6 +10,7 @@
   import { Button } from '../UI/index.js';
   import { AGENT_STATUS, AGENT_RUNTIME_STATUS } from '../../shared/constants.js';
   import { formatCurrency } from '../../shared/utils.js';
+  import { isOpen } from '../../stores/market.js';
 
   // Props
   let {
@@ -67,7 +68,7 @@
   });
 
   // Agent 顏色 (從設定中取得，預設為綠色或橙色)
-  let agentColor = $derived(agent.color || '34, 197, 94');
+  let agentColor = $derived(agent.color_theme || '34, 197, 94');
 
   // 是否可以啟動/停止
   let canStart = $derived(
@@ -205,13 +206,16 @@
       <h3 class="text-xl font-bold" style="color: rgb({agentColor});">
         {agent.name}
       </h3>
+      <div class="text-base text-gray-500 my-3" style="color: rgb({agentColor});">
+        {agent.ai_model}
+      </div>
       <div class="flex items-center gap-2 mt-1">
         {#if agent.runtime_status === AGENT_RUNTIME_STATUS.RUNNING}
           <span class="status-dot status-running"></span>
-          <span class="text-xs text-green-400">運行中</span>
+          <span class="text-sm text-green-400">運行中</span>
         {:else}
           <span class="status-dot status-stopped"></span>
-          <span class="text-xs text-gray-400">已停止</span>
+          <span class="text-sm text-gray-400">已停止</span>
         {/if}
       </div>
     </div>
@@ -311,7 +315,7 @@
 
   <!-- 操作按鈕 -->
   <div class="flex gap-3">
-    {#if canStart}
+    {#if isOpen && canStart}
       <Button
         variant="primary"
         size="md"

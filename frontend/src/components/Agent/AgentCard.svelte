@@ -8,7 +8,7 @@
    */
 
   import { Button, StatusIndicator } from '../UI/index.js';
-  import { AI_MODEL_LABELS, AGENT_STATUS, AGENT_RUNTIME_STATUS } from '../../shared/constants.js';
+  import { AGENT_STATUS, AGENT_RUNTIME_STATUS } from '../../shared/constants.js';
   import { formatCurrency, formatDateTime } from '../../shared/utils.js';
 
   // Props
@@ -77,7 +77,7 @@
   <div class="mb-4">
     <h3 class="text-lg font-semibold text-gray-900">{agent.name}</h3>
     <p class="mt-1 text-sm text-gray-500">
-      {AI_MODEL_LABELS[agent.ai_model] || agent.ai_model}
+      {agent.ai_model || '未知模型'}
     </p>
   </div>
 

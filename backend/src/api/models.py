@@ -91,7 +91,7 @@ class InvestmentPreferences(BaseModel):
 
     preferred_sectors: list[str] = Field(default_factory=list)  # 優先投資產業
     excluded_tickers: list[str] = Field(default_factory=list)  # 排除股票清單
-    max_position_size: float = Field(default=0.15, ge=0.0, le=1.0)  # 最大單一持股比例
+    max_position_size: int = Field(default=50, ge=0, le=100)  # 最大單一持股比例
     rebalance_frequency: str = "weekly"  # 再平衡頻率
 
 
@@ -114,7 +114,7 @@ class CreateAgentRequest(BaseModel):
     )  # 使用 AI 模型（從資料庫動態載入）
     strategy_type: StrategyType = Field(default=StrategyType.BALANCED)  # 投資策略類型
     strategy_prompt: str = Field(..., min_length=10)  # 策略提示語
-    color: str = Field(
+    color_theme: str = Field(
         default="34, 197, 94",
         pattern=r"^\d{1,3},\s*\d{1,3},\s*\d{1,3}$",
         description="UI 卡片顏色 (RGB 格式，例如: 34, 197, 94)",
@@ -138,7 +138,7 @@ class UpdateAgentRequest(BaseModel):
     name: str | None = Field(None, min_length=1, max_length=100)  # 代理人名稱
     description: str | None = Field(None, max_length=500)  # 代理人描述
     strategy_prompt: str | None = Field(None, min_length=10)  # 策略提示語
-    color: str | None = Field(
+    color_theme: str | None = Field(
         None,
         pattern=r"^\d{1,3},\s*\d{1,3},\s*\d{1,3}$",
         description="UI 卡片顏色 (RGB 格式)",

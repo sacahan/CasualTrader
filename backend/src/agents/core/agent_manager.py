@@ -145,7 +145,9 @@ class AgentManager:
         Returns:
             創建的 Agent ID
         """
-        self.logger.info(f"create_agent called for '{config.name}' with model '{config.model}'")
+        self.logger.info(
+            f"create_agent called for '{config.name}' with ai_model '{config.ai_model}'"
+        )
 
         # Auto-start Agent Manager if not running
         if not self._is_running:
@@ -325,7 +327,7 @@ class AgentManager:
             "id": agent.agent_id,
             "name": agent.config.name,
             "description": agent.config.description,
-            "ai_model": agent.config.model,
+            "ai_model": agent.config.ai_model,
             "strategy_type": agent.config.investment_preferences.strategy_type,
             "strategy_prompt": agent.config.instructions,
             "current_mode": str(agent.state.current_mode.value),
@@ -343,11 +345,11 @@ class AgentManager:
             "investment_preferences": {
                 "preferred_sectors": agent.config.investment_preferences.preferred_sectors,
                 "excluded_stocks": agent.config.investment_preferences.excluded_tickers,
-                "max_position_size": agent.config.investment_preferences.max_position_size
-                / 100,  # Convert back to 0-1 range
+                "max_position_size": agent.config.investment_preferences.max_position_size,
                 "rebalance_frequency": "weekly",  # Default value
             },
             "custom_instructions": agent.config.additional_instructions,
+            "color_theme": agent.config.color_theme,  # 添加 color_theme 字段
             "created_at": agent.state.created_at,
             "updated_at": agent.state.updated_at,
             "portfolio": None,
@@ -909,3 +911,134 @@ class AgentManager:
             self.logger.error(f"Error getting additional performance metrics: {e}")
 
         return performance
+
+    async def update_agent(self, agent_id: str, update_data: dict[str, Any]) -> None:
+        """
+        更新 Agent 配置
+
+        Args:
+            agent_id: Agent ID
+            update_data: 要更新的數據字典
+
+        Raises:
+            ValueError: Agent 不存在
+        """
+        if agent_id not in self._agents:
+            raise ValueError(f"Agent {agent_id} not found")
+
+        agent = self._agents[agent_id]
+
+        # 更新 Agent 配置和狀態
+        if "name" in update_data:
+            agent.config.name = update_data["name"]
+            agent.state.name = update_data["name"]
+
+        if "description" in update_data:
+            agent.config.description = update_data["description"]
+
+        if "strategy_prompt" in update_data:
+            agent.config.instructions = update_data["strategy_prompt"]
+
+        if "custom_instructions" in update_data:
+            agent.config.additional_instructions = update_data["custom_instructions"]
+
+        if "color_theme" in update_data:
+            agent.config.color_theme = update_data["color_theme"]
+
+        if "risk_tolerance" in update_data:
+            # Update risk tolerance in investment preferences
+            if hasattr(agent.config, "investment_preferences"):
+                # Convert float to risk category string
+                from .models import InvestmentPreferences
+
+                risk_category = InvestmentPreferences.risk_tolerance_from_float(
+                    update_data["risk_tolerance"]
+                )
+                agent.config.investment_preferences.risk_tolerance = risk_category
+
+        if "enabled_tools" in update_data:
+            agent.config.enabled_tools = update_data["enabled_tools"]
+
+        if "investment_preferences" in update_data:
+            # Update investment preferences
+            prefs_data = update_data["investment_preferences"]
+            if hasattr(agent.config, "investment_preferences"):
+                if "preferred_sectors" in prefs_data:
+                    agent.config.investment_preferences.preferred_sectors = prefs_data[
+                        "preferred_sectors"
+                    ]
+                if "excluded_tickers" in prefs_data:
+                    agent.config.investment_preferences.excluded_tickers = prefs_data[
+                        "excluded_tickers"
+                    ]
+                if "max_position_size" in prefs_data:
+                    agent.config.investment_preferences.max_position_size = prefs_data[
+                        "max_position_size"
+                    ]
+
+        # 更新時間戳
+        agent.state.update_activity()
+
+        # 同步狀態到資料庫
+        if self._database_service:
+            try:
+                await self._database_service.save_agent_state(agent.state)
+                self.logger.info(f"Agent {agent_id} updated and saved to database")
+            except Exception as e:
+                self.logger.error(f"Failed to save updated agent state to database: {e}")
+
+        self.logger.info(f"Agent {agent_id} configuration updated")
+
+    async def update_agent_mode(
+        self, agent_id: str, new_mode: AgentMode, reason: str = "", trigger: str = ""
+    ) -> None:
+        """
+        更新 Agent 交易模式
+
+        Args:
+            agent_id: Agent ID
+            new_mode: 新的交易模式
+            reason: 模式變更原因
+            trigger: 觸發模式變更的事件
+
+        Raises:
+            ValueError: Agent 不存在
+        """
+        if agent_id not in self._agents:
+            raise ValueError(f"Agent {agent_id} not found")
+
+        agent = self._agents[agent_id]
+        old_mode = agent.state.current_mode
+
+        # 更新模式
+        agent.state.current_mode = new_mode
+        agent.state.update_activity()
+
+        # 記錄模式變更
+        self.logger.info(
+            f"Agent {agent_id} mode changed from {old_mode.value} to {new_mode.value}. "
+            f"Reason: {reason}, Trigger: {trigger}"
+        )
+
+        # 同步狀態到資料庫
+        if self._database_service:
+            try:
+                await self._database_service.save_agent_state(agent.state)
+                self.logger.info(f"Agent {agent_id} mode updated in database")
+            except Exception as e:
+                self.logger.error(f"Failed to save agent mode change to database: {e}")
+
+        # TODO: 記錄模式變更歷史到資料庫
+        # if self._database_service and hasattr(self._database_service, 'log_mode_change'):
+        #     try:
+        #         await self._database_service.log_mode_change(
+        #             agent_id=agent_id,
+        #             old_mode=old_mode.value,
+        #             new_mode=new_mode.value,
+        #             reason=reason,
+        #             trigger=trigger
+        #         )
+        #     except Exception as e:
+        #         self.logger.error(f"Failed to log mode change: {e}")
+
+        self.logger.info(f"Agent {agent_id} mode successfully updated to {new_mode.value}")

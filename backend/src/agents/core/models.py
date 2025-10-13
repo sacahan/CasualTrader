@@ -136,7 +136,8 @@ class AgentConfig:
     name: str
     description: str
     agent_type: str = "trading"
-    model: str = "gpt-4o-mini"
+    ai_model: str = "gpt-4o-mini"
+    color_theme: str = "34, 197, 94"  # UI 顏色主題 (RGB 格式)
 
     # 資金配置
     initial_funds: float = 1000000.0
