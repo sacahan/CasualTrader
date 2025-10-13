@@ -241,6 +241,8 @@ async def update_agent(agent_id: str, request: UpdateAgentRequest):
             update_data["investment_preferences"] = request.investment_preferences.model_dump()
         if request.custom_instructions is not None:
             update_data["custom_instructions"] = request.custom_instructions
+        if request.ai_model is not None:
+            update_data["ai_model"] = request.ai_model
 
         # Apply updates
         await agent_manager.update_agent(agent_id, update_data)

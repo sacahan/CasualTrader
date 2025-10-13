@@ -158,6 +158,7 @@ class AgentDatabaseService:
         db_agent.name = agent_state.name
         db_agent.description = config.description
         db_agent.instructions = config.instructions
+        db_agent.ai_model = config.ai_model
         db_agent.color_theme = config.color_theme  # 添加 color_theme 字段更新
         db_agent.status = agent_state.status.value
         db_agent.current_mode = agent_state.current_mode.value

@@ -912,13 +912,13 @@ class AgentManager:
 
         return performance
 
-    async def update_agent(self, agent_id: str, update_data: dict[str, Any]) -> None:
+    async def update_agent_config(self, agent_id: str, config_updates: dict[str, Any]) -> None:
         """
         更新 Agent 配置
 
         Args:
             agent_id: Agent ID
-            update_data: 要更新的數據字典
+            config_updates: 配置更新數據
 
         Raises:
             ValueError: Agent 不存在
@@ -927,67 +927,176 @@ class AgentManager:
             raise ValueError(f"Agent {agent_id} not found")
 
         agent = self._agents[agent_id]
+        config_changed = False
 
-        # 更新 Agent 配置和狀態
+        # 更新基本配置
+        if "name" in config_updates:
+            agent.config.name = config_updates["name"]
+            config_changed = True
+
+        if "description" in config_updates:
+            agent.config.description = config_updates["description"]
+            config_changed = True
+
+        if "strategy_prompt" in config_updates:
+            agent.config.instructions = config_updates["strategy_prompt"]
+            config_changed = True
+
+        if "custom_instructions" in config_updates:
+            agent.config.additional_instructions = config_updates["custom_instructions"]
+            config_changed = True
+
+        if "color_theme" in config_updates:
+            agent.config.color_theme = config_updates["color_theme"]
+            config_changed = True
+
+        if "ai_model" in config_updates:
+            agent.config.ai_model = config_updates["ai_model"]
+            config_changed = True
+
+        # 更新風險容忍度
+        if "risk_tolerance" in config_updates:
+            from .models import InvestmentPreferences
+
+            risk_category = InvestmentPreferences.risk_tolerance_from_float(
+                config_updates["risk_tolerance"]
+            )
+            agent.config.investment_preferences.risk_tolerance = risk_category
+            config_changed = True
+
+        # 更新工具配置
+        if "enabled_tools" in config_updates:
+            agent.config.enabled_tools = config_updates["enabled_tools"]
+            config_changed = True
+
+        # 更新投資偏好
+        if "investment_preferences" in config_updates:
+            prefs_data = config_updates["investment_preferences"]
+            if "preferred_sectors" in prefs_data:
+                agent.config.investment_preferences.preferred_sectors = prefs_data[
+                    "preferred_sectors"
+                ]
+                config_changed = True
+            if "excluded_tickers" in prefs_data:
+                agent.config.investment_preferences.excluded_tickers = prefs_data[
+                    "excluded_tickers"
+                ]
+                config_changed = True
+            if "max_position_size" in prefs_data:
+                agent.config.investment_preferences.max_position_size = prefs_data[
+                    "max_position_size"
+                ]
+                config_changed = True
+
+        # 如果配置有變更，同步到狀態並保存
+        if config_changed:
+            await self._sync_config_to_state_and_persist(agent)
+
+        self.logger.info(f"Agent {agent_id} configuration updated")
+
+    async def update_agent_state(self, agent_id: str, state_updates: dict[str, Any]) -> None:
+        """
+        更新 Agent 狀態
+
+        Args:
+            agent_id: Agent ID
+            state_updates: 狀態更新數據
+
+        Raises:
+            ValueError: Agent 不存在
+        """
+        if agent_id not in self._agents:
+            raise ValueError(f"Agent {agent_id} not found")
+
+        agent = self._agents[agent_id]
+        state_changed = False
+
+        # 更新狀態欄位
+        if "name" in state_updates:
+            agent.state.name = state_updates["name"]
+            state_changed = True
+
+        # 如果狀態有變更，保存到資料庫
+        if state_changed:
+            agent.state.update_activity()
+            await self._persist_agent_state(agent)
+
+        self.logger.info(f"Agent {agent_id} state updated")
+
+    async def update_agent(self, agent_id: str, update_data: dict[str, Any]) -> None:
+        """
+        更新 Agent（配置和狀態的統一入口）
+
+        Args:
+            agent_id: Agent ID
+            update_data: 更新數據字典
+
+        Raises:
+            ValueError: Agent 不存在
+        """
+        # 分離配置更新和狀態更新
+        config_updates = {}
+        state_updates = {}
+
+        # 配置相關的更新
+        config_fields = {
+            "description",
+            "strategy_prompt",
+            "custom_instructions",
+            "color_theme",
+            "ai_model",
+            "risk_tolerance",
+            "enabled_tools",
+            "investment_preferences",
+        }
+
+        # name 比較特殊，需要同時更新配置和狀態
         if "name" in update_data:
-            agent.config.name = update_data["name"]
-            agent.state.name = update_data["name"]
+            config_updates["name"] = update_data["name"]
+            state_updates["name"] = update_data["name"]
 
-        if "description" in update_data:
-            agent.config.description = update_data["description"]
+        # 分類其他更新
+        for key, value in update_data.items():
+            if key in config_fields:
+                config_updates[key] = value
 
-        if "strategy_prompt" in update_data:
-            agent.config.instructions = update_data["strategy_prompt"]
+        # 執行更新
+        if config_updates:
+            await self.update_agent_config(agent_id, config_updates)
 
-        if "custom_instructions" in update_data:
-            agent.config.additional_instructions = update_data["custom_instructions"]
+        if state_updates:
+            await self.update_agent_state(agent_id, state_updates)
 
-        if "color_theme" in update_data:
-            agent.config.color_theme = update_data["color_theme"]
+    async def _sync_config_to_state_and_persist(self, agent: CasualTradingAgent) -> None:
+        """
+        同步配置到狀態並持久化
 
-        if "risk_tolerance" in update_data:
-            # Update risk tolerance in investment preferences
-            if hasattr(agent.config, "investment_preferences"):
-                # Convert float to risk category string
-                from .models import InvestmentPreferences
-
-                risk_category = InvestmentPreferences.risk_tolerance_from_float(
-                    update_data["risk_tolerance"]
-                )
-                agent.config.investment_preferences.risk_tolerance = risk_category
-
-        if "enabled_tools" in update_data:
-            agent.config.enabled_tools = update_data["enabled_tools"]
-
-        if "investment_preferences" in update_data:
-            # Update investment preferences
-            prefs_data = update_data["investment_preferences"]
-            if hasattr(agent.config, "investment_preferences"):
-                if "preferred_sectors" in prefs_data:
-                    agent.config.investment_preferences.preferred_sectors = prefs_data[
-                        "preferred_sectors"
-                    ]
-                if "excluded_tickers" in prefs_data:
-                    agent.config.investment_preferences.excluded_tickers = prefs_data[
-                        "excluded_tickers"
-                    ]
-                if "max_position_size" in prefs_data:
-                    agent.config.investment_preferences.max_position_size = prefs_data[
-                        "max_position_size"
-                    ]
+        Args:
+            agent: Agent 實例
+        """
+        # 確保 state 中的 config 是最新的（雖然通常是同一個物件引用）
+        agent.state.config = agent.config
 
         # 更新時間戳
         agent.state.update_activity()
 
-        # 同步狀態到資料庫
+        # 持久化到資料庫
+        await self._persist_agent_state(agent)
+
+    async def _persist_agent_state(self, agent: CasualTradingAgent) -> None:
+        """
+        持久化 Agent 狀態到資料庫
+
+        Args:
+            agent: Agent 實例
+        """
         if self._database_service:
             try:
                 await self._database_service.save_agent_state(agent.state)
-                self.logger.info(f"Agent {agent_id} updated and saved to database")
+                self.logger.debug(f"Agent {agent.agent_id} persisted to database")
             except Exception as e:
-                self.logger.error(f"Failed to save updated agent state to database: {e}")
-
-        self.logger.info(f"Agent {agent_id} configuration updated")
+                self.logger.error(f"Failed to persist agent {agent.agent_id} to database: {e}")
+                raise
 
     async def update_agent_mode(
         self, agent_id: str, new_mode: AgentMode, reason: str = "", trigger: str = ""

@@ -147,6 +147,7 @@ class UpdateAgentRequest(BaseModel):
     enabled_tools: EnabledTools | None = None  # 啟用工具
     investment_preferences: InvestmentPreferences | None = None  # 投資偏好
     custom_instructions: str | None = None  # 自訂指令
+    ai_model: str | None = Field(None, description="AI 模型")  # AI 模型
 
 
 class StartAgentRequest(BaseModel):

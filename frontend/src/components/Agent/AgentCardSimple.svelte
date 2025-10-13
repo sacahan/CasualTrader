@@ -315,12 +315,13 @@
 
   <!-- 操作按鈕 -->
   <div class="flex gap-3">
-    {#if isOpen && canStart}
+    {#if canStart}
       <Button
         variant="primary"
         size="md"
         fullWidth
         onclick={handleStart}
+        disabled={!$isOpen}
         style="background-color: rgb({agentColor}); border-color: rgb({agentColor});"
       >
         <svg class="mr-2 h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -342,7 +343,7 @@
     {/if}
 
     {#if canStop}
-      <Button variant="secondary" size="md" fullWidth onclick={handleStop}>
+      <Button variant="secondary" size="md" fullWidth onclick={handleStop} disabled={!$isOpen}>
         <svg class="mr-2 h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path
             stroke-linecap="round"
