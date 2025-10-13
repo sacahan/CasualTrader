@@ -84,8 +84,8 @@ class Settings(BaseSettings):
     mcp_casual_market_command: str = Field(
         default="uvx", description="MCP Casual Market command (uvx or npx)"
     )
-    mcp_casual_market_args: str = Field(
-        default="casual-market-mcp", description="MCP Casual Market package name"
+    mcp_casual_market_args: list[str] = Field(
+        default=["casual-market-mcp"], description="MCP Casual Market arguments array"
     )
     mcp_casual_market_timeout: int = Field(
         default=10, description="MCP Casual Market API timeout (seconds)"
@@ -105,6 +105,21 @@ class Settings(BaseSettings):
             except json.JSONDecodeError:
                 # Fallback to comma-separated
                 return [origin.strip() for origin in v.split(",")]
+        return v
+
+    @field_validator("mcp_casual_market_args", mode="before")
+    @classmethod
+    def parse_mcp_args(cls, v: Any) -> list[str]:
+        """Parse MCP args from string or list."""
+        if isinstance(v, str):
+            # Handle JSON-like string format
+            import json
+
+            try:
+                return json.loads(v)
+            except json.JSONDecodeError:
+                # Fallback to single arg
+                return [v]
         return v
 
     @property

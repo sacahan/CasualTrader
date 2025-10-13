@@ -4,7 +4,7 @@
  * 提供 AI 模型的 API 調用功能
  */
 
-import { API_BASE_URL } from '../constants.js';
+import { API_BASE_URL } from './constants.js';
 
 /**
  * 獲取所有可用的 AI 模型列表

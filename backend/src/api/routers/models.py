@@ -10,7 +10,7 @@ from typing import Any
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
-from src.database.agent_database_service import (
+from ...database.agent_database_service import (
     AgentDatabaseService,
     DatabaseConfig,
 )

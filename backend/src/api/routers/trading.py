@@ -13,12 +13,8 @@ from .agents import agent_manager
 router = APIRouter()
 
 
-# Note: This router does NOT directly use MCP tools
-# MCP tools are only available within Agent execution context via OpenAI SDK
-# For system-level market status checks, we use simplified logic (weekday check)
-#
-# If accurate holiday detection is needed, Agents use MarketStatusChecker
-# with MCP tools configured via their mcp_servers parameter.
+# Note: Market status endpoint now uses holiday_client for accurate holiday detection
+# Trading agents can use MarketStatusChecker with MCP tools configured via their mcp_servers parameter
 
 
 @router.get("/agents/{agent_id}/portfolio")
@@ -160,20 +156,22 @@ async def get_agent_performance(agent_id: str):
 @router.get("/market/status")
 async def get_market_status():
     """
-    Get current market status using CasualMarket MCP.
+    Get current market status using holiday_client.
 
     Returns Taiwan stock market status including:
-    - Trading day status (with accurate holiday detection via MCP)
+    - Trading day status (with accurate holiday detection)
     - Current trading hours status
     - Market open/close times
     - Holiday information if applicable
 
-    Uses CasualMarket MCP's check_taiwan_trading_day tool for accurate results.
+    Uses TaiwanHolidayAPIClient for accurate holiday detection.
     """
     try:
         from datetime import datetime, time
 
         import pytz
+
+        from ..holiday_client import create_holiday_client
 
         # Get current time in Taipei timezone
         tz = pytz.timezone("Asia/Taipei")
@@ -181,62 +179,24 @@ async def get_market_status():
         current_date = now.strftime("%Y-%m-%d")
         current_time = now.strftime("%H:%M")
 
-        # Query CasualMarket MCP for accurate trading day status
+        # Use holiday_client to check trading day status
         is_trading_day = False
         is_weekend = False
         is_holiday = False
         holiday_name = None
 
-        try:
-            import asyncio
-            import json
+        async with create_holiday_client() as client:
+            # Check if it's a weekend
+            is_weekend = client.is_weekend(current_date)
 
-            # Call CasualMarket MCP via CLI
-            # Format: uvx casual-market-mcp check-trading-day YYYY-MM-DD
-            process = await asyncio.create_subprocess_exec(
-                "uvx",
-                "casual-market-mcp",
-                "check-trading-day",
-                current_date,
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE,
-            )
+            # Check if it's a holiday
+            holiday_info = await client.get_holiday_info(current_date)
+            if holiday_info:
+                is_holiday = holiday_info.is_holiday
+                holiday_name = holiday_info.name
 
-            stdout, stderr = await asyncio.wait_for(process.communicate(), timeout=10.0)
-
-            if process.returncode == 0 and stdout:
-                # Parse JSON response
-                mcp_response = json.loads(stdout.decode())
-                if mcp_response.get("success"):
-                    mcp_data = mcp_response.get("data", {})
-                    is_trading_day = mcp_data.get("is_trading_day", False)
-                    is_weekend = mcp_data.get("is_weekend", False)
-                    is_holiday = mcp_data.get("is_holiday", False)
-                    holiday_name = mcp_data.get("holiday_name")
-                else:
-                    logger.warning(
-                        f"MCP check_taiwan_trading_day returned error: {mcp_response.get('error')}"
-                    )
-                    raise ValueError("MCP returned error response")
-            else:
-                error_msg = stderr.decode() if stderr else "No error output"
-                logger.warning(
-                    f"MCP subprocess failed (exit code {process.returncode}): {error_msg}"
-                )
-                raise ValueError(f"MCP subprocess failed with exit code {process.returncode}")
-
-        except (
-            asyncio.TimeoutError,
-            json.JSONDecodeError,
-            ValueError,
-            FileNotFoundError,
-        ) as mcp_error:
-            # Fallback to basic weekday check if MCP unavailable
-            logger.warning(f"MCP unavailable, using fallback logic: {mcp_error}")
-            is_trading_day = now.weekday() < 5
-            is_weekend = now.weekday() >= 5
-            is_holiday = False
-            holiday_name = None
+            # Check if it's a trading day
+            is_trading_day = await client.is_trading_day(current_date)
 
         # Check if in trading hours (9:00-13:30)
         is_trading_hours = False
