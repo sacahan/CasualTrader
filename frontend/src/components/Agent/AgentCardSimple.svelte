@@ -8,8 +8,8 @@
 
   import { onMount } from 'svelte';
   import { Button } from '../UI/index.js';
-  import { AGENT_STATUS } from '../../lib/constants.js';
-  import { formatCurrency } from '../../lib/utils.js';
+  import { AGENT_STATUS, AGENT_RUNTIME_STATUS } from '../../shared/constants.js';
+  import { formatCurrency } from '../../shared/utils.js';
 
   // Props
   let {
@@ -24,23 +24,44 @@
   } = $props();
 
   // 計算資產相關數據
-  // 這些值應該來自 API 或 props，暫時使用默認值
-  let initialFunds = $derived(() => agent.initial_funds || 1000000);
-  let totalAssets = $derived(() => agent.total_assets || agent.initial_funds || 1000000); // 應該從 API 獲取實際總資產
-  let currentCash = $derived(() => agent.current_cash || agent.initial_funds || 1000000); // 應該從 API 獲取實際現金
-  let pnl = $derived(() => {
-    const assets = agent.total_assets || agent.initial_funds || 1000000;
+  // 從後端 API 響應映射正確的字段名稱
+  let initialFunds = $derived(agent.initial_funds || 1000000);
+  let currentFunds = $derived(agent.current_funds || agent.initial_funds || 1000000);
+
+  // 計算總資產
+  let totalAssets = $derived.by(() => {
+    const portfolioValue = agent.portfolio?.total_value || 0;
+    const funds = agent.current_funds || agent.initial_funds || 1000000;
+    return portfolioValue > 0 ? portfolioValue : funds;
+  });
+
+  // 計算當前現金
+  let currentCash = $derived.by(() => {
+    const funds = agent.current_funds || agent.initial_funds || 1000000;
+    return agent.portfolio?.cash || funds;
+  });
+
+  // 計算損益
+  let pnl = $derived.by(() => {
+    const assets =
+      agent.portfolio?.total_value || agent.current_funds || agent.initial_funds || 1000000;
     const initial = agent.initial_funds || 1000000;
     return assets - initial;
   });
-  let pnlPercent = $derived(() => {
+
+  // 計算損益百分比
+  let pnlPercent = $derived.by(() => {
     const initial = agent.initial_funds || 1000000;
-    const assets = agent.total_assets || agent.initial_funds || 1000000;
+    const assets =
+      agent.portfolio?.total_value || agent.current_funds || agent.initial_funds || 1000000;
     const profit = assets - initial;
     return initial > 0 ? (profit / initial) * 100 : 0;
   });
-  let isProfit = $derived(() => {
-    const assets = agent.total_assets || agent.initial_funds || 1000000;
+
+  // 判斷是否盈利
+  let isProfit = $derived.by(() => {
+    const assets =
+      agent.portfolio?.total_value || agent.current_funds || agent.initial_funds || 1000000;
     const initial = agent.initial_funds || 1000000;
     return assets >= initial;
   });
@@ -50,9 +71,12 @@
 
   // 是否可以啟動/停止
   let canStart = $derived(
-    agent.status === AGENT_STATUS.IDLE || agent.status === AGENT_STATUS.STOPPED
+    (agent.status === AGENT_STATUS.ACTIVE || agent.status === AGENT_STATUS.INACTIVE) &&
+      (agent.runtime_status === AGENT_RUNTIME_STATUS.IDLE ||
+        agent.runtime_status === AGENT_RUNTIME_STATUS.STOPPED ||
+        !agent.runtime_status)
   );
-  let canStop = $derived(agent.status === AGENT_STATUS.RUNNING);
+  let canStop = $derived(agent.runtime_status === AGENT_RUNTIME_STATUS.RUNNING);
 
   // Canvas for mini chart
   let chartCanvas;
@@ -182,7 +206,7 @@
         {agent.name}
       </h3>
       <div class="flex items-center gap-2 mt-1">
-        {#if agent.status === AGENT_STATUS.RUNNING}
+        {#if agent.runtime_status === AGENT_RUNTIME_STATUS.RUNNING}
           <span class="status-dot status-running"></span>
           <span class="text-xs text-green-400">運行中</span>
         {:else}

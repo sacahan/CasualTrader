@@ -9,8 +9,8 @@
 
   import { Button, Modal } from '../UI/index.js';
   import { PerformanceChart } from '../Chart/index.js';
-  import { formatCurrency, formatDateTime } from '../../lib/utils.js';
-  import { AI_MODEL_LABELS } from '../../lib/constants.js';
+  import { formatCurrency, formatDateTime } from '../../shared/utils.js';
+  import { AI_MODEL_LABELS } from '../../shared/constants.js';
 
   // Props
   let {

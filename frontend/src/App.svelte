@@ -29,7 +29,7 @@
   import { connectWebSocket, disconnectWebSocket } from './stores/websocket.js';
   import { loadMarketStatus, startMarketDataPolling } from './stores/market.js';
   import { notifySuccess, notifyError } from './stores/notifications.js';
-  import { apiClient } from './lib/api.js';
+  import { apiClient } from './shared/api.js';
 
   // 模態視窗狀態
   let showCreateModal = $state(false);

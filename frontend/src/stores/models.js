@@ -10,7 +10,7 @@ import {
   fetchAvailableModelsGrouped,
   transformModelsForSelect,
   createModelLabelsMap,
-} from '../lib/api/models.js';
+} from '../shared/api/models.js';
 
 // ==========================================
 // Store 定義

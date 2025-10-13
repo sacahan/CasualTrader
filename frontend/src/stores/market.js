@@ -1,6 +1,6 @@
 import { writable, derived } from 'svelte/store';
-import { apiClient } from '../lib/api.js';
-import { extractErrorMessage, isMarketOpen } from '../lib/utils.js';
+import { apiClient } from '../shared/api.js';
+import { extractErrorMessage } from '../shared/utils.js';
 
 /**
  * Market Store
@@ -25,16 +25,38 @@ export const loading = writable(false);
 export const error = writable(null);
 
 // 衍生 store: 市場是否開盤
+// 完全依賴後端 API 的市場狀態判斷（包含節假日偵測）
 export const isOpen = derived(marketStatus, ($marketStatus) => {
-  if (!$marketStatus) return isMarketOpen(); // 使用本地判斷作為預設
-  // 後端 API 返回 is_trading_hours 而非 is_open
+  if (!$marketStatus) return false;
   return $marketStatus.is_trading_hours || false;
 });
 
-// 衍生 store: 下次開盤時間
-export const nextOpenTime = derived(marketStatus, ($marketStatus) => {
-  if (!$marketStatus) return null;
-  return $marketStatus.next_open_time || null;
+// 衍生 store: 市場狀態描述
+export const marketStatusText = derived(marketStatus, ($marketStatus) => {
+  if (!$marketStatus) return '載入中...';
+
+  const statusMap = {
+    open: '開盤中',
+    pre_market: '盤前',
+    after_market: '盤後',
+    closed: '休市',
+    weekend: '週末休市',
+    holiday: `休市 - ${$marketStatus.holiday_name || '國定假日'}`,
+  };
+
+  return statusMap[$marketStatus.status] || '未知狀態';
+});
+
+// 衍生 store: 是否為節假日
+export const isHoliday = derived(marketStatus, ($marketStatus) => {
+  if (!$marketStatus) return false;
+  return $marketStatus.is_holiday || false;
+});
+
+// 衍生 store: 是否為交易日
+export const isTradingDay = derived(marketStatus, ($marketStatus) => {
+  if (!$marketStatus) return false;
+  return $marketStatus.is_trading_day || false;
 });
 
 /**

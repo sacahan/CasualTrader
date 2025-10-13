@@ -41,12 +41,20 @@ class Base(AsyncAttrs, DeclarativeBase):
 
 
 class AgentStatus(str, Enum):
-    """Agent 執行狀態枚舉"""
+    """Agent 持久化狀態枚舉 (儲存在資料庫)"""
 
     ACTIVE = "active"
     INACTIVE = "inactive"
     ERROR = "error"
     SUSPENDED = "suspended"
+
+
+class AgentRuntimeStatus(str, Enum):
+    """Agent 執行時狀態枚舉 (僅存在於記憶體/前端)"""
+
+    IDLE = "idle"
+    RUNNING = "running"
+    STOPPED = "stopped"
 
 
 class AgentMode(str, Enum):

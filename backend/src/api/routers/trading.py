@@ -160,15 +160,15 @@ async def get_agent_performance(agent_id: str):
 @router.get("/market/status")
 async def get_market_status():
     """
-    Get current market status using simplified logic.
+    Get current market status using CasualMarket MCP.
 
     Returns Taiwan stock market status including:
-    - Trading day status (weekday check only, NO holiday detection)
+    - Trading day status (with accurate holiday detection via MCP)
     - Current trading hours status
     - Market open/close times
+    - Holiday information if applicable
 
-    Note: Does NOT detect Taiwan national holidays.
-    For accurate holiday detection, use Agent with MCP tools.
+    Uses CasualMarket MCP's check_taiwan_trading_day tool for accurate results.
     """
     try:
         from datetime import datetime, time
@@ -181,14 +181,68 @@ async def get_market_status():
         current_date = now.strftime("%Y-%m-%d")
         current_time = now.strftime("%H:%M")
 
-        # Basic weekday check (no holiday detection)
-        is_weekday = now.weekday() < 5
+        # Query CasualMarket MCP for accurate trading day status
+        is_trading_day = False
+        is_weekend = False
+        is_holiday = False
+        holiday_name = None
+
+        try:
+            import asyncio
+            import json
+
+            # Call CasualMarket MCP via CLI
+            # Format: uvx casual-market-mcp check-trading-day YYYY-MM-DD
+            process = await asyncio.create_subprocess_exec(
+                "uvx",
+                "casual-market-mcp",
+                "check-trading-day",
+                current_date,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+            )
+
+            stdout, stderr = await asyncio.wait_for(process.communicate(), timeout=10.0)
+
+            if process.returncode == 0 and stdout:
+                # Parse JSON response
+                mcp_response = json.loads(stdout.decode())
+                if mcp_response.get("success"):
+                    mcp_data = mcp_response.get("data", {})
+                    is_trading_day = mcp_data.get("is_trading_day", False)
+                    is_weekend = mcp_data.get("is_weekend", False)
+                    is_holiday = mcp_data.get("is_holiday", False)
+                    holiday_name = mcp_data.get("holiday_name")
+                else:
+                    logger.warning(
+                        f"MCP check_taiwan_trading_day returned error: {mcp_response.get('error')}"
+                    )
+                    raise ValueError("MCP returned error response")
+            else:
+                error_msg = stderr.decode() if stderr else "No error output"
+                logger.warning(
+                    f"MCP subprocess failed (exit code {process.returncode}): {error_msg}"
+                )
+                raise ValueError(f"MCP subprocess failed with exit code {process.returncode}")
+
+        except (
+            asyncio.TimeoutError,
+            json.JSONDecodeError,
+            ValueError,
+            FileNotFoundError,
+        ) as mcp_error:
+            # Fallback to basic weekday check if MCP unavailable
+            logger.warning(f"MCP unavailable, using fallback logic: {mcp_error}")
+            is_trading_day = now.weekday() < 5
+            is_weekend = now.weekday() >= 5
+            is_holiday = False
+            holiday_name = None
 
         # Check if in trading hours (9:00-13:30)
         is_trading_hours = False
         market_status = "closed"
 
-        if is_weekday:
+        if is_trading_day:
             if time(9, 0) <= now.time() <= time(13, 30):
                 is_trading_hours = True
                 market_status = "open"
@@ -196,19 +250,32 @@ async def get_market_status():
                 market_status = "pre_market"
             else:
                 market_status = "after_market"
-        else:
+        elif is_weekend:
             market_status = "weekend"
+        elif is_holiday:
+            market_status = "holiday"
+        else:
+            market_status = "closed"
 
-        return {
-            "is_trading_day": is_weekday,
+        response = {
+            "is_trading_day": is_trading_day,
             "is_trading_hours": is_trading_hours,
             "market_open": "09:00",
             "market_close": "13:30",
             "current_time": current_time,
             "current_date": current_date,
             "status": market_status,
-            "is_weekend": not is_weekday,
+            "is_weekend": is_weekend,
         }
+
+        # Add holiday information if applicable
+        if is_holiday and holiday_name:
+            response["is_holiday"] = True
+            response["holiday_name"] = holiday_name
+        else:
+            response["is_holiday"] = False
+
+        return response
 
     except Exception as e:
         logger.error(f"Error getting market status: {e}")

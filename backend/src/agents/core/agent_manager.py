@@ -36,6 +36,9 @@ class AgentManager:
         self._active_executions: dict[str, asyncio.Task[AgentExecutionResult]] = {}
         self._execution_history: dict[str, list[AgentExecutionResult]] = {}
 
+        # Agent runtime status tracking (idle/running/stopped)
+        self._runtime_status: dict[str, str] = {}
+
         # 資料庫服務（用於持久化 Agent 狀態）
         self._database_service = database_service
 
@@ -306,6 +309,18 @@ class AgentManager:
     def _agent_to_dict(self, agent: CasualTradingAgent) -> dict[str, Any]:
         """Convert agent to dictionary for API response."""
 
+        # Determine runtime status
+        agent_id = agent.agent_id
+        if agent_id in self._active_executions:
+            runtime_status = "running"
+        elif agent.is_active:
+            runtime_status = "idle"
+        else:
+            runtime_status = "stopped"
+
+        # Update runtime status cache
+        self._runtime_status[agent_id] = runtime_status
+
         return {
             "id": agent.agent_id,
             "name": agent.config.name,
@@ -314,7 +329,10 @@ class AgentManager:
             "strategy_type": agent.config.investment_preferences.strategy_type,
             "strategy_prompt": agent.config.instructions,
             "current_mode": str(agent.state.current_mode.value),
-            "status": str(agent.state.status.value),
+            "status": str(
+                agent.state.status.value
+            ),  # persistent status (active/inactive/error/suspended)
+            "runtime_status": runtime_status,  # runtime status (idle/running/stopped)
             "initial_funds": float(agent.config.initial_funds),
             "current_funds": float(agent.config.current_funds or agent.config.initial_funds),
             "max_turns": agent.config.max_turns,

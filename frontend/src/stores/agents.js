@@ -1,6 +1,6 @@
 import { writable, derived, get } from 'svelte/store';
-import { apiClient } from '../lib/api.js';
-import { extractErrorMessage } from '../lib/utils.js';
+import { apiClient } from '../shared/api.js';
+import { extractErrorMessage } from '../shared/utils.js';
 
 /**
  * Agent Store

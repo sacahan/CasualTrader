@@ -8,8 +8,8 @@
    */
 
   import { Button, StatusIndicator } from '../UI/index.js';
-  import { AI_MODEL_LABELS, AGENT_STATUS } from '../../lib/constants.js';
-  import { formatCurrency, formatDateTime } from '../../lib/utils.js';
+  import { AI_MODEL_LABELS, AGENT_STATUS, AGENT_RUNTIME_STATUS } from '../../shared/constants.js';
+  import { formatCurrency, formatDateTime } from '../../shared/utils.js';
 
   // Props
   let {
@@ -24,15 +24,18 @@
   // 卡片操作事件
 
   // 是否可以編輯 (執行中不可編輯 - 配置鎖定)
-  let isEditable = $derived(agent.status !== AGENT_STATUS.RUNNING);
+  let isEditable = $derived(agent.runtime_status !== AGENT_RUNTIME_STATUS.RUNNING);
 
-  // 是否可以啟動
+  // 是否可以啟動 (persistent status 為 active/inactive 且 runtime 不在執行中)
   let canStart = $derived(
-    agent.status === AGENT_STATUS.IDLE || agent.status === AGENT_STATUS.STOPPED
+    (agent.status === AGENT_STATUS.ACTIVE || agent.status === AGENT_STATUS.INACTIVE) &&
+      (agent.runtime_status === AGENT_RUNTIME_STATUS.IDLE ||
+        agent.runtime_status === AGENT_RUNTIME_STATUS.STOPPED ||
+        !agent.runtime_status)
   );
 
   // 是否可以停止
-  let canStop = $derived(agent.status === AGENT_STATUS.RUNNING);
+  let canStop = $derived(agent.runtime_status === AGENT_RUNTIME_STATUS.RUNNING);
   // 函數定義 - 移到根層級以符合 eslint no-inner-declarations 規則
   function handleClick() {
     onclick?.(agent);

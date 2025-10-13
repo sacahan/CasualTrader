@@ -7,9 +7,9 @@
    */
 
   import { onMount } from 'svelte';
-  import { apiClient } from '../../lib/api.js';
-  import { formatDateTime } from '../../lib/utils.js';
-  import { CHANGE_TYPE_LABELS, CHANGE_TYPE_COLORS } from '../../lib/constants.js';
+  import { apiClient } from '../../shared/api.js';
+  import { formatDateTime } from '../../shared/utils.js';
+  import { CHANGE_TYPE_LABELS, CHANGE_TYPE_COLORS } from '../../shared/constants.js';
 
   /**
    * @typedef {Object} Props

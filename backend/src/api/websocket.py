@@ -121,16 +121,27 @@ class WebSocketManager:
             await self.disconnect(websocket)
 
     async def broadcast_agent_status(
-        self, agent_id: str, status: str, details: dict[str, Any] | None = None
+        self,
+        agent_id: str,
+        status: str,
+        runtime_status: str | None = None,
+        details: dict[str, Any] | None = None,
     ):
         """
         廣播代理人狀態變更事件。
-        會將狀態與細節資料廣播給所有客戶端。
+        會將持久化狀態、執行時狀態與細節資料廣播給所有客戶端。
+
+        Args:
+            agent_id: Agent ID
+            status: 持久化狀態 (active/inactive/error/suspended)
+            runtime_status: 執行時狀態 (idle/running/stopped)
+            details: 其他詳細資訊
         """
         message = {
             "type": "agent_status",
             "agent_id": agent_id,
             "status": status,
+            "runtime_status": runtime_status,
             "data": details or {},
         }
         await self.broadcast(message)

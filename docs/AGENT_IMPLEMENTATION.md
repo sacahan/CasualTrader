@@ -1,16 +1,41 @@
 # Agent 系統實作規格
 
-**版本**: 3.2
-**日期**: 2025-10-10
+**版本**: 3.3
+**日期**: 2025-10-13
 **相關設計**: SYSTEM_DESIGN.md
 **基於**: OpenAI Agents SDK + Prompt-Based Strategy Management
 
-> **⚠️ 重要架構變更 (v3.2)**
+> **⚠️ 重要架構變更 (v3.3)**
+>
+> - **新增**: Agent 狀態管理系統 - 雙狀態架構設計（Persistent + Runtime Status）
+> - **整合**: AGENT_STATUS_ALIGNMENT.md 狀態對齊規範
+> - **優化**: 前後端狀態一致性，避免狀態定義不匹配問題
+> - **改進**: WebSocket 即時狀態同步和狀態轉換邏輯
+
+> **架構變更記錄 (v3.2)**
 >
 > - **移除**: `src/agents/integrations/mcp_client.py` (包裝層已移除)
 > - **移動**: `database_service.py` → `src/database/agent_database_service.py`
 > - **改用**: Trading Agent 直接透過 OpenAI SDK 的 `mcp_servers` 參數連接 Casual Market MCP
 > - **簡化**: 移除中間包裝層,降低複雜度,直接使用 MCP protocol
+
+---
+
+## 📚 文檔目錄
+
+1. [📋 概述](#-概述)
+2. [🔌 MCP 整合架構](#-mcp-整合架構-v32-更新)
+3. [💾 資料庫管理](#-資料庫管理)
+4. [⚙️ Agent 執行參數配置](#️-agent-執行參數配置)
+5. [🤖 TradingAgent 主體架構](#-tradingagent-主體架構)
+6. [🔄 策略演化與自主調整系統](#-策略演化與自主調整系統)
+7. [📊 策略變更記錄系統](#-策略變更記錄系統)
+8. [🎨 前端 Agent 配置介面](#-前端-agent-配置介面)
+9. [📊 Agent 狀態管理系統](#-agent-狀態管理系統) **⭐ 新增**
+10. [📊 API 端點設計](#-api-端點設計)
+11. [⚙️ 配置管理](#️-配置管理)
+12. [📊 執行追蹤](#-執行追蹤)
+13. [🧠 專門化 Agent Tools](#-專門化-agent-tools自主型-agent-架構)
 
 ---
 
@@ -1129,7 +1154,172 @@ const StrategyHistoryView = ({ agentId }: { agentId: string }) => {
 
 ---
 
+## 📊 Agent 狀態管理系統
+
+### 狀態架構設計
+
+CasualTrader 採用**雙狀態架構**來清楚區分 Agent 的不同狀態層級：
+
+#### 1. Persistent Status（持久化狀態）
+
+存儲在資料庫中的 Agent 基本狀態，對應後端模型：
+
+```python
+# Backend: backend/src/database/models.py
+class AgentStatus(str, Enum):
+    ACTIVE = "active"          # 活躍中，可以被啟動
+    INACTIVE = "inactive"      # 未啟用，暫時停用
+    ERROR = "error"           # 錯誤狀態，需要修復
+    SUSPENDED = "suspended"    # 已暫停，由系統或用戶暫停
+```
+
+#### 2. Runtime Status（執行時狀態）
+
+反映 Agent 的即時執行狀況，僅存在於前端/記憶體中：
+
+```javascript
+// Frontend: frontend/src/shared/constants.js
+export const AGENT_RUNTIME_STATUS = {
+  IDLE: "idle",           // 待命中，等待執行
+  RUNNING: "running",     // 執行中，正在處理任務
+  STOPPED: "stopped",     // 已停止，主動停止執行
+};
+```
+
+### 狀態判斷邏輯
+
+前端組件使用狀態的標準模式：
+
+```javascript
+// 判斷 Agent 是否可以啟動
+let canStart = $derived(
+  (agent.status === AGENT_STATUS.ACTIVE || agent.status === AGENT_STATUS.INACTIVE) &&
+  (agent.runtime_status === AGENT_RUNTIME_STATUS.IDLE ||
+   agent.runtime_status === AGENT_RUNTIME_STATUS.STOPPED ||
+   !agent.runtime_status)
+);
+
+// 判斷 Agent 是否可以停止
+let canStop = $derived(agent.runtime_status === AGENT_RUNTIME_STATUS.RUNNING);
+
+// 判斷 Agent 配置是否可編輯（執行中不可編輯）
+let isEditable = $derived(agent.runtime_status !== AGENT_RUNTIME_STATUS.RUNNING);
+```
+
+### API 狀態回傳格式
+
+後端 API 應同時提供兩種狀態資訊：
+
+```python
+# Agent API Response Format
+{
+  "id": "agent-123",
+  "name": "Trading Agent",
+  "status": "active",           # Persistent status from database
+  "runtime_status": "running",  # Runtime status (optional, if tracked)
+  "current_mode": "trading",
+  "created_at": "2025-01-01T00:00:00Z",
+  ...
+}
+```
+
+### 前端狀態標籤
+
+提供一致的狀態顯示標籤：
+
+```javascript
+export const AGENT_STATUS_LABELS = {
+  [AGENT_STATUS.ACTIVE]: "活躍",
+  [AGENT_STATUS.INACTIVE]: "未啟用",
+  [AGENT_STATUS.ERROR]: "錯誤",
+  [AGENT_STATUS.SUSPENDED]: "已暫停",
+};
+
+export const AGENT_RUNTIME_STATUS_LABELS = {
+  [AGENT_RUNTIME_STATUS.IDLE]: "待命",
+  [AGENT_RUNTIME_STATUS.RUNNING]: "執行中",
+  [AGENT_RUNTIME_STATUS.STOPPED]: "已停止",
+};
+```
+
+### WebSocket 狀態同步
+
+即時同步 Agent 執行狀態變化：
+
+```javascript
+// WebSocket 訊息格式
+{
+  "type": "agent_status_update",
+  "data": {
+    "agent_id": "agent-123",
+    "status": "active",
+    "runtime_status": "running",
+    "timestamp": "2025-01-01T00:00:00Z"
+  }
+}
+```
+
+### 狀態轉換規則
+
+**Persistent Status 轉換**：
+
+- `INACTIVE` → `ACTIVE`：用戶啟用 Agent
+- `ACTIVE` → `SUSPENDED`：系統檢測到錯誤或用戶暫停
+- `ERROR` → `ACTIVE`：錯誤修復後重新啟用
+- `SUSPENDED` → `ACTIVE`：用戶手動恢復
+
+**Runtime Status 轉換**：
+
+- `IDLE` → `RUNNING`：開始執行任務
+- `RUNNING` → `STOPPED`：任務完成或用戶停止
+- `STOPPED` → `IDLE`：準備下次執行
+
+### 設計優勢
+
+1. **清晰職責分離**：持久狀態管理配置，執行狀態管理即時性
+2. **前後端一致性**：避免狀態定義不匹配的問題
+3. **用戶體驗優化**：提供準確的按鈕可用性和狀態提示
+4. **系統可維護性**：狀態邏輯集中管理，易於調試和擴展
+
+---
+
 ## 📊 API 端點設計
+
+### Agent 狀態管理 API
+
+```python
+from fastapi import APIRouter, HTTPException
+from typing import Optional
+
+router = APIRouter(prefix="/api/agents", tags=["agent_management"])
+
+@router.patch("/{agent_id}/status")
+async def update_agent_status(
+    agent_id: str,
+    status: AgentStatus,
+    runtime_status: Optional[str] = None
+) -> dict:
+    """更新 Agent 狀態"""
+    try:
+        result = await agent_service.update_status(agent_id, status, runtime_status)
+
+        # 透過 WebSocket 廣播狀態變更
+        await websocket_manager.broadcast_agent_status_update({
+            "agent_id": agent_id,
+            "status": status.value,
+            "runtime_status": runtime_status,
+            "timestamp": datetime.now().isoformat()
+        })
+
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.get("/{agent_id}/status")
+async def get_agent_status(agent_id: str) -> dict:
+    """獲取 Agent 狀態詳情"""
+    return await agent_service.get_status_detail(agent_id)
+```
 
 ### 策略變更 API
 
@@ -2722,6 +2912,58 @@ tests/frontend/unit/components/Agent/  # Agent 組件測試
 
 - [ ] 外部 MCP 服務設定 (CasualMarket 專案)
 - [ ] CasualMarket MCP Server 連接
+
+---
+
+## 📝 更新日誌
+
+### v3.3 (2025-10-13)
+
+**新增功能**：
+
+- ✅ **Agent 狀態管理系統**：整合完整的雙狀態架構設計
+- ✅ **狀態對齊規範**：統一前後端狀態定義和轉換邏輯
+- ✅ **WebSocket 狀態同步**：即時狀態更新和廣播機制
+- ✅ **API 狀態端點**：Agent 狀態管理相關 API 設計
+
+**文檔整合**：
+
+- ✅ 整合 `AGENT_STATUS_ALIGNMENT.md` 內容至主實作文檔
+- ✅ 新增文檔目錄導航，提升可讀性
+- ✅ 狀態管理章節完整涵蓋：
+  - Persistent Status vs Runtime Status 區別
+  - 前端狀態判斷邏輯和組件使用指南
+  - 後端 API 狀態回傳格式
+  - WebSocket 即時同步機制
+  - 狀態轉換規則和設計優勢
+
+**技術改進**：
+
+- 📊 雙狀態架構避免前後端狀態不一致問題
+- 🔄 清晰的狀態轉換邏輯和職責分離
+- 🎯 提升用戶體驗：準確的按鈕可用性和狀態提示
+- 🛠️ 系統可維護性：狀態邏輯集中管理
+
+### v3.2 (2025-10-10)
+
+**架構簡化**：
+
+- 🗑️ 移除 MCP 包裝層，直接使用 OpenAI SDK MCP 整合
+- 📁 重新組織資料庫服務模組位置
+- ⚡ 降低系統複雜度，提升維護性
+
+---
+
+## 🔗 相關文檔
+
+- **主要設計文檔**：`SYSTEM_DESIGN.md`
+- **API 架構**：`API_ARCHITECTURE.md`
+- **前端實作**：`FRONTEND_IMPLEMENTATION.md`
+- **專案結構**：`PROJECT_STRUCTURE.md`
+
+> **📋 狀態整合說明**
+> 本文檔 v3.3 版本已完整整合 `AGENT_STATUS_ALIGNMENT.md` 的所有核心內容。
+> 原 AGENT_STATUS_ALIGNMENT.md 可以安全移除，所有狀態管理相關資訊已統一在此文檔中。
 - [ ] MCP工具Function包裝器
 - [ ] MCP工具錯誤處理和重試機制
 

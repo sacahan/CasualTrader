@@ -43,7 +43,8 @@ def _map_agent_to_response(agent_data: dict[str, Any]) -> AgentResponse:
         strategy_prompt=agent_data.get("strategy_prompt", ""),
         color_theme=agent_data.get("color_theme", "#007bff"),
         current_mode=agent_data.get("current_mode", "TRADING"),
-        status=agent_data.get("status", "idle"),
+        status=agent_data.get("status", "inactive"),  # persistent status
+        runtime_status=agent_data.get("runtime_status"),  # runtime status (idle/running/stopped)
         initial_funds=agent_data.get("initial_funds", 1000000.0),
         current_funds=agent_data.get("current_funds"),
         max_turns=agent_data.get("max_turns", 50),

@@ -4,7 +4,7 @@ import {
   WS_EVENT_TYPES,
   MAX_RECONNECT_ATTEMPTS,
   RECONNECT_DELAY_MS,
-} from '../lib/constants.js';
+} from '../shared/constants.js';
 import { agents } from './agents.js';
 import { addNotification } from './notifications.js';
 

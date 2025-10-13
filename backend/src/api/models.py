@@ -36,15 +36,25 @@ class ExecutionMode(str, Enum):
 
 class AgentStatus(str, Enum):
     """
-    代理人執行狀態列舉。
-    用於標示代理人目前狀態。
+    代理人持久化狀態列舉 (對應資料庫)。
+    用於標示代理人在資料庫中的狀態。
     """
 
-    IDLE = "idle"  # 閒置
+    ACTIVE = "active"  # 活躍
+    INACTIVE = "inactive"  # 未啟用
+    ERROR = "error"  # 錯誤
+    SUSPENDED = "suspended"  # 已暫停
+
+
+class AgentRuntimeStatus(str, Enum):
+    """
+    代理人執行時狀態列舉 (記憶體中的執行狀態)。
+    用於標示代理人目前執行狀態。
+    """
+
+    IDLE = "idle"  # 待命
     RUNNING = "running"  # 執行中
     STOPPED = "stopped"  # 已停止
-    PAUSED = "paused"  # 已暫停
-    ERROR = "error"  # 錯誤
 
 
 class TradingMode(str, Enum):
@@ -129,7 +139,9 @@ class UpdateAgentRequest(BaseModel):
     description: str | None = Field(None, max_length=500)  # 代理人描述
     strategy_prompt: str | None = Field(None, min_length=10)  # 策略提示語
     color: str | None = Field(
-        None, pattern=r"^\d{1,3},\s*\d{1,3},\s*\d{1,3}$", description="UI 卡片顏色 (RGB 格式)"
+        None,
+        pattern=r"^\d{1,3},\s*\d{1,3},\s*\d{1,3}$",
+        description="UI 卡片顏色 (RGB 格式)",
     )  # UI 卡片顏色
     risk_tolerance: float | None = Field(None, ge=0.0, le=1.0)  # 風險容忍度
     enabled_tools: EnabledTools | None = None  # 啟用工具
@@ -185,7 +197,8 @@ class AgentResponse(BaseModel):
     strategy_prompt: str  # 策略提示語
     color_theme: str  # 顏色主題
     current_mode: str  # 目前交易模式
-    status: str  # 代理人狀態
+    status: str  # 代理人持久化狀態 (active/inactive/error/suspended)
+    runtime_status: str | None = None  # 代理人執行時狀態 (idle/running/stopped)
     initial_funds: float  # 初始資金
     current_funds: float | None = None  # 目前資金
     max_turns: int  # 最大回合數

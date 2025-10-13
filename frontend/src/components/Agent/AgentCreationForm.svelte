@@ -11,7 +11,7 @@
   import { notifySuccess, notifyError } from '../../stores/notifications.js';
   import { modelOptionsForSelect, modelsLoading, loadModels } from '../../stores/models.js';
   import { Button, Input, Select, Textarea } from '../UI/index.js';
-  import { DEFAULT_INITIAL_FUNDS, DEFAULT_MAX_POSITION_SIZE } from '../../lib/constants.js';
+  import { DEFAULT_INITIAL_FUNDS, DEFAULT_MAX_POSITION_SIZE } from '../../shared/constants.js';
   import { onMount } from 'svelte';
 
   /**

@@ -1,5 +1,5 @@
 import { writable } from 'svelte/store';
-import { generateId } from '../lib/utils.js';
+import { generateId } from '../shared/utils.js';
 
 /**
  * Notifications Store
