@@ -47,13 +47,11 @@ class TestCompleteUserWorkflow:
             "name": "E2E Test Agent",
             "description": "End-to-end test agent for workflow validation",
             "ai_model": "gpt-4o-mini",  # Use mini for faster testing
-            "strategy_type": "balanced",
             "strategy_prompt": "Focus on technology sector with moderate risk tolerance. "
             "Prioritize companies with strong fundamentals and positive growth trends.",
             "color_theme": "#00bcd4",
             "initial_funds": 1000000.0,
             "max_turns": 30,
-            "risk_tolerance": 0.6,
             "enabled_tools": {
                 "fundamental_analysis": True,
                 "technical_analysis": True,
@@ -82,7 +80,6 @@ class TestCompleteUserWorkflow:
                 "name": "E2E Test Agent",
                 "description": "End-to-end test agent for workflow validation",
                 "ai_model": "gpt-4o-mini",
-                "strategy_type": "balanced",
                 "strategy_prompt": create_request["strategy_prompt"],
                 "color_theme": "#00bcd4",
                 "current_mode": "OBSERVATION",
@@ -90,7 +87,6 @@ class TestCompleteUserWorkflow:
                 "initial_funds": 1000000.0,
                 "current_funds": 1000000.0,
                 "max_turns": 30,
-                "risk_tolerance": 0.6,
                 "enabled_tools": create_request["enabled_tools"],
                 "investment_preferences": create_request["investment_preferences"],
                 "custom_instructions": "Avoid high-volatility stocks",

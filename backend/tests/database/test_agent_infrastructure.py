@@ -21,7 +21,6 @@ from src.agents import (  # noqa: E402
     AgentMode,
     AgentSession,
     AutoAdjustSettings,
-    InvestmentPreferences,
     TradingAgent,
     TradingSettings,
     create_default_agent_config,
@@ -65,11 +64,7 @@ async def test_trading_agent() -> None:
         name="測試交易員",
         description="模擬投資的智能交易員",
         initial_funds=500000.0,
-        investment_preferences=InvestmentPreferences(
-            preferred_sectors=["半導體", "金融"],
-            max_position_size=8.0,
-            risk_tolerance="medium",
-        ),
+        investment_preferences=["穩健成長", "價值投資", "偏好半導體和金融產業"],
         trading_settings=TradingSettings(
             max_daily_trades=3,
             enable_stop_loss=True,

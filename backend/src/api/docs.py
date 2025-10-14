@@ -12,7 +12,6 @@ AGENT_EXAMPLE = {
     "name": "保守型價值投資者",
     "description": "專注於穩健成長的價值型股票",
     "ai_model": "gpt-4o",
-    "strategy_type": "conservative",
     "strategy_prompt": "尋找本益比低於15、股息殖利率高於4%的穩定企業",
     "color_theme": "#28a745",
     "current_mode": "TRADING",
@@ -20,7 +19,6 @@ AGENT_EXAMPLE = {
     "initial_funds": 1000000.0,
     "current_funds": 1050000.0,
     "max_turns": 50,
-    "risk_tolerance": 0.3,
     "enabled_tools": {
         "get_taiwan_stock_price": True,
         "buy_taiwan_stock": True,
@@ -58,12 +56,10 @@ CREATE_AGENT_EXAMPLE = {
     "name": "積極型成長投資者",
     "description": "追求高成長的科技股",
     "ai_model": "gpt-4o",
-    "strategy_type": "aggressive",
     "strategy_prompt": "尋找營收成長率超過20%、本益比在合理範圍的科技股",
     "color_theme": "#dc3545",
     "initial_funds": 1000000.0,
     "max_turns": 100,
-    "risk_tolerance": 0.8,
     "enabled_tools": {
         "get_taiwan_stock_price": True,
         "buy_taiwan_stock": True,

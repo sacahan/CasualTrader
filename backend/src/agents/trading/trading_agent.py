@@ -81,11 +81,25 @@ try:
     from agents import CodeInterpreterTool, WebSearchTool, function_tool
     from agents.mcp import MCPServerStdio
 except ImportError:
-    # Fallback for development
-    function_tool = Any
-    WebSearchTool = Any
-    CodeInterpreterTool = Any
-    MCPServerStdio = None
+    # Fallback for development - create a dummy decorator
+    def function_tool(strict_mode=False):
+        def decorator(func):
+            return func
+
+        return decorator
+
+    # Dummy classes for development fallback
+    class CodeInterpreterTool:
+        def __init__(self, *args, **kwargs):
+            pass
+
+    class WebSearchTool:
+        def __init__(self, *args, **kwargs):
+            pass
+
+    class MCPServerStdio:
+        def __init__(self, *args, **kwargs):
+            pass
 
 # ==========================================
 # Trading Agent 主要實作
@@ -720,9 +734,6 @@ class TradingAgent(CasualTradingAgent):
         guidance = f"""
 投資策略指導：
 {self.config.investment_preferences}
-
-策略調整依據：
-{self.config.strategy_adjustment_criteria}
         """.strip()
 
         if self.config.auto_adjust.enabled:

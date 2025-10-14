@@ -905,6 +905,156 @@ class RenameModelToAIModelMigration:
         logging.info("AI_model column renamed back to model successfully")
 
 
+class RemoveUnusedAgentColumnsMigration:
+    """移除 Agent 表中不再使用的欄位"""
+
+    version = "008"
+    name = "remove_unused_agent_columns"
+    description = "移除 config, strategy_adjustment_criteria, auto_adjust_settings 欄位"
+
+    async def up(self, engine: AsyncEngine) -> None:
+        """執行遷移：移除不需要的欄位"""
+        logging.info("Starting removal of unused agent columns...")
+
+        async with engine.begin() as conn:
+            # SQLite 不支援直接 DROP COLUMN，需要重建表
+            # 1. 創建臨時表，只包含需要的欄位
+            await conn.execute(
+                text("""
+                    CREATE TABLE agents_new (
+                        id TEXT PRIMARY KEY,
+                        name TEXT NOT NULL,
+                        description TEXT,
+                        instructions TEXT NOT NULL,
+                        ai_model TEXT NOT NULL DEFAULT 'gpt-4o-mini',
+                        color_theme TEXT DEFAULT '34, 197, 94',
+
+                        -- 投資配置
+                        initial_funds DECIMAL(15,2) NOT NULL,
+                        max_position_size DECIMAL(5,2) DEFAULT 5.0,
+
+                        -- Agent 狀態
+                        status TEXT NOT NULL DEFAULT 'inactive' CHECK (status IN ('active', 'inactive', 'error', 'suspended')),
+                        current_mode TEXT DEFAULT 'OBSERVATION' CHECK (current_mode IN ('TRADING', 'REBALANCING', 'STRATEGY_REVIEW', 'OBSERVATION')),
+
+                        -- 配置參數 (僅保留 investment_preferences)
+                        investment_preferences TEXT,
+
+                        -- 時間戳記
+                        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                        last_active_at DATETIME
+                    )
+                """)
+            )
+
+            # 2. 複製資料到新表，排除不需要的欄位
+            await conn.execute(
+                text("""
+                    INSERT INTO agents_new (
+                        id, name, description, instructions, ai_model, color_theme,
+                        initial_funds, max_position_size, status, current_mode,
+                        investment_preferences, created_at, updated_at, last_active_at
+                    )
+                    SELECT
+                        id, name, description, instructions, ai_model, color_theme,
+                        initial_funds, max_position_size, status, current_mode,
+                        investment_preferences, created_at, updated_at, last_active_at
+                    FROM agents
+                """)
+            )
+
+            # 3. 刪除舊表
+            await conn.execute(text("DROP TABLE agents"))
+
+            # 4. 重命名新表
+            await conn.execute(text("ALTER TABLE agents_new RENAME TO agents"))
+
+            # 5. 重新創建索引
+            await conn.execute(
+                text("CREATE INDEX IF NOT EXISTS idx_agents_status ON agents(status)")
+            )
+            await conn.execute(
+                text("CREATE INDEX IF NOT EXISTS idx_agents_created_at ON agents(created_at)")
+            )
+
+        logging.info(
+            "Successfully removed unused agent columns: config, strategy_adjustment_criteria, auto_adjust_settings"
+        )
+
+    async def down(self, engine: AsyncEngine) -> None:
+        """回滾遷移：恢復移除的欄位"""
+        logging.info("Rolling back: adding back removed agent columns...")
+
+        async with engine.begin() as conn:
+            # 創建臨時表，包含所有原始欄位
+            await conn.execute(
+                text("""
+                    CREATE TABLE agents_old (
+                        id TEXT PRIMARY KEY,
+                        name TEXT NOT NULL,
+                        description TEXT,
+                        instructions TEXT NOT NULL,
+                        ai_model TEXT NOT NULL DEFAULT 'gpt-4o-mini',
+                        color_theme TEXT DEFAULT '34, 197, 94',
+
+                        -- 投資配置
+                        initial_funds DECIMAL(15,2) NOT NULL,
+                        max_position_size DECIMAL(5,2) DEFAULT 5.0,
+
+                        -- Agent 狀態
+                        status TEXT NOT NULL DEFAULT 'inactive' CHECK (status IN ('active', 'inactive', 'error', 'suspended')),
+                        current_mode TEXT DEFAULT 'OBSERVATION' CHECK (current_mode IN ('TRADING', 'REBALANCING', 'STRATEGY_REVIEW', 'OBSERVATION')),
+
+                        -- 配置參數 (恢復所有欄位)
+                        config JSON,
+                        investment_preferences TEXT,
+                        strategy_adjustment_criteria TEXT,
+                        auto_adjust_settings JSON,
+
+                        -- 時間戳記
+                        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                        last_active_at DATETIME
+                    )
+                """)
+            )
+
+            # 複製資料到舊表格式，新增的欄位設為 NULL
+            await conn.execute(
+                text("""
+                    INSERT INTO agents_old (
+                        id, name, description, instructions, ai_model, color_theme,
+                        initial_funds, max_position_size, status, current_mode,
+                        investment_preferences, created_at, updated_at, last_active_at,
+                        config, strategy_adjustment_criteria, auto_adjust_settings
+                    )
+                    SELECT
+                        id, name, description, instructions, ai_model, color_theme,
+                        initial_funds, max_position_size, status, current_mode,
+                        investment_preferences, created_at, updated_at, last_active_at,
+                        NULL, NULL, NULL
+                    FROM agents
+                """)
+            )
+
+            # 刪除當前表並重命名
+            await conn.execute(text("DROP TABLE agents"))
+            await conn.execute(text("ALTER TABLE agents_old RENAME TO agents"))
+
+            # 重新創建索引
+            await conn.execute(
+                text("CREATE INDEX IF NOT EXISTS idx_agents_status ON agents(status)")
+            )
+            await conn.execute(
+                text("CREATE INDEX IF NOT EXISTS idx_agents_created_at ON agents(created_at)")
+            )
+
+        logging.info(
+            "Rollback completed: restored config, strategy_adjustment_criteria, auto_adjust_settings columns"
+        )
+
+
 class DatabaseMigrationManager:
     """資料庫遷移管理器 - 使用 Python 3.12+ 語法"""
 
@@ -919,6 +1069,7 @@ class DatabaseMigrationManager:
             AddAgentColorMigration(),
             RenameColorToColorThemeMigration(),
             RenameModelToAIModelMigration(),
+            RemoveUnusedAgentColumnsMigration(),
         ]
 
         # Setup logging

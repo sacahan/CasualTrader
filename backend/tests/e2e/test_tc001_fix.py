@@ -15,7 +15,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent / "src"))
 
 # 直接導入需要的模組，避免導入 TradingAgent
-from src.agents.core.models import AgentConfig, InvestmentPreferences
+from src.agents.core.models import AgentConfig
 from src.database.agent_database_service import AgentDatabaseService, DatabaseConfig
 
 # 使用測試資料庫
@@ -52,10 +52,7 @@ async def test_agent_creation_with_database():
         model="gpt-4o-mini",
         instructions="你是一位測試用的交易 Agent",
         initial_funds=1000000.0,
-        investment_preferences=InvestmentPreferences(
-            max_position_size=50.0,
-            preferred_sectors="科技股",
-        ),
+        investment_preferences=["長期投資", "科技股偏好", "穩健成長"],
     )
     print(f"✅ Agent 配置準備完成：{config.name}")
 

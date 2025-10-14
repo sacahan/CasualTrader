@@ -6,7 +6,7 @@ CasualTrader Agent System Database Models
 from __future__ import annotations
 
 import uuid
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import date, datetime
 from decimal import Decimal
 from enum import Enum
@@ -113,25 +113,6 @@ class ModelType(str, Enum):
 
 
 @dataclass
-class AgentConfig:
-    """Agent 配置資料結構 (Python 3.12+ dataclass)"""
-
-    max_turns: int = 30
-    execution_timeout: int = 300
-    trace_retention_days: int = 30
-    additional_settings: dict[str, Any] = field(default_factory=dict)
-
-
-@dataclass
-class AutoAdjustSettings:
-    """自動調整設定資料結構"""
-
-    triggers: str = "連續三天虧損超過2% ; 單日跌幅超過3% ; 最大回撤超過10%"
-    auto_apply: bool = True
-    review_frequency: str = "daily"
-
-
-@dataclass
 class PerformanceMetrics:
     """績效指標資料結構"""
 
@@ -172,10 +153,7 @@ class Agent(Base):
     current_mode: Mapped[AgentMode] = mapped_column(String(30), default=AgentMode.OBSERVATION)
 
     # JSON 配置欄位
-    config: Mapped[dict[str, Any] | None] = mapped_column(JSON)
     investment_preferences: Mapped[str | None] = mapped_column(Text)
-    strategy_adjustment_criteria: Mapped[str | None] = mapped_column(Text)
-    auto_adjust_settings: Mapped[dict[str, Any] | None] = mapped_column(JSON)
 
     # 時間戳記
     created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now())

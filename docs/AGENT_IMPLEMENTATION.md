@@ -2597,10 +2597,8 @@ class MCPToolWrapper:
 interface AgentCreationForm {
   name: string;
   description: string;
-  strategy_type: "conservative" | "balanced" | "aggressive";
   initial_funds: number;
   max_turns: number;
-  risk_tolerance: number;
 
   // Agent Tools 選擇
   enabled_tools: {

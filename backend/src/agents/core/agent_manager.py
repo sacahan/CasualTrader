@@ -333,7 +333,7 @@ class AgentManager:
             "name": agent.config.name,
             "description": agent.config.description,
             "ai_model": agent.config.ai_model,
-            "strategy_type": agent.config.investment_preferences.strategy_type,
+            "max_position_size": agent.config.max_position_size,
             "strategy_prompt": agent.config.instructions,
             "current_mode": str(agent.state.current_mode.value),
             "status": str(
@@ -343,16 +343,8 @@ class AgentManager:
             "initial_funds": float(agent.config.initial_funds),
             "current_funds": float(agent.config.current_funds or agent.config.initial_funds),
             "max_turns": agent.config.max_turns,
-            "risk_tolerance": agent.config.investment_preferences.risk_tolerance_to_float(
-                agent.config.investment_preferences.risk_tolerance
-            ),
             "enabled_tools": agent.config.enabled_tools,
-            "investment_preferences": {
-                "preferred_sectors": agent.config.investment_preferences.preferred_sectors,
-                "excluded_stocks": agent.config.investment_preferences.excluded_tickers,
-                "max_position_size": agent.config.investment_preferences.max_position_size,
-                "rebalance_frequency": "weekly",  # Default value
-            },
+            "investment_preferences": agent.config.investment_preferences,
             "custom_instructions": agent.config.additional_instructions,
             "color_theme": agent.config.color_theme,  # 添加 color_theme 字段
             "created_at": agent.state.created_at,
@@ -962,38 +954,16 @@ class AgentManager:
             agent.config.ai_model = config_updates["ai_model"]
             config_changed = True
 
-        # 更新風險容忍度
-        if "risk_tolerance" in config_updates:
-            from .models import InvestmentPreferences
-
-            risk_category = InvestmentPreferences.risk_tolerance_from_float(
-                config_updates["risk_tolerance"]
-            )
-            agent.config.investment_preferences.risk_tolerance = risk_category
-            config_changed = True
-
         # 更新工具配置
         if "enabled_tools" in config_updates:
             agent.config.enabled_tools = config_updates["enabled_tools"]
             config_changed = True
 
-        # 更新投資偏好
+        # 更新投資偏好 (股票代碼列表)
         if "investment_preferences" in config_updates:
             prefs_data = config_updates["investment_preferences"]
-            if "preferred_sectors" in prefs_data:
-                agent.config.investment_preferences.preferred_sectors = prefs_data[
-                    "preferred_sectors"
-                ]
-                config_changed = True
-            if "excluded_tickers" in prefs_data:
-                agent.config.investment_preferences.excluded_tickers = prefs_data[
-                    "excluded_tickers"
-                ]
-                config_changed = True
-            if "max_position_size" in prefs_data:
-                agent.config.investment_preferences.max_position_size = prefs_data[
-                    "max_position_size"
-                ]
+            if isinstance(prefs_data, list):
+                agent.config.investment_preferences = prefs_data
                 config_changed = True
 
         # 如果配置有變更，同步到狀態並保存
@@ -1053,7 +1023,6 @@ class AgentManager:
             "custom_instructions",
             "color_theme",
             "ai_model",
-            "risk_tolerance",
             "enabled_tools",
             "investment_preferences",
         }

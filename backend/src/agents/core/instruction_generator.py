@@ -10,7 +10,7 @@ import logging
 from datetime import datetime
 from typing import Any
 
-from .models import AgentConfig, InvestmentPreferences, TradingSettings
+from .models import AgentConfig, TradingSettings
 
 
 class InstructionGenerator:
@@ -84,41 +84,28 @@ class InstructionGenerator:
 - 📊 STRATEGY_REVIEW: 策略檢討和調整
 - 👀 OBSERVATION: 市場觀察和分析"""
 
-    def _build_investment_preferences_section(self, prefs: InvestmentPreferences) -> str:
+    def _build_investment_preferences_section(self, preferences: list[str]) -> str:
         """建構投資偏好指令"""
         section = "## 投資偏好與策略\n"
 
-        # 風險偏好
-        risk_mapping = {
-            "low": "保守型 - 優先考慮資本保全和穩定收益",
-            "medium": "平衡型 - 追求適度成長並控制下檔風險",
-            "high": "積極型 - 追求高成長機會，可承受較高波動",
-        }
-        section += f"**風險偏好**：{risk_mapping.get(prefs.risk_tolerance, '平衡型')}\n\n"
+        # 偏好股票代碼（從列表中獲取）
+        if preferences:
+            section += f"**偏好股票代碼**：{', '.join(preferences)}\n\n"
+            section += "**投資策略**：優先關注上述偏好股票，但不限於此範圍\n\n"
+        else:
+            section += "**投資策略**：平衡型 - 追求適度成長並控制下檔風險\n\n"
 
         # 投資期間
-        horizon_mapping = {
-            "short_term": "短期 (1-6個月) - 重視技術面和短期催化劑",
-            "medium_term": "中期 (6個月-2年) - 平衡基本面和技術面分析",
-            "long_term": "長期 (2年以上) - 重視基本面和企業競爭優勢",
-        }
-        section += f"**投資期間**：{horizon_mapping.get(prefs.investment_horizon, '中期')}\n\n"
+        section += "**投資期間**：中期 (6個月-2年) - 平衡基本面和技術面分析\n\n"
 
-        # 偏好產業
-        if prefs.preferred_sectors:
-            section += f"**偏好產業**：{', '.join(prefs.preferred_sectors)}\n\n"
-        else:
-            section += "**產業配置**：多元化投資，不過度集中特定產業\n\n"
-
-        # 排除標的
-        if prefs.excluded_tickers:
-            section += f"**排除標的**：{', '.join(prefs.excluded_tickers)}\n\n"
+        # 產業配置
+        section += "**產業配置**：多元化投資，不過度集中特定產業\n\n"
 
         # 部位大小限制
-        section += f"""**部位控制**：
-- 單筆投資上限：{prefs.max_position_size}% (最大 NT${prefs.max_position_size / 100 * 1000000:,.0f})
-- 單筆投資下限：{prefs.min_position_size}% (最小 NT${prefs.min_position_size / 100 * 1000000:,.0f})
-- 避免過度集中單一標的或產業"""
+        section += """**部位控制**：
+- 避免過度集中單一標的或產業
+- 嚴格控制單筆交易風險
+- 維持適當的流動性準備"""
 
         return section
 
@@ -146,10 +133,7 @@ class InstructionGenerator:
         """建構策略調整指令"""
         section = "## 策略調整機制\n"
 
-        if config.strategy_adjustment_criteria:
-            section += f"**調整依據**：\n{config.strategy_adjustment_criteria}\n\n"
-        else:
-            section += """**調整依據**：
+        section += """**調整依據**：
 - 績效表現：連續虧損或回撤超過預設閾值
 - 市場環境：重大政策變化、市場極端波動
 - 個股基本面：持股公司基本面惡化
@@ -280,12 +264,9 @@ class InstructionGenerator:
         """
         return {
             "agent_name": config.name,
-            "risk_tolerance": config.investment_preferences.risk_tolerance,
-            "investment_horizon": config.investment_preferences.investment_horizon,
-            "max_position_size": config.investment_preferences.max_position_size,
+            "investment_preferences": config.investment_preferences,
+            "max_position_size": config.max_position_size,
             "auto_adjust_enabled": config.auto_adjust.enabled,
-            "preferred_sectors": config.investment_preferences.preferred_sectors,
-            "excluded_tickers": config.investment_preferences.excluded_tickers,
             "max_daily_trades": config.trading_settings.max_daily_trades,
             "stop_loss_enabled": config.trading_settings.enable_stop_loss,
             "initial_funds": config.initial_funds,

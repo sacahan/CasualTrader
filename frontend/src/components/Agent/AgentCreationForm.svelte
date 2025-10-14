@@ -41,6 +41,7 @@
     max_position_size: DEFAULT_MAX_POSITION_SIZE.toString(),
     ai_model: 'gpt-5-mini', // 默認模型,將在 onMount 中驗證
     color_theme: '34, 197, 94', // 預設綠色
+    investment_preferences: '', // 偏好公司代號，以逗號分隔
   });
 
   // 預設顏色選項
@@ -118,6 +119,7 @@
     initial_funds: '',
     max_position_size: '',
     color_theme: '',
+    investment_preferences: '',
   });
 
   // 提交狀態
@@ -139,11 +141,10 @@
         name: agent.name || '',
         description: agent.description || agent.strategy_prompt || '',
         initial_funds: (agent.initial_funds || DEFAULT_INITIAL_FUNDS).toString(),
-        max_position_size: (
-          agent.investment_preferences?.max_position_size || DEFAULT_MAX_POSITION_SIZE
-        ).toString(),
+        max_position_size: (agent.max_position_size || DEFAULT_MAX_POSITION_SIZE).toString(),
         ai_model: agent.ai_model || 'gpt-5-mini',
         color_theme: agent.color_theme || '34, 197, 94',
+        investment_preferences: agent.investment_preferences?.join(', ') || '',
       };
 
       // 在編輯模式下，同步 customColor
@@ -175,6 +176,7 @@
       initial_funds: '',
       max_position_size: '',
       color_theme: '',
+      investment_preferences: '',
     };
 
     if (!formData.name.trim()) {
@@ -205,6 +207,17 @@
       isValid = false;
     }
 
+    // 驗證偏好公司代號格式 (可選)
+    if (formData.investment_preferences.trim()) {
+      const companies = formData.investment_preferences.split(',').map((c) => c.trim());
+      const invalidCompanies = companies.filter((c) => !/^[A-Z0-9]{1,10}$/.test(c));
+      if (invalidCompanies.length > 0) {
+        errors.investment_preferences =
+          '請輸入有效的股票代號 (英文數字，最多10字元)，多個代號請用逗號分隔';
+        isValid = false;
+      }
+    }
+
     return isValid;
   }
 
@@ -223,12 +236,10 @@
         initial_funds: parseFloat(formData.initial_funds),
         ai_model: formData.ai_model,
         color_theme: formData.color_theme, // 卡片顏色
-        investment_preferences: {
-          preferred_sectors: [],
-          excluded_tickers: [],
-          max_position_size: parseInt(formData.max_position_size), // Convert to integer percentage
-          rebalance_frequency: 'weekly',
-        },
+        investment_preferences: formData.investment_preferences.trim()
+          ? formData.investment_preferences.split(',').map((c) => c.trim().toUpperCase())
+          : [],
+        max_position_size: parseInt(formData.max_position_size), // Convert to integer percentage
       };
 
       if (isEditMode) {
@@ -268,6 +279,7 @@
       max_position_size: DEFAULT_MAX_POSITION_SIZE.toString(),
       ai_model: 'gpt-5-mini', // 與初始值一致
       color_theme: '34, 197, 94', // 預設綠色
+      investment_preferences: '', // 重置偏好公司
     };
     errors = {
       name: '',
@@ -275,6 +287,7 @@
       initial_funds: '',
       max_position_size: '',
       color_theme: '',
+      investment_preferences: '',
     };
 
     // 重置 customColor 為預設綠色
@@ -354,6 +367,15 @@
     bind:value={formData.ai_model}
     optionGroups={$modelOptionsForSelect}
     disabled={$modelsLoading}
+  />
+
+  <!-- 偏好公司代號 -->
+  <Input
+    label="偏好公司代號"
+    bind:value={formData.investment_preferences}
+    placeholder="例如: 2330, 2454, 0050 (多個代號請用逗號分隔)"
+    error={errors.investment_preferences}
+    help="可選欄位：輸入您偏好投資的股票代號，系統會優先考慮這些標的"
   />
 
   <!-- 卡片顏色選擇 -->

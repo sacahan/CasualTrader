@@ -210,7 +210,6 @@ async def create_agent(request: CreateAgentRequest) -> AgentResponse:
     請求體:
     - name: Agent 名稱
     - ai_model: AI 模型選擇（gpt-4o, claude-sonnet-4.5 等）
-    - strategy_type: 策略類型（conservative, balanced, aggressive）
     - investment_preferences: 投資偏好描述
     - initial_funds: 初始資金
     - max_turns: 最大執行回合數
@@ -406,11 +405,9 @@ class CreateAgentRequest(BaseModel):
     name: str = Field(..., min_length=1, max_length=100)
     description: str = Field(default="", max_length=500)
     ai_model: str = Field(default="gpt-4o")
-    strategy_type: str = Field(default="balanced")
     strategy_prompt: str = Field(default="")
     initial_funds: float = Field(default=1000000.0, ge=100000.0)
     max_turns: int = Field(default=50, ge=1, le=1000)
-    risk_tolerance: float = Field(default=0.5, ge=0.0, le=1.0)
     enabled_tools: dict[str, bool] = Field(default_factory=dict)
     investment_preferences: dict[str, Any] = Field(default_factory=dict)
     custom_instructions: str = Field(default="")
@@ -437,7 +434,6 @@ class AgentResponse(BaseModel):
     name: str
     description: str
     ai_model: str
-    strategy_type: str
     strategy_prompt: str
     color_theme: str
     current_mode: str
@@ -445,7 +441,6 @@ class AgentResponse(BaseModel):
     initial_funds: float
     current_funds: float | None
     max_turns: int
-    risk_tolerance: float
     enabled_tools: dict[str, bool]
     investment_preferences: dict[str, Any]
     custom_instructions: str

@@ -71,51 +71,6 @@ class AutoAdjustSettings:
 
 
 @dataclass
-class InvestmentPreferences:
-    """投資偏好設定"""
-
-    preferred_sectors: list[str] = field(default_factory=list)
-    excluded_tickers: list[str] = field(default_factory=list)
-    max_position_size: float = 5.0  # 單筆最大投資比例 (%)
-    min_position_size: float = 1.0  # 單筆最小投資比例 (%)
-    risk_tolerance: str = "medium"  # low, medium, high
-    investment_horizon: str = "long_term"  # short_term, medium_term, long_term
-    strategy_type: str = "balanced"  # conservative, balanced, aggressive, custom
-
-    @staticmethod
-    def risk_tolerance_from_float(value: float) -> str:
-        """
-        Convert risk tolerance from float (0.0-1.0) to string category.
-
-        Args:
-            value: Risk tolerance as float (0.0 = low risk, 1.0 = high risk)
-
-        Returns:
-            Risk tolerance category: "low", "medium", or "high"
-        """
-        if value < 0.35:
-            return "low"
-        elif value < 0.70:
-            return "medium"
-        else:
-            return "high"
-
-    @staticmethod
-    def risk_tolerance_to_float(category: str) -> float:
-        """
-        Convert risk tolerance from string category to float.
-
-        Args:
-            category: Risk tolerance category ("low", "medium", "high")
-
-        Returns:
-            Risk tolerance as float (0.0-1.0)
-        """
-        mapping = {"low": 0.2, "medium": 0.5, "high": 0.8}
-        return mapping.get(category.lower(), 0.5)
-
-
-@dataclass
 class TradingSettings:
     """交易相關設定"""
 
@@ -144,13 +99,13 @@ class AgentConfig:
     current_funds: float | None = None
 
     # 投資配置
-    investment_preferences: InvestmentPreferences = field(default_factory=InvestmentPreferences)
+    investment_preferences: list[str] = Field(default_factory=list)
     trading_settings: TradingSettings = field(default_factory=TradingSettings)
     auto_adjust: AutoAdjustSettings = field(default_factory=AutoAdjustSettings)
+    max_position_size: int = 50  # 最大持倉比例 (%)
 
     # Agent 行為設定
     instructions: str = ""
-    strategy_adjustment_criteria: str = ""
     additional_instructions: str = ""
 
     # 執行參數
@@ -316,15 +271,14 @@ class AgentCreationRequest(BaseModel):
     description: str = Field(min_length=1, max_length=500)
     initial_funds: float = Field(gt=0, le=100000000)
 
-    # 投資設定 (自然語言輸入)
-    investment_preferences: str = Field(min_length=10, max_length=2000)
-    strategy_adjustment_criteria: str = Field(min_length=10, max_length=2000)
+    # 投資設定 (股票代碼列表)
+    investment_preferences: list[str] = Field(default_factory=list)
 
     # 自動調整設定 (可選)
     auto_adjust: AutoAdjustSettings | None = None
 
     # 進階設定 (可選)
-    max_position_size: float | None = Field(default=None, gt=0, le=20)
+    max_position_size: float | None = Field(default=None, gt=0, le=100)
     excluded_tickers: list[str] = Field(default_factory=list)
     additional_instructions: str | None = None
 
@@ -421,7 +375,6 @@ def create_default_agent_config(
         description=description,
         initial_funds=initial_funds,
         instructions="",  # 將由 instruction_generator 生成
-        strategy_adjustment_criteria="",
     )
 
 
@@ -435,7 +388,7 @@ def validate_agent_config(config: AgentConfig) -> list[str]:
     if config.initial_funds <= 0:
         errors.append("Initial funds must be positive")
 
-    if config.investment_preferences.max_position_size <= 0:
+    if config.max_position_size <= 0:
         errors.append("Max position size must be positive")
 
     if config.trading_settings.max_daily_trades <= 0:

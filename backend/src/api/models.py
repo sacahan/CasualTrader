@@ -12,18 +12,6 @@ from typing import Any
 from pydantic import BaseModel, Field
 
 
-class StrategyType(str, Enum):
-    """
-    投資策略類型列舉。
-    用於指定代理人投資風格。
-    """
-
-    CONSERVATIVE = "conservative"  # 保守型
-    BALANCED = "balanced"  # 均衡型
-    AGGRESSIVE = "aggressive"  # 積極型
-    CUSTOM = "custom"  # 自訂型
-
-
 class ExecutionMode(str, Enum):
     """
     代理人執行模式列舉。
@@ -83,18 +71,6 @@ class EnabledTools(BaseModel):
     code_interpreter: bool = False  # 是否啟用程式碼解譯器
 
 
-class InvestmentPreferences(BaseModel):
-    """
-    投資偏好設定。
-    用於指定代理人投資偏好與限制。
-    """
-
-    preferred_sectors: list[str] = Field(default_factory=list)  # 優先投資產業
-    excluded_tickers: list[str] = Field(default_factory=list)  # 排除股票清單
-    max_position_size: int = Field(default=50, ge=0, le=100)  # 最大單一持股比例
-    rebalance_frequency: str = "weekly"  # 再平衡頻率
-
-
 class CreateAgentRequest(BaseModel):
     """
     建立新交易代理人請求模型。
@@ -112,7 +88,6 @@ class CreateAgentRequest(BaseModel):
         max_length=50,
         description="AI 模型 key，必須存在於 ai_model_configs 表中",
     )  # 使用 AI 模型（從資料庫動態載入）
-    strategy_type: StrategyType = Field(default=StrategyType.BALANCED)  # 投資策略類型
     strategy_prompt: str = Field(..., min_length=10)  # 策略提示語
     color_theme: str = Field(
         default="34, 197, 94",
@@ -120,12 +95,10 @@ class CreateAgentRequest(BaseModel):
         description="UI 卡片顏色 (RGB 格式，例如: 34, 197, 94)",
     )  # UI 卡片顏色
     initial_funds: float = Field(default=1000000.0, gt=0)  # 初始資金
+    max_position_size: int = Field(default=50, ge=1, le=100)  # 最大持倉比例 (%)
     max_turns: int = Field(default=10, ge=1, le=30)  # 最大回合數
-    risk_tolerance: float = Field(default=0.5, ge=0.0, le=1.0)  # 風險容忍度
     enabled_tools: EnabledTools = Field(default_factory=EnabledTools)  # 啟用工具
-    investment_preferences: InvestmentPreferences = Field(
-        default_factory=InvestmentPreferences
-    )  # 投資偏好
+    investment_preferences: list[str] = Field(default_factory=list)
     custom_instructions: str = Field(default="")  # 自訂指令
 
 
@@ -143,11 +116,11 @@ class UpdateAgentRequest(BaseModel):
         pattern=r"^\d{1,3},\s*\d{1,3},\s*\d{1,3}$",
         description="UI 卡片顏色 (RGB 格式)",
     )  # UI 卡片顏色
-    risk_tolerance: float | None = Field(None, ge=0.0, le=1.0)  # 風險容忍度
     enabled_tools: EnabledTools | None = None  # 啟用工具
-    investment_preferences: InvestmentPreferences | None = None  # 投資偏好
+    investment_preferences: list[str] | None = None  # 投資偏好
     custom_instructions: str | None = None  # 自訂指令
     ai_model: str | None = Field(None, description="AI 模型")  # AI 模型
+    max_position_size: int | None = Field(None, ge=1, le=100)  # 最大持倉比例 (%)
 
 
 class StartAgentRequest(BaseModel):
@@ -194,18 +167,17 @@ class AgentResponse(BaseModel):
     name: str  # 代理人名稱
     description: str  # 代理人描述
     ai_model: str  # 使用 AI 模型
-    strategy_type: str  # 投資策略類型
     strategy_prompt: str  # 策略提示語
     color_theme: str  # 顏色主題
     current_mode: str  # 目前交易模式
+    max_position_size: int  # 最大持倉比例 (%)
     status: str  # 代理人持久化狀態 (active/inactive/error/suspended)
     runtime_status: str | None = None  # 代理人執行時狀態 (idle/running/stopped)
     initial_funds: float  # 初始資金
     current_funds: float | None = None  # 目前資金
     max_turns: int  # 最大回合數
-    risk_tolerance: float  # 風險容忍度
     enabled_tools: EnabledTools  # 啟用工具
-    investment_preferences: InvestmentPreferences  # 投資偏好
+    investment_preferences: list[str]  # 投資偏好
     custom_instructions: str  # 自訂指令
     created_at: datetime  # 建立時間
     updated_at: datetime  # 更新時間

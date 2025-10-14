@@ -12,6 +12,7 @@
    * @property {boolean} [disabled]
    * @property {string} [error]
    * @property {string} [label]
+   * @property {string} [help]
    * @property {boolean} [required]
    * @property {string} [id]
    * @property {Function} [oninput]
@@ -28,6 +29,7 @@
     disabled = false,
     error = '',
     label = '',
+    help = '',
     required = false,
     id = '',
     oninput = undefined,
@@ -88,6 +90,10 @@
       onfocus={(e) => onfocus?.(e)}
       {...rest}
     />
+  {/if}
+
+  {#if help && !error}
+    <p class="mt-1 text-sm text-gray-500">{help}</p>
   {/if}
 
   {#if error}

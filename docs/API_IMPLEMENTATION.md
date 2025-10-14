@@ -41,12 +41,10 @@ DELETE /api/agents/{id}               # 刪除代理人
   "name": "Prudent Investor",
   "description": "穩健投資策略代理人",
   "ai_model": "gpt-4o",
-  "strategy_type": "conservative",
   "strategy_prompt": "保守投資策略，專注於穩定成長...",
   "color_theme": "#007bff",
   "initial_funds": 1000000.0,
   "max_turns": 50,
-  "risk_tolerance": 0.3,
 
   "enabled_tools": {
     "fundamental_analysis": true,
@@ -101,14 +99,12 @@ DELETE /api/agents/{id}               # 刪除代理人
   "name": "Prudent Investor",
   "description": "穩健投資策略代理人",
   "ai_model": "gpt-4o",
-  "strategy_type": "conservative",
   "strategy_prompt": "保守投資策略...",
   "color_theme": "#007bff",
   "current_mode": "TRADING",
   "status": "stopped",
   "initial_funds": 1000000.0,
   "max_turns": 50,
-  "risk_tolerance": 0.3,
 
   "enabled_tools": {
     "fundamental_analysis": true,
@@ -202,7 +198,6 @@ PUT    /api/agents/{id}/config        # 更新執行配置
 {
   "max_turns": 50,
   "execution_timeout": 600,
-  "risk_tolerance": "moderate"
 }
 ```
 

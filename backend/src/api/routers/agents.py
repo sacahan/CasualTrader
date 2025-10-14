@@ -45,7 +45,7 @@ def _map_agent_to_response(agent_data: dict[str, Any]) -> AgentResponse:
         name=agent_data["name"],
         description=agent_data.get("description", ""),
         ai_model=agent_data.get("ai_model", "gpt-4o"),
-        strategy_type=agent_data.get("strategy_type", "balanced"),
+        max_position_size=agent_data.get("max_position_size", 50),
         strategy_prompt=agent_data.get("strategy_prompt", ""),
         color_theme=agent_data.get("color_theme", "#007bff"),
         current_mode=agent_data.get("current_mode", "TRADING"),
@@ -54,7 +54,6 @@ def _map_agent_to_response(agent_data: dict[str, Any]) -> AgentResponse:
         initial_funds=agent_data.get("initial_funds", 1000000.0),
         current_funds=agent_data.get("current_funds"),
         max_turns=agent_data.get("max_turns", 50),
-        risk_tolerance=agent_data.get("risk_tolerance", 0.5),
         enabled_tools=agent_data.get("enabled_tools", {}),
         investment_preferences=agent_data.get("investment_preferences", {}),
         custom_instructions=agent_data.get("custom_instructions", ""),
@@ -127,24 +126,6 @@ async def create_agent(request: CreateAgentRequest):
             f"Agent config: initial_funds={request.initial_funds}, max_turns={request.max_turns}"
         )
 
-        # Import InvestmentPreferences from agent models
-        from ...agents.core.models import (
-            InvestmentPreferences as AgentInvestmentPreferences,
-        )
-
-        # Convert risk_tolerance from float to string category
-        risk_category = AgentInvestmentPreferences.risk_tolerance_from_float(request.risk_tolerance)
-
-        # Create InvestmentPreferences dataclass
-        agent_investment_prefs = AgentInvestmentPreferences(
-            preferred_sectors=request.investment_preferences.preferred_sectors,
-            excluded_tickers=request.investment_preferences.excluded_tickers,
-            max_position_size=request.investment_preferences.max_position_size
-            * 100,  # Convert to percentage
-            risk_tolerance=risk_category,
-            strategy_type=request.strategy_type.value,
-        )
-
         logger.debug(f"Creating AgentConfig with ai_model={request.ai_model}")
         config = AgentConfig(
             name=request.name,
@@ -156,7 +137,8 @@ async def create_agent(request: CreateAgentRequest):
             instructions=request.strategy_prompt,
             additional_instructions=request.custom_instructions,
             enabled_tools=request.enabled_tools.model_dump(),
-            investment_preferences=agent_investment_prefs,
+            investment_preferences=request.investment_preferences or [],
+            max_position_size=request.max_position_size or 50,
         )
         logger.debug(f"AgentConfig created: {config.name}, enabled_tools={config.enabled_tools}")
 
@@ -241,12 +223,10 @@ async def update_agent(agent_id: str, request: UpdateAgentRequest):
             update_data["ai_model"] = request.ai_model
         if request.color_theme is not None:
             update_data["color_theme"] = request.color_theme
-        if request.risk_tolerance is not None:
-            update_data["risk_tolerance"] = request.risk_tolerance
         if request.enabled_tools is not None:
             update_data["enabled_tools"] = request.enabled_tools.model_dump()
         if request.investment_preferences is not None:
-            update_data["investment_preferences"] = request.investment_preferences.model_dump()
+            update_data["investment_preferences"] = request.investment_preferences
         if request.custom_instructions is not None:
             update_data["custom_instructions"] = request.custom_instructions
 

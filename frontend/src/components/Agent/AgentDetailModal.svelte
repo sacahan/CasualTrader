@@ -72,30 +72,69 @@
           基本資訊
         </h3>
         <div class="space-y-3 text-sm">
-          <div>
-            <p class="text-gray-400">AI 模型</p>
-            <p class="font-medium text-white">
-              {agent?.ai_model || '未知模型'}
-            </p>
+          <div class="border-b border-gray-700 pb-3">
+            <p class="text-gray-400">描述</p>
+            <p class="mt-1 text-white">{agent.description}</p>
           </div>
-          <div>
-            <p class="text-gray-400">狀態</p>
-            <p class="font-medium text-white">{agent?.status || 'IDLE'}</p>
+          <div class="grid grid-cols-2 gap-4">
+            <div>
+              <p class="text-gray-400">AI 模型</p>
+              <p class="font-medium text-white">
+                {agent?.ai_model || '未知模型'}
+              </p>
+            </div>
+            <div>
+              <p class="text-gray-400">單一持股上限</p>
+              <p class="font-medium text-white">
+                {agent?.max_position_size || 50}%
+              </p>
+            </div>
+            <div>
+              <p class="text-gray-400">狀態</p>
+              <p class="font-medium text-white">{agent?.status || 'IDLE'}</p>
+            </div>
+            <div>
+              <p class="text-gray-400">創建時間</p>
+              <p class="font-medium text-white">{formatDateTime(agent?.created_at)}</p>
+            </div>
           </div>
-          <div>
-            <p class="text-gray-400">創建時間</p>
-            <p class="font-medium text-white">{formatDateTime(agent?.created_at)}</p>
-          </div>
-          <div>
-            <p class="text-gray-400">單一持股上限</p>
-            <p class="font-medium text-white">
-              {((agent?.investment_preferences?.max_position_size || 0.15) * 100).toFixed(0)}%
-            </p>
-          </div>
-          {#if agent?.description}
-            <div class="border-t border-gray-700 pt-3">
-              <p class="text-gray-400">描述</p>
-              <p class="mt-1 text-white">{agent.description}</p>
+
+          <!-- 投資偏好 -->
+          {#if agent?.investment_preferences}
+            <div class="mt-4 border-t border-gray-700 pt-3">
+              <p class="mb-2 text-gray-400">投資偏好</p>
+              <div class="space-y-2 text-sm">
+                {#if agent.investment_preferences && agent.investment_preferences.length > 0}
+                  <div>
+                    <span class="text-gray-400">偏好公司：</span>
+                    <span class="ml-2 font-medium text-white">
+                      {agent.investment_preferences.join(', ')}
+                    </span>
+                  </div>
+                {/if}
+                {#if agent.investment_preferences.preferred_sectors && agent.investment_preferences.preferred_sectors.length > 0}
+                  <div>
+                    <span class="text-gray-400">偏好產業：</span>
+                    <span class="ml-2 font-medium text-white">
+                      {agent.investment_preferences.preferred_sectors.join(', ')}
+                    </span>
+                  </div>
+                {/if}
+                {#if agent.investment_preferences.excluded_tickers && agent.investment_preferences.excluded_tickers.length > 0}
+                  <div>
+                    <span class="text-gray-400">排除股票：</span>
+                    <span class="ml-2 font-medium text-white">
+                      {agent.investment_preferences.excluded_tickers.join(', ')}
+                    </span>
+                  </div>
+                {/if}
+                <div>
+                  <span class="text-gray-400">再平衡頻率：</span>
+                  <span class="ml-2 font-medium text-white">
+                    {agent.investment_preferences.rebalance_frequency || '每週'}
+                  </span>
+                </div>
+              </div>
             </div>
           {/if}
         </div>

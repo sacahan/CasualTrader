@@ -133,14 +133,11 @@ class AgentDatabaseService:
             ai_model=config.ai_model,
             color_theme=config.color_theme,  # 添加 color_theme 字段
             initial_funds=config.initial_funds,
-            max_position_size=config.investment_preferences.max_position_size,
+            max_position_size=config.max_position_size,
             status=agent_state.status.value,
             current_mode=agent_state.current_mode.value,
             config=self._serialize_config(config),
-            investment_preferences=json.dumps(
-                config.investment_preferences.preferred_sectors, ensure_ascii=False
-            ),
-            strategy_adjustment_criteria=config.strategy_adjustment_criteria,
+            investment_preferences=json.dumps(config.investment_preferences, ensure_ascii=False),
             auto_adjust_settings=self._serialize_auto_adjust(config.auto_adjust),
             created_at=agent_state.created_at,
             updated_at=agent_state.updated_at,
@@ -164,9 +161,8 @@ class AgentDatabaseService:
         db_agent.current_mode = agent_state.current_mode.value
         db_agent.config = self._serialize_config(config)
         db_agent.investment_preferences = json.dumps(
-            config.investment_preferences.preferred_sectors, ensure_ascii=False
+            config.investment_preferences, ensure_ascii=False
         )
-        db_agent.strategy_adjustment_criteria = config.strategy_adjustment_criteria
         db_agent.auto_adjust_settings = self._serialize_auto_adjust(config.auto_adjust)
         db_agent.updated_at = agent_state.updated_at
         db_agent.last_active_at = agent_state.last_active_at
@@ -194,13 +190,12 @@ class AgentDatabaseService:
 
     async def _db_agent_to_state(self, db_agent: DBAgent) -> AgentState:
         """將資料庫 Agent 轉換為 AgentState"""
-        from ..agents.core.models import InvestmentPreferences
 
         # 反序列化 investment_preferences
-        preferred_sectors = []
+        investment_preferences = []
         if db_agent.investment_preferences:
             try:
-                preferred_sectors = json.loads(db_agent.investment_preferences)
+                investment_preferences = json.loads(db_agent.investment_preferences)
             except json.JSONDecodeError:
                 self.logger.warning(
                     f"Failed to parse investment_preferences for agent {db_agent.id}"
@@ -214,13 +209,8 @@ class AgentDatabaseService:
             ai_model=db_agent.ai_model,
             color_theme=db_agent.color_theme or "34, 197, 94",  # 添加 color_theme 字段，提供預設值
             initial_funds=db_agent.initial_funds,
-            strategy_adjustment_criteria=db_agent.strategy_adjustment_criteria or "",
-        )
-
-        # 重建 InvestmentPreferences
-        config.investment_preferences = InvestmentPreferences(
-            preferred_sectors=preferred_sectors,
-            max_position_size=float(db_agent.max_position_size),
+            max_position_size=db_agent.max_position_size or 50,
+            investment_preferences=investment_preferences,
         )
 
         # 創建 AgentState
@@ -680,12 +670,7 @@ class AgentDatabaseService:
             "max_turns": config.max_turns,
             "execution_timeout": config.execution_timeout,
             "enabled_tools": config.enabled_tools,
-            "investment_preferences": {
-                "preferred_sectors": config.investment_preferences.preferred_sectors,
-                "excluded_tickers": config.investment_preferences.excluded_tickers,
-                "max_position_size": config.investment_preferences.max_position_size,
-                "risk_tolerance": config.investment_preferences.risk_tolerance,
-            },
+            "investment_preferences": config.investment_preferences,
             "trading_settings": {
                 "max_daily_trades": config.trading_settings.max_daily_trades,
                 "enable_stop_loss": config.trading_settings.enable_stop_loss,

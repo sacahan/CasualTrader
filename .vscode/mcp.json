@@ -7,6 +7,16 @@
                 "/Users/sacahan/Documents/workspace/CasualMarket",
                 "casual-market-mcp"
             ]
+        },
+        "mcp-memory-libsql": {
+            "command": "npx",
+            "args": [
+                "-y",
+                "mcp-memory-libsql"
+            ],
+            "env": {
+                "LIBSQL_URL": "file:./memory/knowledge.db"
+            }
         }
     }
 }

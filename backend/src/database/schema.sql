@@ -24,11 +24,8 @@ CREATE TABLE IF NOT EXISTS agents (
     status TEXT NOT NULL DEFAULT 'inactive' CHECK (status IN ('active', 'inactive', 'error', 'suspended')),
     current_mode TEXT DEFAULT 'OBSERVATION' CHECK (current_mode IN ('TRADING', 'REBALANCING', 'STRATEGY_REVIEW', 'OBSERVATION')),
 
-    -- 配置參數 (JSON)
-    config JSON,                            -- Agent 配置參數
-    investment_preferences TEXT,            -- 投資偏好
-    strategy_adjustment_criteria TEXT,      -- 策略調整依據
-    auto_adjust_settings JSON,              -- 自動調整設定
+    -- 配置參數
+    investment_preferences TEXT,            -- 投資偏好 (JSON 格式)
 
     -- 時間戳記
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
