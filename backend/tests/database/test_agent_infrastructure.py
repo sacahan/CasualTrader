@@ -154,7 +154,8 @@ async def test_agent_manager() -> None:
     """測試 AgentManager"""
     print("\n🏢 測試 AgentManager...")
 
-    manager = AgentManager()
+    # 使用預設的最大併發執行數 10
+    manager = AgentManager(max_concurrent_executions=5)  # 測試時使用較小的值
     print("✅ AgentManager 創建成功")
 
     # 啟動管理器

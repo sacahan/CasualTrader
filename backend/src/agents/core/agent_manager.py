@@ -31,7 +31,7 @@ class AgentManager:
     Agent 管理器 - 負責管理多個 Agent 的生命週期
     """
 
-    def __init__(self, database_service: Any = None) -> None:
+    def __init__(self, database_service: Any = None, max_concurrent_executions: int = 10) -> None:
         self._agents: dict[str, CasualTradingAgent] = {}
         self._active_executions: dict[str, asyncio.Task[AgentExecutionResult]] = {}
         self._execution_history: dict[str, list[AgentExecutionResult]] = {}
@@ -43,7 +43,7 @@ class AgentManager:
         self._database_service = database_service
 
         # 配置管理
-        self._max_concurrent_executions = 10
+        self._max_concurrent_executions = max_concurrent_executions
         self._execution_semaphore = asyncio.Semaphore(self._max_concurrent_executions)
 
         # 日誌設定
@@ -68,6 +68,11 @@ class AgentManager:
     def active_agent_count(self) -> int:
         """獲取活躍 Agent 數量"""
         return sum(1 for agent in self._agents.values() if agent.is_active)
+
+    @property
+    def max_concurrent_executions(self) -> int:
+        """獲取最大併發執行數"""
+        return self._max_concurrent_executions
 
     # ==========================================
     # 管理器生命週期
@@ -389,7 +394,7 @@ class AgentManager:
         if not agent.is_active:
             raise RuntimeError(f"Agent {agent_id} is not active")
 
-        # 檢查並發限制
+        # 檢查並發限制：每次執行 async with semaphore: 時，計數器減一，直到為零時，新的協程會被暫停（等待），直到有其他協程釋放（離開 with 區塊，計數器加一
         async with self._execution_semaphore:
             # 創建執行任務
             execution_task = asyncio.create_task(
@@ -625,6 +630,9 @@ class AgentManager:
             "total_agents": self.agent_count,
             "active_agents": self.active_agent_count,
             "active_executions": len(self._active_executions),
+            "max_concurrent_executions": self._max_concurrent_executions,
+            "available_execution_slots": self._max_concurrent_executions
+            - len(self._active_executions),
             "total_executions": total_executions,
             "agent_statistics": agent_stats,
         }

@@ -120,7 +120,7 @@ class CreateAgentRequest(BaseModel):
         description="UI 卡片顏色 (RGB 格式，例如: 34, 197, 94)",
     )  # UI 卡片顏色
     initial_funds: float = Field(default=1000000.0, gt=0)  # 初始資金
-    max_turns: int = Field(default=50, ge=1, le=1000)  # 最大回合數
+    max_turns: int = Field(default=10, ge=1, le=30)  # 最大回合數
     risk_tolerance: float = Field(default=0.5, ge=0.0, le=1.0)  # 風險容忍度
     enabled_tools: EnabledTools = Field(default_factory=EnabledTools)  # 啟用工具
     investment_preferences: InvestmentPreferences = Field(
@@ -157,7 +157,7 @@ class StartAgentRequest(BaseModel):
     """
 
     execution_mode: ExecutionMode = Field(default=ExecutionMode.CONTINUOUS)  # 執行模式
-    max_cycles: int = Field(default=100, ge=1, le=10000)  # 最大執行週期
+    max_cycles: int = Field(default=10, ge=1, le=30)  # 最大執行週期
     stop_on_loss_threshold: float = Field(default=0.15, ge=0.0, le=1.0)  # 停損門檻
 
 

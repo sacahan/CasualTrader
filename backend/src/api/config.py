@@ -54,7 +54,7 @@ class Settings(BaseSettings):
     database_echo: bool = Field(default=False, description="Echo SQL queries")
 
     # Agent Settings
-    max_agents: int = Field(default=10, description="Maximum number of agents")
+    max_agents: int = Field(default=10, description="Maximum concurrent agent executions")
     default_ai_model: str = Field(default="gpt-4o-mini", description="Default AI model")
     default_initial_capital: float = Field(default=1000000.0, description="Default initial capital")
     default_max_turns: int = Field(default=30, description="Default max turns for main agent")

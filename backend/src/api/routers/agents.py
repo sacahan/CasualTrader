@@ -13,6 +13,7 @@ from loguru import logger
 from ...agents.core.agent_manager import AgentManager
 from ...agents.core.models import AgentConfig, AgentMode
 from ...database.agent_database_service import AgentDatabaseService, DatabaseConfig
+from ..config import Settings
 from ..models import (
     AgentListResponse,
     AgentResponse,
@@ -25,11 +26,16 @@ from ..websocket import websocket_manager
 
 router = APIRouter()
 
+# Global settings instance
+settings = Settings()
+
 # Global database service instance
 database_service = AgentDatabaseService(DatabaseConfig())
 
-# Global agent manager instance (注入資料庫服務)
-agent_manager = AgentManager(database_service=database_service)
+# Global agent manager instance (注入資料庫服務和配置)
+agent_manager = AgentManager(
+    database_service=database_service, max_concurrent_executions=settings.max_agents
+)
 
 
 def _map_agent_to_response(agent_data: dict[str, Any]) -> AgentResponse:
@@ -231,6 +237,8 @@ async def update_agent(agent_id: str, request: UpdateAgentRequest):
             update_data["description"] = request.description
         if request.strategy_prompt is not None:
             update_data["strategy_prompt"] = request.strategy_prompt
+        if request.ai_model is not None:
+            update_data["ai_model"] = request.ai_model
         if request.color_theme is not None:
             update_data["color_theme"] = request.color_theme
         if request.risk_tolerance is not None:
@@ -241,8 +249,6 @@ async def update_agent(agent_id: str, request: UpdateAgentRequest):
             update_data["investment_preferences"] = request.investment_preferences.model_dump()
         if request.custom_instructions is not None:
             update_data["custom_instructions"] = request.custom_instructions
-        if request.ai_model is not None:
-            update_data["ai_model"] = request.ai_model
 
         # Apply updates
         await agent_manager.update_agent(agent_id, update_data)
