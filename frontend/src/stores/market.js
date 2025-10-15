@@ -102,23 +102,23 @@ export async function loadMarketIndices() {
 /**
  * 載入股票報價
  */
-export async function loadStockQuote(symbol) {
+export async function loadStockQuote(ticker) {
   loading.set(true);
   error.set(null);
 
   try {
-    const quote = await apiClient.getStockQuote(symbol);
+    const quote = await apiClient.getStockQuote(ticker);
 
     // 更新快取
     stockQuotes.update((quotes) => ({
       ...quotes,
-      [symbol]: quote,
+      [ticker]: quote,
     }));
 
     return quote;
   } catch (err) {
     error.set(extractErrorMessage(err));
-    console.error(`Failed to load quote for ${symbol}:`, err);
+    console.error(`Failed to load quote for ${ticker}:`, err);
     throw err;
   } finally {
     loading.set(false);
@@ -128,8 +128,8 @@ export async function loadStockQuote(symbol) {
 /**
  * 批量載入股票報價
  */
-export async function loadStockQuotes(symbols) {
-  const promises = symbols.map((symbol) => loadStockQuote(symbol));
+export async function loadStockQuotes(tickers) {
+  const promises = tickers.map((ticker) => loadStockQuote(ticker));
 
   try {
     const quotes = await Promise.allSettled(promises);
@@ -143,12 +143,12 @@ export async function loadStockQuotes(symbols) {
 /**
  * 從快取中取得股票報價
  */
-export function getCachedQuote(symbol) {
+export function getCachedQuote(ticker) {
   let quotes;
   stockQuotes.subscribe((value) => {
     quotes = value;
   })();
-  return quotes[symbol] || null;
+  return quotes[ticker] || null;
 }
 
 /**

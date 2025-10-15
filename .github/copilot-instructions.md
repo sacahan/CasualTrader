@@ -4,6 +4,13 @@
 
 These are VS Code coding guidelines. Please also review our [Source Code Organisation](https://github.com/microsoft/vscode/wiki/Source-Code-Organization) page.
 
+## Key Principles
+
+- **Code as configuration** - No need for a complex configuration system
+- **Configuration close to usage** - Place configuration where it is used, not buried deep
+- **Explicit over implicit** - See parameter values directly, no need to track down
+- **Simple over complex** - Prefer a few repeated lines over excessive abstraction
+
 ## Task List
 
 List the available executable tasks or options using 1, 2, 3, ... for easy user selection.

@@ -185,7 +185,7 @@
               class="flex items-center justify-between rounded-lg border border-gray-700 bg-gray-900 p-3"
             >
               <div>
-                <p class="font-medium text-white">{holding.symbol}</p>
+                <p class="font-medium text-white">{holding.ticker}</p>
                 <p class="text-sm text-gray-400">{holding.name || ''}</p>
               </div>
               <div class="text-right">
@@ -217,7 +217,7 @@
                 <span class={tx.type === 'BUY' ? 'text-green-400' : 'text-red-400'}>
                   {tx.type === 'BUY' ? '買入' : '賣出'}
                 </span>
-                <span class="ml-2 text-white">{tx.symbol}</span>
+                <span class="ml-2 text-white">{tx.ticker}</span>
               </div>
               <div class="text-right">
                 <p class="text-white">{tx.shares} 股 @ {formatCurrency(tx.price)}</p>

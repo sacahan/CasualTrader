@@ -220,8 +220,8 @@ class APIClient {
   /**
    * Get stock quote
    */
-  getStockQuote(symbol) {
-    return this.request(`/api/trading/market/quote/${symbol}`);
+  getStockQuote(ticker) {
+    return this.request(`/api/trading/market/quote/${ticker}`);
   }
 
   /**

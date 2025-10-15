@@ -30,10 +30,10 @@ class AgentStatus(str, Enum):
 class AgentMode(str, Enum):
     """Agent 執行模式"""
 
-    TRADING = "TRADING"
-    REBALANCING = "REBALANCING"
-    STRATEGY_REVIEW = "STRATEGY_REVIEW"
-    OBSERVATION = "OBSERVATION"
+    TRADING = "TRADING"  # 尋找和執行交易機會
+    REBALANCING = "REBALANCING"  # 調整投資組合配置
+    STRATEGY_REVIEW = "STRATEGY_REVIEW"  # 檢討策略和績效
+    OBSERVATION = "OBSERVATION"  # 監控市場但不交易
 
 
 class SessionStatus(str, Enum):

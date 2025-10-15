@@ -268,11 +268,11 @@ function handleAgentStatusUpdate(payload) {
  * 處理交易執行事件
  */
 function handleTradeExecution(payload) {
-  const { agent_id, action, symbol, quantity, price } = payload;
+  const { agent_id, action, ticker, quantity, price } = payload;
 
   addNotification({
     type: 'success',
-    message: `Agent ${agent_id} ${action === 'buy' ? '買入' : '賣出'} ${symbol} ${quantity} 股 @ ${price}`,
+    message: `Agent ${agent_id} ${action === 'buy' ? '買入' : '賣出'} ${ticker} ${quantity} 股 @ ${price}`,
   });
 
   // 可以觸發投資組合刷新等後續操作
