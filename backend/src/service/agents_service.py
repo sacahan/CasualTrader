@@ -188,13 +188,89 @@ class AgentsService:
             raise AgentDatabaseError(f"Failed to list agents by status: {str(e)}")
 
     # ==========================================
+    # Create Operations
+    # ==========================================
+
+    async def create_agent(
+        self,
+        name: str,
+        description: str,
+        ai_model: str,
+        strategy_prompt: str,
+        initial_funds: float,
+        max_position_size: float = 5.0,
+        color_theme: str = "34, 197, 94",
+        investment_preferences: list[str] | None = None,
+        custom_instructions: str = "",
+        enabled_tools: dict | None = None,
+    ) -> Agent:
+        """
+        創建新 Agent
+
+        Args:
+            name: Agent 名稱
+            description: Agent 描述
+            ai_model: AI 模型名稱
+            strategy_prompt: 策略提示
+            initial_funds: 初始資金
+            max_position_size: 最大持倉比例 (%)
+            color_theme: 顏色主題 (RGB 格式)
+            investment_preferences: 投資偏好列表
+            custom_instructions: 自訂指令
+            enabled_tools: 啟用的工具
+
+        Returns:
+            創建的 Agent 實例
+
+        Raises:
+            AgentConfigurationError: 配置錯誤
+            AgentDatabaseError: 資料庫操作失敗
+        """
+        try:
+            # 生成 Agent ID
+            agent_id = f"agent_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{str(uuid.uuid4())[:8]}"
+
+            # 轉換投資偏好為 JSON 字串
+            preferences_json = None
+            if investment_preferences:
+                import json
+
+                preferences_json = json.dumps(investment_preferences, ensure_ascii=False)
+
+            # 創建 Agent 實例
+            agent = Agent(
+                id=agent_id,
+                name=name,
+                description=description,
+                ai_model=ai_model,
+                color_theme=color_theme,
+                initial_funds=Decimal(str(initial_funds)),
+                current_funds=Decimal(str(initial_funds)),
+                max_position_size=Decimal(str(max_position_size)),
+                status=AgentStatus.INACTIVE,
+                current_mode=AgentMode.OBSERVATION,
+                investment_preferences=preferences_json,
+                created_at=datetime.now(),
+                updated_at=datetime.now(),
+            )
+
+            self.session.add(agent)
+            logger.info(f"Created new agent: {agent_id}")
+
+            return agent
+
+        except Exception as e:
+            logger.error(f"Failed to create agent: {e}", exc_info=True)
+            raise AgentDatabaseError(f"Failed to create agent: {str(e)}")
+
+    # ==========================================
     # Update Operations
     # ==========================================
 
     async def update_agent_status(
         self,
         agent_id: str,
-        status: AgentStatus,
+        status: AgentStatus | None = None,
         mode: AgentMode | None = None,
     ) -> None:
         """
@@ -217,12 +293,19 @@ class AgentsService:
             if not agent:
                 raise AgentNotFoundError(f"Agent '{agent_id}' not found")
 
-            agent.status = status
-            if mode:
+            if status is not None:
+                agent.status = status
+            if mode is not None:
                 agent.current_mode = mode
 
             await self.session.commit()
-            logger.info(f"Updated agent {agent_id} status to {status.value}")
+
+            log_msg = f"Updated agent {agent_id}"
+            if status:
+                log_msg += f" status to {status.value}"
+            if mode:
+                log_msg += f" mode to {mode.value}"
+            logger.info(log_msg)
 
         except AgentNotFoundError:
             raise
@@ -415,6 +498,44 @@ class AgentsService:
             logger.error(f"Database error updating holdings: {e}", exc_info=True)
             raise AgentDatabaseError(f"Failed to update holdings: {str(e)}")
 
+    async def get_agent_transactions(
+        self,
+        agent_id: str,
+        limit: int = 50,
+        offset: int = 0,
+    ) -> list[Transaction]:
+        """
+        取得 Agent 的交易記錄
+
+        Args:
+            agent_id: Agent ID
+            limit: 返回記錄數量限制
+            offset: 偏移量
+
+        Returns:
+            交易記錄列表
+
+        Raises:
+            AgentDatabaseError: 資料庫操作失敗
+        """
+        try:
+            stmt = (
+                select(Transaction)
+                .where(Transaction.agent_id == agent_id)
+                .order_by(Transaction.created_at.desc())
+                .limit(limit)
+                .offset(offset)
+            )
+            result = await self.session.execute(stmt)
+            transactions = list(result.scalars().all())
+
+            logger.info(f"Found {len(transactions)} transactions for agent {agent_id}")
+            return transactions
+
+        except Exception as e:
+            logger.error(f"Database error getting transactions: {e}", exc_info=True)
+            raise AgentDatabaseError(f"Failed to get transactions: {str(e)}")
+
     async def calculate_and_update_performance(self, agent_id: str) -> None:
         """
         計算並更新 Agent 績效指標
@@ -579,9 +700,6 @@ class AgentsService:
         # 驗證必要欄位
         if not agent.name:
             raise AgentConfigurationError("Agent name is required")
-
-        if not agent.instructions:
-            raise AgentConfigurationError("Agent instructions are required")
 
         if not agent.ai_model:
             raise AgentConfigurationError("AI model is required")

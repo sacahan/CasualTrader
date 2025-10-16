@@ -34,7 +34,6 @@ from ..common.enums import (
     AgentStatus,
     ModelType,
     SessionStatus,
-    StrategyChangeType,
     TransactionAction,
     TransactionStatus,
 )
@@ -77,7 +76,6 @@ class Agent(Base):
     id: Mapped[str] = mapped_column(String(50), primary_key=True, default=lambda: str(uuid.uuid4()))
     name: Mapped[str] = mapped_column(String(200), nullable=False)
     description: Mapped[str | None] = mapped_column(Text)
-    instructions: Mapped[str] = mapped_column(Text, nullable=False)
     ai_model: Mapped[str] = mapped_column(String(50), default="gpt-4o-mini")
     color_theme: Mapped[str] = mapped_column(
         String(20), default="34, 197, 94"
@@ -110,9 +108,6 @@ class Agent(Base):
     )
     transactions: Mapped[list[Transaction]] = relationship(
         "Transaction", back_populates="agent", cascade="all, delete-orphan"
-    )
-    strategy_changes: Mapped[list[StrategyChange]] = relationship(
-        "StrategyChange", back_populates="agent", cascade="all, delete-orphan"
     )
     performance_records: Mapped[list[AgentPerformance]] = relationship(
         "AgentPerformance", back_populates="agent", cascade="all, delete-orphan"
@@ -251,46 +246,6 @@ class Transaction(Base):
     )
 
 
-class StrategyChange(Base):
-    """策略變更記錄模型"""
-
-    __tablename__ = "strategy_changes"
-
-    id: Mapped[str] = mapped_column(String(50), primary_key=True, default=lambda: str(uuid.uuid4()))
-    agent_id: Mapped[str] = mapped_column(String(50), ForeignKey("agents.id"), nullable=False)
-
-    # 變更觸發資訊
-    trigger_reason: Mapped[str] = mapped_column(Text, nullable=False)
-    change_type: Mapped[StrategyChangeType] = mapped_column(String(30), nullable=False)
-
-    # 策略內容變更
-    old_strategy: Mapped[str | None] = mapped_column(Text)
-    new_strategy: Mapped[str] = mapped_column(Text, nullable=False)
-    change_summary: Mapped[str] = mapped_column(Text, nullable=False)
-
-    # 績效背景資料
-    performance_at_change: Mapped[dict[str, Any] | None] = mapped_column(JSON)
-
-    # Agent 說明
-    agent_explanation: Mapped[str | None] = mapped_column(Text)
-
-    # 時間戳記
-    timestamp: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now())
-
-    # 關聯關係
-    agent: Mapped[Agent] = relationship("Agent", back_populates="strategy_changes")
-
-    # 表約束
-    __table_args__ = (
-        CheckConstraint(
-            change_type.in_([c.value for c in StrategyChangeType]),
-            name="check_strategy_change_type",
-        ),
-        Index("idx_strategy_changes_agent_id", "agent_id"),
-        Index("idx_strategy_changes_timestamp", "timestamp"),
-    )
-
-
 class AgentPerformance(Base):
     """Agent 績效指標模型"""
 
@@ -424,7 +379,6 @@ def get_model_by_name(model_name: str) -> type[Base] | None:
         "session": AgentSession,
         "holding": AgentHolding,
         "transaction": Transaction,
-        "strategy_change": StrategyChange,
         "performance": AgentPerformance,
         "cache": MarketDataCache,
         "config": AgentConfigCache,

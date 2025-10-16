@@ -99,19 +99,6 @@ class TransactionStatus(str, Enum):
 
 
 # ==========================================
-# 策略變更相關枚舉
-# ==========================================
-
-
-class StrategyChangeType(str, Enum):
-    """策略變更類型枚舉"""
-
-    AUTO = "auto"  # 自動調整
-    MANUAL = "manual"  # 手動調整
-    PERFORMANCE_DRIVEN = "performance_driven"  # 績效驅動調整
-
-
-# ==========================================
 # AI 模型相關枚舉
 # ==========================================
 

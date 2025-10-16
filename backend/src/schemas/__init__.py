@@ -13,7 +13,7 @@ from .agent import (
     UpdateAgentRequest,
     UpdateModeRequest,
 )
-from .trading import StrategyChange, TradeRecord
+from .trading import TradeRecord
 from .websocket import ErrorResponse, WebSocketMessage
 
 __all__ = [
@@ -28,7 +28,6 @@ __all__ = [
     "AgentListResponse",
     # Trading schemas
     "TradeRecord",
-    "StrategyChange",
     # WebSocket schemas
     "WebSocketMessage",
     "ErrorResponse",

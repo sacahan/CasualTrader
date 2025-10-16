@@ -158,11 +158,11 @@ class APIClient {
     return this.request(`/api/agent-execution/${agentId}/statistics`);
   }
 
-  // ========== TODO: 以下端點需要後端實現 ==========
+  // ========== Agent Mode & Reset APIs ==========
 
   /**
    * Switch agent mode
-   * TODO: 後端尚未實現此端點
+   * Note: 後端已實現 POST /api/agents/{agent_id}/mode
    */
   switchAgentMode(agentId, mode) {
     return this.request(`/api/agents/${agentId}/mode`, {
@@ -173,7 +173,7 @@ class APIClient {
 
   /**
    * Reset agent (clear portfolio and history)
-   * TODO: 後端尚未實現此端點
+   * Note: 後端已實現 POST /api/agents/{agent_id}/reset
    */
   resetAgent(agentId) {
     return this.request(`/api/agents/${agentId}/reset`, {
@@ -182,11 +182,10 @@ class APIClient {
   }
 
   // ========== Portfolio & Trading APIs ==========
-  // TODO: 以下所有 Trading API 端點都需要後端實現
 
   /**
    * Get agent portfolio
-   * TODO: 後端尚未實現此端點
+   * Note: 後端已實現 GET /api/trading/agents/{agent_id}/portfolio
    */
   getPortfolio(agentId) {
     return this.request(`/api/trading/agents/${agentId}/portfolio`);
@@ -194,7 +193,7 @@ class APIClient {
 
   /**
    * Get agent trades
-   * TODO: 後端尚未實現此端點
+   * Note: 後端已實現 GET /api/trading/agents/{agent_id}/trades
    */
   getTrades(agentId, limit = 50, offset = 0) {
     const params = new URLSearchParams({
@@ -206,7 +205,7 @@ class APIClient {
 
   /**
    * Get agent performance metrics
-   * TODO: 後端尚未實現此端點
+   * Note: 後端已實現 GET /api/trading/agents/{agent_id}/performance
    */
   getPerformance(agentId) {
     return this.request(`/api/trading/agents/${agentId}/performance`);
@@ -214,7 +213,7 @@ class APIClient {
 
   /**
    * Get agent holdings
-   * TODO: 後端尚未實現此端點
+   * Note: 後端已實現 GET /api/trading/agents/{agent_id}/holdings
    */
   getHoldings(agentId) {
     return this.request(`/api/trading/agents/${agentId}/holdings`);
@@ -222,7 +221,7 @@ class APIClient {
 
   /**
    * Get agent transactions
-   * TODO: 後端尚未實現此端點
+   * Note: 後端已實現 GET /api/trading/agents/{agent_id}/transactions
    */
   getTransactions(agentId, limit = 50, offset = 0) {
     const params = new URLSearchParams({
@@ -232,65 +231,6 @@ class APIClient {
     return this.request(`/api/trading/agents/${agentId}/transactions?${params}`);
   }
 
-  // ========== Strategy Change APIs ==========
-  // TODO: 以下所有 Strategy API 端點都需要後端實現
-
-  /**
-   * Get strategy changes
-   * TODO: 後端尚未實現此端點
-   */
-  getStrategyChanges(agentId, limit = 50, offset = 0, changeType = null) {
-    const params = new URLSearchParams({
-      limit: String(limit),
-      offset: String(offset),
-    });
-    if (changeType) params.append('change_type', changeType);
-    return this.request(`/api/trading/agents/${agentId}/strategy-changes?${params}`);
-  }
-
-  /**
-   * Get latest strategy
-   * TODO: 後端尚未實現此端點
-   */
-  getLatestStrategy(agentId) {
-    return this.request(`/api/trading/agents/${agentId}/strategy-changes/latest`);
-  }
-
-  /**
-   * Get strategy evolution summary
-   * TODO: 後端尚未實現此端點
-   */
-  getStrategyEvolution(agentId) {
-    return this.request(`/api/trading/agents/${agentId}/strategy-changes/evolution`);
-  }
-
-  // ========== Market APIs ==========
-  // TODO: 以下所有 Market API 端點都需要後端實現
-
-  /**
-   * Get market status
-   * TODO: 後端尚未實現此端點
-   */
-  getMarketStatus() {
-    return this.request('/api/trading/market/status');
-  }
-
-  /**
-   * Get stock quote
-   * TODO: 後端尚未實現此端點
-   */
-  getStockQuote(ticker) {
-    return this.request(`/api/trading/market/quote/${ticker}`);
-  }
-
-  /**
-   * Get market indices
-   * TODO: 後端尚未實現此端點
-   */
-  getMarketIndices() {
-    return this.request('/api/trading/market/indices');
-  }
-
   // ========== System APIs ==========
 
   /**
@@ -298,14 +238,6 @@ class APIClient {
    */
   healthCheck() {
     return this.request('/api/health');
-  }
-
-  /**
-   * Get system stats
-   * TODO: 後端尚未實現此端點
-   */
-  getSystemStats() {
-    return this.request('/api/system/stats');
   }
 
   // ========== AI Models APIs ==========

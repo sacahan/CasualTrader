@@ -50,7 +50,7 @@ except Exception as e:
 # Test 4: Schemas - Trading
 try:
     test_results.append(("✅", "schemas.trading", "Pydantic Trading schemas"))
-    print("✅ schemas.trading - TradeRecord, StrategyChange")
+    print("✅ schemas.trading - TradeRecord")
 except Exception as e:
     test_results.append(("❌", "schemas.trading", str(e)))
     print(f"❌ schemas.trading: {e}")

@@ -11,7 +11,6 @@ from .enums import (
     ExecutionMode,
     ModelType,
     SessionStatus,
-    StrategyChangeType,
     TransactionAction,
     TransactionStatus,
     get_all_agent_modes,
@@ -31,7 +30,6 @@ __all__ = [
     "ExecutionMode",
     "TransactionAction",
     "TransactionStatus",
-    "StrategyChangeType",
     "ModelType",
     # Utility functions
     "validate_agent_status",

@@ -213,21 +213,6 @@ class TradeRecord(BaseModel):
     reason: str | None = None  # 交易原因
 
 
-class StrategyChange(BaseModel):
-    """
-    策略變更紀錄模型。
-    用於記錄代理人策略調整。
-    """
-
-    id: str  # 變更紀錄 ID
-    agent_id: str  # 代理人 ID
-    trigger_reason: str  # 觸發原因
-    change_content: str  # 變更內容
-    agent_explanation: str  # 代理人說明
-    performance_at_change: dict[str, Any]  # 當下績效
-    timestamp: datetime  # 變更時間
-
-
 class WebSocketMessage(BaseModel):
     """
     WebSocket 訊息結構模型。

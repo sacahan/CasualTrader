@@ -229,36 +229,6 @@ class AgentExecutionResult(BaseModel):
 
 
 # ==========================================
-# 策略變更模型
-# ==========================================
-
-
-class StrategyChange(BaseModel):
-    """策略變更記錄"""
-
-    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
-    agent_id: str
-    timestamp: datetime = Field(default_factory=datetime.now)
-
-    # 變更觸發資訊
-    trigger_reason: str
-    change_type: ChangeType = ChangeType.AUTO
-
-    # 策略內容變更
-    old_strategy: str | None = None
-    new_strategy: str
-    change_summary: str
-
-    # 績效背景資料
-    performance_at_change: dict[str, Any] | None = None
-
-    # Agent 說明
-    agent_explanation: str | None = None
-
-    model_config = {"arbitrary_types_allowed": True}
-
-
-# ==========================================
 # 響應模型 (API Response Models)
 # ==========================================
 
