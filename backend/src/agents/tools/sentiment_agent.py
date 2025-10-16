@@ -5,20 +5,22 @@
 
 from __future__ import annotations
 
+import logging
+import os
 from datetime import datetime
 from typing import Any
 
-# Logger
-from ..utils.logger import get_agent_logger
+from dotenv import load_dotenv
 
-# Agent SDK
-try:
-    from agents import Agent, CodeInterpreterTool, WebSearchTool, function_tool
-except ImportError:
-    Agent = Any
-    function_tool = Any
-    WebSearchTool = Any
-    CodeInterpreterTool = Any
+from agents import Agent, function_tool, ModelSettings
+
+# Logger
+logger = logging.getLogger(__name__)
+
+load_dotenv()
+
+DEFAULT_MODEL = os.getenv("DEFAULT_AI_MODEL", "gpt-5-mini")
+DEFAULT_MAX_TURNS = os.getenv("DEFAULT_MAX_TURNS", 30)
 
 
 def sentiment_agent_instructions() -> str:
@@ -113,436 +115,463 @@ def sentiment_agent_instructions() -> str:
 """
 
 
-class SentimentAnalysisTools:
-    """市場情緒分析輔助工具集合
+@function_tool
+def calculate_fear_greed_index(
+    market_data: dict[str, Any],
+) -> dict[str, Any]:
+    """計算恐懼貪婪指數
 
-    提供各種情緒評估和心理分析功能。
-    Agent 根據需求靈活組合使用。
+    Args:
+        market_data: 市場數據,包含:
+            - price_momentum: 價格動能
+            - market_breadth: 市場寬度
+            - volatility: 波動率
+            - put_call_ratio: 賣權買權比
+
+    Returns:
+        dict: 恐懼貪婪指數
+            {
+                "index_value": float,       # 0-100
+                "level": str,               # 恐慌/恐懼/中性/貪婪/極度貪婪
+                "components": dict,         # 各組成分數
+                "interpretation": str       # 解讀說明
+            }
     """
+    logger.info("開始計算恐懼貪婪指數")
 
-    def __init__(self) -> None:
-        self.logger = get_agent_logger("sentiment_analysis_tools")
+    momentum_score = market_data.get("price_momentum", 50)
+    breadth_score = market_data.get("market_breadth", 50)
+    volatility_score = 100 - market_data.get("volatility", 50)  # 波動率越高越恐慌
+    put_call_score = 100 - market_data.get("put_call_ratio", 50)  # 賣權比越高越恐慌
 
-    def calculate_fear_greed_index(
-        self,
-        market_data: dict[str, Any],
-    ) -> dict[str, Any]:
-        """計算恐懼貪婪指數
+    logger.debug(
+        f"組成分數 | 動能: {momentum_score:.1f} | 寬度: {breadth_score:.1f} | "
+        f"波動: {volatility_score:.1f} | 賣買權比: {put_call_score:.1f}"
+    )
 
-        Args:
-            market_data: 市場數據,包含:
-                - price_momentum: 價格動能
-                - market_breadth: 市場寬度
-                - volatility: 波動率
-                - put_call_ratio: 賣權買權比
+    # 加權平均
+    index_value = (
+        momentum_score * 0.3 + breadth_score * 0.3 + volatility_score * 0.25 + put_call_score * 0.15
+    )
 
-        Returns:
-            dict: 恐懼貪婪指數
-                {
-                    "index_value": float,       # 0-100
-                    "level": str,               # 恐慌/恐懼/中性/貪婪/極度貪婪
-                    "components": dict,         # 各組成分數
-                    "interpretation": str       # 解讀說明
-                }
-        """
-        self.logger.info("開始計算恐懼貪婪指數")
+    # 等級判定
+    if index_value >= 80:
+        level = "極度貪婪"
+        interpretation = "市場過熱，考慮獲利了結"
+    elif index_value >= 60:
+        level = "貪婪"
+        interpretation = "市場樂觀，注意風險"
+    elif index_value >= 40:
+        level = "中性"
+        interpretation = "市場平穩，等待機會"
+    elif index_value >= 20:
+        level = "恐懼"
+        interpretation = "市場悲觀，可能接近底部"
+    else:
+        level = "極度恐慌"
+        interpretation = "市場恐慌，考慮逢低買進"
 
-        momentum_score = market_data.get("price_momentum", 50)
-        breadth_score = market_data.get("market_breadth", 50)
-        volatility_score = 100 - market_data.get("volatility", 50)  # 波動率越高越恐慌
-        put_call_score = 100 - market_data.get("put_call_ratio", 50)  # 賣權比越高越恐慌
+    logger.info(f"恐懼貪婪指數計算完成 | 指數: {index_value:.2f} | 等級: {level}")
 
-        self.logger.debug(
-            f"組成分數 | 動能: {momentum_score:.1f} | 寬度: {breadth_score:.1f} | "
-            f"波動: {volatility_score:.1f} | 賣買權比: {put_call_score:.1f}"
-        )
+    return {
+        "index_value": index_value,
+        "level": level,
+        "components": {
+            "price_momentum": momentum_score,
+            "market_breadth": breadth_score,
+            "volatility": volatility_score,
+            "put_call_ratio": put_call_score,
+        },
+        "interpretation": interpretation,
+    }
 
-        # 加權平均
-        index_value = (
-            momentum_score * 0.3
-            + breadth_score * 0.3
-            + volatility_score * 0.25
-            + put_call_score * 0.15
-        )
 
-        # 等級判定
-        if index_value >= 80:
-            level = "極度貪婪"
-            interpretation = "市場過度樂觀,注意反轉風險"
-        elif index_value >= 60:
-            level = "貪婪"
-            interpretation = "市場情緒偏多,可考慮獲利了結"
-        elif index_value >= 40:
-            level = "中性"
-            interpretation = "市場情緒平穩"
-        elif index_value >= 20:
-            level = "恐懼"
-            interpretation = "市場情緒偏空,可留意反彈機會"
-        else:
-            level = "極度恐慌"
-            interpretation = "市場過度悲觀,可能是買進機會"
+@function_tool
+def analyze_money_flow(
+    ticker: str,
+    trading_data: dict[str, Any],
+) -> dict[str, Any]:
+    """分析資金流向
 
-        self.logger.info(f"恐懼貪婪指數計算完成 | 指數: {index_value:.2f} | 等級: {level}")
+    Args:
+        ticker: 股票代號 (例如: "2330")
+        trading_data: 交易數據,包含:
+            - large_buy: 大單買進
+            - large_sell: 大單賣出
+            - foreign_net: 外資淨買賣
+            - institutional_net: 法人淨買賣
 
-        return {
-            "index_value": index_value,
-            "level": level,
-            "components": {
-                "price_momentum": momentum_score,
-                "market_breadth": breadth_score,
-                "volatility": volatility_score,
-                "put_call_ratio": put_call_score,
-            },
-            "interpretation": interpretation,
-        }
-
-    def analyze_money_flow(
-        self,
-        ticker: str,
-        trading_data: dict[str, Any],
-    ) -> dict[str, Any]:
-        """分析資金流向
-
-        Args:
-            symbol: 股票代號 (例如: "2330")
-            trading_data: 交易數據,包含:
-                - large_buy: 大單買進
-                - large_sell: 大單賣出
-                - foreign_net: 外資淨買賣
-                - institutional_net: 法人淨買賣
-
-        Returns:
-            dict: 資金流向分析
-                {
-                    "ticker": "2330",
-                    "net_flow": float,          # 淨流入金額
-                    "flow_direction": str,      # 流入/流出/平衡
-                    "large_order_ratio": float, # 大單佔比
-                    "foreign_attitude": str,    # 外資態度
-                    "interpretation": str
-                }
-        """
-        self.logger.info(f"開始分析資金流向 | 股票: {ticker}")
-
-        large_buy = trading_data.get("large_buy", 0)
-        large_sell = trading_data.get("large_sell", 0)
-        foreign_net = trading_data.get("foreign_net", 0)
-        institutional_net = trading_data.get("institutional_net", 0)
-
-        self.logger.debug(
-            f"交易數據 | 大買: {large_buy:,.0f} | 大賣: {large_sell:,.0f} | "
-            f"外資淨: {foreign_net:,.0f} | 法人淨: {institutional_net:,.0f}"
-        )
-
-        net_flow = large_buy - large_sell + foreign_net + institutional_net
-        total_volume = large_buy + large_sell
-        large_order_ratio = (large_buy + large_sell) / total_volume if total_volume > 0 else 0
-
-        # 流向判斷
-        if net_flow > 0:
-            flow_direction = "流入"
-            flow_strength = "強勁" if net_flow > total_volume * 0.1 else "溫和"
-        elif net_flow < 0:
-            flow_direction = "流出"
-            flow_strength = "明顯" if abs(net_flow) > total_volume * 0.1 else "輕微"
-        else:
-            flow_direction = "平衡"
-            flow_strength = ""
-
-        # 外資態度
-        if foreign_net > 0:
-            foreign_attitude = "積極買進"
-        elif foreign_net < 0:
-            foreign_attitude = "調節賣出"
-        else:
-            foreign_attitude = "觀望"
-
-        interpretation = f"資金呈{flow_strength}{flow_direction}態勢,外資{foreign_attitude}"
-
-        self.logger.info(
-            f"資金流向分析完成 | 股票: {ticker} | 淨流: {net_flow:,.0f} | "
-            f"方向: {flow_direction} | 外資: {foreign_attitude}"
-        )
-
-        return {
-            "ticker": ticker,
-            "net_flow": net_flow,
-            "flow_direction": flow_direction,
-            "large_order_ratio": large_order_ratio,
-            "foreign_attitude": foreign_attitude,
-            "institutional_attitude": "買超" if institutional_net > 0 else "賣超",
-            "interpretation": interpretation,
-        }
-
-    def analyze_news_sentiment(
-        self,
-        ticker: str | None,
-        news_data: list[dict[str, Any]],
-    ) -> dict[str, Any]:
-        """分析新聞情緒
-
-        Args:
-            symbol: 股票代號 (可選,None 表示整體市場)
-            news_data: 新聞列表,每筆包含:
-                - title: 標題
-                - content: 內容
-                - sentiment: 情緒分數 (-1 到 1)
-                - timestamp: 時間
-
-        Returns:
-            dict: 新聞情緒分析
-                {
-                    "ticker": str,
-                    "news_count": int,
-                    "positive_ratio": float,
-                    "negative_ratio": float,
-                    "sentiment_score": float,   # -100 到 100
-                    "key_topics": [str, ...],
-                    "interpretation": str
-                }
-        """
-        target = ticker or "市場"
-        self.logger.info(f"開始分析新聞情緒 | 標的: {target} | 新聞數: {len(news_data)}")
-
-        if not news_data:
-            self.logger.warning(f"無新聞數據 | 標的: {target}")
-            return {
-                "ticker": ticker or "市場",
-                "news_count": 0,
-                "sentiment_score": 0,
-                "interpretation": "無相關新聞數據",
+    Returns:
+        dict: 資金流向分析
+            {
+                "ticker": "2330",
+                "net_flow": float,          # 淨流入金額
+                "flow_direction": str,      # 流入/流出/平衡
+                "large_order_ratio": float, # 大單佔比
+                "foreign_attitude": str,    # 外資態度
+                "interpretation": str
             }
+    """
+    logger.info(f"開始分析資金流向 | 股票: {ticker}")
 
-        news_count = len(news_data)
-        sentiments = [news.get("sentiment", 0) for news in news_data]
+    large_buy = trading_data.get("large_buy", 0)
+    large_sell = trading_data.get("large_sell", 0)
+    foreign_net = trading_data.get("foreign_net", 0)
+    institutional_net = trading_data.get("institutional_net", 0)
 
-        positive_count = sum(1 for s in sentiments if s > 0.2)
-        negative_count = sum(1 for s in sentiments if s < -0.2)
+    logger.debug(
+        f"交易數據 | 大買: {large_buy:,.0f} | 大賣: {large_sell:,.0f} | "
+        f"外資淨: {foreign_net:,.0f} | 法人淨: {institutional_net:,.0f}"
+    )
 
-        self.logger.debug(
-            f"情緒分布 | 正面: {positive_count} | 負面: {negative_count} | 中性: {news_count - positive_count - negative_count}"
-        )
+    net_flow = large_buy - large_sell + foreign_net + institutional_net
+    total_volume = large_buy + large_sell
+    large_order_ratio = (large_buy + large_sell) / total_volume if total_volume > 0 else 0
 
-        positive_ratio = positive_count / news_count if news_count > 0 else 0
-        negative_ratio = negative_count / news_count if news_count > 0 else 0
+    # 流向判斷
+    if net_flow > 0:
+        flow_direction = "流入"
+        flow_strength = "強勁" if net_flow > total_volume * 0.1 else "溫和"
+    elif net_flow < 0:
+        flow_direction = "流出"
+        flow_strength = "明顯" if abs(net_flow) > total_volume * 0.1 else "輕微"
+    else:
+        flow_direction = "平衡"
+        flow_strength = ""
 
-        sentiment_score = (sum(sentiments) / news_count) * 100 if sentiments else 0
+    # 外資態度
+    if foreign_net > 0:
+        foreign_attitude = "買超" if foreign_net > 10000000 else "小買"
+    elif foreign_net < 0:
+        foreign_attitude = "賣超" if abs(foreign_net) > 10000000 else "小賣"
+    else:
+        foreign_attitude = "觀望"
 
-        # 主題提取 (簡化)
-        key_topics = ["市場動態", "公司營運", "產業趨勢"]
+    interpretation = f"資金呈{flow_strength}{flow_direction}態勢,外資{foreign_attitude}"
 
-        if sentiment_score > 30:
-            interpretation = "新聞面偏多,市場關注度高"
-        elif sentiment_score < -30:
-            interpretation = "新聞面偏空,需注意風險"
-        else:
-            interpretation = "新聞面中性"
+    logger.info(
+        f"資金流向分析完成 | 股票: {ticker} | 淨流: {net_flow:,.0f} | "
+        f"方向: {flow_direction} | 外資: {foreign_attitude}"
+    )
 
-        self.logger.info(
-            f"新聞情緒分析完成 | 標的: {target} | 情緒分數: {sentiment_score:.2f} | "
-            f"正面: {positive_ratio:.1%} | 負面: {negative_ratio:.1%}"
-        )
+    return {
+        "ticker": ticker,
+        "net_flow": net_flow,
+        "flow_direction": flow_direction,
+        "large_order_ratio": large_order_ratio,
+        "foreign_attitude": foreign_attitude,
+        "institutional_attitude": "買超" if institutional_net > 0 else "賣超",
+        "interpretation": interpretation,
+    }
 
-        return {
-            "ticker": ticker or "市場",
-            "news_count": news_count,
-            "positive_ratio": positive_ratio,
-            "negative_ratio": negative_ratio,
-            "sentiment_score": sentiment_score,
-            "key_topics": key_topics,
-            "interpretation": interpretation,
-        }
 
-    def analyze_social_sentiment(
-        self,
-        ticker: str,
-        social_data: dict[str, Any],
-    ) -> dict[str, Any]:
-        """分析社群媒體情緒
+@function_tool
+def analyze_news_sentiment(
+    ticker: str | None,
+    news_data: list[dict[str, Any]],
+) -> dict[str, Any]:
+    """分析新聞情緒
 
-        Args:
-            symbol: 股票代號 (例如: "2330")
-            social_data: 社群數據,包含:
-                - mention_count: 提及次數
-                - positive_mentions: 正面提及
-                - negative_mentions: 負面提及
-                - trending_score: 熱度分數
+    Args:
+        ticker: 股票代號 (可選,None 表示整體市場)
+        news_data: 新聞列表,每筆包含:
+            - title: 標題
+            - content: 內容
+            - sentiment: 情緒分數 (-1 到 1)
+            - timestamp: 時間
 
-        Returns:
-            dict: 社群情緒分析
-                {
-                    "ticker": "2330",
-                    "mention_count": int,
-                    "sentiment_distribution": dict,
-                    "trending_level": str,
-                    "sentiment_score": float,
-                    "interpretation": str
-                }
-        """
-        mention_count = social_data.get("mention_count", 0)
-        positive = social_data.get("positive_mentions", 0)
-        negative = social_data.get("negative_mentions", 0)
-        trending_score = social_data.get("trending_score", 0)
-
-        self.logger.info(
-            f"開始分析社群情緒 | 股票: {ticker} | 提及數: {mention_count} | "
-            f"熱度: {trending_score:.1f}"
-        )
-
-        if mention_count == 0:
-            self.logger.warning(f"無社群數據 | 股票: {ticker}")
-            return {
-                "ticker": ticker,
-                "mention_count": 0,
-                "sentiment_score": 0,
-                "interpretation": "社群討論度低",
+    Returns:
+        dict: 新聞情緒分析
+            {
+                "ticker": str,
+                "news_count": int,
+                "positive_ratio": float,
+                "negative_ratio": float,
+                "sentiment_score": float,   # -100 到 100
+                "key_topics": [str, ...],
+                "interpretation": str
             }
+    """
+    target = ticker or "市場"
+    logger.info(f"開始分析新聞情緒 | 標的: {target} | 新聞數: {len(news_data)}")
 
-        neutral = mention_count - positive - negative
-
-        sentiment_distribution = {
-            "positive": positive / mention_count,
-            "neutral": neutral / mention_count,
-            "negative": negative / mention_count,
-        }
-
-        sentiment_score = ((positive - negative) / mention_count) * 100
-
-        self.logger.debug(
-            f"情緒分布 | 正面: {positive} ({sentiment_distribution['positive']:.1%}) | "
-            f"中性: {neutral} ({sentiment_distribution['neutral']:.1%}) | "
-            f"負面: {negative} ({sentiment_distribution['negative']:.1%})"
-        )
-
-        # 熱度等級
-        if trending_score > 80:
-            trending_level = "爆紅"
-        elif trending_score > 60:
-            trending_level = "熱門"
-        elif trending_score > 40:
-            trending_level = "普通"
-        else:
-            trending_level = "冷門"
-
-        interpretation = f"社群討論{trending_level},情緒{'偏多' if sentiment_score > 20 else '偏空' if sentiment_score < -20 else '中性'}"
-
-        self.logger.info(
-            f"社群情緒分析完成 | 股票: {ticker} | 情緒分數: {sentiment_score:.2f} | "
-            f"熱度: {trending_level}"
-        )
-
+    if not news_data:
+        logger.warning(f"無新聞數據 | 標的: {target}")
         return {
+            "error": "無新聞數據",
             "ticker": ticker,
-            "mention_count": mention_count,
-            "sentiment_distribution": sentiment_distribution,
-            "trending_level": trending_level,
-            "sentiment_score": sentiment_score,
-            "interpretation": interpretation,
+            "news_count": 0,
+            "sentiment_score": 0,
         }
 
-    def generate_sentiment_signals(
-        self,
-        fear_greed_index: dict[str, Any],
-        money_flow: dict[str, Any],
-        news_sentiment: dict[str, Any],
-        social_sentiment: dict[str, Any],
-    ) -> dict[str, Any]:
-        """產生情緒交易訊號
+    news_count = len(news_data)
+    sentiments = [news.get("sentiment", 0) for news in news_data]
 
-        Args:
-            fear_greed_index: 恐懼貪婪指數
-            money_flow: 資金流向分析
-            news_sentiment: 新聞情緒
-            social_sentiment: 社群情緒
+    positive_count = sum(1 for s in sentiments if s > 0.2)
+    negative_count = sum(1 for s in sentiments if s < -0.2)
 
-        Returns:
-            dict: 情緒交易訊號
-                {
-                    "overall_sentiment": float,     # -100 到 100
-                    "signal": str,                  # 買進/賣出/觀望
-                    "strategy": str,                # 反向/順勢
-                    "confidence": float,            # 0-1
-                    "key_factors": [str, ...],
-                    "recommendations": [str, ...]
-                }
-        """
-        fg_value = fear_greed_index.get("index_value", 50)
-        flow_direction = money_flow.get("flow_direction", "平衡")
-        news_score = news_sentiment.get("sentiment_score", 0)
-        social_score = social_sentiment.get("sentiment_score", 0)
+    logger.debug(
+        f"情緒分布 | 正面: {positive_count} | 負面: {negative_count} | "
+        f"中性: {news_count - positive_count - negative_count}"
+    )
 
-        self.logger.info(
-            f"開始產生情緒訊號 | 恐貪指數: {fg_value:.1f} | 資金: {flow_direction} | "
-            f"新聞: {news_score:.1f} | 社群: {social_score:.1f}"
-        )
+    positive_ratio = positive_count / news_count if news_count > 0 else 0
+    negative_ratio = negative_count / news_count if news_count > 0 else 0
 
-        # 綜合情緒評分
-        overall_sentiment = (fg_value - 50) * 2 * 0.4 + news_score * 0.3 + social_score * 0.3
+    # 計算整體情緒分數 (-100 到 100)
+    avg_sentiment = sum(sentiments) / len(sentiments) if sentiments else 0
+    sentiment_score = avg_sentiment * 100
 
-        key_factors = []
-        recommendations = []
+    # 解讀
+    if sentiment_score > 50:
+        interpretation = "新聞情緒極度正面，市場情緒樂觀"
+    elif sentiment_score > 20:
+        interpretation = "新聞情緒偏正面，市場氛圍良好"
+    elif sentiment_score > -20:
+        interpretation = "新聞情緒中性，市場觀望"
+    elif sentiment_score > -50:
+        interpretation = "新聞情緒偏負面，市場擔憂"
+    else:
+        interpretation = "新聞情緒極度負面，市場悲觀"
 
-        # 極端情緒 - 反向操作機會
-        if fg_value >= 80:
-            signal = "賣出"
-            strategy = "反向操作"
-            confidence = 0.75
-            key_factors.append(f"市場極度貪婪 ({fg_value:.0f})")
-            recommendations.append("市場過熱,建議逢高減碼")
-        elif fg_value <= 20:
-            signal = "買進"
-            strategy = "反向操作"
-            confidence = 0.80
-            key_factors.append(f"市場極度恐慌 ({fg_value:.0f})")
-            recommendations.append("市場超賣,可分批布局")
-        # 正常情緒 - 順勢操作
-        elif flow_direction == "流入" and overall_sentiment > 20:
-            signal = "買進"
-            strategy = "順勢操作"
-            confidence = 0.65
-            key_factors.append("資金持續流入")
-            recommendations.append("趨勢向上,可順勢參與")
-        elif flow_direction == "流出" and overall_sentiment < -20:
-            signal = "賣出"
-            strategy = "順勢操作"
-            confidence = 0.65
-            key_factors.append("資金持續流出")
-            recommendations.append("趨勢向下,建議減碼觀望")
-        else:
-            signal = "觀望"
-            strategy = "等待明確訊號"
-            confidence = 0.50
-            recommendations.append("情緒面無明確方向,建議觀望")
+    logger.info(
+        f"新聞情緒分析完成 | 標的: {target} | 分數: {sentiment_score:.1f} | "
+        f"正面: {positive_ratio:.1%} | 負面: {negative_ratio:.1%}"
+    )
 
-        self.logger.info(
-            f"情緒訊號產生完成 | 訊號: {signal} | 策略: {strategy} | "
-            f"信心度: {confidence:.1%} | 綜合情緒: {overall_sentiment:.2f}"
-        )
+    return {
+        "ticker": ticker,
+        "news_count": news_count,
+        "positive_ratio": positive_ratio,
+        "negative_ratio": negative_ratio,
+        "sentiment_score": sentiment_score,
+        "key_topics": [],  # 可以擴展實作關鍵詞提取
+        "interpretation": interpretation,
+    }
 
+
+@function_tool
+def analyze_social_sentiment(
+    ticker: str,
+    social_data: dict[str, Any],
+) -> dict[str, Any]:
+    """分析社群媒體情緒
+
+    Args:
+        ticker: 股票代號 (例如: "2330")
+        social_data: 社群數據,包含:
+            - mention_count: 提及次數
+            - positive_mentions: 正面提及
+            - negative_mentions: 負面提及
+            - trending: 是否熱門
+
+    Returns:
+        dict: 社群情緒分析
+            {
+                "ticker": "2330",
+                "mention_count": int,
+                "sentiment_ratio": float,    # 正負面比
+                "trending_status": str,      # 熱度狀態
+                "sentiment_score": float,    # -100 到 100
+                "interpretation": str
+            }
+    """
+    logger.info(f"開始分析社群情緒 | 股票: {ticker}")
+
+    mention_count = social_data.get("mention_count", 0)
+    positive = social_data.get("positive_mentions", 0)
+    negative = social_data.get("negative_mentions", 0)
+    trending = social_data.get("trending", False)
+
+    if mention_count == 0:
+        logger.warning(f"無社群數據 | 股票: {ticker}")
         return {
-            "overall_sentiment": overall_sentiment,
-            "signal": signal,
-            "strategy": strategy,
-            "confidence": confidence,
-            "key_factors": key_factors,
-            "recommendations": recommendations,
-            "timestamp": datetime.now().isoformat(),
+            "error": "無社群數據",
+            "ticker": ticker,
+            "mention_count": 0,
+            "sentiment_score": 0,
         }
+
+    logger.debug(
+        f"社群數據 | 提及: {mention_count} | 正面: {positive} | 負面: {negative} | 熱門: {trending}"
+    )
+
+    # 計算情緒比例
+    total_sentiment = positive + negative
+    if total_sentiment > 0:
+        sentiment_ratio = (positive - negative) / total_sentiment
+    else:
+        sentiment_ratio = 0
+
+    sentiment_score = sentiment_ratio * 100
+
+    # 熱度狀態
+    if mention_count > 1000:
+        trending_status = "極度熱門"
+    elif mention_count > 500:
+        trending_status = "熱門"
+    elif mention_count > 100:
+        trending_status = "中等關注"
+    else:
+        trending_status = "低關注"
+
+    # 解讀
+    if sentiment_score > 50:
+        interpretation = f"社群高度看好，{trending_status}"
+    elif sentiment_score > 20:
+        interpretation = f"社群偏向樂觀，{trending_status}"
+    elif sentiment_score > -20:
+        interpretation = f"社群態度中性，{trending_status}"
+    elif sentiment_score > -50:
+        interpretation = f"社群偏向悲觀，{trending_status}"
+    else:
+        interpretation = f"社群高度看壞，{trending_status}"
+
+    logger.info(
+        f"社群情緒分析完成 | 股票: {ticker} | 分數: {sentiment_score:.1f} | "
+        f"熱度: {trending_status} | 提及: {mention_count}"
+    )
+
+    return {
+        "ticker": ticker,
+        "mention_count": mention_count,
+        "sentiment_ratio": sentiment_ratio,
+        "trending_status": trending_status,
+        "sentiment_score": sentiment_score,
+        "interpretation": interpretation,
+    }
+
+
+@function_tool
+def generate_sentiment_signals(
+    fear_greed_index: dict[str, Any],
+    money_flow: dict[str, Any],
+    news_sentiment: dict[str, Any],
+    social_sentiment: dict[str, Any],
+) -> dict[str, Any]:
+    """產生情緒交易訊號
+
+    Args:
+        fear_greed_index: 恐懼貪婪指數 (來自 calculate_fear_greed_index)
+        money_flow: 資金流向分析 (來自 analyze_money_flow)
+        news_sentiment: 新聞情緒 (來自 analyze_news_sentiment)
+        social_sentiment: 社群情緒 (來自 analyze_social_sentiment)
+
+    Returns:
+        dict: 情緒交易訊號
+            {
+                "overall_signal": str,      # "買進" | "賣出" | "觀望"
+                "confidence": float,        # 信心度 0-1
+                "strategy": str,            # "反向" | "順勢" | "觀望"
+                "reasoning": [str, ...],    # 分析理由
+                "risk_level": str,          # "高" | "中" | "低"
+                "timestamp": str
+            }
+    """
+    logger.info("開始產生情緒交易訊號")
+
+    signals = []
+    confidence = 0.5
+    reasoning = []
+
+    # 分析恐懼貪婪指數
+    fg_value = fear_greed_index.get("index_value", 50)
+    if fg_value >= 80:
+        signals.append("賣出")
+        reasoning.append(f"恐懼貪婪指數過高 ({fg_value:.0f})，市場過熱")
+        confidence += 0.15
+    elif fg_value <= 20:
+        signals.append("買進")
+        reasoning.append(f"恐懼貪婪指數過低 ({fg_value:.0f})，市場恐慌")
+        confidence += 0.15
+
+    # 分析資金流向
+    flow_direction = money_flow.get("flow_direction", "平衡")
+    if flow_direction == "流入":
+        signals.append("買進")
+        reasoning.append("資金持續流入，多方力量強勁")
+        confidence += 0.1
+    elif flow_direction == "流出":
+        signals.append("賣出")
+        reasoning.append("資金流出明顯，空方佔優")
+        confidence += 0.1
+
+    # 分析新聞情緒
+    news_score = news_sentiment.get("sentiment_score", 0)
+    if news_score > 50:
+        signals.append("買進")
+        reasoning.append(f"新聞情緒極度正面 ({news_score:.0f})")
+        confidence += 0.05
+    elif news_score < -50:
+        signals.append("賣出")
+        reasoning.append(f"新聞情緒極度負面 ({news_score:.0f})")
+        confidence += 0.05
+
+    # 分析社群情緒
+    social_score = social_sentiment.get("sentiment_score", 0)
+    if social_score > 50:
+        signals.append("買進")
+        reasoning.append(f"社群高度看好 ({social_score:.0f})")
+        confidence += 0.05
+    elif social_score < -50:
+        signals.append("賣出")
+        reasoning.append(f"社群高度看壞 ({social_score:.0f})")
+        confidence += 0.05
+
+    logger.debug(f"訊號彙總 | 買進: {signals.count('買進')} | 賣出: {signals.count('賣出')}")
+
+    # 決定整體訊號
+    buy_count = signals.count("買進")
+    sell_count = signals.count("賣出")
+
+    if buy_count > sell_count and buy_count >= 2:
+        overall_signal = "買進"
+        strategy = "順勢" if fg_value < 60 else "反向"
+    elif sell_count > buy_count and sell_count >= 2:
+        overall_signal = "賣出"
+        strategy = "順勢" if fg_value > 40 else "反向"
+    else:
+        overall_signal = "觀望"
+        strategy = "觀望"
+
+    # 風險評估
+    if confidence > 0.75:
+        risk_level = "低"
+    elif confidence > 0.60:
+        risk_level = "中"
+    else:
+        risk_level = "高"
+
+    confidence = min(0.95, confidence)
+
+    logger.info(
+        f"情緒訊號產生完成 | 訊號: {overall_signal} | 策略: {strategy} | "
+        f"信心度: {confidence:.1%} | 風險: {risk_level}"
+    )
+
+    return {
+        "overall_signal": overall_signal,
+        "confidence": confidence,
+        "strategy": strategy,
+        "reasoning": reasoning,
+        "risk_level": risk_level,
+        "timestamp": datetime.now().isoformat(),
+    }
 
 
 async def get_sentiment_agent(
-    mcp_servers: list[Any],
-    model_name: str = "gpt-4o-mini",
-    shared_tools: list[Any] | None = None,
-    max_turns: int = 15,
+    model_name: str = DEFAULT_MODEL,
+    mcp_servers: list[Any] | None = None,
+    openai_tools: list[Any] | None = None,
+    max_turns: int = DEFAULT_MAX_TURNS,
 ) -> Agent:
     """創建市場情緒分析 Agent
 
     Args:
-        mcp_servers: MCP servers 實例列表（MCPServerStdio 對象），從 TradingAgent 傳入
         model_name: 使用的 AI 模型名稱
-        shared_tools: 從 TradingAgent 傳入的共用工具（WebSearchTool, CodeInterpreterTool）
-        max_turns: 最大執行回合數（預設 15）
+        mcp_servers: MCP servers 實例列表（MCPServerStdio 對象），從 TradingAgent 傳入
+        openai_tools: 從 TradingAgent 傳入的共用工具（WebSearchTool, CodeInterpreterTool）
+        max_turns: 最大執行回合數
 
     Returns:
         Agent: 配置好的市場情緒分析 Agent
@@ -551,50 +580,35 @@ async def get_sentiment_agent(
         Timeout 由主 TradingAgent 的 execution_timeout 統一控制，
         sub-agent 作為 Tool 執行時會受到主 Agent 的 timeout 限制。
     """
-    tools_instance = SentimentAnalysisTools()
+    logger.info(f"get_sentiment_agent() called with model={model_name}")
 
+    logger.debug("Creating custom tools with function_tool")
     custom_tools = [
-        function_tool(
-            tools_instance.calculate_fear_greed_index,
-            name_override="calculate_fear_greed_index",
-            description_override="計算恐懼貪婪指數 (0-100, 評估市場整體情緒)",
-            strict_mode=False,
-        ),
-        function_tool(
-            tools_instance.analyze_money_flow,
-            name_override="analyze_money_flow",
-            description_override="分析資金流向 (大單、外資、法人動向)",
-            strict_mode=False,
-        ),
-        function_tool(
-            tools_instance.analyze_news_sentiment,
-            name_override="analyze_news_sentiment",
-            description_override="分析新聞情緒 (正負面新聞比例、關鍵話題)",
-            strict_mode=False,
-        ),
-        function_tool(
-            tools_instance.analyze_social_sentiment,
-            name_override="analyze_social_sentiment",
-            description_override="分析社群媒體情緒 (討論熱度、情緒分布)",
-            strict_mode=False,
-        ),
-        function_tool(
-            tools_instance.generate_sentiment_signals,
-            name_override="generate_sentiment_signals",
-            description_override="產生情緒交易訊號 (買進/賣出/觀望建議)",
-            strict_mode=False,
-        ),
+        calculate_fear_greed_index,
+        analyze_money_flow,
+        analyze_news_sentiment,
+        analyze_social_sentiment,
+        generate_sentiment_signals,
     ]
 
     # 合併自訂工具和共用工具
-    all_tools = custom_tools + (shared_tools or [])
+    all_tools = custom_tools + (openai_tools or [])
+    logger.debug(f"Total tools (custom + shared): {len(all_tools)}")
 
+    logger.info(
+        f"Creating Agent with model={model_name}, "
+        f"mcp_servers={len(mcp_servers) if mcp_servers else 0}, tools={len(all_tools)}"
+    )
     analyst = Agent(
         name="Sentiment Analyst",
         instructions=sentiment_agent_instructions(),
         model=model_name,
         mcp_servers=mcp_servers,
         tools=all_tools,
+        model_settings=ModelSettings(
+            tool_choice="required",
+        ),
     )
+    logger.info("Sentiment Analyst Agent created successfully")
 
     return analyst

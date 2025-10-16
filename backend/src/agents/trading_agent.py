@@ -19,8 +19,11 @@ from agents.mcp import MCPServerStdio
 from agents.tools import WebSearchTool, CodeInterpreterTool
 
 from .tools.fundamental_agent import get_fundamental_agent
+from .tools.rick_agent import get_risk_agent
+from .tools.sentiment_agent import get_sentiment_agent
+from .tools.technical_agent import get_technical_agent
 
-from .models import AgentStatus
+from ..common.enums import AgentStatus, AgentMode
 
 from ..service.agents_service import (
     AgentsService,
@@ -28,7 +31,8 @@ from ..service.agents_service import (
     AgentNotFoundError,
     AgentDatabaseError,
 )
-from ..service.models import AgentMode, Agent as AgentConfig
+
+from ..database.models import Agent as AgentConfig
 
 logger = logging.getLogger(__name__)
 
@@ -151,7 +155,7 @@ class TradingAgent:
             self.agent = Agent(
                 name=self.agent_id,
                 model=self.agent_config.ai_model or DEFAULT_MODEL,
-                instructions=self.agent_config.instructions,
+                instructions=self._build_instructions(self.agent_config.description),
                 tools=all_tools,
                 mcp_servers=self.mcp_servers,
                 model_settings=ModelSettings(
@@ -225,6 +229,9 @@ class TradingAgent:
 
         # 生成 Sub-agents
         subagents.append(await get_fundamental_agent(**subagent_config))
+        subagents.append(await get_risk_agent(**subagent_config))
+        subagents.append(await get_sentiment_agent(**subagent_config))
+        subagents.append(await get_technical_agent(**subagent_config))
 
         # 將 Sub-agents 包裝為工具
         return [agent.as_tool() for agent in subagents]
@@ -311,6 +318,34 @@ class TradingAgent:
                 logger.error(f"Failed to update error status: {status_error}")
 
             raise AgentExecutionError(f"Agent execution failed: {str(e)}")
+
+    def _build_instructions(self, description: str) -> str:
+        """
+        根據描述構建 Agent 指令
+        Args:
+            description: Agent 基本描述
+
+        Returns:
+            Agent 指令
+        """
+
+        instructions = f"""
+            你是一個專業的股票交易 Agent，你的代號是 {self.agent_id}。
+            你的目標是根據市場數據和分析來做出明智的交易決策。
+            你的基本描述如下：
+            {description}
+
+            請根據以上描述作為你的根本指導。
+
+            你可以使用各種工具來幫助你完成任務，包括網路搜尋、財務分析、技術分析、風險評估、情緒分析和程式碼執行。
+            你可以使用工具作為持久記憶來儲存和回想各種搜尋結果與分析資訊。
+            你有工具可以直接進行股票交易，完成交易後使用工具紀錄本次交易的資訊並回傳執行交易的評估理由。
+
+            請記住，你的最終目標是最大化投資回報，同時控制風險。
+        """
+        logger.info(f"Instructions for {self.agent_id}: {instructions.strip()}")
+
+        return instructions.strip()
 
     def _build_task_prompt(self, task: str, mode: AgentMode, context: dict[str, Any] | None) -> str:
         """

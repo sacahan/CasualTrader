@@ -14,15 +14,15 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from ...database.agent_service import AgentNotFoundError
-from ...database.models import AgentMode, SessionStatus
-from ...database.session_service import SessionError
-from ...database.trading_service import (
+from ..service.agents_service import AgentNotFoundError
+from ..common.enums import AgentMode, SessionStatus
+from ..service.session_service import SessionError
+from ..service.trading_service import (
     AgentBusyError,
     TradingService,
     TradingServiceError,
 )
-from ..config import get_db_session
+from ..api.config import get_db_session
 
 logger = logging.getLogger(__name__)
 

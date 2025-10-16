@@ -9,11 +9,11 @@ from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
+from sqlalchemy.ext.asyncio import AsyncSession
 
-from ...database.agent_database_service import (
-    AgentDatabaseService,
-    DatabaseConfig,
-)
+from ..api.config import get_db_session
+from ..service.agents_service import AgentsService
+
 
 # ==========================================
 # Pydantic Models
@@ -54,14 +54,9 @@ class AIModelsGroupedResponse(BaseModel):
 # ==========================================
 
 
-async def get_db_service() -> AgentDatabaseService:
+async def get_db_service(db_session: AsyncSession = Depends(get_db_session)) -> AgentsService:
     """獲取資料庫服務依賴"""
-    db_service = AgentDatabaseService(DatabaseConfig())
-    await db_service.initialize()
-    try:
-        yield db_service
-    finally:
-        await db_service.close()
+    return AgentsService(db_session)
 
 
 # ==========================================
@@ -80,7 +75,7 @@ router = APIRouter(
 
 @router.get("/available", response_model=AIModelListResponse, summary="獲取可用的 AI 模型列表")
 async def list_available_models(
-    db_service: AgentDatabaseService = Depends(get_db_service),
+    db_service: AgentsService = Depends(get_db_service),
 ) -> dict[str, Any]:
     """
     獲取所有可用(已啟用)的 AI 模型列表
@@ -107,7 +102,7 @@ async def list_available_models(
     summary="獲取按分組的 AI 模型列表",
 )
 async def list_available_models_grouped(
-    db_service: AgentDatabaseService = Depends(get_db_service),
+    db_service: AgentsService = Depends(get_db_service),
 ) -> dict[str, Any]:
     """
     獲取按 group_name 分組的 AI 模型列表
@@ -137,7 +132,7 @@ async def list_available_models_grouped(
 @router.get("/{model_key}", response_model=AIModelResponse, summary="獲取特定 AI 模型資訊")
 async def get_model_by_key(
     model_key: str,
-    db_service: AgentDatabaseService = Depends(get_db_service),
+    db_service: AgentsService = Depends(get_db_service),
 ) -> dict[str, Any]:
     """
     根據 model_key 獲取特定模型的詳細資訊
@@ -168,7 +163,7 @@ async def get_model_by_key(
 @router.get("/", response_model=AIModelListResponse, summary="獲取所有 AI 模型列表(包含禁用)")
 async def list_all_models(
     include_disabled: bool = False,
-    db_service: AgentDatabaseService = Depends(get_db_service),
+    db_service: AgentsService = Depends(get_db_service),
 ) -> dict[str, Any]:
     """
     獲取所有 AI 模型列表

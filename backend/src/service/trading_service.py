@@ -14,8 +14,9 @@ from typing import Any
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..agents.trading_agent import TradingAgent
-from .agent_service import AgentsService, AgentNotFoundError
-from .models import AgentMode, SessionStatus, Agent
+from .agents_service import AgentsService, AgentNotFoundError
+from ..common.enums import AgentMode, SessionStatus
+from ..database.models import Agent
 from .session_service import AgentSessionService
 
 logger = logging.getLogger(__name__)

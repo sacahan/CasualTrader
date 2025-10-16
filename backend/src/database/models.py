@@ -1,6 +1,8 @@
 """
-CasualTrader Agent System Database Models
+CasualTrader Database Models
 使用 Python 3.12+ 語法特性和 SQLAlchemy 2.0+ 異步支援
+
+所有 Enum 定義統一從 common.enums 導入
 """
 
 from __future__ import annotations
@@ -9,7 +11,6 @@ import uuid
 from dataclasses import dataclass
 from datetime import date, datetime
 from decimal import Decimal
-from enum import Enum
 from typing import Any
 
 from sqlalchemy import (
@@ -28,83 +29,21 @@ from sqlalchemy import (
 from sqlalchemy.ext.asyncio import AsyncAttrs
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
+from ..common.enums import (
+    AgentMode,
+    AgentStatus,
+    ModelType,
+    SessionStatus,
+    StrategyChangeType,
+    TransactionAction,
+    TransactionStatus,
+)
+
 
 class Base(AsyncAttrs, DeclarativeBase):
     """Base class for all database models using Python 3.12+ syntax"""
 
     pass
-
-
-# ==========================================
-# Enums for type safety (Python 3.12+ style)
-# ==========================================
-
-
-class AgentStatus(str, Enum):
-    """Agent 持久化狀態枚舉 (儲存在資料庫)"""
-
-    ACTIVE = "active"
-    INACTIVE = "inactive"
-    ERROR = "error"
-    SUSPENDED = "suspended"
-
-
-class AgentRuntimeStatus(str, Enum):
-    """Agent 執行時狀態枚舉 (僅存在於記憶體/前端)"""
-
-    IDLE = "idle"
-    RUNNING = "running"
-    STOPPED = "stopped"
-
-
-class AgentMode(str, Enum):
-    """Agent 交易模式枚舉"""
-
-    TRADING = "TRADING"
-    REBALANCING = "REBALANCING"
-    STRATEGY_REVIEW = "STRATEGY_REVIEW"
-    OBSERVATION = "OBSERVATION"
-
-
-class SessionStatus(str, Enum):
-    """執行會話狀態枚舉"""
-
-    PENDING = "pending"
-    RUNNING = "running"
-    COMPLETED = "completed"
-    FAILED = "failed"
-    TIMEOUT = "timeout"
-
-
-class TransactionAction(str, Enum):
-    """交易動作枚舉"""
-
-    BUY = "BUY"
-    SELL = "SELL"
-
-
-class TransactionStatus(str, Enum):
-    """交易狀態枚舉"""
-
-    PENDING = "pending"
-    EXECUTED = "executed"
-    FAILED = "failed"
-    CANCELLED = "cancelled"
-
-
-class StrategyChangeType(str, Enum):
-    """策略變更類型枚舉"""
-
-    AUTO = "auto"
-    MANUAL = "manual"
-    PERFORMANCE_DRIVEN = "performance_driven"
-
-
-class ModelType(str, Enum):
-    """AI 模型類型枚舉"""
-
-    OPENAI = "openai"
-    LITELLM = "litellm"
 
 
 # ==========================================
@@ -139,7 +78,7 @@ class Agent(Base):
     name: Mapped[str] = mapped_column(String(200), nullable=False)
     description: Mapped[str | None] = mapped_column(Text)
     instructions: Mapped[str] = mapped_column(Text, nullable=False)
-    ai_model: Mapped[str] = mapped_column(String(50), default="gpt-5-mini")
+    ai_model: Mapped[str] = mapped_column(String(50), default="gpt-4o-mini")
     color_theme: Mapped[str] = mapped_column(
         String(20), default="34, 197, 94"
     )  # RGB 格式，預設綠色
@@ -148,7 +87,7 @@ class Agent(Base):
     initial_funds: Mapped[Decimal] = mapped_column(Numeric(15, 2), nullable=False)
     max_position_size: Mapped[Decimal] = mapped_column(Numeric(5, 2), default=Decimal("5.0"))
 
-    # Agent 狀態 (使用 Enum)
+    # Agent 狀態 (使用統一的 Enum)
     status: Mapped[AgentStatus] = mapped_column(String(20), default=AgentStatus.INACTIVE)
     current_mode: Mapped[AgentMode] = mapped_column(String(30), default=AgentMode.OBSERVATION)
 

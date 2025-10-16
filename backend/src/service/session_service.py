@@ -13,7 +13,8 @@ from typing import Any
 from sqlalchemy import desc, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from .models import AgentSession, SessionStatus
+from ..database.models import AgentSession
+from ..common.enums import SessionStatus
 
 logger = logging.getLogger(__name__)
 

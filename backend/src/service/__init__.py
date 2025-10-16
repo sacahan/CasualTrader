@@ -1,5 +1,5 @@
 """
-Database Package
+Service Package
 """
 
 from __future__ import annotations
@@ -9,14 +9,11 @@ from .agents_service import AgentsService
 from .session_service import AgentSessionService
 # TradingService 延遲導入以避免循環依賴
 
-from .models import Base
-
 __all__ = [
     # 新架構
     "AgentsService",
     "AgentSessionService",
     "TradingService",
-    "Base",
 ]
 
 

@@ -8,9 +8,7 @@ from __future__ import annotations
 
 # 正確的重構架構 - 使用 trading_agent.py
 from .trading_agent import TradingAgent
-from .subagent_loader import SubAgentLoader
 
 __all__ = [
     "TradingAgent",
-    "SubAgentLoader",
 ]

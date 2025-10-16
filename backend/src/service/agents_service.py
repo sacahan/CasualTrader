@@ -15,7 +15,8 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from .models import Agent, AgentMode, AgentStatus
+from ..database.models import Agent
+from ..common.enums import AgentMode, AgentStatus
 
 logger = logging.getLogger(__name__)
 
