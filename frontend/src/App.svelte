@@ -20,8 +20,8 @@
     selectedAgent,
     loading as agentsLoading,
     loadAgents,
-    startAgent,
-    stopAgent,
+    // startAgent,  // TODO: 暫時註解，後端 API 已移除
+    // stopAgent,   // TODO: 暫時註解，後端 API 已移除
     deleteAgent,
     updateAgent,
     selectAgent,
@@ -85,23 +85,24 @@
     showDetailModal = true;
   }
 
-  async function handleStartAgent(agent) {
-    try {
-      await startAgent(agent.agent_id);
-      notifySuccess(`Agent ${agent.name} 已啟動`);
-    } catch (error) {
-      notifyError(`啟動失敗: ${error.message}`);
-    }
-  }
+  // TODO: 暫時註解，後端 API 已移除，未來需重新實現
+  // async function handleStartAgent(agent) {
+  //   try {
+  //     await startAgent(agent.agent_id);
+  //     notifySuccess(`Agent ${agent.name} 已啟動`);
+  //   } catch (error) {
+  //     notifyError(`啟動失敗: ${error.message}`);
+  //   }
+  // }
 
-  async function handleStopAgent(agent) {
-    try {
-      await stopAgent(agent.agent_id);
-      notifySuccess(`Agent ${agent.name} 已停止`);
-    } catch (error) {
-      notifyError(`停止失敗: ${error.message}`);
-    }
-  }
+  // async function handleStopAgent(agent) {
+  //   try {
+  //     await stopAgent(agent.agent_id);
+  //     notifySuccess(`Agent ${agent.name} 已停止`);
+  //   } catch (error) {
+  //     notifyError(`停止失敗: ${error.message}`);
+  //   }
+  // }
 
   async function handleEditAgent(agent) {
     editingAgent = agent;
@@ -244,11 +245,12 @@
             performanceData={agentPerformanceData[agent.agent_id] || []}
             holdings={agentHoldings[agent.agent_id] || []}
             onclick={handleAgentSelect}
-            onstart={handleStartAgent}
-            onstop={handleStopAgent}
             onedit={handleEditAgent}
             ondelete={handleDeleteAgent}
           />
+          <!-- TODO: 暫時移除 onstart 和 onstop props，待後端 API 重新實現 -->
+          <!-- onstart={handleStartAgent} -->
+          <!-- onstop={handleStopAgent} -->
         {/each}
       </div>
     {/if}

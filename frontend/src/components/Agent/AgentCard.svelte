@@ -134,28 +134,29 @@
 
   <!-- 操作按鈕 -->
   <div class="flex gap-2">
-    {#if canStart}
+    <!-- TODO: 暫時隱藏啟動/停止按鈕，待後端 API 重新實現 -->
+    {#if canStart && onstart}
       <Button
         variant="primary"
         size="sm"
         fullWidth
         onclick={(e) => {
           e.stopPropagation();
-          handleStart(e);
+          handleStart();
         }}
       >
         啟動
       </Button>
     {/if}
 
-    {#if canStop}
+    {#if canStop && onstop}
       <Button
         variant="secondary"
         size="sm"
         fullWidth
         onclick={(e) => {
           e.stopPropagation();
-          handleStop(e);
+          handleStop();
         }}
       >
         停止
@@ -167,7 +168,7 @@
       size="sm"
       onclick={(e) => {
         e.stopPropagation();
-        handleDelete(e);
+        handleDelete();
       }}
       disabled={!isEditable}
     >

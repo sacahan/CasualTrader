@@ -14,15 +14,15 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from ..service.agents_service import AgentNotFoundError
-from ..common.enums import AgentMode, SessionStatus
-from ..service.session_service import SessionError
-from ..service.trading_service import (
+from ...service.agents_service import AgentNotFoundError
+from ...common.enums import AgentMode, SessionStatus
+from ...service.session_service import SessionError
+from ...service.trading_service import (
     AgentBusyError,
     TradingService,
     TradingServiceError,
 )
-from ..api.config import get_db_session
+from ..config import get_db_session
 
 logger = logging.getLogger(__name__)
 
@@ -266,107 +266,110 @@ async def execute_agent_task(
         ) from e
 
 
-@router.post(
-    "/{agent_id}/start",
-    response_model=StartStopResponse,
-    status_code=status.HTTP_200_OK,
-    summary="啟動 Agent",
-    description="啟動 Agent，更新狀態為 ACTIVE",
-)
-async def start_agent(
-    agent_id: str,
-    request: StartAgentRequest | None = None,
-    trading_service: TradingService = Depends(get_trading_service),
-):
-    """
-    啟動 Agent
+# TODO: 以下啟動/停止端點已暫時註解，因 TradingService 已移除相關方法
+# 未來需重新實現 Agent 生命週期管理
 
-    Args:
-        agent_id: Agent ID
-        request: 啟動請求（可選）
-        trading_service: TradingService 實例
+# @router.post(
+#     "/{agent_id}/start",
+#     response_model=StartStopResponse,
+#     status_code=status.HTTP_200_OK,
+#     summary="啟動 Agent",
+#     description="啟動 Agent，更新狀態為 ACTIVE",
+# )
+# async def start_agent(
+#     agent_id: str,
+#     request: StartAgentRequest | None = None,
+#     trading_service: TradingService = Depends(get_trading_service),
+# ):
+#     """
+#     啟動 Agent
+#
+#     Args:
+#         agent_id: Agent ID
+#         request: 啟動請求（可選）
+#         trading_service: TradingService 實例
+#
+#     Returns:
+#         啟動結果
+#
+#     Raises:
+#         404: Agent 不存在
+#         500: 啟動失敗
+#     """
+#     try:
+#         logger.info(f"Starting agent {agent_id}")
+#
+#         # 解析模式
+#         mode = None
+#         if request and request.mode:
+#             mode = parse_agent_mode(request.mode)
+#
+#         # 啟動 Agent
+#         result = await trading_service.start_agent(agent_id, mode)
+#
+#         return StartStopResponse(**result)
+#
+#     except AgentNotFoundError as e:
+#         logger.warning(f"Agent not found: {agent_id}")
+#         raise HTTPException(
+#             status_code=status.HTTP_404_NOT_FOUND,
+#             detail=f"Agent {agent_id} not found",
+#         ) from e
+#
+#     except TradingServiceError as e:
+#         logger.error(f"Failed to start agent {agent_id}: {e}")
+#         raise HTTPException(
+#             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+#             detail=str(e),
+#         ) from e
 
-    Returns:
-        啟動結果
 
-    Raises:
-        404: Agent 不存在
-        500: 啟動失敗
-    """
-    try:
-        logger.info(f"Starting agent {agent_id}")
-
-        # 解析模式
-        mode = None
-        if request and request.mode:
-            mode = parse_agent_mode(request.mode)
-
-        # 啟動 Agent
-        result = await trading_service.start_agent(agent_id, mode)
-
-        return StartStopResponse(**result)
-
-    except AgentNotFoundError as e:
-        logger.warning(f"Agent not found: {agent_id}")
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Agent {agent_id} not found",
-        ) from e
-
-    except TradingServiceError as e:
-        logger.error(f"Failed to start agent {agent_id}: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=str(e),
-        ) from e
-
-
-@router.post(
-    "/{agent_id}/stop",
-    response_model=StartStopResponse,
-    status_code=status.HTTP_200_OK,
-    summary="停止 Agent",
-    description="停止 Agent，更新狀態為 INACTIVE",
-)
-async def stop_agent(
-    agent_id: str,
-    trading_service: TradingService = Depends(get_trading_service),
-):
-    """
-    停止 Agent
-
-    Args:
-        agent_id: Agent ID
-        trading_service: TradingService 實例
-
-    Returns:
-        停止結果
-
-    Raises:
-        404: Agent 不存在
-        500: 停止失敗
-    """
-    try:
-        logger.info(f"Stopping agent {agent_id}")
-
-        # 停止 Agent
-        result = await trading_service.stop_agent(agent_id)
-
-        return StartStopResponse(**result)
-
-    except AgentNotFoundError as e:
-        logger.warning(f"Agent not found: {agent_id}")
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Agent {agent_id} not found",
-        ) from e
-
-    except TradingServiceError as e:
-        logger.error(f"Failed to stop agent {agent_id}: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=str(e),
-        ) from e
+# @router.post(
+#     "/{agent_id}/stop",
+#     response_model=StartStopResponse,
+#     status_code=status.HTTP_200_OK,
+#     summary="停止 Agent",
+#     description="停止 Agent，更新狀態為 INACTIVE",
+# )
+# async def stop_agent(
+#     agent_id: str,
+#     trading_service: TradingService = Depends(get_trading_service),
+# ):
+#     """
+#     停止 Agent
+#
+#     Args:
+#         agent_id: Agent ID
+#         trading_service: TradingService 實例
+#
+#     Returns:
+#         停止結果
+#
+#     Raises:
+#         404: Agent 不存在
+#         500: 停止失敗
+#     """
+#     try:
+#         logger.info(f"Stopping agent {agent_id}")
+#
+#         # 停止 Agent
+#         result = await trading_service.stop_agent(agent_id)
+#
+#         return StartStopResponse(**result)
+#
+#     except AgentNotFoundError as e:
+#         logger.warning(f"Agent not found: {agent_id}")
+#         raise HTTPException(
+#             status_code=status.HTTP_404_NOT_FOUND,
+#             detail=f"Agent {agent_id} not found",
+#         ) from e
+#
+#     except TradingServiceError as e:
+#         logger.error(f"Failed to stop agent {agent_id}: {e}")
+#         raise HTTPException(
+#             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+#             detail=str(e),
+#         ) from e
 
 
 @router.get(
