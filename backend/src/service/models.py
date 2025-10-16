@@ -139,7 +139,7 @@ class Agent(Base):
     name: Mapped[str] = mapped_column(String(200), nullable=False)
     description: Mapped[str | None] = mapped_column(Text)
     instructions: Mapped[str] = mapped_column(Text, nullable=False)
-    ai_model: Mapped[str] = mapped_column(String(50), default="gpt-4o-mini")
+    ai_model: Mapped[str] = mapped_column(String(50), default="gpt-5-mini")
     color_theme: Mapped[str] = mapped_column(
         String(20), default="34, 197, 94"
     )  # RGB 格式，預設綠色

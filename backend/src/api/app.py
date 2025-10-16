@@ -16,8 +16,7 @@ from loguru import logger
 
 from .config import settings
 from .docs import get_openapi_tags
-from .routers import agents, models, trading, websocket_router
-from .routers.agents import agent_manager, database_service
+from .routers import agent_execution, models, websocket_router
 from .websocket import websocket_manager
 
 
@@ -35,16 +34,6 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     logger.info(f"Database: {settings.database_url}")
     logger.info("=" * 80)
 
-    # Initialize Database Service
-    logger.info("Initializing Database Service...")
-    await database_service.initialize()
-    logger.success("Database Service initialized successfully")
-
-    # Initialize Agent Manager
-    logger.info("Initializing Agent Manager...")
-    await agent_manager.start()
-    logger.success("Agent Manager initialized successfully")
-
     # Initialize WebSocket manager
     logger.info("Initializing WebSocket manager...")
     await websocket_manager.startup()
@@ -59,10 +48,6 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     logger.info("⏹️ CasualTrader API Server Shutting Down...")
     logger.info("Closing WebSocket connections...")
     await websocket_manager.shutdown()
-    logger.info("Shutting down Agent Manager...")
-    await agent_manager.shutdown()
-    logger.info("Closing Database Service...")
-    await database_service.close()
     logger.success("✅ CasualTrader API Server shut down successfully")
     logger.info("=" * 80)
 
@@ -155,8 +140,9 @@ def create_app() -> FastAPI:
 
     # Include routers
     logger.info("Registering API routers...")
-    app.include_router(agents.router, prefix="/api/agents", tags=["agents"])
-    app.include_router(trading.router, prefix="/api/trading", tags=["trading"])
+    app.include_router(
+        agent_execution.router, prefix="/api/agent-execution", tags=["agent-execution"]
+    )
     app.include_router(models.router, prefix="/api")
     app.include_router(websocket_router.router, tags=["websocket"])
     logger.info("✓ All routers registered")

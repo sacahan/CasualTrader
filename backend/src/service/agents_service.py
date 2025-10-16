@@ -44,20 +44,20 @@ class AgentDatabaseError(Exception):
 
 
 # ==========================================
-# Agent Database Service
+# Agents Service
 # ==========================================
 
 
-class AgentDatabaseService:
+class AgentsService:
     """
-    Agent 資料庫服務
+    Agents 資料庫服務
 
-    提供 Agent 配置的完整 CRUD 操作
+    提供 Agents 配置的完整 CRUD 操作
     """
 
     def __init__(self, session: AsyncSession):
         """
-        初始化 Agent 資料庫服務
+        初始化 Agents 資料庫服務
 
         Args:
             session: SQLAlchemy 異步 Session
@@ -70,7 +70,7 @@ class AgentDatabaseService:
 
     async def get_agent_config(self, agent_id: str) -> Agent:
         """
-        載入 Agent 配置
+        載入 Agents 配置
 
         Args:
             agent_id: Agent ID
@@ -107,7 +107,7 @@ class AgentDatabaseService:
 
     async def get_agent_with_holdings(self, agent_id: str) -> Agent:
         """
-        載入 Agent 配置和持倉資料
+        載入 Agents 配置和持倉資料
 
         Args:
             agent_id: Agent ID

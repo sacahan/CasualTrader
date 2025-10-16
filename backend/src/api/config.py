@@ -175,3 +175,77 @@ def get_settings() -> Settings:
 
 # Global settings instance
 settings = get_settings()
+
+
+# ==========================================
+# Database Session Management
+# ==========================================
+
+# Global engine and session maker
+_engine = None
+_async_session_maker = None
+
+
+def get_engine():
+    """Get or create database engine."""
+    global _engine
+    if _engine is None:
+        from sqlalchemy.ext.asyncio import create_async_engine
+
+        _engine = create_async_engine(
+            settings.database_url,
+            echo=settings.database_echo,
+            pool_pre_ping=True,
+            pool_recycle=3600,
+        )
+    return _engine
+
+
+def get_session_maker():
+    """Get or create async session maker."""
+    global _async_session_maker
+    if _async_session_maker is None:
+        from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
+
+        engine = get_engine()
+        _async_session_maker = async_sessionmaker(
+            engine,
+            class_=AsyncSession,
+            expire_on_commit=False,
+        )
+    return _async_session_maker
+
+
+async def get_db_session():
+    """
+    FastAPI dependency for database session.
+
+    Yields:
+        AsyncSession: SQLAlchemy async session
+
+    Example:
+        ```python
+        @router.get("/items")
+        async def get_items(db: AsyncSession = Depends(get_db_session)):
+            # Use db session
+            pass
+        ```
+    """
+    session_maker = get_session_maker()
+    async with session_maker() as session:
+        try:
+            yield session
+            await session.commit()
+        except Exception:
+            await session.rollback()
+            raise
+        finally:
+            await session.close()
+
+
+async def close_db_engine():
+    """Close database engine."""
+    global _engine
+    if _engine is not None:
+        await _engine.dispose()
+        _engine = None

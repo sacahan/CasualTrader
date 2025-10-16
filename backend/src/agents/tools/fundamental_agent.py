@@ -4,21 +4,24 @@
 """
 
 from __future__ import annotations
+import os
+
+from dotenv import load_dotenv
 
 from datetime import datetime
 from typing import Any
 
-# Logger
-from ..utils.logger import get_agent_logger
+from agents import Agent, function_tool, ModelSettings
 
-# Agent SDK
-try:
-    from agents import Agent, CodeInterpreterTool, WebSearchTool, function_tool
-except ImportError:
-    Agent = Any
-    function_tool = Any
-    WebSearchTool = Any
-    CodeInterpreterTool = Any
+# Logger
+import logging
+
+logger = logging.getLogger(__name__)
+
+load_dotenv()
+
+DEFAULT_MODEL = os.getenv("DEFAULT_AI_MODEL", "gpt-5-mini")
+DEFAULT_MAX_TURNS = os.getenv("DEFAULT_MAX_TURNS", 30)
 
 
 def fundamental_agent_instructions() -> str:
@@ -116,391 +119,383 @@ def fundamental_agent_instructions() -> str:
 """
 
 
-class FundamentalAnalysisTools:
-    """基本面分析輔助工具集合
+@function_tool
+def calculate_financial_ratios(
+    ticker: str,
+    financial_data: dict[str, Any],
+) -> dict[str, Any]:
+    """計算財務比率
 
-    提供各種財務分析和估值評估功能。
-    Agent 根據需求靈活組合使用。
+    Args:
+        symbol: 股票代號 (例如: "2330")
+        financial_data: 財務數據,包含 revenue, net_income, total_assets 等
+
+    Returns:
+        dict: 財務比率 (ROE, ROA, 負債比, 流動比率等)
     """
+    logger.info(f"開始計算財務比率 | 股票: {ticker}")
 
-    def __init__(self) -> None:
-        self.logger = get_agent_logger("fundamental_analysis_tools")
+    if not financial_data:
+        logger.warning(f"缺少財務數據 | 股票: {ticker}")
+        return {"error": ..., "ticker": ticker}
 
-    def calculate_financial_ratios(
-        self,
-        ticker: str,
-        financial_data: dict[str, Any],
-    ) -> dict[str, Any]:
-        """計算財務比率
+    result = {
+        "ticker": ticker,
+        "profitability": {},
+        "solvency": {},
+        "valuation": {},
+    }
 
-        Args:
-            symbol: 股票代號 (例如: "2330")
-            financial_data: 財務數據,包含 revenue, net_income, total_assets 等
+    equity = financial_data.get("total_equity", 1)
+    assets = financial_data.get("total_assets", 1)
+    revenue = financial_data.get("revenue", 0)
+    net_income = financial_data.get("net_income", 0)
 
-        Returns:
-            dict: 財務比率 (ROE, ROA, 負債比, 流動比率等)
-        """
-        self.logger.info(f"開始計算財務比率 | 股票: {ticker}")
+    result["profitability"] = {
+        "roe": net_income / equity if equity > 0 else 0,
+        "roa": net_income / assets if assets > 0 else 0,
+        "net_margin": net_income / revenue if revenue > 0 else 0,
+    }
 
-        if not financial_data:
-            self.logger.warning(f"缺少財務數據 | 股票: {ticker}")
-            return {"error": ..., "ticker": ticker}
+    logger.debug(
+        f"獲利能力指標 | ROE: {result['profitability']['roe']:.2%}, "
+        f"ROA: {result['profitability']['roa']:.2%}, "
+        f"淨利率: {result['profitability']['net_margin']:.2%}"
+    )
 
-        result = {
-            "ticker": ticker,
-            "profitability": {},
-            "solvency": {},
-            "valuation": {},
-        }
+    total_liabilities = financial_data.get("total_liabilities", 0)
+    current_assets = financial_data.get("current_assets", 0)
+    current_liabilities = financial_data.get("current_liabilities", 1)
 
-        equity = financial_data.get("total_equity", 1)
-        assets = financial_data.get("total_assets", 1)
-        revenue = financial_data.get("revenue", 0)
-        net_income = financial_data.get("net_income", 0)
+    result["solvency"] = {
+        "debt_ratio": total_liabilities / assets if assets > 0 else 0,
+        "current_ratio": current_assets / current_liabilities if current_liabilities > 0 else 0,
+    }
 
-        result["profitability"] = {
-            "roe": net_income / equity if equity > 0 else 0,
-            "roa": net_income / assets if assets > 0 else 0,
-            "net_margin": net_income / revenue if revenue > 0 else 0,
-        }
+    logger.debug(
+        f"償債能力指標 | 負債比: {result['solvency']['debt_ratio']:.2%}, "
+        f"流動比率: {result['solvency']['current_ratio']:.2f}"
+    )
 
-        self.logger.debug(
-            f"獲利能力指標 | ROE: {result['profitability']['roe']:.2%}, "
-            f"ROA: {result['profitability']['roa']:.2%}, "
-            f"淨利率: {result['profitability']['net_margin']:.2%}"
-        )
+    market_cap = financial_data.get("market_cap", 0)
+    result["valuation"] = {
+        "pe_ratio": market_cap / net_income if net_income > 0 else 0,
+        "pb_ratio": market_cap / equity if equity > 0 else 0,
+    }
 
-        total_liabilities = financial_data.get("total_liabilities", 0)
-        current_assets = financial_data.get("current_assets", 0)
-        current_liabilities = financial_data.get("current_liabilities", 1)
+    logger.info(f"財務比率計算完成 | 股票: {ticker}")
+    return result
 
-        result["solvency"] = {
-            "debt_ratio": total_liabilities / assets if assets > 0 else 0,
-            "current_ratio": current_assets / current_liabilities if current_liabilities > 0 else 0,
-        }
 
-        self.logger.debug(
-            f"償債能力指標 | 負債比: {result['solvency']['debt_ratio']:.2%}, "
-            f"流動比率: {result['solvency']['current_ratio']:.2f}"
-        )
+@function_tool
+def analyze_financial_health(
+    ticker: str,
+    financial_ratios: dict[str, Any],
+) -> dict[str, Any]:
+    """分析財務體質
 
-        market_cap = financial_data.get("market_cap", 0)
-        result["valuation"] = {
-            "pe_ratio": market_cap / net_income if net_income > 0 else 0,
-            "pb_ratio": market_cap / equity if equity > 0 else 0,
-        }
+    Args:
+        symbol: 股票代號 (例如: "2330")
+        financial_ratios: 財務比率 (來自 calculate_financial_ratios)
 
-        self.logger.info(f"財務比率計算完成 | 股票: {ticker}")
-        return result
+    Returns:
+        dict: 財務體質分析 (健康度評分、評級、優勢、弱點)
+    """
+    logger.info(f"開始分析財務體質 | 股票: {ticker}")
 
-    def analyze_financial_health(
-        self,
-        ticker: str,
-        financial_ratios: dict[str, Any],
-    ) -> dict[str, Any]:
-        """分析財務體質
+    if "error" in financial_ratios:
+        logger.error(f"無法分析財務體質 | 股票: {ticker} | 原因: {financial_ratios.get('error')}")
+        return {"error": ..., "ticker": ticker}
 
-        Args:
-            symbol: 股票代號 (例如: "2330")
-            financial_ratios: 財務比率 (來自 calculate_financial_ratios)
+    score = 0
+    strengths = []
+    weaknesses = []
 
-        Returns:
-            dict: 財務體質分析 (健康度評分、評級、優勢、弱點)
-        """
-        self.logger.info(f"開始分析財務體質 | 股票: {ticker}")
+    roe = financial_ratios.get("profitability", {}).get("roe", 0)
+    if roe > 0.15:
+        score += 25
+        strengths.append(f"優異的 ROE ({roe:.1%})")
+    elif roe > 0.10:
+        score += 15
+        strengths.append(f"良好的 ROE ({roe:.1%})")
+    elif roe < 0.05:
+        weaknesses.append(f"偏低的 ROE ({roe:.1%})")
 
-        if "error" in financial_ratios:
-            self.logger.error(
-                f"無法分析財務體質 | 股票: {ticker} | 原因: {financial_ratios.get('error')}"
-            )
-            return {"error": ..., "ticker": ticker}
+    debt_ratio = financial_ratios.get("solvency", {}).get("debt_ratio", 0)
+    if debt_ratio < 0.3:
+        score += 25
+        strengths.append(f"低負債比 ({debt_ratio:.1%})")
+    elif debt_ratio < 0.5:
+        score += 15
+    elif debt_ratio > 0.7:
+        weaknesses.append(f"高負債比 ({debt_ratio:.1%})")
 
-        score = 0
-        strengths = []
-        weaknesses = []
+    current_ratio = financial_ratios.get("solvency", {}).get("current_ratio", 0)
+    if current_ratio > 2.0:
+        score += 25
+        strengths.append(f"優異的流動比率 ({current_ratio:.2f})")
+    elif current_ratio > 1.5:
+        score += 15
+    elif current_ratio < 1.0:
+        weaknesses.append(f"流動比率偏低 ({current_ratio:.2f})")
 
-        roe = financial_ratios.get("profitability", {}).get("roe", 0)
-        if roe > 0.15:
-            score += 25
-            strengths.append(f"優異的 ROE ({roe:.1%})")
-        elif roe > 0.10:
-            score += 15
-            strengths.append(f"良好的 ROE ({roe:.1%})")
-        elif roe < 0.05:
-            weaknesses.append(f"偏低的 ROE ({roe:.1%})")
+    net_margin = financial_ratios.get("profitability", {}).get("net_margin", 0)
+    if net_margin > 0.15:
+        score += 25
+        strengths.append(f"高淨利率 ({net_margin:.1%})")
+    elif net_margin > 0.08:
+        score += 15
+    elif net_margin < 0.03:
+        weaknesses.append(f"淨利率偏低 ({net_margin:.1%})")
 
-        debt_ratio = financial_ratios.get("solvency", {}).get("debt_ratio", 0)
-        if debt_ratio < 0.3:
-            score += 25
-            strengths.append(f"低負債比 ({debt_ratio:.1%})")
-        elif debt_ratio < 0.5:
-            score += 15
-        elif debt_ratio > 0.7:
-            weaknesses.append(f"高負債比 ({debt_ratio:.1%})")
+    if score >= 80:
+        grade, assessment = "A", "財務體質優異"
+    elif score >= 60:
+        grade, assessment = "B", "財務體質良好"
+    elif score >= 40:
+        grade, assessment = "C", "財務體質普通"
+    elif score >= 20:
+        grade, assessment = "D", "財務體質偏弱"
+    else:
+        grade, assessment = "F", "財務體質堪憂"
 
-        current_ratio = financial_ratios.get("solvency", {}).get("current_ratio", 0)
-        if current_ratio > 2.0:
-            score += 25
-            strengths.append(f"優異的流動比率 ({current_ratio:.2f})")
-        elif current_ratio > 1.5:
-            score += 15
-        elif current_ratio < 1.0:
-            weaknesses.append(f"流動比率偏低 ({current_ratio:.2f})")
+    logger.info(
+        f"財務體質分析完成 | 股票: {ticker} | 評級: {grade} | "
+        f"得分: {score} | 優勢: {len(strengths)} | 弱點: {len(weaknesses)}"
+    )
 
-        net_margin = financial_ratios.get("profitability", {}).get("net_margin", 0)
-        if net_margin > 0.15:
-            score += 25
-            strengths.append(f"高淨利率 ({net_margin:.1%})")
-        elif net_margin > 0.08:
-            score += 15
-        elif net_margin < 0.03:
-            weaknesses.append(f"淨利率偏低 ({net_margin:.1%})")
+    return {
+        "ticker": ticker,
+        "health_score": score,
+        "health_grade": grade,
+        "strengths": strengths,
+        "weaknesses": weaknesses,
+        "assessment": assessment,
+    }
 
-        if score >= 80:
-            grade, assessment = "A", "財務體質優異"
-        elif score >= 60:
-            grade, assessment = "B", "財務體質良好"
-        elif score >= 40:
-            grade, assessment = "C", "財務體質普通"
-        elif score >= 20:
-            grade, assessment = "D", "財務體質偏弱"
-        else:
-            grade, assessment = "F", "財務體質堪憂"
 
-        self.logger.info(
-            f"財務體質分析完成 | 股票: {ticker} | 評級: {grade} | "
-            f"得分: {score} | 優勢: {len(strengths)} | 弱點: {len(weaknesses)}"
-        )
+@function_tool
+def evaluate_valuation(
+    ticker: str,
+    current_price: float,
+    financial_ratios: dict[str, Any],
+    industry_avg: dict[str, float] | None = None,
+) -> dict[str, Any]:
+    """評估估值水準
 
-        return {
-            "ticker": ticker,
-            "health_score": score,
-            "health_grade": grade,
-            "strengths": strengths,
-            "weaknesses": weaknesses,
-            "assessment": assessment,
-        }
+    Args:
+        symbol: 股票代號 (例如: "2330")
+        current_price: 當前股價
+        financial_ratios: 財務比率 (來自 calculate_financial_ratios)
+        industry_avg: 產業平均值 (可選)
 
-    def evaluate_valuation(
-        self,
-        ticker: str,
-        current_price: float,
-        financial_ratios: dict[str, Any],
-        industry_avg: dict[str, float] | None = None,
-    ) -> dict[str, Any]:
-        """評估估值水準
+    Returns:
+        dict: 估值分析 (估值水準、合理價、折溢價率)
+    """
+    logger.info(f"開始評估估值 | 股票: {ticker} | 當前價: {current_price}")
 
-        Args:
-            symbol: 股票代號 (例如: "2330")
-            current_price: 當前股價
-            financial_ratios: 財務比率 (來自 calculate_financial_ratios)
-            industry_avg: 產業平均值 (可選)
+    if "error" in financial_ratios:
+        logger.error(f"無法評估估值 | 股票: {ticker} | 原因: 財務比率錯誤")
+        return {"error": ..., "ticker": ticker}
 
-        Returns:
-            dict: 估值分析 (估值水準、合理價、折溢價率)
-        """
-        self.logger.info(f"開始評估估值 | 股票: {ticker} | 當前價: {current_price}")
+    pe_ratio = financial_ratios.get("valuation", {}).get("pe_ratio", 0)
+    pb_ratio = financial_ratios.get("valuation", {}).get("pb_ratio", 0)
 
-        if "error" in financial_ratios:
-            self.logger.error(f"無法評估估值 | 股票: {ticker} | 原因: 財務比率錯誤")
-            return {"error": ..., "ticker": ticker}
+    industry_pe = industry_avg.get("pe", 15.0) if industry_avg else 15.0
+    industry_pb = industry_avg.get("pb", 1.8) if industry_avg else 1.8
 
-        pe_ratio = financial_ratios.get("valuation", {}).get("pe_ratio", 0)
-        pb_ratio = financial_ratios.get("valuation", {}).get("pb_ratio", 0)
+    logger.debug(
+        f"估值指標 | P/E: {pe_ratio:.2f} (產業: {industry_pe:.2f}) | "
+        f"P/B: {pb_ratio:.2f} (產業: {industry_pb:.2f})"
+    )
 
-        industry_pe = industry_avg.get("pe", 15.0) if industry_avg else 15.0
-        industry_pb = industry_avg.get("pb", 1.8) if industry_avg else 1.8
+    pe_assessment = (
+        "低估"
+        if pe_ratio < industry_pe * 0.8
+        else "高估"
+        if pe_ratio > industry_pe * 1.2
+        else "合理"
+    )
+    pb_assessment = (
+        "低估"
+        if pb_ratio < industry_pb * 0.8
+        else "高估"
+        if pb_ratio > industry_pb * 1.2
+        else "合理"
+    )
 
-        self.logger.debug(
-            f"估值指標 | P/E: {pe_ratio:.2f} (產業: {industry_pe:.2f}) | "
-            f"P/B: {pb_ratio:.2f} (產業: {industry_pb:.2f})"
-        )
+    if pe_assessment == "低估" and pb_assessment == "低估":
+        valuation_level, fair_value = "便宜", current_price * 1.2
+    elif pe_assessment == "高估" or pb_assessment == "高估":
+        valuation_level, fair_value = "昂貴", current_price * 0.85
+    else:
+        valuation_level, fair_value = "合理", current_price
 
-        pe_assessment = (
-            "低估"
-            if pe_ratio < industry_pe * 0.8
-            else "高估"
-            if pe_ratio > industry_pe * 1.2
-            else "合理"
-        )
-        pb_assessment = (
-            "低估"
-            if pb_ratio < industry_pb * 0.8
-            else "高估"
-            if pb_ratio > industry_pb * 1.2
-            else "合理"
-        )
+    discount_rate = (fair_value - current_price) / current_price if current_price > 0 else 0
 
-        if pe_assessment == "低估" and pb_assessment == "低估":
-            valuation_level, fair_value = "便宜", current_price * 1.2
-        elif pe_assessment == "高估" or pb_assessment == "高估":
-            valuation_level, fair_value = "昂貴", current_price * 0.85
-        else:
-            valuation_level, fair_value = "合理", current_price
+    logger.info(
+        f"估值評估完成 | 股票: {ticker} | 等級: {valuation_level} | "
+        f"合理價: {fair_value:.2f} | 折溢價率: {discount_rate:.1%}"
+    )
 
-        discount_rate = (fair_value - current_price) / current_price if current_price > 0 else 0
+    return {
+        "ticker": ticker,
+        "current_price": current_price,
+        "valuation_level": valuation_level,
+        "fair_value": fair_value,
+        "discount_rate": discount_rate,
+        "pe_assessment": pe_assessment,
+        "pb_assessment": pb_assessment,
+    }
 
-        self.logger.info(
-            f"估值評估完成 | 股票: {ticker} | 等級: {valuation_level} | "
-            f"合理價: {fair_value:.2f} | 折溢價率: {discount_rate:.1%}"
-        )
 
-        return {
-            "ticker": ticker,
-            "current_price": current_price,
-            "valuation_level": valuation_level,
-            "fair_value": fair_value,
-            "discount_rate": discount_rate,
-            "pe_assessment": pe_assessment,
-            "pb_assessment": pb_assessment,
-        }
+@function_tool
+def analyze_growth_potential(
+    ticker: str,
+    historical_data: dict[str, Any],
+) -> dict[str, Any]:
+    """分析成長潛力
 
-    def analyze_growth_potential(
-        self,
-        ticker: str,
-        historical_data: dict[str, Any],
-    ) -> dict[str, Any]:
-        """分析成長潛力
+    Args:
+        symbol: 股票代號 (例如: "2330")
+        historical_data: 歷史財務數據 (營收成長率、EPS 成長率)
 
-        Args:
-            symbol: 股票代號 (例如: "2330")
-            historical_data: 歷史財務數據 (營收成長率、EPS 成長率)
+    Returns:
+        dict: 成長潛力分析 (成長評分、成長趨勢)
+    """
+    logger.info(f"開始分析成長潛力 | 股票: {ticker}")
 
-        Returns:
-            dict: 成長潛力分析 (成長評分、成長趨勢)
-        """
-        self.logger.info(f"開始分析成長潛力 | 股票: {ticker}")
+    if not historical_data:
+        logger.warning(f"缺少歷史數據 | 股票: {ticker}")
+        return {"error": ..., "ticker": ticker}
 
-        if not historical_data:
-            self.logger.warning(f"缺少歷史數據 | 股票: {ticker}")
-            return {"error": ..., "ticker": ticker}
+    score = 0
+    revenue_growth = historical_data.get("latest_revenue_growth", 0)
+    eps_growth = historical_data.get("latest_eps_growth", 0)
 
-        score = 0
-        revenue_growth = historical_data.get("latest_revenue_growth", 0)
-        eps_growth = historical_data.get("latest_eps_growth", 0)
+    logger.debug(f"成長數據 | 營收成長: {revenue_growth:.1%} | EPS成長: {eps_growth:.1%}")
 
-        self.logger.debug(f"成長數據 | 營收成長: {revenue_growth:.1%} | EPS成長: {eps_growth:.1%}")
+    if revenue_growth > 0.15:
+        score += 40
+        growth_assessment = "高成長"
+    elif revenue_growth > 0.08:
+        score += 25
+        growth_assessment = "穩健成長"
+    elif revenue_growth > 0:
+        score += 10
+        growth_assessment = "低速成長"
+    else:
+        growth_assessment = "負成長"
 
-        if revenue_growth > 0.15:
-            score += 40
-            growth_assessment = "高成長"
-        elif revenue_growth > 0.08:
-            score += 25
-            growth_assessment = "穩健成長"
-        elif revenue_growth > 0:
-            score += 10
-            growth_assessment = "低速成長"
-        else:
-            growth_assessment = "負成長"
+    if eps_growth > 0.20:
+        score += 40
+    elif eps_growth > 0.10:
+        score += 25
+    elif eps_growth > 0:
+        score += 10
 
-        if eps_growth > 0.20:
-            score += 40
-        elif eps_growth > 0.10:
-            score += 25
-        elif eps_growth > 0:
-            score += 10
+    if revenue_growth > 0.10 and eps_growth > 0.15:
+        growth_trend = "加速"
+    elif revenue_growth > 0.05 and eps_growth > 0.05:
+        growth_trend = "穩定"
+    else:
+        growth_trend = "趨緩"
 
-        if revenue_growth > 0.10 and eps_growth > 0.15:
-            growth_trend = "加速"
-        elif revenue_growth > 0.05 and eps_growth > 0.05:
-            growth_trend = "穩定"
-        else:
-            growth_trend = "趨緩"
+    logger.info(
+        f"成長潛力分析完成 | 股票: {ticker} | 評估: {growth_assessment} | "
+        f"趨勢: {growth_trend} | 分數: {min(score, 100)}"
+    )
 
-        self.logger.info(
-            f"成長潛力分析完成 | 股票: {ticker} | 評估: {growth_assessment} | "
-            f"趨勢: {growth_trend} | 分數: {min(score, 100)}"
-        )
+    return {
+        "ticker": ticker,
+        "growth_score": min(score, 100),
+        "growth_trend": growth_trend,
+        "revenue_growth": revenue_growth,
+        "eps_growth": eps_growth,
+        "assessment": growth_assessment,
+    }
 
-        return {
-            "ticker": ticker,
-            "growth_score": min(score, 100),
-            "growth_trend": growth_trend,
-            "revenue_growth": revenue_growth,
-            "eps_growth": eps_growth,
-            "assessment": growth_assessment,
-        }
 
-    def generate_investment_rating(
-        self,
-        ticker: str,
-        financial_health: dict[str, Any],
-        valuation: dict[str, Any],
-        growth: dict[str, Any],
-    ) -> dict[str, Any]:
-        """產生投資評級
+@function_tool
+def generate_investment_rating(
+    ticker: str,
+    financial_health: dict[str, Any],
+    valuation: dict[str, Any],
+    growth: dict[str, Any],
+) -> dict[str, Any]:
+    """產生投資評級
 
-        Args:
-            symbol: 股票代號 (例如: "2330")
-            financial_health: 財務體質分析
-            valuation: 估值分析
-            growth: 成長分析
+    Args:
+        symbol: 股票代號 (例如: "2330")
+        financial_health: 財務體質分析
+        valuation: 估值分析
+        growth: 成長分析
 
-        Returns:
-            dict: 投資評級 (買進/持有/賣出建議)
-        """
-        health_score = financial_health.get("health_score", 0)
-        valuation_level = valuation.get("valuation_level", "合理")
-        growth_score = growth.get("growth_score", 0)
+    Returns:
+        dict: 投資評級 (買進/持有/賣出建議)
+    """
+    health_score = financial_health.get("health_score", 0)
+    valuation_level = valuation.get("valuation_level", "合理")
+    growth_score = growth.get("growth_score", 0)
 
-        self.logger.info(
-            f"開始產生投資評級 | 股票: {ticker} | 體質分數: {health_score} | "
-            f"估值: {valuation_level} | 成長分數: {growth_score}"
-        )
+    logger.info(
+        f"開始產生投資評級 | 股票: {ticker} | 體質分數: {health_score} | "
+        f"估值: {valuation_level} | 成長分數: {growth_score}"
+    )
 
-        overall_score = (health_score * 0.4 + growth_score * 0.35) * (
-            1.2 if valuation_level == "便宜" else 0.9 if valuation_level == "昂貴" else 1.0
-        )
+    overall_score = (health_score * 0.4 + growth_score * 0.35) * (
+        1.2 if valuation_level == "便宜" else 0.9 if valuation_level == "昂貴" else 1.0
+    )
 
-        key_reasons = []
+    key_reasons = []
 
-        if overall_score >= 75 and valuation_level == "便宜":
-            rating, confidence = "強力買進", 0.85
-            recommendation = "優質公司且估值便宜,建議積極買進"
-            key_reasons.extend(financial_health.get("strengths", []))
-        elif overall_score >= 60:
-            rating, confidence = "買進", 0.70
-            recommendation = "基本面穩健,建議逢低買進"
-            key_reasons.extend(financial_health.get("strengths", [])[:2])
-        elif overall_score >= 40:
-            rating, confidence = "持有", 0.60
-            recommendation = "基本面普通,建議持有觀望"
-        else:
-            rating, confidence = "賣出", 0.75
-            recommendation = "基本面轉弱,建議減碼"
-            key_reasons.extend(financial_health.get("weaknesses", []))
+    if overall_score >= 75 and valuation_level == "便宜":
+        rating, confidence = "強力買進", 0.85
+        recommendation = "優質公司且估值便宜,建議積極買進"
+        key_reasons.extend(financial_health.get("strengths", []))
+    elif overall_score >= 60:
+        rating, confidence = "買進", 0.70
+        recommendation = "基本面穩健,建議逢低買進"
+        key_reasons.extend(financial_health.get("strengths", [])[:2])
+    elif overall_score >= 40:
+        rating, confidence = "持有", 0.60
+        recommendation = "基本面普通,建議持有觀望"
+    else:
+        rating, confidence = "賣出", 0.75
+        recommendation = "基本面轉弱,建議減碼"
+        key_reasons.extend(financial_health.get("weaknesses", []))
 
-        target_price = valuation.get("fair_value", 0)
+    target_price = valuation.get("fair_value", 0)
 
-        self.logger.info(
-            f"投資評級產生完成 | 股票: {ticker} | 評級: {rating} | "
-            f"目標價: {target_price:.2f} | 信心度: {confidence:.1%}"
-        )
+    logger.info(
+        f"投資評級產生完成 | 股票: {ticker} | 評級: {rating} | "
+        f"目標價: {target_price:.2f} | 信心度: {confidence:.1%}"
+    )
 
-        return {
-            "ticker": ticker,
-            "rating": rating,
-            "target_price": target_price,
-            "confidence": confidence,
-            "recommendation": recommendation,
-            "key_reasons": key_reasons,
-            "timestamp": datetime.now().isoformat(),
-        }
+    return {
+        "ticker": ticker,
+        "rating": rating,
+        "target_price": target_price,
+        "confidence": confidence,
+        "recommendation": recommendation,
+        "key_reasons": key_reasons,
+        "timestamp": datetime.now().isoformat(),
+    }
 
 
 async def get_fundamental_agent(
-    mcp_servers: list[Any],
-    model_name: str = "gpt-4o-mini",
-    shared_tools: list[Any] | None = None,
-    max_turns: int = 15,
+    model_name: str = DEFAULT_MODEL,
+    mcp_servers: list[Any] | None = None,
+    openai_tools: list[Any] | None = None,
+    max_turns: int = DEFAULT_MAX_TURNS,
 ) -> Agent:
     """創建基本面分析 Agent
 
     Args:
-        mcp_servers: MCP servers 實例列表（MCPServerStdio 對象），從 TradingAgent 傳入
         model_name: 使用的 AI 模型名稱
-        shared_tools: 從 TradingAgent 傳入的共用工具（WebSearchTool, CodeInterpreterTool）
-        max_turns: 最大執行回合數（預設 15）
+        mcp_servers: MCP servers 實例列表（MCPServerStdio 對象），從 TradingAgent 傳入
+        openai_tools: 從 TradingAgent 傳入的共用工具（WebSearchTool, CodeInterpreterTool）
+        max_turns: 最大執行回合數
 
     Returns:
         Agent: 配置好的基本面分析 Agent
@@ -509,54 +504,19 @@ async def get_fundamental_agent(
         Timeout 由主 TradingAgent 的 execution_timeout 統一控制，
         sub-agent 作為 Tool 執行時會受到主 Agent 的 timeout 限制。
     """
-    logger = get_agent_logger("fundamental_agent")
     logger.info(f"get_fundamental_agent() called with model={model_name}")
 
-    logger.debug("Creating FundamentalAnalysisTools instance")
-    tools_instance = FundamentalAnalysisTools()
-    logger.debug("FundamentalAnalysisTools instance created")
-
     logger.debug("Creating custom tools with function_tool")
-    try:
-        custom_tools = [
-            function_tool(
-                tools_instance.calculate_financial_ratios,
-                name_override="calculate_financial_ratios",
-                description_override="計算財務比率 (ROE, ROA, 負債比, 流動比率, P/E, P/B)",
-                strict_mode=False,
-            ),
-            function_tool(
-                tools_instance.analyze_financial_health,
-                name_override="analyze_financial_health",
-                description_override="分析財務體質健康度並給予評級 (A-F)",
-                strict_mode=False,
-            ),
-            function_tool(
-                tools_instance.evaluate_valuation,
-                name_override="evaluate_valuation",
-                description_override="評估股價估值水準 (便宜/合理/昂貴)",
-                strict_mode=False,
-            ),
-            function_tool(
-                tools_instance.analyze_growth_potential,
-                name_override="analyze_growth_potential",
-                description_override="分析公司成長潛力 (營收/EPS 成長趨勢)",
-                strict_mode=False,
-            ),
-            function_tool(
-                tools_instance.generate_investment_rating,
-                name_override="generate_investment_rating",
-                description_override="綜合產生投資評級 (強力買進/買進/持有/賣出)",
-                strict_mode=False,
-            ),
-        ]
-        logger.debug(f"Created {len(custom_tools)} custom tools successfully")
-    except Exception as e:
-        logger.error(f"Error creating custom tools with function_tool: {e}", exc_info=True)
-        raise
+    custom_tools = [
+        calculate_financial_ratios,
+        analyze_financial_health,
+        evaluate_valuation,
+        analyze_growth_potential,
+        generate_investment_rating,
+    ]
 
     # 合併自訂工具和共用工具
-    all_tools = custom_tools + (shared_tools or [])
+    all_tools = custom_tools + (openai_tools or [])
     logger.debug(f"Total tools (custom + shared): {len(all_tools)}")
 
     logger.info(
@@ -568,6 +528,11 @@ async def get_fundamental_agent(
         model=model_name,
         mcp_servers=mcp_servers,
         tools=all_tools,
+        # max_turns=max_turns,
+        model_settings=ModelSettings(
+            tool_choice="required",  # 強制使用工具
+            # max_completion_tokens=500,  # 控制回答長度，避免過度冗長
+        ),
     )
     logger.info("Fundamental Analyst Agent created successfully")
 
