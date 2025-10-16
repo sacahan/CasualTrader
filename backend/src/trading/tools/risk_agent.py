@@ -8,7 +8,6 @@ from __future__ import annotations
 import logging
 import os
 from datetime import datetime
-from typing import Any
 
 from dotenv import load_dotenv
 
@@ -114,9 +113,9 @@ def risk_agent_instructions() -> str:
 @function_tool
 def calculate_position_risk(
     ticker: str,
-    position_data: dict[str, Any],
-    market_data: dict[str, Any] | None = None,
-) -> dict[str, Any]:
+    position_data: str,
+    market_data: str = "",
+) -> str:
     """計算個別部位風險
 
     Args:
@@ -169,9 +168,9 @@ def calculate_position_risk(
 
 @function_tool
 def analyze_portfolio_concentration(
-    positions: list[dict[str, Any]],
+    positions: str,
     total_value: float,
-) -> dict[str, Any]:
+) -> str:
     """分析投資組合集中度
 
     Args:
@@ -188,7 +187,7 @@ def analyze_portfolio_concentration(
         return {"error": "無效的投資組合數據"}
 
     weights = []
-    sector_weights: dict[str, float] = {}
+    sector_weights: str = ""
 
     for pos in positions:
         value = pos.get("value", 0)
@@ -238,10 +237,10 @@ def analyze_portfolio_concentration(
 
 @function_tool
 def calculate_portfolio_risk(
-    position_risks: list[dict[str, Any]],
-    concentration: dict[str, Any],
+    position_risks: str,
+    concentration: str,
     total_value: float,
-) -> dict[str, Any]:
+) -> str:
     """計算整體投資組合風險
 
     Args:
@@ -311,9 +310,9 @@ def calculate_portfolio_risk(
 
 @function_tool
 def perform_stress_test(
-    positions: list[dict[str, Any]],
-    scenarios: list[dict[str, Any]] | None = None,
-) -> dict[str, Any]:
+    positions: str,
+    scenarios: str = "",
+) -> str:
     """執行壓力測試
 
     Args:
@@ -384,10 +383,10 @@ def perform_stress_test(
 
 @function_tool
 def generate_risk_recommendations(
-    portfolio_risk: dict[str, Any],
-    concentration: dict[str, Any],
-    position_risks: list[dict[str, Any]],
-) -> dict[str, Any]:
+    portfolio_risk: str,
+    concentration: str,
+    position_risks: str,
+) -> str:
     """產生風險管理建議
 
     Args:
@@ -436,8 +435,8 @@ def generate_risk_recommendations(
 
 async def get_risk_agent(
     model_name: str = DEFAULT_MODEL,
-    mcp_servers: list[Any] | None = None,
-    openai_tools: list[Any] | None = None,
+    mcp_servers: str = "",
+    openai_tools: str = "",
     max_turns: int = DEFAULT_MAX_TURNS,
 ) -> Agent:
     """創建風險管理 Agent

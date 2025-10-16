@@ -13,7 +13,7 @@ from typing import Any
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from ..agents.trading_agent import TradingAgent
+from ..trading.trading_agent import TradingAgent
 from .agents_service import AgentsService, AgentNotFoundError
 from ..common.enums import AgentMode, SessionStatus
 from ..database.models import Agent

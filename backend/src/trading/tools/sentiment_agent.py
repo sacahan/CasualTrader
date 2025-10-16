@@ -8,7 +8,6 @@ from __future__ import annotations
 import logging
 import os
 from datetime import datetime
-from typing import Any
 
 from dotenv import load_dotenv
 
@@ -117,8 +116,8 @@ def sentiment_agent_instructions() -> str:
 
 @function_tool
 def calculate_fear_greed_index(
-    market_data: dict[str, Any],
-) -> dict[str, Any]:
+    market_data: str,
+) -> str:
     """計算恐懼貪婪指數
 
     Args:
@@ -189,8 +188,8 @@ def calculate_fear_greed_index(
 @function_tool
 def analyze_money_flow(
     ticker: str,
-    trading_data: dict[str, Any],
-) -> dict[str, Any]:
+    trading_data: str,
+) -> str:
     """分析資金流向
 
     Args:
@@ -267,9 +266,9 @@ def analyze_money_flow(
 
 @function_tool
 def analyze_news_sentiment(
-    ticker: str | None,
-    news_data: list[dict[str, Any]],
-) -> dict[str, Any]:
+    ticker: str,
+    news_data: str,
+) -> str:
     """分析新聞情緒
 
     Args:
@@ -353,8 +352,8 @@ def analyze_news_sentiment(
 @function_tool
 def analyze_social_sentiment(
     ticker: str,
-    social_data: dict[str, Any],
-) -> dict[str, Any]:
+    social_data: str,
+) -> str:
     """分析社群媒體情緒
 
     Args:
@@ -444,11 +443,11 @@ def analyze_social_sentiment(
 
 @function_tool
 def generate_sentiment_signals(
-    fear_greed_index: dict[str, Any],
-    money_flow: dict[str, Any],
-    news_sentiment: dict[str, Any],
-    social_sentiment: dict[str, Any],
-) -> dict[str, Any]:
+    fear_greed_index: str,
+    money_flow: str,
+    news_sentiment: str,
+    social_sentiment: str,
+) -> str:
     """產生情緒交易訊號
 
     Args:
@@ -561,8 +560,8 @@ def generate_sentiment_signals(
 
 async def get_sentiment_agent(
     model_name: str = DEFAULT_MODEL,
-    mcp_servers: list[Any] | None = None,
-    openai_tools: list[Any] | None = None,
+    mcp_servers: str = "",
+    openai_tools: str = "",
     max_turns: int = DEFAULT_MAX_TURNS,
 ) -> Agent:
     """創建市場情緒分析 Agent

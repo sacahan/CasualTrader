@@ -9,7 +9,6 @@ import os
 from dotenv import load_dotenv
 
 from datetime import datetime
-from typing import Any
 
 from agents import Agent, function_tool, ModelSettings
 
@@ -122,22 +121,30 @@ def fundamental_agent_instructions() -> str:
 @function_tool
 def calculate_financial_ratios(
     ticker: str,
-    financial_data: dict[str, Any],
-) -> dict[str, Any]:
+    financial_data_json: str,
+) -> str:
     """計算財務比率
 
     Args:
-        symbol: 股票代號 (例如: "2330")
-        financial_data: 財務數據,包含 revenue, net_income, total_assets 等
+        ticker: 股票代號 (例如: "2330")
+        financial_data_json: 財務數據的JSON字符串,包含 revenue, net_income, total_assets 等
 
     Returns:
-        dict: 財務比率 (ROE, ROA, 負債比, 流動比率等)
+        str: 財務比率結果的JSON字符串 (ROE, ROA, 負債比, 流動比率等)
     """
     logger.info(f"開始計算財務比率 | 股票: {ticker}")
 
+    try:
+        import json
+
+        financial_data = json.loads(financial_data_json)
+    except json.JSONDecodeError:
+        logger.warning(f"無法解析財務數據 | 股票: {ticker}")
+        return json.dumps({"error": "Invalid financial data JSON", "ticker": ticker})
+
     if not financial_data:
         logger.warning(f"缺少財務數據 | 股票: {ticker}")
-        return {"error": ..., "ticker": ticker}
+        return json.dumps({"error": "Missing financial data", "ticker": ticker})
 
     result = {
         "ticker": ticker,
@@ -190,8 +197,8 @@ def calculate_financial_ratios(
 @function_tool
 def analyze_financial_health(
     ticker: str,
-    financial_ratios: dict[str, Any],
-) -> dict[str, Any]:
+    financial_ratios: str,
+) -> str:
     """分析財務體質
 
     Args:
@@ -278,9 +285,9 @@ def analyze_financial_health(
 def evaluate_valuation(
     ticker: str,
     current_price: float,
-    financial_ratios: dict[str, Any],
-    industry_avg: dict[str, float] | None = None,
-) -> dict[str, Any]:
+    financial_ratios: str,
+    industry_avg: str = "",
+) -> str:
     """評估估值水準
 
     Args:
@@ -352,8 +359,8 @@ def evaluate_valuation(
 @function_tool
 def analyze_growth_potential(
     ticker: str,
-    historical_data: dict[str, Any],
-) -> dict[str, Any]:
+    historical_data: str,
+) -> str:
     """分析成長潛力
 
     Args:
@@ -419,10 +426,10 @@ def analyze_growth_potential(
 @function_tool
 def generate_investment_rating(
     ticker: str,
-    financial_health: dict[str, Any],
-    valuation: dict[str, Any],
-    growth: dict[str, Any],
-) -> dict[str, Any]:
+    financial_health: str,
+    valuation: str,
+    growth: str,
+) -> str:
     """產生投資評級
 
     Args:
@@ -485,8 +492,8 @@ def generate_investment_rating(
 
 async def get_fundamental_agent(
     model_name: str = DEFAULT_MODEL,
-    mcp_servers: list[Any] | None = None,
-    openai_tools: list[Any] | None = None,
+    mcp_servers: str = "",
+    openai_tools: str = "",
     max_turns: int = DEFAULT_MAX_TURNS,
 ) -> Agent:
     """創建基本面分析 Agent

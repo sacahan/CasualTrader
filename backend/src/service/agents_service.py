@@ -10,13 +10,16 @@ from __future__ import annotations
 import json
 import logging
 from typing import Any
+from decimal import Decimal
+from datetime import datetime
+import uuid
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from ..database.models import Agent
-from ..common.enums import AgentMode, AgentStatus
+from ..database.models import Agent, Transaction, AgentHolding, AgentPerformance
+from ..common.enums import AgentMode, AgentStatus, TransactionAction, TransactionStatus
 
 logger = logging.getLogger(__name__)
 
@@ -227,6 +230,337 @@ class AgentsService:
             await self.session.rollback()
             logger.error(f"Database error updating agent status: {e}", exc_info=True)
             raise AgentDatabaseError(f"Failed to update agent status: {str(e)}")
+
+    # ==========================================
+    # Trading Operations
+    # ==========================================
+
+    async def create_transaction(
+        self,
+        agent_id: str,
+        ticker: str,
+        action: str,
+        quantity: int,
+        price: float,
+        total_amount: float,
+        commission: float,
+        decision_reason: str,
+        company_name: str | None = None,
+        status: str = "COMPLETED",
+    ) -> Transaction:
+        """
+        創建交易記錄
+
+        Args:
+            agent_id: Agent ID
+            ticker: 股票代號
+            action: 交易動作 ("BUY" 或 "SELL")
+            quantity: 交易股數
+            price: 交易價格
+            total_amount: 交易總金額
+            commission: 手續費
+            decision_reason: 交易決策理由
+            company_name: 公司名稱（可選）
+            status: 交易狀態
+
+        Returns:
+            創建的交易記錄
+
+        Raises:
+            AgentDatabaseError: 資料庫操作失敗
+        """
+        try:
+            # 轉換 action 為 enum
+            action_enum = (
+                TransactionAction.BUY if action.upper() == "BUY" else TransactionAction.SELL
+            )
+            status_enum = (
+                TransactionStatus.COMPLETED
+                if status.upper() == "COMPLETED"
+                else TransactionStatus.PENDING
+            )
+
+            transaction = Transaction(
+                id=str(uuid.uuid4()),
+                agent_id=agent_id,
+                ticker=ticker,
+                company_name=company_name,
+                action=action_enum,
+                quantity=quantity,
+                price=Decimal(str(price)),
+                total_amount=Decimal(str(total_amount)),
+                commission=Decimal(str(commission)),
+                status=status_enum,
+                execution_time=datetime.now()
+                if status_enum == TransactionStatus.COMPLETED
+                else None,
+                decision_reason=decision_reason,
+            )
+
+            self.session.add(transaction)
+            await self.session.commit()
+
+            logger.info(f"Created transaction: {action} {quantity} {ticker} for agent {agent_id}")
+            return transaction
+
+        except Exception as e:
+            await self.session.rollback()
+            logger.error(f"Database error creating transaction: {e}", exc_info=True)
+            raise AgentDatabaseError(f"Failed to create transaction: {str(e)}")
+
+    async def get_agent_holdings(self, agent_id: str) -> list[AgentHolding]:
+        """
+        取得 Agent 持股明細
+
+        Args:
+            agent_id: Agent ID
+
+        Returns:
+            持股列表
+
+        Raises:
+            AgentDatabaseError: 資料庫操作失敗
+        """
+        try:
+            stmt = select(AgentHolding).where(AgentHolding.agent_id == agent_id)
+            result = await self.session.execute(stmt)
+            holdings = list(result.scalars().all())
+
+            logger.info(f"Found {len(holdings)} holdings for agent {agent_id}")
+            return holdings
+
+        except Exception as e:
+            logger.error(f"Database error getting holdings: {e}", exc_info=True)
+            raise AgentDatabaseError(f"Failed to get holdings: {str(e)}")
+
+    async def update_agent_holdings(
+        self,
+        agent_id: str,
+        ticker: str,
+        action: str,
+        quantity: int,
+        price: float,
+        company_name: str | None = None,
+    ) -> None:
+        """
+        更新 Agent 持股明細
+
+        Args:
+            agent_id: Agent ID
+            ticker: 股票代號
+            action: 交易動作 ("BUY" 或 "SELL")
+            quantity: 交易股數
+            price: 交易價格
+            company_name: 公司名稱（可選）
+
+        Raises:
+            AgentDatabaseError: 資料庫操作失敗
+        """
+        try:
+            # 查找現有持股
+            stmt = select(AgentHolding).where(
+                AgentHolding.agent_id == agent_id, AgentHolding.ticker == ticker
+            )
+            result = await self.session.execute(stmt)
+            holding = result.scalar_one_or_none()
+
+            if action.upper() == "BUY":
+                if holding:
+                    # 更新現有持股
+                    new_quantity = holding.quantity + quantity
+                    new_total_cost = holding.total_cost + Decimal(str(quantity * price))
+                    new_average_cost = new_total_cost / new_quantity
+
+                    holding.quantity = new_quantity
+                    holding.total_cost = new_total_cost
+                    holding.average_cost = new_average_cost
+                    holding.updated_at = datetime.now()
+                else:
+                    # 創建新持股
+                    total_cost = Decimal(str(quantity * price))
+                    holding = AgentHolding(
+                        agent_id=agent_id,
+                        ticker=ticker,
+                        company_name=company_name,
+                        quantity=quantity,
+                        average_cost=Decimal(str(price)),
+                        total_cost=total_cost,
+                    )
+                    self.session.add(holding)
+
+            elif action.upper() == "SELL":
+                if not holding:
+                    raise AgentDatabaseError(f"Cannot sell {ticker}: no holdings found")
+
+                if holding.quantity < quantity:
+                    raise AgentDatabaseError(
+                        f"Cannot sell {quantity} shares of {ticker}: only {holding.quantity} shares available"
+                    )
+
+                # 更新持股
+                holding.quantity -= quantity
+                if holding.quantity == 0:
+                    # 完全賣出，刪除持股記錄
+                    await self.session.delete(holding)
+                else:
+                    # 部分賣出，更新成本
+                    holding.total_cost = holding.average_cost * holding.quantity
+                    holding.updated_at = datetime.now()
+
+            await self.session.commit()
+            logger.info(f"Updated holdings: {action} {quantity} {ticker} for agent {agent_id}")
+
+        except Exception as e:
+            await self.session.rollback()
+            logger.error(f"Database error updating holdings: {e}", exc_info=True)
+            raise AgentDatabaseError(f"Failed to update holdings: {str(e)}")
+
+    async def calculate_and_update_performance(self, agent_id: str) -> None:
+        """
+        計算並更新 Agent 績效指標
+
+        Args:
+            agent_id: Agent ID
+
+        Raises:
+            AgentDatabaseError: 資料庫操作失敗
+        """
+        try:
+            from datetime import date
+
+            # 取得 Agent 配置
+            agent = await self.get_agent_config(agent_id)
+
+            # 取得持股明細
+            holdings = await self.get_agent_holdings(agent_id)
+
+            # 計算股票市值（簡化：使用平均成本作為當前價格）
+            stocks_value = sum(holding.quantity * holding.average_cost for holding in holdings)
+
+            # 計算現金餘額
+            cash_balance = agent.current_funds or agent.initial_funds
+
+            # 計算總資產價值
+            total_value = Decimal(str(cash_balance)) + stocks_value
+
+            # 取得交易統計
+            from sqlalchemy import func
+
+            stmt_transactions = (
+                select(
+                    func.count(Transaction.id).label("total_trades"),
+                    func.sum(
+                        func.case((Transaction.action == TransactionAction.SELL, 1), else_=0)
+                    ).label("completed_trades"),
+                )
+                .where(Transaction.agent_id == agent_id)
+                .where(Transaction.status == TransactionStatus.COMPLETED)
+            )
+
+            result = await self.session.execute(stmt_transactions)
+            trade_stats = result.first()
+
+            total_trades = trade_stats.total_trades or 0
+            completed_trades = trade_stats.completed_trades or 0
+
+            # 計算總回報率
+            total_return = (
+                (total_value - agent.initial_funds) / agent.initial_funds
+                if agent.initial_funds > 0
+                else Decimal("0")
+            )
+
+            # 計算勝率（簡化：基於交易完成率）
+            win_rate = (
+                Decimal(str(completed_trades / total_trades * 100))
+                if total_trades > 0
+                else Decimal("0")
+            )
+
+            # 查找今日績效記錄
+            today = date.today()
+            stmt_performance = select(AgentPerformance).where(
+                AgentPerformance.agent_id == agent_id, AgentPerformance.date == today
+            )
+            result = await self.session.execute(stmt_performance)
+            performance = result.scalar_one_or_none()
+
+            if performance:
+                # 更新現有記錄
+                performance.total_value = total_value
+                performance.cash_balance = Decimal(str(cash_balance))
+                performance.total_return = total_return
+                performance.win_rate = win_rate
+                performance.total_trades = total_trades
+                performance.winning_trades = completed_trades
+            else:
+                # 創建新記錄
+                performance = AgentPerformance(
+                    agent_id=agent_id,
+                    date=today,
+                    total_value=total_value,
+                    cash_balance=Decimal(str(cash_balance)),
+                    unrealized_pnl=Decimal("0"),  # TODO: 計算未實現損益
+                    realized_pnl=Decimal("0"),  # TODO: 計算已實現損益
+                    total_return=total_return,
+                    win_rate=win_rate,
+                    total_trades=total_trades,
+                    winning_trades=completed_trades,
+                )
+                self.session.add(performance)
+
+            await self.session.commit()
+            logger.info(f"Updated performance for agent {agent_id}: total_value={total_value}")
+
+        except Exception as e:
+            await self.session.rollback()
+            logger.error(f"Database error calculating performance: {e}", exc_info=True)
+            raise AgentDatabaseError(f"Failed to calculate performance: {str(e)}")
+
+    async def update_agent_funds(
+        self,
+        agent_id: str,
+        amount_change: float,
+        transaction_type: str,
+    ) -> None:
+        """
+        更新 Agent 資金
+
+        Args:
+            agent_id: Agent ID
+            amount_change: 資金變化量（正數為增加，負數為減少）
+            transaction_type: 交易類型描述
+
+        Raises:
+            AgentDatabaseError: 資料庫操作失敗
+        """
+        try:
+            stmt = select(Agent).where(Agent.id == agent_id)
+            result = await self.session.execute(stmt)
+            agent = result.scalar_one_or_none()
+
+            if not agent:
+                raise AgentNotFoundError(f"Agent '{agent_id}' not found")
+
+            current_funds = agent.current_funds or agent.initial_funds
+            new_funds = float(current_funds) + amount_change
+
+            if new_funds < 0:
+                raise AgentDatabaseError(
+                    f"Insufficient funds: current={current_funds}, required={-amount_change}"
+                )
+
+            agent.current_funds = Decimal(str(new_funds))
+            await self.session.commit()
+
+            logger.info(
+                f"Updated funds for agent {agent_id}: {current_funds} -> {new_funds} ({transaction_type})"
+            )
+
+        except Exception as e:
+            await self.session.rollback()
+            logger.error(f"Database error updating funds: {e}", exc_info=True)
+            raise AgentDatabaseError(f"Failed to update funds: {str(e)}")
 
     # ==========================================
     # Validation and Parsing

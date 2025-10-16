@@ -8,7 +8,6 @@ from __future__ import annotations
 import logging
 import os
 from datetime import datetime
-from typing import Any
 
 from dotenv import load_dotenv
 
@@ -114,9 +113,9 @@ def technical_agent_instructions() -> str:
 @function_tool
 def calculate_technical_indicators(
     ticker: str,
-    price_data: list[dict[str, Any]],
-    indicators: list[str] | None = None,
-) -> dict[str, Any]:
+    price_data: str,
+    indicators: str = "",
+) -> str:
     """計算技術指標
 
     Args:
@@ -191,9 +190,9 @@ def calculate_technical_indicators(
 @function_tool
 def identify_chart_patterns(
     ticker: str,
-    price_data: list[dict[str, Any]],
+    price_data: str,
     lookback_days: int = 60,
-) -> dict[str, Any]:
+) -> str:
     """識別圖表型態
 
     Args:
@@ -260,8 +259,8 @@ def identify_chart_patterns(
 @function_tool
 def analyze_trend(
     ticker: str,
-    price_data: list[dict[str, Any]],
-) -> dict[str, Any]:
+    price_data: str,
+) -> str:
     """分析趨勢方向和強度
 
     Args:
@@ -310,8 +309,8 @@ def analyze_trend(
 @function_tool
 def analyze_support_resistance(
     ticker: str,
-    price_data: list[dict[str, Any]],
-) -> dict[str, Any]:
+    price_data: str,
+) -> str:
     """分析支撐和壓力位
 
     Args:
@@ -363,10 +362,10 @@ def analyze_support_resistance(
 @function_tool
 def generate_trading_signals(
     ticker: str,
-    technical_indicators: dict[str, Any],
-    trend_analysis: dict[str, Any],
-    patterns: dict[str, Any],
-) -> dict[str, Any]:
+    technical_indicators: str,
+    trend_analysis: str,
+    patterns: str,
+) -> str:
     """綜合分析產生交易訊號
 
     Args:
@@ -427,8 +426,8 @@ def generate_trading_signals(
 
 async def get_technical_agent(
     model_name: str = DEFAULT_MODEL,
-    mcp_servers: list[Any] | None = None,
-    openai_tools: list[Any] | None = None,
+    mcp_servers: str = "",
+    openai_tools: str = "",
     max_turns: int = DEFAULT_MAX_TURNS,
 ) -> Agent:
     """創建技術分析 Agent

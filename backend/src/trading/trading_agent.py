@@ -7,24 +7,37 @@ TradingAgent - 基於 OpenAI Agents SDK 的生產級實作
 
 from __future__ import annotations
 import os
-
-from dotenv import load_dotenv
-
 import logging
 from typing import Any
 from contextlib import AsyncExitStack
 
-from agents import Agent, ModelSettings, Runner, gen_trace_id, trace, Tool
-from agents.mcp import MCPServerStdio
-from agents.tools import WebSearchTool, CodeInterpreterTool
+from dotenv import load_dotenv
 
-from .tools.fundamental_agent import get_fundamental_agent
-from .tools.rick_agent import get_risk_agent
-from .tools.sentiment_agent import get_sentiment_agent
+# 現在可以正常導入 OpenAI Agents SDK
+try:
+    from agents import (
+        Agent,
+        ModelSettings,
+        Runner,
+        gen_trace_id,
+        trace,
+        Tool,
+        WebSearchTool,
+        CodeInterpreterTool,
+    )
+    from agents.mcp import MCPServerStdio
+except ImportError as e:
+    logging.getLogger(__name__).error(f"Failed to import OpenAI Agents SDK: {e}")
+    raise
+
+# 導入所有 sub-agents
 from .tools.technical_agent import get_technical_agent
+from .tools.sentiment_agent import get_sentiment_agent
+from .tools.fundamental_agent import get_fundamental_agent
+from .tools.risk_agent import get_risk_agent
+from .tools.trading_tools import create_trading_tools
 
 from ..common.enums import AgentStatus, AgentMode
-
 from ..service.agents_service import (
     AgentsService,
     AgentConfigurationError,
@@ -145,13 +158,16 @@ class TradingAgent:
             # 2. 初始化 OpenAI Tools
             self.openai_tools = self._setup_openai_tools()
 
-            # 3. 載入 Sub-agents (從 tools/ 目錄，傳入共享配置)
+            # 3. 初始化 Trading Tools
+            self.trading_tools = self._setup_trading_tools()
+
+            # 4. 載入 Sub-agents (從 tools/ 目錄，傳入共享配置)
             self.subagent_tools = await self._load_subagents_as_tools()
 
-            # 4. 合併所有 tools
-            all_tools = self.openai_tools + self.subagent_tools
+            # 5. 合併所有 tools
+            all_tools = self.openai_tools + self.trading_tools + self.subagent_tools
 
-            # 5. 創建 OpenAI Agent
+            # 6. 創建 OpenAI Agent
             self.agent = Agent(
                 name=self.agent_id,
                 model=self.agent_config.ai_model or DEFAULT_MODEL,
@@ -215,23 +231,54 @@ class TradingAgent:
 
         return tools
 
+    def _setup_trading_tools(self) -> list[Tool]:
+        """設置交易相關工具"""
+        return create_trading_tools(self.agent_service, self.agent_id)
+
     async def _load_subagents_as_tools(self) -> list[Tool]:
         """載入 Sub-agents (從 tools/ 目錄，根據資料庫配置）"""
         subagents = []
 
-        # 統一的 subagent 配置參數
-        subagent_config = {
-            "model_name": self.ai_model,  # 從資料庫載入
-            "mcp_servers": self.mcp_servers,  # 傳入相同的 MCP servers
-            "openai_tools": self.openai_tools,  # 傳入相同的 OpenAI tools
-            "max_turns": DEFAULT_MAX_TURNS,
-        }
+        try:
+            # 統一的 subagent 配置參數
+            subagent_config = {
+                "model_name": self.agent_config.ai_model or DEFAULT_MODEL,  # 從資料庫載入
+                "mcp_servers": self.mcp_servers,  # 傳入相同的 MCP servers
+                "openai_tools": self.openai_tools,  # 傳入相同的 OpenAI tools
+                "max_turns": DEFAULT_MAX_TURNS,
+            }
 
-        # 生成 Sub-agents
-        subagents.append(await get_fundamental_agent(**subagent_config))
-        subagents.append(await get_risk_agent(**subagent_config))
-        subagents.append(await get_sentiment_agent(**subagent_config))
-        subagents.append(await get_technical_agent(**subagent_config))
+            # 生成所有 Sub-agents
+            try:
+                technical_agent = await get_technical_agent(**subagent_config)
+                subagents.append(technical_agent)
+                logger.info("技術分析 agent 載入成功")
+            except Exception as e:
+                logger.warning(f"技術分析 agent 載入失敗: {e}")
+
+            try:
+                sentiment_agent = await get_sentiment_agent(**subagent_config)
+                subagents.append(sentiment_agent)
+                logger.info("情緒分析 agent 載入成功")
+            except Exception as e:
+                logger.warning(f"情緒分析 agent 載入失敗: {e}")
+
+            try:
+                fundamental_agent = await get_fundamental_agent(**subagent_config)
+                subagents.append(fundamental_agent)
+                logger.info("基本面分析 agent 載入成功")
+            except Exception as e:
+                logger.warning(f"基本面分析 agent 載入失敗: {e}")
+
+            try:
+                risk_agent = await get_risk_agent(**subagent_config)
+                subagents.append(risk_agent)
+                logger.info("風險評估 agent 載入成功")
+            except Exception as e:
+                logger.warning(f"風險評估 agent 載入失敗: {e}")
+
+        except Exception as e:
+            logger.error(f"載入 sub-agents 時發生錯誤: {e}")
 
         # 將 Sub-agents 包裝為工具
         return [agent.as_tool() for agent in subagents]
@@ -329,20 +376,131 @@ class TradingAgent:
             Agent 指令
         """
 
-        instructions = f"""
-            你是一個專業的股票交易 Agent，你的代號是 {self.agent_id}。
-            你的目標是根據市場數據和分析來做出明智的交易決策。
-            你的基本描述如下：
-            {description}
+        # 基本描述
+        instructions_parts = [
+            f"你是一個專業的股票交易 Agent，你的代號是 {self.agent_id}。",
+            "你的基本描述如下：",
+            f"{description}",
+        ]
 
+        # 投資偏好設定（如果有的話）
+        if self.agent_config.investment_preferences:
+            instructions_parts.extend(
+                [
+                    "你偏好以下的股票代號：",
+                    f"{self.agent_config.investment_preferences}",
+                ]
+            )
+
+        # 持股比例限制
+        if self.agent_config.max_position_per_stock:
+            instructions_parts.extend(
+                [
+                    f"你對於每一隻股票的最大持股比例為 {self.agent_config.max_position_per_stock}%。",
+                ]
+            )
+
+        instructions = (
+            "\n".join(instructions_parts)
+            + """
             請根據以上描述作為你的根本指導。
 
-            你可以使用各種工具來幫助你完成任務，包括網路搜尋、財務分析、技術分析、風險評估、情緒分析和程式碼執行。
-            你可以使用工具作為持久記憶來儲存和回想各種搜尋結果與分析資訊。
-            你有工具可以直接進行股票交易，完成交易後使用工具紀錄本次交易的資訊並回傳執行交易的評估理由。
+            你可以使用各種工具來幫助你完成任務，包括：
 
-            請記住，你的最終目標是最大化投資回報，同時控制風險。
+            **🌐 OpenAI 內建工具：**
+            • 網路搜尋 (WebSearchTool) - 獲取最新市場資訊、新聞、產業動態
+            • 程式碼執行 (CodeInterpreterTool) - 進行複雜的數據計算、統計分析、圖表繪製
+
+            **📊 台灣股市數據工具 (Casual Market MCP)：**
+            • get_taiwan_stock_price(symbol) - 查詢台灣股票即時價格、漲跌幅、成交量
+            • get_market_index_info(category, count, format) - 取得市場指數資訊（加權指數、類股指數等）
+            • get_market_historical_index() - 查詢歷史指數資料，進行技術分析與回測
+            • check_taiwan_trading_day(date) - 檢查是否為交易日，避免在休市日執行交易
+            • get_taiwan_holiday_info(date) - 取得節假日資訊
+            • get_foreign_investment_by_industry() - 查詢外資各產業持股狀況
+            • get_top_foreign_holdings() - 取得外資持股前20名
+            • get_dividend_rights_schedule(symbol) - 查詢除權息行事曆
+            • get_etf_regular_investment_ranking() - 取得ETF定期定額排名
+            • buy_taiwan_stock(symbol, quantity, price) - 模擬買入台灣股票
+            • sell_taiwan_stock(symbol, quantity, price) - 模擬賣出台灣股票
+
+            **💰 投資組合管理工具：**
+            • get_portfolio_status() - 查詢當前投資組合狀態，包括現金餘額、持股明細、總資產價值、資產配置比例
+            • record_trade(symbol, action, quantity, price, decision_reason, company_name) - 記錄交易到資料庫，自動更新持股、資金和績效指標
+
+            **🧠 持久記憶工具 (Memory MCP)：**
+            • 使用記憶工具儲存和回想：
+              - 市場分析結果和趨勢判斷
+              - 技術指標計算和圖表分析
+              - 基本面研究和公司評估
+              - 風險評估和投資決策邏輯
+              - 過往交易經驗和教訓
+            • 你的記憶會在不同執行週期間保持，請善用此能力累積知識
+
+            **🤖 專業分析 Sub-Agents：**
+            • technical_agent - 技術分析專家
+              - 進行技術指標分析（MA, RSI, MACD, KD, 布林帶等）
+              - 識別圖表型態和趨勢
+              - 提供買賣點建議
+
+            • sentiment_agent - 情緒分析專家
+              - 分析市場情緒和投資人心理
+              - 追蹤社交媒體和新聞輿論
+              - 評估市場氛圍對股價的影響
+
+            • fundamental_agent - 基本面分析專家
+              - 研究公司財務報表和營運狀況
+              - 評估本益比、股價淨值比等估值指標
+              - 分析產業競爭力和成長潛力
+
+            • risk_agent - 風險評估專家
+              - 評估投資風險和波動性
+              - 計算風險調整後報酬
+              - 提供資產配置和避險建議
+
+            **🎯 執行流程建議：**
+
+            1. **市場觀察階段：**
+               - 使用 check_taiwan_trading_day() 確認是否為交易日
+               - 使用 get_market_index_info() 了解大盤走勢
+               - 使用 get_foreign_investment_by_industry() 觀察資金流向
+               - 將重要資訊存入記憶工具
+
+            2. **標的分析階段：**
+               - 使用 get_taiwan_stock_price() 取得股票基本資訊
+               - 呼叫 technical_agent 進行技術分析
+               - 呼叫 fundamental_agent 評估基本面
+               - 呼叫 sentiment_agent 分析市場情緒
+               - 呼叫 risk_agent 評估風險
+               - 使用程式碼執行工具進行深度計算
+
+            3. **決策前準備：**
+               - 使用 get_portfolio_status() 了解當前資產狀況
+               - 評估可用資金和現有持股
+               - 考慮資產配置比例
+
+            4. **執行交易：**
+               - 使用 buy_taiwan_stock() 或 sell_taiwan_stock() 執行交易（模擬）
+               - 使用 record_trade() 記錄交易詳情和決策理由
+               - 系統會自動更新持股、資金和績效指標
+
+            5. **記錄與學習：**
+               - 將分析過程和決策邏輯存入記憶工具
+               - 記錄成功和失敗的經驗教訓
+               - 持續優化投資策略
+
+            **⚠️ 重要執行原則：**
+            1. 決策前必須先使用 get_portfolio_status() 了解資產狀況
+            2. 充分利用 Sub-agents 的專業分析能力，做出全面評估
+            3. 善用 MCP 記憶工具累積知識和經驗
+            4. 每筆交易都要使用 record_trade() 詳細記錄決策理由
+            5. 決策理由應包含：分析過程、市場判斷、風險考量、Sub-agents 建議
+            6. 注意交易日檢查，避免在休市日執行操作
+            7. 最終目標是最大化投資回報，同時嚴格控制風險
+
+            請始終保持理性、謹慎，運用所有可用工具做出明智的投資決策。
         """
+        )
         logger.info(f"Instructions for {self.agent_id}: {instructions.strip()}")
 
         return instructions.strip()
