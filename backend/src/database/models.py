@@ -409,8 +409,6 @@ def validate_agent_mode(mode: str) -> AgentMode | None:
             return AgentMode.TRADING
         case "REBALANCING":
             return AgentMode.REBALANCING
-        case "STRATEGY_REVIEW":
-            return AgentMode.STRATEGY_REVIEW
         case "OBSERVATION":
             return AgentMode.OBSERVATION
         case _:

@@ -8,7 +8,6 @@ The core of the project is a sophisticated AI agent system that can operate in s
 
 * **TRADING:** Actively seeks investment opportunities and executes trades.
 * **REBALANCING:** Adjusts the investment portfolio to maintain a desired asset allocation.
-* **STRATEGY_REVIEW:** Evaluates and adjusts the investment strategy based on performance.
 * **OBSERVATION:** Monitors the market and gathers data without executing trades.
 
 The project uses a SQLite database to store information about agents, transactions, and performance.

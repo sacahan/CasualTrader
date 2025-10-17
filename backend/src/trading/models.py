@@ -32,7 +32,6 @@ class AgentMode(str, Enum):
 
     TRADING = "TRADING"  # 尋找和執行交易機會
     REBALANCING = "REBALANCING"  # 調整投資組合配置
-    STRATEGY_REVIEW = "STRATEGY_REVIEW"  # 檢討策略和績效
     OBSERVATION = "OBSERVATION"  # 監控市場但不交易
 
 

@@ -7,21 +7,18 @@ export const AGENT_MODES = {
   TRADING: 'trading',
   REBALANCING: 'rebalancing',
   OBSERVATION: 'observation',
-  STRATEGY_REVIEW: 'strategy_review',
 };
 
 export const AGENT_MODE_LABELS = {
   [AGENT_MODES.TRADING]: '交易',
   [AGENT_MODES.REBALANCING]: '再平衡',
   [AGENT_MODES.OBSERVATION]: '觀察',
-  [AGENT_MODES.STRATEGY_REVIEW]: '策略檢討',
 };
 
 export const AGENT_MODE_COLORS = {
   [AGENT_MODES.TRADING]: 'bg-green-500',
   [AGENT_MODES.REBALANCING]: 'bg-blue-500',
   [AGENT_MODES.OBSERVATION]: 'bg-orange-500',
-  [AGENT_MODES.STRATEGY_REVIEW]: 'bg-purple-500',
 };
 
 // Agent Status (persistent, matches backend database models)

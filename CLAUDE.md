@@ -8,18 +8,20 @@ CasualTrader is an AI-powered trading simulation platform that combines:
 
 - **FastAPI Backend**: RESTful API + WebSocket real-time communication
 - **AI Trading Agents**: Multi-model support (GPT-4, Claude, Gemini, DeepSeek) with dynamic strategy evolution
-- **MCP Integration**: Market data via Model Context Protocol
-- **Database Persistence**: SQLAlchemy async ORM with SQLite/PostgreSQL support
-- **Agent Lifecycle Management**: Session-based trading with portfolio tracking and performance analytics
+- **MCP Integration**: Market data via Model Context Protocol (casual-market-mcp)
+- **Database Persistence**: SQLAlchemy async ORM with SQLite support
+- **Frontend Dashboard**: Svelte 5 + Vite + Chart.js for real-time visualization
+- **Monorepo Structure**: Unified backend + frontend codebase
 
 ### Core Architecture
 
-The system uses a **multi-layered agent architecture**:
+The system uses a **service-oriented layered architecture**:
 
-- **Agent Manager** (`src/agents/core/agent_manager.py`): Manages multiple AI agents concurrently
-- **Base Agent** (`src/agents/core/base_agent.py`): Abstract base class for all trading agents
-- **Trading Agent** (`src/agents/trading/trading_agent.py`): Concrete implementation with strategy execution
-- **Persistent Agent** (`src/agents/integrations/persistent_agent.py`): Database-backed agent with session management
+- **Trading Agent** (`backend/src/trading/trading_agent.py`): Main AI agent with strategy execution and decision-making
+- **Trading Tools** (`backend/src/trading/tools/`): Specialized analysis agents (technical, fundamental, risk, sentiment)
+- **Service Layer** (`backend/src/service/`): Business logic and agent lifecycle management
+- **API Layer** (`backend/src/api/`): FastAPI routers and WebSocket communication
+- **Database Layer** (`backend/src/database/`): SQLAlchemy async ORM models and migrations
 
 ### MCP Integration (Model Context Protocol)
 
@@ -60,7 +62,7 @@ agent = Agent(
 ### Quick Start
 
 ```bash
-# Start both frontend and backend (recommended)
+# From project root - Start both frontend and backend (recommended)
 ./scripts/start.sh
 
 # Start backend only
@@ -76,379 +78,620 @@ agent = Agent(
 ### Environment Setup
 
 ```bash
-# Install dependencies
+# Backend setup (from backend/ directory)
+cd backend
 uv sync --dev
 
-# Run database migrations
+# Frontend setup (from frontend/ directory)
+cd frontend
+npm install
+
+# Run database migrations (from project root or backend/)
 ./scripts/db_migrate.sh up
 # or
-uv run python -m src.database.migrations
+cd backend && uv run python -m src.database.migrations
 
-# Start FastAPI server manually
-uv run python src/api/server.py
-# or
-uv run uvicorn src.api.server:app --reload --host 0.0.0.0 --port 8000
+# Start FastAPI server manually (from backend/)
+cd backend
+uv run uvicorn src.api.app:create_app --factory --host 0.0.0.0 --port 8000 --reload
+
+# Start frontend dev server manually (from frontend/)
+cd frontend
+npm run dev
 ```
 
 ### Testing
 
 ```bash
-# Run all tests
+# Run all backend tests (from backend/)
+cd backend
 uv run pytest
 
-# Run specific test suites
-uv run pytest tests/backend/                    # Backend unit tests
-uv run pytest tests/integration/                # Integration tests
-uv run pytest tests/test_e2e_complete_flow.py   # End-to-end flow
-uv run pytest tests/test_e2e_api_integration.py # API integration
+# Run specific test files
+uv run pytest tests/test_core_imports.py
+uv run pytest tests/test_complete_verification.py
+uv run pytest tests/test_trading_integration.py
 
 # Run with coverage
 uv run pytest --cov=src --cov-report=html
 
-# Run e2e tests (bash script)
-./tests/run_e2e_tests.sh
+# Run with verbose output
+uv run pytest -v
+
+# Run frontend tests (from frontend/)
+cd frontend
+npm run check        # Type checking
+npm run build        # Build test
 ```
 
 ### Code Quality
 
 ```bash
-# Linting and formatting
-uv run ruff check
-uv run ruff format
+# Backend linting and formatting (from backend/)
+cd backend
+uv run ruff check src/
+uv run ruff format src/
 
 # Type checking
-uv run mypy src
+uv run mypy src/
+
+# Frontend linting (from frontend/)
+cd frontend
+npm run check        # Svelte type checking
 ```
 
 ## 🏗️ Architecture & Code Structure
 
-### Agent System Core
+### Backend Structure (`backend/src/`)
 
-**Agent Lifecycle** (`src/agents/core/`):
+**Trading Agent System** (`backend/src/trading/`):
 
-- `base_agent.py`: Abstract base defining agent interface and state management
-- `agent_manager.py`: Multi-agent orchestration with concurrent execution control
-- `agent_session.py`: Session-based execution tracking with context management
-- `models.py`: Type-safe data models (AgentConfig, AgentState, AgentMode, etc.)
-- `instruction_generator.py`: Dynamic prompt generation based on agent state
-- `strategy_tracker.py`: Strategy evolution tracking and performance monitoring
-- `strategy_auto_adjuster.py`: Automatic strategy adjustment based on performance
+- `trading_agent.py`: Main AI trading agent with OpenAI Agent SDK integration
+- `config.py`: Trading agent configuration and parameters
+- `models.py`: Trading-related data models (AgentState, Position, etc.)
+- `state.py`: Agent state management and tracking
+- `tools/`: Specialized analysis agents
+  - `technical_agent.py`: Technical analysis (indicators, patterns)
+  - `fundamental_agent.py`: Fundamental analysis (financials, ratios)
+  - `risk_agent.py`: Risk metrics (VaR, Sharpe, drawdown)
+  - `sentiment_agent.py`: Market sentiment analysis
+  - `trading_tools.py`: Trading execution and portfolio queries
 
-**Integration Layer** (`src/agents/integrations/`):
+**Service Layer** (`backend/src/service/`):
 
-- `persistent_agent.py`: Main agent implementation with database persistence
-- `openai_tools.py`: AI model integration (OpenAI, Claude, etc.)
+- Business logic for agent lifecycle management
+- Session management and execution control
+- Integration with database and trading systems
 
-**Database Layer** (`src/database/`):
+**API Layer** (`backend/src/api/`):
 
-- `agent_database_service.py`: Async database operations for agent state persistence
-- `models.py`: SQLAlchemy ORM models for database schema
-
-**Trading Functions** (`src/agents/functions/`):
-
-- `trading_validation.py`: Pre-trade validation and risk checks
-- `market_status.py`: Market hours and trading day verification
-- `portfolio_queries.py`: Portfolio analytics and position queries
-- `strategy_change_recorder.py`: Strategy change logging and versioning
-
-**Agent Tools** (`src/agents/tools/`):
-
-- `technical_agent.py`: Technical analysis (indicators, patterns)
-- `fundamental_agent.py`: Fundamental analysis (financials, ratios)
-- `risk_agent.py`: Risk metrics (VaR, Sharpe, drawdown)
-- `sentiment_agent.py`: Market sentiment analysis
-
-### API Layer
-
-**FastAPI Application** (`src/api/`):
-
-- `app.py`: Application factory with lifespan management
-- `server.py`: Server entry point
+- `app.py`: FastAPI application factory with lifespan management
 - `config.py`: Pydantic settings with environment variables
-- `models.py`: API request/response models
-- `routers/agents.py`: Agent CRUD and execution endpoints
-- `routers/trading.py`: Portfolio, trades, performance endpoints
-- `routers/websocket_router.py`: WebSocket endpoint for real-time updates
+- `docs.py`: OpenAPI documentation tags
+- `models.py`: API request/response Pydantic models
 - `websocket.py`: WebSocket connection manager
+- `routers/`:
+  - `agents.py`: Agent CRUD endpoints
+  - `agent_execution.py`: Agent execution and control endpoints
+  - `trading.py`: Portfolio, trades, performance endpoints
+  - `ai_models.py`: AI model configuration endpoints
+  - `websocket_router.py`: WebSocket endpoint
 
-### Database Layer
+**Database Layer** (`backend/src/database/`):
 
-**SQLAlchemy Models** (`src/database/`):
-
-- `models.py`: ORM models using Python 3.12+ syntax with AsyncAttrs
+- `models.py`: SQLAlchemy async ORM models
   - `Agent`: Agent metadata and configuration
   - `AgentSession`: Execution session tracking
-  - `Transaction`: Trade records with full audit trail
-  - `Holding`: Current portfolio positions
+  - `Transaction`: Trade records with audit trail
+  - `AgentHolding`: Current portfolio positions
   - `PortfolioSnapshot`: Historical portfolio state
-  - `StrategyChange`: Strategy evolution history
-- `migrations.py`: Database schema initialization and migration logic
+  - `AIModel`: AI model configurations
+- `migrations.py`: Database schema migrations and versioning
+- `schema.sql`: SQL schema reference
+
+**Common Layer** (`backend/src/common/`):
+
+- Shared utilities and helper functions
+- Common data models and types
+
+**Schemas** (`backend/src/schemas/`):
+
+- Shared Pydantic schemas for data validation
+- Cross-layer data transfer objects
+
+### Frontend Structure (`frontend/src/`)
+
+**Components** (`frontend/src/components/`):
+
+- `Agent/`: Agent-related UI components
+- `Chart/`: Chart.js visualization components
+- `Layout/`: Page layout and structure
+- `Market/`: Market data display components
+- `UI/`: Reusable UI components
+
+**Libraries** (`frontend/src/lib/`):
+
+- `api/`: API client functions
+- `api.js`: Common API utilities
+- `constants.js`: Application constants
+- `utils.js`: Helper functions
+
+**Stores** (`frontend/src/stores/`):
+
+- Svelte stores for state management
+- WebSocket connection state
+- Agent and portfolio data
+
+**Types** (`frontend/src/types/`):
+
+- TypeScript type definitions
+- API response types
 
 ### Data Flow Architecture
 
 **Agent Execution Flow**:
 
-1. API Request → `routers/agents.py` (endpoint handler)
-2. Agent Manager → `agent_manager.py` (lifecycle management)
-3. Trading Agent → `trading_agent.py` (strategy execution)
-4. Casual Market MCP → Direct MCP tool calls via OpenAI SDK (market data)
-5. Trading Functions → validation, execution, recording
-6. Database Service → `agent_database_service.py` (persistence)
-7. WebSocket → `websocket.py` (real-time broadcast)
+1. API Request → `api/routers/agent_execution.py`
+2. Service Layer → Business logic and validation
+3. Trading Agent → `trading/trading_agent.py` (OpenAI Agent SDK)
+4. MCP Tools → Direct calls to casual-market-mcp via Agent SDK
+5. Trading Tools → Sub-agents for analysis (technical, fundamental, risk, sentiment)
+6. Database → Persist state, transactions, holdings
+7. WebSocket → Broadcast updates to connected frontend clients
 
-**Agent Modes Cycle**:
+**Trading Agent Workflow**:
 
 ```
-OBSERVATION → TRADING → REBALANCING → STRATEGY_REVIEW → OBSERVATION
+1. Initialize Agent → Load strategy and state
+2. Analyze Market → Call MCP tools for data
+3. Consult Sub-Agents → Technical/Fundamental/Risk/Sentiment analysis
+4. Make Decision → Based on strategy and analysis
+5. Execute Trade → Validate and record transaction
+6. Update State → Persist to database
+7. Broadcast Event → WebSocket to frontend
 ```
-
-- **OBSERVATION**: Market analysis and knowledge accumulation
-- **TRADING**: Execute trades based on current strategy
-- **REBALANCING**: Portfolio adjustment to target allocation
-- **STRATEGY_REVIEW**: Performance analysis and strategy evolution
 
 ### Key Design Patterns
 
-- **Async-First Architecture**: All I/O operations use async/await
-- **Dependency Injection**: Services injected via constructors (agent_database_service)
-- **Session Pattern**: Agent execution wrapped in database sessions for atomicity
-- **Event Broadcasting**: WebSocket manager broadcasts agent state changes
-- **Strategy Evolution**: Performance-driven strategy adjustment with rollback capability
-- **MCP Integration**: Direct MCP server integration via OpenAI SDK's mcp_servers parameter
+- **Async-First Architecture**: All I/O operations use async/await (Python), promises (JS)
+- **Factory Pattern**: FastAPI app creation, agent initialization
+- **Service Layer Pattern**: Business logic separated from API layer
+- **Repository Pattern**: Database operations encapsulated in service classes
+- **Observer Pattern**: WebSocket broadcasts for real-time updates
+- **Strategy Pattern**: Trading strategy as configurable parameters
+- **MCP Integration**: Direct MCP server integration via OpenAI Agent SDK's `mcp_servers` parameter
 
 ## 🧪 Testing Strategy
 
 ### Test Organization
 
-Tests follow the project structure with clear separation:
-
 ```
-tests/
-├── backend/              # Backend unit tests
-│   ├── agents/          # Agent system tests
-│   │   ├── functions/   # Trading function tests
-│   │   └── tools/       # Agent tool tests
-│   └── shared/
-│       └── database/    # Database integration tests
-├── integration/         # MCP and multi-component tests
-├── database/           # Database migration tests
-└── test_e2e_*.py       # End-to-end workflow tests
+backend/tests/
+├── test_core_imports.py              # Core module import verification
+├── test_complete_verification.py     # Complete system verification
+├── test_trading_integration.py       # Trading system integration
+├── test_trading_tools_standalone.py  # Trading tools unit tests
+├── test_trading_tools.py             # Trading tools integration
+├── test_full_import.py               # Full module import tests
+├── test_imports.py                   # Import validation
+└── test_import.py                    # Basic import tests
+
+frontend/tests/
+└── (Frontend test suite to be implemented)
 ```
 
 ### Test Categories
 
-- **Unit Tests** (`tests/backend/`): Individual component testing with mocks
-- **Integration Tests** (`tests/integration/`): Multi-component interaction
-- **Database Tests** (`tests/database/`): Schema validation and migrations
-- **E2E Tests** (`tests/test_e2e_*.py`): Complete user workflows
+- **Core Import Tests**: Verify all modules can be imported without errors
+- **Integration Tests**: Multi-component interaction and data flow
+- **Trading Tests**: Trading agent, tools, and execution logic
+- **Verification Tests**: Complete system functionality validation
+
+### Test Execution
+
+- Run tests from `backend/` directory
+- Use `pytest` with async support via `pytest-asyncio`
+- Tests use in-memory SQLite for isolation
+- Mock MCP responses for predictable testing
 
 ### Test Data
 
 - Use real Taiwan stock tickers: 2330 (台積電), 2412 (中華電), 2454 (聯發科)
 - Test accounts start with 1,000,000 TWD initial capital
-- Mock MCP responses for predictable testing
-- Use in-memory SQLite for test isolation
+- Mock external API calls and MCP responses
+- Use fixtures for common test data setup
 
 ## 🐛 Common Development Patterns
 
-### Adding New Agent Functions
+### Adding New Trading Tools (Sub-Agents)
 
-1. Create function in `src/agents/functions/`
-2. Define input/output models in function file
-3. Register in agent's `enabled_functions` list
-4. Add integration tests in `tests/backend/agents/functions/`
+1. Create new tool file in `backend/src/trading/tools/`
+2. Define the agent function with proper docstring for AI understanding
+3. Register tool in `trading_agent.py`'s tool list
+4. Add tests in `backend/tests/`
 
 Example:
 
 ```python
-# src/agents/functions/my_function.py
-async def my_function(agent_id: str, param: str) -> dict:
-    """Function docstring for AI model."""
+# backend/src/trading/tools/my_analysis_agent.py
+def analyze_something(ticker: str, agent_id: str) -> dict:
+    """
+    Analyze something about a stock.
+
+    Args:
+        ticker: Stock ticker symbol
+        agent_id: Agent identifier
+
+    Returns:
+        Analysis results with recommendations
+    """
     # Implementation
-    return {"result": "success"}
+    return {"analysis": "result", "recommendation": "action"}
 ```
 
 ### Adding New API Endpoints
 
-1. Define request/response models in `src/api/models.py`
-2. Add endpoint to appropriate router in `src/api/routers/`
-3. Update OpenAPI tags in `src/api/docs.py`
-4. Add endpoint tests in `tests/test_e2e_api_integration.py`
+1. Choose appropriate router in `backend/src/api/routers/`
+2. Define request/response models in `backend/src/api/models.py` or create schema in `backend/src/schemas/`
+3. Implement endpoint with proper error handling
+4. Update OpenAPI tags in `backend/src/api/docs.py`
+5. Test endpoint manually via Swagger UI at http://localhost:8000/api/docs
+
+Example:
+
+```python
+# backend/src/api/routers/my_router.py
+from fastapi import APIRouter, HTTPException
+from ..models import MyRequest, MyResponse
+
+router = APIRouter(prefix="/api/my-feature", tags=["my-feature"])
+
+@router.post("/action", response_model=MyResponse)
+async def perform_action(request: MyRequest):
+    """Perform some action."""
+    # Implementation
+    return MyResponse(result="success")
+```
 
 ### Database Schema Changes
 
-1. Modify models in `src/database/models.py`
-2. Update migration logic in `src/database/migrations.py`
-3. Test migration in `tests/database/test_migration.py`
-4. Run migration: `uv run python -m src.database.migrations`
+1. Modify ORM models in `backend/src/database/models.py`
+2. Create new migration in `backend/src/database/migrations.py`
+3. Update version number and migration logic
+4. Run migration: `./scripts/db_migrate.sh up` or `cd backend && uv run python -m src.database.migrations`
+5. Verify schema with `./scripts/db_migrate.sh status`
 
-### Adding New Agent Tools
+### Adding Frontend Components
 
-1. Create tool class in `src/agents/tools/`
-2. Inherit from base tool class or define standalone
-3. Register tool in agent's tool registry
-4. Add tool tests in `tests/backend/agents/tools/`
+1. Create component in `frontend/src/components/` (organized by feature)
+2. Use Svelte 5 syntax with proper TypeScript types
+3. Import and use in parent components or `App.svelte`
+4. Style with Tailwind CSS classes
+5. Test in browser with hot reload
+
+Example:
+
+```svelte
+<!-- frontend/src/components/MyComponent.svelte -->
+<script>
+  let { data = [] } = $props();
+  let count = $state(0);
+</script>
+
+<div class="p-4 bg-white rounded shadow">
+  <h2 class="text-xl font-bold">{count}</h2>
+  <button onclick={() => count++} class="btn btn-primary">
+    Increment
+  </button>
+</div>
+```
 
 ## 🚀 API Documentation
 
 ### Running the API Server
 
 ```bash
-# Development mode with auto-reload
-uv run uvicorn src.api.server:app --reload --host 0.0.0.0 --port 8000
+# From backend/ directory
+cd backend
 
-# Production mode
-uv run uvicorn src.api.server:app --host 0.0.0.0 --port 8000 --workers 4
+# Development mode with auto-reload (recommended)
+uv run uvicorn src.api.app:create_app --factory --reload --host 0.0.0.0 --port 8000
+
+# Or use the start script from project root
+cd ..
+./scripts/start.sh -b
+
+# Production mode (multiple workers)
+cd backend
+uv run uvicorn src.api.app:create_app --factory --host 0.0.0.0 --port 8000 --workers 4
 ```
 
-### API Endpoints
+### API Documentation URLs
 
-- **API Docs**: http://localhost:8000/api/docs (Swagger UI)
+- **API Docs**: http://localhost:8000/api/docs (Swagger UI - Interactive)
 - **ReDoc**: http://localhost:8000/api/redoc (Alternative documentation)
-- **OpenAPI Schema**: http://localhost:8000/api/openapi.json
+- **OpenAPI Schema**: http://localhost:8000/api/openapi.json (JSON schema)
+- **Health Check**: http://localhost:8000/api/health (Server status)
 
 ### Core Endpoints
 
-**Agent Management**:
+**Agent Management** (`/api/agents`):
 
-- `POST /api/agents` - Create agent
+- `POST /api/agents` - Create new trading agent
 - `GET /api/agents` - List all agents
 - `GET /api/agents/{agent_id}` - Get agent details
-- `DELETE /api/agents/{agent_id}` - Remove agent
-- `POST /api/agents/{agent_id}/start` - Start agent
-- `POST /api/agents/{agent_id}/stop` - Stop agent
-- `POST /api/agents/{agent_id}/execute` - Execute agent cycle
+- `PATCH /api/agents/{agent_id}` - Update agent configuration
+- `DELETE /api/agents/{agent_id}` - Delete agent
 
-**Trading Data**:
+**Agent Execution** (`/api/agent-execution`):
 
-- `GET /api/trading/agents/{agent_id}/portfolio` - Get portfolio
-- `GET /api/trading/agents/{agent_id}/trades` - Get trade history
+- `POST /api/agent-execution/agents/{agent_id}/start` - Start agent execution
+- `POST /api/agent-execution/agents/{agent_id}/stop` - Stop agent execution
+- `POST /api/agent-execution/agents/{agent_id}/execute` - Execute one agent cycle
+- `GET /api/agent-execution/agents/{agent_id}/status` - Get execution status
+
+**Trading Data** (`/api/trading`):
+
+- `GET /api/trading/agents/{agent_id}/portfolio` - Get current portfolio
+- `GET /api/trading/agents/{agent_id}/transactions` - Get transaction history
+- `GET /api/trading/agents/{agent_id}/holdings` - Get current holdings
 - `GET /api/trading/agents/{agent_id}/performance` - Get performance metrics
-- `GET /api/trading/agents/{agent_id}/strategy-changes` - Get strategy evolution
 
-**WebSocket**:
+**AI Models** (`/api/ai-models`):
+
+- `GET /api/ai-models` - List available AI models
+- `GET /api/ai-models/{model_id}` - Get model details
+
+**WebSocket** (`/ws`):
 
 - `WS /ws` - Real-time agent events and state updates
 
 ### Environment Variables
 
+Located in `backend/.env` (copy from `backend/.env.example`):
+
 ```bash
-# API Configuration
+# OpenAI API (required for AI agents)
+OPENAI_API_KEY=your-api-key-here
+
+# MCP Server Configuration
+MCP_CASUAL_MARKET_COMMAND=uvx
+MCP_CASUAL_MARKET_ARGS=["casual-market-mcp"]
+MCP_CASUAL_MARKET_TIMEOUT=10
+MCP_CASUAL_MARKET_RETRIES=5
+
+# API Server
 API_HOST=0.0.0.0
 API_PORT=8000
-ENVIRONMENT=development
-DEBUG=true
+API_RELOAD=true
+API_WORKERS=1
 
 # Database
-DATABASE_URL=sqlite+aiosqlite:///./casualtrader.db
+DATABASE_URL=sqlite+aiosqlite:///casualtrader.db
+DATABASE_ECHO=false
 
 # CORS
-CORS_ORIGINS=["http://localhost:3000"]
+CORS_ORIGINS=["http://localhost:3000", "http://localhost:5173"]
 CORS_ALLOW_CREDENTIALS=true
 
-# Agent Limits
+# Agent Configuration
 MAX_AGENTS=10
-MAX_CONCURRENT_EXECUTIONS=5
+DEFAULT_AI_MODEL=gpt-4o-mini
+DEFAULT_INITIAL_CAPITAL=1000000
+DEFAULT_MAX_TURNS=30
+DEFAULT_AGENT_TIMEOUT=300
+DEFAULT_SUBAGENT_MAX_TURNS=15
+
+# WebSocket
+WS_HEARTBEAT_INTERVAL=30
+WS_MAX_CONNECTIONS=100
 
 # Logging
 LOG_LEVEL=INFO
+LOG_FORMAT=<green>{time:YYYY-MM-DD HH:mm:ss.SSS}</green> | <level>{level: <8}</level> | <cyan>{name}</cyan>:<cyan>{function}</cyan>:<cyan>{line}</cyan> - <level>{message}</level>
+LOG_FILE=logs/api_{time:YYYY-MM-DD}.log
+LOG_ROTATION=500 MB
+LOG_RETENTION=30 days
+
+# Environment
+ENVIRONMENT=development
+DEBUG=true
 ```
-
-## 📋 SpecPilot Workflow Integration
-
-### Workflow Commands
-
-```bash
-# Check project status
-./scripts/specpilot-workflow.sh status
-
-# Start task
-./scripts/specpilot-workflow.sh start-task <task-id>
-
-# Prepare PR
-./scripts/specpilot-workflow.sh prepare-pr <task-id> [title]
-
-# Close task
-./scripts/specpilot-workflow.sh close-task <task-id> [merge-method]
-
-# Next action
-./scripts/specpilot-workflow.sh next-action
-```
-
-### Specification Documents
-
-- **PRD** (`specs/prd/`): Product Requirements
-- **TSD** (`specs/tsd/`): Technical Specifications
-- **Epics** (`specs/epics/`): Feature breakdowns
-- **Tasks** (`specs/tasks/`): Development tasks
 
 ## 📚 Documentation Structure
 
 ### Core Documentation
 
 - **`CLAUDE.md`**: This file - guidance for Claude Code instances
-- **`README.md`**: Project overview and FastMCP architecture
-- **`docs/PROJECT_STRUCTURE.md`**: Complete project structure reference
-- **`docs/AGENT_IMPLEMENTATION.md`**: Agent system implementation details (includes database migration and AI model management)
-- **`docs/API_IMPLEMENTATION.md`**: API endpoints and usage guide
-- **`docs/FRONTEND_ARCHITECTURE.md`**: Frontend architecture (Svelte)
+- **`README.md`**: Project overview, quick start, and documentation roadmap
+- **`backend/.env.example`**: Environment variable template with detailed explanations
+- **`docs/`**: Technical documentation (architecture, implementation, deployment guides)
 
-### Important Notes
+### Quick Reference
 
-- Database migration documentation is consolidated in `docs/AGENT_IMPLEMENTATION.md` under "💾 資料庫管理"
-- AI model configuration management is also in `docs/AGENT_IMPLEMENTATION.md`
-- Scripts have been unified: use `./scripts/start.sh` instead of separate API/dev scripts
+- **Backend Entry Point**: `backend/src/api/app.py` (FastAPI application factory)
+- **Trading Agent**: `backend/src/trading/trading_agent.py` (Main AI agent logic)
+- **Database Models**: `backend/src/database/models.py` (SQLAlchemy ORM)
+- **API Routers**: `backend/src/api/routers/` (REST endpoints)
+- **Frontend Entry**: `frontend/src/App.svelte` (Main Svelte component)
+
+### Scripts
+
+- **`./scripts/start.sh`**: Unified development server launcher (frontend + backend)
+- **`./scripts/db_migrate.sh`**: Database migration management tool
 
 ## 🔍 Debugging Tips
 
-### Agent Execution Debugging
-
-```python
-# Enable detailed logging in agent execution
-import logging
-logging.getLogger("agent_manager").setLevel(logging.DEBUG)
-logging.getLogger("trading_agent").setLevel(logging.DEBUG)
-```
-
-### Database Query Debugging
-
-```python
-# Enable SQLAlchemy query logging
-import logging
-logging.getLogger("sqlalchemy.engine").setLevel(logging.INFO)
-```
-
-### WebSocket Connection Testing
+### Backend Debugging
 
 ```bash
-# Test WebSocket endpoint
-wscat -c ws://localhost:8000/ws
+# Enable debug logging (in backend/.env)
+LOG_LEVEL=DEBUG
+DEBUG=true
+DATABASE_ECHO=true  # Show SQL queries
+
+# Run with verbose pytest output
+cd backend
+uv run pytest -v -s
+
+# Check API health
+curl http://localhost:8000/api/health
+
+# View API logs
+tail -f backend/logs/api_*.log
 ```
 
-## 📊 Performance Considerations
+### Database Debugging
 
-- **Concurrent Agent Execution**: Limited by `MAX_CONCURRENT_EXECUTIONS` semaphore
-- **Database Connection Pool**: Async SQLAlchemy with connection pooling
-- **MCP Client Caching**: Market data cached with TTL to reduce API calls
-- **WebSocket Broadcasting**: Efficient fanout to connected clients
-- **Agent Session Cleanup**: Automatic cleanup of old sessions (configurable retention)
+```bash
+# Check migration status
+./scripts/db_migrate.sh status
 
-## 🎯 Current Implementation Status
+# View database schema
+cd backend
+sqlite3 casualtrader.db ".schema"
 
-Based on the codebase, the following systems are fully implemented:
+# Query agents
+sqlite3 casualtrader.db "SELECT * FROM agents;"
 
-- ✅ **Agent Core System**: Multi-agent management with lifecycle control
-- ✅ **Database Integration**: SQLAlchemy async ORM with complete schema
-- ✅ **FastAPI Backend**: RESTful API + WebSocket support
-- ✅ **Trading Functions**: Buy/sell validation, market status, portfolio queries
-- ✅ **Strategy Evolution**: Automatic strategy adjustment based on performance
-- ✅ **Agent Tools**: Technical, fundamental, risk, sentiment analysis
-- ✅ **Session Management**: Database-backed execution tracking
-- ✅ **Real-time Events**: WebSocket broadcasting of agent state
+# Enable SQLAlchemy echo (shows all SQL queries)
+# In backend/.env: DATABASE_ECHO=true
+```
 
-## 🔐 Security Notes
+### Frontend Debugging
 
-- API keys for AI models should be set in environment variables
-- Database credentials should not be committed to git
+```bash
+# Run dev server with verbose output
+cd frontend
+npm run dev
+
+# Check Svelte syntax
+npm run check
+
+# Build and check for errors
+npm run build
+```
+
+### WebSocket Testing
+
+```bash
+# Using websocat (install: brew install websocat)
+websocat ws://localhost:8000/ws
+
+# Using wscat (install: npm install -g wscat)
+wscat -c ws://localhost:8000/ws
+
+# Using Python
+python -c "
+import asyncio
+import websockets
+
+async def test():
+    async with websockets.connect('ws://localhost:8000/ws') as ws:
+        msg = await ws.recv()
+        print(f'Received: {msg}')
+
+asyncio.run(test())
+"
+```
+
+### Common Issues
+
+**Port Already in Use**:
+
+```bash
+# Kill process on port 8000
+lsof -ti:8000 | xargs kill -9
+
+# Or use the start script which handles this
+./scripts/start.sh
+```
+
+**Database Locked**:
+
+```bash
+# Close all connections and restart
+cd backend
+rm casualtrader.db
+uv run python -m src.database.migrations
+```
+
+**MCP Connection Issues**:
+
+```bash
+# Test MCP server directly
+uvx casual-market-mcp
+
+# Check MCP configuration in backend/.env
+# Ensure OPENAI_API_KEY is set
+```
+
+## 📊 Project Status & Implementation Notes
+
+### Monorepo Structure
+
+CasualTrader uses a monorepo structure with backend and frontend in separate directories:
+
+```
+CasualTrader/
+├── backend/          # Python FastAPI backend
+├── frontend/         # Svelte 5 frontend
+├── scripts/          # Unified development scripts
+├── docs/            # Technical documentation
+└── CLAUDE.md        # This file
+```
+
+### Key Implementation Details
+
+**Backend (Python 3.12+)**:
+
+- Uses `uv` for dependency management (fast pip replacement)
+- Async-first with SQLAlchemy 2.0+ async API
+- OpenAI Agent SDK for AI agent orchestration
+- MCP integration via `casual-market-mcp` package
+- Pydantic v2 for data validation and settings
+
+**Frontend (Svelte 5 + Vite)**:
+
+- Modern Svelte 5 syntax with runes (`$state`, `$props`, `$derived`)
+- Vite for fast HMR and builds
+- Chart.js for data visualization
+- WebSocket client for real-time updates
+- Tailwind CSS for styling
+
+**Database**:
+
+- SQLite with async driver (`aiosqlite`)
+- Versioned migrations via `migrations.py`
+- ORM models use Python 3.12+ type syntax
+- Database file: `backend/casualtrader.db`
+
+**Development Workflow**:
+
+1. Use `./scripts/start.sh` to launch both backend and frontend
+2. Backend auto-reloads on code changes (uvicorn --reload)
+3. Frontend has HMR via Vite
+4. Database migrations via `./scripts/db_migrate.sh`
+
+### Performance Considerations
+
+- **Async I/O**: All database and API operations are async
+- **Agent Concurrency**: Controlled by `MAX_AGENTS` setting
+- **WebSocket Broadcasting**: Efficient message distribution to connected clients
+- **MCP Client**: Market data fetched on-demand via MCP protocol
+- **Database**: Single SQLite file, suitable for development and moderate production use
+
+### Important Notes
+
+- **Working Directory**: Most commands assume you're in the project root or appropriate subdirectory
+- **Environment Variables**: Backend requires `OPENAI_API_KEY` at minimum
+- **MCP Server**: Requires `casual-market-mcp` package (installed via `uvx`)
+- **Python Version**: Requires Python 3.12+ for modern syntax features
+- **Node Version**: Requires Node.js 18+ for frontend
+
+### Security Considerations
+
+- API keys should be in `backend/.env`, never committed to git
 - CORS origins should be restricted in production
-- WebSocket connections should be authenticated in production
+- WebSocket connections should add authentication in production
+- Rate limiting should be enabled for production use
