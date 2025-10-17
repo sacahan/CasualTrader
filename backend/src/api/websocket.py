@@ -10,7 +10,8 @@ from datetime import datetime
 from typing import Any
 
 from fastapi import WebSocket, WebSocketDisconnect
-from loguru import logger
+
+from common.logger import logger
 
 
 class WebSocketManager:

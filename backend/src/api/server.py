@@ -6,7 +6,7 @@ Run this file to start the CasualTrader API server.
 
 import uvicorn
 
-from src.api.app import create_app
+from .app import create_app
 
 # Create app instance for uvicorn to import
 app = create_app()

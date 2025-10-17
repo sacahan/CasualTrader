@@ -136,11 +136,33 @@ CasualTrader/
 
 ## 🚀 快速開始
 
+### 🎯 選擇使用方式
+
+**方式 A：使用 MCP Client（推薦，最簡單）** ⭐
+
+直接在 Claude Desktop 或其他 MCP Client 中使用 casual-market 獲取台灣股市數據。
+
+```bash
+# 一鍵配置
+./scripts/setup_mcp_client.sh
+```
+
+詳細指南：[快速開始 MCP Client](./docs/QUICKSTART_MCP.md)
+
+---
+
+**方式 B：運行完整的 CasualTrader 應用**
+
+運行後端和前端，建立完整的 AI 交易模擬器。
+
+繼續以下步驟...
+
 ### 系統需求
 
 - **Python**: >= 3.12
 - **Node.js**: >= 18.0
 - **作業系統**: macOS, Linux, Windows
+- **uv**: Python 套件管理器（用於 MCP）
 
 ### 環境設定
 
@@ -151,7 +173,16 @@ git clone https://github.com/sacahan/CasualTrader.git
 cd CasualTrader
 ```
 
-1. **設定後端環境**
+2. **設定 MCP Client（可選但推薦）**
+
+```zsh
+# 自動配置 Claude Desktop
+./scripts/setup_mcp_client.sh
+
+# 或手動配置，參考：docs/SETUP_MCP_CLIENT.md
+```
+
+3. **設定後端環境**
 
 ```zsh
 cd backend
@@ -169,7 +200,7 @@ cp .env.example .env
 # 編輯 .env 填入 API Keys
 ```
 
-1. **設定前端環境**
+4. **設定前端環境**
 
 ```zsh
 cd frontend

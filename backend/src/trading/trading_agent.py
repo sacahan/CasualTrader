@@ -7,7 +7,6 @@ TradingAgent - 基於 OpenAI Agents SDK 的生產級實作
 
 from __future__ import annotations
 import os
-import logging
 from typing import Any
 from contextlib import AsyncExitStack
 from datetime import datetime
@@ -28,27 +27,28 @@ try:
     )
     from agents.mcp import MCPServerStdio
 except ImportError as e:
-    logging.getLogger(__name__).error(f"Failed to import OpenAI Agents SDK: {e}")
+    from common.logger import logger
+
+    logger.error(f"Failed to import OpenAI Agents SDK: {e}")
     raise
 
 # 導入所有 sub-agents
-from .tools.technical_agent import get_technical_agent
-from .tools.sentiment_agent import get_sentiment_agent
-from .tools.fundamental_agent import get_fundamental_agent
-from .tools.risk_agent import get_risk_agent
-from .tools.trading_tools import create_trading_tools
+from trading.tools.technical_agent import get_technical_agent
+from trading.tools.sentiment_agent import get_sentiment_agent
+from trading.tools.fundamental_agent import get_fundamental_agent
+from trading.tools.risk_agent import get_risk_agent
+from trading.tools.trading_tools import create_trading_tools
 
-from ..common.enums import AgentStatus, AgentMode
-from ..service.agents_service import (
+from common.enums import AgentStatus, AgentMode
+from common.logger import logger
+from service.agents_service import (
     AgentsService,
     AgentConfigurationError,
     AgentNotFoundError,
     AgentDatabaseError,
 )
 
-from ..database.models import Agent as AgentConfig
-
-logger = logging.getLogger(__name__)
+from database.models import Agent as AgentConfig
 
 load_dotenv()
 

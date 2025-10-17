@@ -15,6 +15,7 @@
    * @property {any} [selectedAgentId]
    * @property {boolean} [loading]
    * @property {Function} [onselect]
+   * @property {Function} [onedit]
    * @property {Function} [onstart]
    * @property {Function} [onstop]
    * @property {Function} [ondelete]
@@ -26,6 +27,7 @@
     selectedAgentId = null,
     loading = false,
     onselect = undefined,
+    onedit = undefined,
     onstart = undefined,
     onstop = undefined,
     ondelete = undefined,
@@ -36,6 +38,9 @@
   // 函數定義 - 移到根層級以符合 eslint no-inner-declarations 規則
   function handleCardClick(agent) {
     onselect?.(agent);
+  }
+  function handleEditAgent(agent) {
+    onedit?.(agent);
   }
   function handleStartAgent(agent) {
     onstart?.(agent);
@@ -104,6 +109,7 @@
         {agent}
         selected={agent.agent_id === selectedAgentId}
         onclick={handleCardClick}
+        onedit={handleEditAgent}
         onstart={handleStartAgent}
         onstop={handleStopAgent}
         ondelete={handleDeleteAgent}

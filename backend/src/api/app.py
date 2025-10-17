@@ -12,13 +12,13 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
-from loguru import logger
 
-from ..service.agent_executor import AgentExecutor
-from .config import get_session_maker, settings
-from .docs import get_openapi_tags
-from .routers import agent_execution, agents, ai_models, trading, websocket_router
-from .websocket import websocket_manager
+from common.logger import logger, setup_logger
+from service.agent_executor import AgentExecutor
+from api.config import get_session_maker, settings
+from api.docs import get_openapi_tags
+from api.routers import agent_execution, agents, ai_models, trading, websocket_router
+from api.websocket import websocket_manager
 
 # ==========================================
 # Global Agent Executor
@@ -31,6 +31,11 @@ _executor: AgentExecutor | None = None
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """Application lifespan manager."""
     global _executor
+
+    # Setup logger first
+    log_level = "DEBUG" if settings.debug else "INFO"
+    log_file = Path(__file__).parent.parent.parent / "logs" / "casualtrader.log"
+    setup_logger(log_level=log_level, log_file=log_file)
 
     # Startup
     logger.info("=" * 80)
@@ -72,12 +77,21 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 
     # Stop all running agents
     if _executor:
-        logger.info("Stopping all running agents...")
-        await _executor.stop_all()
-        logger.success("All agents stopped successfully")
+        try:
+            logger.info("Stopping all running agents...")
+            await _executor.stop_all()
+            logger.success("All agents stopped successfully")
+        except Exception as e:
+            logger.error(f"Error stopping agents: {e}")
 
-    logger.info("Closing WebSocket connections...")
-    await websocket_manager.shutdown()
+    # Close WebSocket connections
+    try:
+        logger.info("Closing WebSocket connections...")
+        await websocket_manager.shutdown()
+        logger.success("WebSocket connections closed")
+    except Exception as e:
+        logger.error(f"Error closing WebSocket connections: {e}")
+
     logger.success("✅ CasualTrader API Server shut down successfully")
     logger.info("=" * 80)
 

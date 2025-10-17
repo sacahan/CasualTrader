@@ -8,7 +8,7 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
-from ..common.enums import AgentMode, ExecutionMode
+from common.enums import AgentMode, ExecutionMode
 
 
 class EnabledTools(BaseModel):

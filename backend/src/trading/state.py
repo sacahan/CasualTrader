@@ -11,8 +11,8 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
-from .config import AgentConfig
-from ..common.enums import AgentMode, AgentStatus, SessionStatus
+from trading.config import AgentConfig
+from common.enums import AgentMode, AgentStatus, SessionStatus
 
 
 # ==========================================

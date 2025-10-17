@@ -6,19 +6,20 @@ Trading API Router
 
 from __future__ import annotations
 
-import logging
+from datetime import datetime
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from ...service.agents_service import (
+from common.logger import logger
+from service.agents_service import (
     AgentNotFoundError,
     AgentsService,
 )
-from ..config import get_db_session
-
-logger = logging.getLogger(__name__)
+from api.config import get_db_session
+from api.holiday_client import TaiwanHolidayAPIClient
+from api.mcp_client import create_mcp_market_client
 
 router = APIRouter(prefix="/api/trading", tags=["trading"])
 
@@ -467,23 +468,72 @@ async def get_performance(
     response_model=dict[str, Any],
     status_code=status.HTTP_200_OK,
     summary="取得市場狀態",
-    description="獲取市場開盤狀態（暫未實現，建議使用 MCP Server）",
+    description="獲取台灣股市開盤狀態（基於交易日檢查）",
 )
 async def get_market_status():
     """
     取得市場狀態
 
+    檢查今日是否為股市交易日（非週末且非國定假日）
+
     Returns:
-        市場狀態資訊
+        市場狀態資訊，包含：
+        - is_trading_day: 是否為交易日
+        - is_open: 市場是否開盤（簡化版，僅判斷交易日）
+        - date: 查詢日期
+        - is_weekend: 是否為週末
+        - is_holiday: 是否為國定假日
+        - holiday_name: 節假日名稱（如果是節假日）
 
     Note:
-        建議使用 MCP Server (casual-market) 獲取即時市場資料
+        此端點使用台灣節假日API進行交易日判斷
+        市場開盤時間為週一至週五 09:00-13:30（不含國定假日）
     """
-    return {
-        "is_open": False,
-        "next_open_time": None,
-        "message": "Market data feature not implemented. Please use MCP Server for real-time market data.",
-    }
+    try:
+        async with TaiwanHolidayAPIClient() as holiday_client:
+            # 取得今日日期
+            today = datetime.now().date()
+
+            # 檢查是否為週末
+            is_weekend = holiday_client.is_weekend(today)
+
+            # 檢查是否為國定假日
+            holiday_info = await holiday_client.get_holiday_info(today)
+            is_holiday = holiday_info is not None and holiday_info.is_holiday
+            holiday_name = holiday_info.name if holiday_info else None
+
+            # 檢查是否為交易日
+            is_trading = await holiday_client.is_trading_day(today)
+
+            # 簡化版開盤判斷：交易日即視為開盤
+            # 實際應該還要檢查當前時間是否在 09:00-13:30 之間
+            current_time = datetime.now().time()
+            market_open_time = datetime.strptime("09:00", "%H:%M").time()
+            market_close_time = datetime.strptime("13:30", "%H:%M").time()
+
+            is_open = (
+                is_trading
+                and current_time >= market_open_time
+                and current_time <= market_close_time
+            )
+
+            return {
+                "is_trading_day": is_trading,
+                "is_open": is_open,
+                "date": today.isoformat(),
+                "current_time": current_time.strftime("%H:%M:%S"),
+                "market_hours": "09:00-13:30",
+                "is_weekend": is_weekend,
+                "is_holiday": is_holiday,
+                "holiday_name": holiday_name,
+            }
+
+    except Exception as e:
+        logger.error(f"Failed to get market status: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"無法取得市場狀態: {str(e)}",
+        ) from e
 
 
 @router.get(
@@ -491,26 +541,58 @@ async def get_market_status():
     response_model=dict[str, Any],
     status_code=status.HTTP_200_OK,
     summary="取得股票報價",
-    description="獲取股票即時報價（暫未實現，建議使用 MCP Server）",
+    description="獲取股票即時報價（透過 MCP Server）",
 )
 async def get_stock_quote(ticker: str):
     """
     取得股票報價
 
     Args:
-        ticker: 股票代碼
+        ticker: 股票代碼或公司名稱（如 "2330" 或 "台積電"）
 
     Returns:
-        股票報價資訊
+        股票報價資訊，包含：
+        - symbol: 股票代碼
+        - company_name: 公司名稱
+        - current_price: 當前價格
+        - change: 漲跌金額
+        - change_percent: 漲跌幅百分比
+        - volume: 成交量
+        - high/low/open: 最高/最低/開盤價
+        - previous_close: 昨收價
+        - last_update: 最後更新時間
 
     Note:
-        建議使用 MCP Server (casual-market) 獲取即時股票報價
+        此端點整合 casual-market MCP Server 獲取即時股票報價
     """
-    return {
-        "ticker": ticker,
-        "price": None,
-        "message": "Stock quote feature not implemented. Please use MCP Server for real-time quotes.",
-    }
+    try:
+        logger.info(f"Getting stock quote for: {ticker}")
+
+        # 使用上下文管理器確保連接正確關閉
+        async with create_mcp_market_client() as mcp_client:
+            result = await mcp_client.get_stock_price(ticker)
+
+            # 檢查結果是否成功
+            if not result.get("success", False):
+                error_msg = result.get("error", "未知錯誤")
+                logger.warning(f"MCP 工具返回錯誤: {error_msg}")
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"無法取得股票報價: {error_msg}",
+                )
+
+            return result
+
+    except HTTPException:
+        # 重新拋出 HTTP 異常
+        raise
+
+    except Exception as e:
+        logger.error(f"Failed to get stock quote for {ticker}: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"無法取得股票報價: {str(e)}",
+        ) from e
 
 
 @router.get(
@@ -518,19 +600,62 @@ async def get_stock_quote(ticker: str):
     response_model=dict[str, Any],
     status_code=status.HTTP_200_OK,
     summary="取得市場指數",
-    description="獲取市場指數資訊（暫未實現，建議使用 MCP Server）",
+    description="獲取市場指數資訊（透過 MCP Server）",
 )
-async def get_market_indices():
+async def get_market_indices(category: str = "major", count: int = 20, format: str = "detailed"):
     """
     取得市場指數
 
+    Args:
+        category: 指數類別
+            - "major": 主要指數（加權指數、櫃買指數等）
+            - "sector": 類股指數
+            - "theme": 主題指數
+            - "all": 所有指數
+        count: 顯示數量（預設 20）
+        format: 顯示格式
+            - "detailed": 詳細資訊
+            - "simple": 簡易資訊
+
     Returns:
-        市場指數資訊
+        市場指數資訊列表，每項包含：
+        - index_name: 指數名稱
+        - current_value: 當前指數值
+        - change: 漲跌點數
+        - change_percent: 漲跌幅 (%)
+        - volume: 成交量
+        - last_update: 最後更新時間
 
     Note:
-        建議使用 MCP Server (casual-market) 獲取即時市場指數
+        此端點整合 casual-market MCP Server 獲取市場指數
     """
-    return {
-        "indices": [],
-        "message": "Market indices feature not implemented. Please use MCP Server for real-time indices.",
-    }
+    try:
+        logger.info(f"Getting market indices (category={category}, count={count}, format={format})")
+
+        # 使用上下文管理器確保連接正確關閉
+        async with create_mcp_market_client() as mcp_client:
+            result = await mcp_client.get_market_indices(
+                category=category, count=count, format=format
+            )
+
+            # 檢查結果是否成功
+            if not result.get("success", False):
+                error_msg = result.get("error", "未知錯誤")
+                logger.warning(f"MCP 工具返回錯誤: {error_msg}")
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"無法取得市場指數: {error_msg}",
+                )
+
+            return result
+
+    except HTTPException:
+        # 重新拋出 HTTP 異常
+        raise
+
+    except Exception as e:
+        logger.error(f"Failed to get market indices: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"無法取得市場指數: {str(e)}",
+        ) from e

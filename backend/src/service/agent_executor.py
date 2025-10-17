@@ -13,13 +13,13 @@ from typing import TYPE_CHECKING
 from loguru import logger
 from sqlalchemy.ext.asyncio import async_sessionmaker
 
-from ..common.enums import AgentMode
-from .trading_service import TradingService
+from common.enums import AgentMode
+from service.trading_service import TradingService
 
 if TYPE_CHECKING:
-    from ..api.config import Settings
-    from ..api.holiday_client import TaiwanHolidayAPIClient
-    from ..api.websocket import ConnectionManager
+    from api.config import Settings
+    from api.holiday_client import TaiwanHolidayAPIClient
+    from api.websocket import ConnectionManager
 
 
 # ==========================================
@@ -189,8 +189,13 @@ class AgentExecutor:
             except Exception as e:
                 logger.error(f"停止 agent {agent_id} 時發生錯誤: {e}")
 
-        # 關閉節假日客戶端
-        await self._holiday_client.close()
+        # 關閉節假日客戶端（如果存在）
+        if self._holiday_client is not None:
+            try:
+                await self._holiday_client.close()
+                logger.debug("節假日客戶端已關閉")
+            except Exception as e:
+                logger.warning(f"關閉節假日客戶端時發生錯誤: {e}")
 
     def get_status(self, agent_id: str) -> dict:
         """
@@ -365,7 +370,7 @@ class AgentExecutor:
         try:
             # 延遲初始化節假日客戶端
             if self._holiday_client is None:
-                from ..api.holiday_client import TaiwanHolidayAPIClient
+                from api.holiday_client import TaiwanHolidayAPIClient
 
                 self._holiday_client = TaiwanHolidayAPIClient()
 

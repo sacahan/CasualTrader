@@ -1,25 +1,25 @@
 <script>
   /**
-   * AgentCard Component
+   * AgentCardSimple Component
    *
-   * Agent 卡片組件,顯示 Agent 基本資訊、狀態和操作按鈕
-   * 符合 FRONTEND_IMPLEMENTATION.md 規格
-   * Svelte 5 compatible - uses callback props instead of createEventDispatcher
-   * 採用 AgentCardSimple 的暗色主題和豐富視覺效果
+   * 簡化的 Agent 卡片組件，模仿 demo 頁面的設計
+   * 顯示關鍵資訊：名稱、資產、損益、現金、簡易圖表、持股簡介
    */
 
-  import { onMount } from 'svelte';
-  import { Button } from '../UI/index.js';
-  import { AGENT_STATUS, AGENT_RUNTIME_STATUS } from '../../shared/constants.js';
-  import { formatCurrency } from '../../shared/utils.js';
-  import { isOpen } from '../../stores/market.js';
+  import { onMount } from "svelte";
+  import { Button } from "../UI/index.js";
+  import {
+    AGENT_STATUS,
+    AGENT_RUNTIME_STATUS,
+  } from "../../shared/constants.js";
+  import { formatCurrency } from "../../shared/utils.js";
+  import { isOpen } from "../../stores/market.js";
 
   // Props
   let {
     agent,
     performanceData = [],
     holdings = [],
-    selected = false,
     onclick = undefined,
     onstart = undefined,
     onstop = undefined,
@@ -28,8 +28,11 @@
   } = $props();
 
   // 計算資產相關數據
+  // 從後端 API 響應映射正確的字段名稱
   let initialFunds = $derived(agent.initial_funds || 1000000);
-  let currentFunds = $derived(agent.current_funds || agent.initial_funds || 1000000);
+  let currentFunds = $derived(
+    agent.current_funds || agent.initial_funds || 1000000
+  );
 
   // 計算總資產
   let totalAssets = $derived.by(() => {
@@ -47,7 +50,10 @@
   // 計算損益
   let pnl = $derived.by(() => {
     const assets =
-      agent.portfolio?.total_value || agent.current_funds || agent.initial_funds || 1000000;
+      agent.portfolio?.total_value ||
+      agent.current_funds ||
+      agent.initial_funds ||
+      1000000;
     const initial = agent.initial_funds || 1000000;
     return assets - initial;
   });
@@ -56,7 +62,10 @@
   let pnlPercent = $derived.by(() => {
     const initial = agent.initial_funds || 1000000;
     const assets =
-      agent.portfolio?.total_value || agent.current_funds || agent.initial_funds || 1000000;
+      agent.portfolio?.total_value ||
+      agent.current_funds ||
+      agent.initial_funds ||
+      1000000;
     const profit = assets - initial;
     return initial > 0 ? (profit / initial) * 100 : 0;
   });
@@ -64,26 +73,25 @@
   // 判斷是否盈利
   let isProfit = $derived.by(() => {
     const assets =
-      agent.portfolio?.total_value || agent.current_funds || agent.initial_funds || 1000000;
+      agent.portfolio?.total_value ||
+      agent.current_funds ||
+      agent.initial_funds ||
+      1000000;
     const initial = agent.initial_funds || 1000000;
     return assets >= initial;
   });
 
-  // Agent 顏色 (從設定中取得，預設為綠色)
-  let agentColor = $derived(agent.color_theme || '34, 197, 94');
+  // Agent 顏色 (從設定中取得，預設為綠色或橙色)
+  let agentColor = $derived(agent.color_theme || "34, 197, 94");
 
-  // 是否可以編輯 (執行中不可編輯 - 配置鎖定)
-  let isEditable = $derived(agent.runtime_status !== AGENT_RUNTIME_STATUS.RUNNING);
-
-  // 是否可以啟動 (persistent status 為 active/inactive 且 runtime 不在執行中)
+  // 是否可以啟動/停止
   let canStart = $derived(
-    (agent.status === AGENT_STATUS.ACTIVE || agent.status === AGENT_STATUS.INACTIVE) &&
+    (agent.status === AGENT_STATUS.ACTIVE ||
+      agent.status === AGENT_STATUS.INACTIVE) &&
       (agent.runtime_status === AGENT_RUNTIME_STATUS.IDLE ||
         agent.runtime_status === AGENT_RUNTIME_STATUS.STOPPED ||
         !agent.runtime_status)
   );
-
-  // 是否可以停止
   let canStop = $derived(agent.runtime_status === AGENT_RUNTIME_STATUS.RUNNING);
 
   // Canvas for mini chart
@@ -110,22 +118,22 @@
   });
 
   function renderMiniChart() {
-    // @ts-ignore - Chart.js is loaded via CDN in index.html
     if (!window.Chart || !chartCanvas) return;
 
-    const ctx = chartCanvas.getContext('2d');
+    const ctx = chartCanvas.getContext("2d");
 
     // 準備數據
     const labels = performanceData.map((d, i) => i);
-    const values = performanceData.map((d) => d.value || d.total_assets || totalAssets);
+    const values = performanceData.map(
+      (d) => d.value || d.total_assets || totalAssets
+    );
 
     if (chartInstance) {
       chartInstance.destroy();
     }
 
-    // @ts-ignore - Chart.js is loaded via CDN in index.html
     chartInstance = new window.Chart(ctx, {
-      type: 'line',
+      type: "line",
       data: {
         labels,
         datasets: [
@@ -149,11 +157,11 @@
           legend: { display: false },
           tooltip: {
             enabled: true,
-            mode: 'index',
+            mode: "index",
             intersect: false,
-            backgroundColor: 'rgba(0, 0, 0, 0.8)',
-            titleColor: '#fff',
-            bodyColor: '#fff',
+            backgroundColor: "rgba(0, 0, 0, 0.8)",
+            titleColor: "#fff",
+            bodyColor: "#fff",
             borderColor: `rgb(${agentColor})`,
             borderWidth: 1,
             callbacks: {
@@ -166,16 +174,15 @@
           y: { display: false },
         },
         interaction: {
-          mode: 'nearest',
-          axis: 'x',
+          mode: "nearest",
+          axis: "x",
           intersect: false,
         },
       },
     });
   }
 
-  // 函數定義
-  function handleClick() {
+  function handleCardClick() {
     onclick?.(agent);
   }
 
@@ -203,12 +210,10 @@
 </script>
 
 <div
-  class="agent-card rounded-2xl border border-gray-700 bg-gray-800 p-6 shadow-lg transition-all duration-300 hover:shadow-2xl hover:scale-[1.02] cursor-pointer {selected
-    ? 'ring-2 ring-primary-500'
-    : ''}"
+  class="agent-card rounded-2xl border border-gray-700 bg-gray-800 p-6 shadow-lg transition-all duration-300 hover:shadow-2xl hover:scale-[1.02] cursor-pointer"
   style="border-color: rgba({agentColor}, 0.3);"
-  onclick={handleClick}
-  onkeydown={(e) => e.key === 'Enter' && handleClick()}
+  onclick={handleCardClick}
+  onkeydown={(e) => e.key === "Enter" && handleCardClick()}
   role="button"
   tabindex="0"
 >
@@ -218,8 +223,11 @@
       <h3 class="text-xl font-bold" style="color: rgb({agentColor});">
         {agent.name}
       </h3>
-      <div class="text-base text-gray-500 my-3" style="color: rgb({agentColor});">
-        {agent.ai_model || '未知模型'}
+      <div
+        class="text-base text-gray-500 my-3"
+        style="color: rgb({agentColor});"
+      >
+        {agent.ai_model}
       </div>
       <div class="flex items-center gap-2 mt-1">
         {#if agent.runtime_status === AGENT_RUNTIME_STATUS.RUNNING}
@@ -233,14 +241,21 @@
     </div>
 
     <!-- 操作按鈕 -->
-    <div class="flex items-center gap-1 opacity-70 hover:opacity-100 transition-opacity">
+    <div
+      class="flex items-center gap-1 opacity-70 hover:opacity-100 transition-opacity"
+    >
       {#if onedit}
         <button
           onclick={handleEdit}
           class="rounded-lg p-2 text-gray-400 hover:bg-gray-700 hover:text-white transition-colors"
           title="編輯 Agent"
         >
-          <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <svg
+            class="h-4 w-4"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+          >
             <path
               stroke-linecap="round"
               stroke-linejoin="round"
@@ -256,9 +271,13 @@
           onclick={handleDelete}
           class="rounded-lg p-2 text-gray-400 hover:bg-red-600 hover:text-white transition-colors"
           title="刪除 Agent"
-          disabled={!isEditable}
         >
-          <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <svg
+            class="h-4 w-4"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+          >
             <path
               stroke-linecap="round"
               stroke-linejoin="round"
@@ -279,8 +298,12 @@
     </div>
     <div>
       <p class="text-xs text-gray-400 mb-1">總損益</p>
-      <p class="text-2xl font-bold" class:text-gain={isProfit} class:text-loss={!isProfit}>
-        {isProfit ? '+' : ''}{formatCurrency(pnl)}
+      <p
+        class="text-2xl font-bold"
+        class:text-gain={isProfit}
+        class:text-loss={!isProfit}
+      >
+        {isProfit ? "+" : ""}{formatCurrency(pnl)}
       </p>
     </div>
   </div>
@@ -306,11 +329,13 @@
         {#each holdings.slice(0, 3) as holding}
           <div class="flex items-center justify-between text-sm">
             <div class="flex items-center gap-2">
-              <span class="font-medium text-gray-300">{holding.ticker || holding.symbol}</span>
-              <span class="text-gray-500">{holding.name || ''}</span>
+              <span class="font-medium text-gray-300">{holding.symbol}</span>
+              <span class="text-gray-500">{holding.name || ""}</span>
             </div>
             <div class="text-right">
-              <span class="text-white font-medium">{holding.shares || 0} 股</span>
+              <span class="text-white font-medium"
+                >{holding.shares || 0} 股</span
+              >
               <span class="text-gray-400 text-xs ml-2"
                 >@ {formatCurrency(holding.avg_price || 0)}</span
               >
@@ -339,7 +364,12 @@
         disabled={!$isOpen}
         style="background-color: rgb({agentColor}); border-color: rgb({agentColor});"
       >
-        <svg class="mr-2 h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <svg
+          class="mr-2 h-5 w-5"
+          fill="none"
+          viewBox="0 0 24 24"
+          stroke="currentColor"
+        >
           <path
             stroke-linecap="round"
             stroke-linejoin="round"
@@ -358,8 +388,19 @@
     {/if}
 
     {#if canStop}
-      <Button variant="secondary" size="md" fullWidth onclick={handleStop} disabled={!$isOpen}>
-        <svg class="mr-2 h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <Button
+        variant="secondary"
+        size="md"
+        fullWidth
+        onclick={handleStop}
+        disabled={!$isOpen}
+      >
+        <svg
+          class="mr-2 h-5 w-5"
+          fill="none"
+          viewBox="0 0 24 24"
+          stroke="currentColor"
+        >
           <path
             stroke-linecap="round"
             stroke-linejoin="round"

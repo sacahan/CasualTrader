@@ -2,10 +2,7 @@ from __future__ import annotations
 
 from agents import function_tool, Tool
 
-# Logger
-import logging
-
-logger = logging.getLogger(__name__)
+from common.logger import logger
 
 
 def create_trading_tools(agent_service, agent_id: str) -> list[Tool]:

@@ -7,19 +7,17 @@ TradingService - 交易服務 API 層
 
 from __future__ import annotations
 
-import logging
 from datetime import datetime
 from typing import Any
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from ..trading.trading_agent import TradingAgent
-from .agents_service import AgentsService, AgentNotFoundError
-from ..common.enums import AgentMode, SessionStatus
-from ..database.models import Agent
-from .session_service import AgentSessionService
-
-logger = logging.getLogger(__name__)
+from trading.trading_agent import TradingAgent
+from service.agents_service import AgentsService, AgentNotFoundError
+from common.enums import AgentMode, SessionStatus
+from common.logger import logger
+from database.models import Agent
+from service.session_service import AgentSessionService
 
 
 # ==========================================

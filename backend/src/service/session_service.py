@@ -6,17 +6,15 @@ AgentSessionService - AgentSession 資料庫服務層
 
 from __future__ import annotations
 
-import logging
 from datetime import datetime
 from typing import Any
 
 from sqlalchemy import desc, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from ..database.models import AgentSession
-from ..common.enums import SessionStatus
-
-logger = logging.getLogger(__name__)
+from database.models import AgentSession
+from common.enums import SessionStatus
+from common.logger import logger
 
 
 # ==========================================

@@ -11,8 +11,8 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from ..config import get_db_session
-from ...service.agents_service import AgentsService
+from api.config import get_db_session
+from service.agents_service import AgentsService
 
 
 # ==========================================

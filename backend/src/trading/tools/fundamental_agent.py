@@ -12,10 +12,7 @@ from datetime import datetime
 
 from agents import Agent, function_tool, ModelSettings
 
-# Logger
-import logging
-
-logger = logging.getLogger(__name__)
+from common.logger import logger
 
 load_dotenv()
 

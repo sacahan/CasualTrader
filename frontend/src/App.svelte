@@ -238,12 +238,12 @@
           <AgentCard
             {agent}
             onclick={handleAgentSelect}
+            onedit={handleEditAgent}
             ondelete={handleDeleteAgent}
             onstart={handleStartAgent}
             onstop={handleStopAgent}
           />
           <!-- 注意: performanceData 和 holdings 在詳細模態中使用 -->
-          <!-- 注意: 編輯功能通過詳細模態提供 -->
         {/each}
       </div>
     {/if}

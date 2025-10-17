@@ -6,23 +6,21 @@ Agents API Router
 
 from __future__ import annotations
 
-import logging
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from ...common.enums import AgentMode
-from ...service.agents_service import (
+from common.enums import AgentMode
+from common.logger import logger
+from service.agents_service import (
     AgentConfigurationError,
     AgentDatabaseError,
     AgentNotFoundError,
     AgentsService,
 )
-from ..config import get_db_session
-from ..models import CreateAgentRequest, UpdateAgentRequest
-
-logger = logging.getLogger(__name__)
+from api.config import get_db_session
+from api.models import CreateAgentRequest, UpdateAgentRequest
 
 router = APIRouter(prefix="/api/agents", tags=["agents"])
 

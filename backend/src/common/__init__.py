@@ -18,6 +18,7 @@ from .enums import (
     validate_agent_status,
     validate_session_status,
 )
+from .logger import get_logger, intercept_standard_logging, logger, setup_logger
 
 __all__ = [
     # Enums
@@ -34,4 +35,9 @@ __all__ = [
     "get_all_agent_statuses",
     "get_all_agent_modes",
     "get_all_session_statuses",
+    # Logger
+    "logger",
+    "get_logger",
+    "setup_logger",
+    "intercept_standard_logging",
 ]

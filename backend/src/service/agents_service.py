@@ -8,7 +8,6 @@ Agent 資料庫服務層
 from __future__ import annotations
 
 import json
-import logging
 from typing import Any
 from decimal import Decimal
 from datetime import datetime
@@ -18,16 +17,15 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from ..database.models import (
+from database.models import (
     Agent,
     Transaction,
     AgentHolding,
     AgentPerformance,
     AIModelConfig,
 )
-from ..common.enums import AgentMode, AgentStatus, TransactionAction, TransactionStatus
-
-logger = logging.getLogger(__name__)
+from common.enums import AgentMode, AgentStatus, TransactionAction, TransactionStatus
+from common.logger import logger
 
 
 # ==========================================

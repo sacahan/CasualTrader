@@ -5,7 +5,6 @@
 
 from __future__ import annotations
 
-import logging
 import os
 from datetime import datetime
 
@@ -13,8 +12,7 @@ from dotenv import load_dotenv
 
 from agents import Agent, function_tool, ModelSettings
 
-# Logger
-logger = logging.getLogger(__name__)
+from common.logger import logger
 
 load_dotenv()
 

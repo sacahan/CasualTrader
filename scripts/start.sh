@@ -130,8 +130,8 @@ if [[ "$FRONTEND_ONLY" == false ]]; then
 	echo "   - Health: http://localhost:8000/api/health"
 	echo "   - WebSocket: ws://localhost:8000/ws"
 
-	# Start backend server (macOS compatible - no setsid)
-	uv run uvicorn src.api.app:create_app --factory --host 0.0.0.0 --port $BACKEND_PORT --reload &
+	# Start backend server using run_server.py (handles Python path correctly)
+	uv run python run_server.py &
 	BACKEND_PID=$!
 fi
 

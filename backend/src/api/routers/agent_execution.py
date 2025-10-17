@@ -7,24 +7,22 @@ Agent Execution API Router
 
 from __future__ import annotations
 
-import logging
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from ...service.agents_service import AgentNotFoundError
-from ...common.enums import AgentMode, SessionStatus
-from ...service.session_service import SessionError
-from ...service.trading_service import (
+from service.agents_service import AgentNotFoundError
+from common.enums import AgentMode, SessionStatus
+from common.logger import logger
+from service.session_service import SessionError
+from service.trading_service import (
     AgentBusyError,
     TradingService,
     TradingServiceError,
 )
-from ..config import get_db_session
-
-logger = logging.getLogger(__name__)
+from api.config import get_db_session
 
 router = APIRouter()
 
@@ -302,7 +300,7 @@ async def start_agent(
     """
     from ..app import get_executor
     from ..config import settings
-    from ...service.agent_executor import AlreadyRunningError
+    from service.agent_executor import AlreadyRunningError
 
     executor = get_executor()
 
@@ -369,7 +367,7 @@ async def stop_agent(
         500: 停止失敗
     """
     from ..app import get_executor
-    from ...service.agent_executor import NotRunningError
+    from service.agent_executor import NotRunningError
 
     executor = get_executor()
 
