@@ -80,7 +80,6 @@ class TradingService:
     async def execute_agent_task(
         self,
         agent_id: str,
-        task: str,
         mode: AgentMode | None = None,
         context: dict[str, Any] | None = None,
         max_turns: int | None = None,
@@ -90,7 +89,6 @@ class TradingService:
 
         Args:
             agent_id: Agent ID
-            task: 任務描述
             mode: 執行模式（可選）
             context: 額外上下文（可選）
             max_turns: 最大輪數（可選）
@@ -116,7 +114,6 @@ class TradingService:
 
         try:
             # 1. 檢查 Agent 是否存在並取得配置
-            logger.info(f"Executing task for agent {agent_id}: {task[:50]}...")
             agent_config = await self.agents_service.get_agent_config(agent_id)
 
             # 2. 檢查 Agent 是否正在執行
@@ -134,7 +131,7 @@ class TradingService:
                 agent_id=agent_id,
                 session_type="manual_task",
                 mode=execution_mode,
-                initial_input={"task": task, "context": context or {}},
+                initial_input={"context": context or {}},
             )
             session_id = session.id
             logger.info(f"Created session {session_id} for agent {agent_id}")
@@ -147,7 +144,7 @@ class TradingService:
 
             # 6. 執行任務
             result = await trading_agent.run(
-                task=task, mode=execution_mode, max_turns=max_turns, context=context
+                mode=execution_mode, max_turns=max_turns, context=context
             )
 
             # 7. 計算執行時間
