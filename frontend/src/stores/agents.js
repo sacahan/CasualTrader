@@ -46,8 +46,10 @@ export async function loadAgents() {
 
   try {
     const data = await apiClient.getAgents();
+    // 後端直接返回陣列,不是 { agents: [...] } 物件
+    const agentsArray = Array.isArray(data) ? data : data.agents || [];
     // 映射後端的 id 欄位到前端的 agent_id
-    const mappedAgents = (data.agents || []).map((agent) => ({
+    const mappedAgents = agentsArray.map((agent) => ({
       ...agent,
       agent_id: agent.id || agent.agent_id,
     }));
@@ -191,58 +193,55 @@ export async function deleteAgent(agentId) {
   }
 }
 
-// TODO: 以下啟動/停止方法已暫時註解，因後端 API 已移除
-// 未來需重新實現 Agent 生命週期管理
+/**
+ * 啟動 agent
+ */
+export async function startAgent(agentId, config = {}) {
+  loading.set(true);
+  error.set(null);
 
-// /**
-//  * 啟動 agent
-//  */
-// export async function startAgent(agentId, config = {}) {
-//   loading.set(true);
-//   error.set(null);
-//
-//   try {
-//     const result = await apiClient.startAgent(agentId, config);
-//
-//     // 更新 agent 狀態為 running
-//     agents.update((list) =>
-//       list.map((a) => (a.agent_id === agentId ? { ...a, status: 'running' } : a))
-//     );
-//
-//     return result;
-//   } catch (err) {
-//     error.set(extractErrorMessage(err));
-//     console.error('Failed to start agent:', err);
-//     throw err;
-//   } finally {
-//     loading.set(false);
-//   }
-// }
+  try {
+    const result = await apiClient.startAgent(agentId, config);
 
-// /**
-//  * 停止 agent
-//  */
-// export async function stopAgent(agentId) {
-//   loading.set(true);
-//   error.set(null);
-//
-//   try {
-//     const result = await apiClient.stopAgent(agentId);
-//
-//     // 更新 agent 狀態為 idle
-//     agents.update((list) =>
-//       list.map((a) => (a.agent_id === agentId ? { ...a, status: 'idle' } : a))
-//     );
-//
-//     return result;
-//   } catch (err) {
-//     error.set(extractErrorMessage(err));
-//     console.error('Failed to stop agent:', err);
-//     throw err;
-//   } finally {
-//     loading.set(false);
-//   }
-// }
+    // 更新 agent 狀態為 running
+    agents.update((list) =>
+      list.map((a) => (a.agent_id === agentId ? { ...a, status: 'running' } : a))
+    );
+
+    return result;
+  } catch (err) {
+    error.set(extractErrorMessage(err));
+    console.error('Failed to start agent:', err);
+    throw err;
+  } finally {
+    loading.set(false);
+  }
+}
+
+/**
+ * 停止 agent
+ */
+export async function stopAgent(agentId) {
+  loading.set(true);
+  error.set(null);
+
+  try {
+    const result = await apiClient.stopAgent(agentId);
+
+    // 更新 agent 狀態為 idle
+    agents.update((list) =>
+      list.map((a) => (a.agent_id === agentId ? { ...a, status: 'idle' } : a))
+    );
+
+    return result;
+  } catch (err) {
+    error.set(extractErrorMessage(err));
+    console.error('Failed to stop agent:', err);
+    throw err;
+  } finally {
+    loading.set(false);
+  }
+}
 
 /**
  * 執行 agent 週期

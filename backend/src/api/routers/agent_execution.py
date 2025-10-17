@@ -70,12 +70,18 @@ class AgentStatusResponse(BaseModel):
 
     agent_id: str
     name: str
-    status: str
-    mode: str
+    status: str  # AgentStatus (active/inactive/error/suspended)
+    mode: str  # AgentMode (TRADING/OBSERVATION/REBALANCING)
     is_initialized: bool
-    is_running: bool
+    is_running: bool  # 是否在循環執行中
     current_session_id: str | None
     last_active_at: str | None
+
+    # 循環執行運行時狀態
+    current_mode: str | None = None  # 當前執行階段
+    last_cycle_at: str | None = None  # 上次循環時間
+    cycle_count: int = 0  # 已完成循環次數
+    interval_minutes: int | None = None  # 循環間隔
 
 
 class StartStopResponse(BaseModel):
@@ -83,8 +89,8 @@ class StartStopResponse(BaseModel):
 
     success: bool
     agent_id: str
-    status: str
-    mode: str | None = None
+    status: str  # "running" or "stopped"
+    interval_minutes: int | None = None  # 循環間隔（僅啟動時有值）
 
 
 class SessionInfo(BaseModel):
@@ -150,7 +156,9 @@ class AgentStatisticsResponse(BaseModel):
 # ==========================================
 
 
-def get_trading_service(db_session: AsyncSession = Depends(get_db_session)) -> TradingService:
+def get_trading_service(
+    db_session: AsyncSession = Depends(get_db_session),
+) -> TradingService:
     """
     獲取 TradingService 實例
 
@@ -266,110 +274,130 @@ async def execute_agent_task(
         ) from e
 
 
-# TODO: 以下啟動/停止端點已暫時註解，因 TradingService 已移除相關方法
-# 未來需重新實現 Agent 生命週期管理
+@router.post(
+    "/{agent_id}/start",
+    response_model=StartStopResponse,
+    status_code=status.HTTP_200_OK,
+    summary="啟動 Agent 循環執行",
+    description="啟動 Agent，開始循環執行 OBSERVATION → TRADING → REBALANCING 三階段",
+)
+async def start_agent(
+    agent_id: str,
+    interval_minutes: int | None = None,
+):
+    """
+    啟動 Agent 循環執行
 
-# @router.post(
-#     "/{agent_id}/start",
-#     response_model=StartStopResponse,
-#     status_code=status.HTTP_200_OK,
-#     summary="啟動 Agent",
-#     description="啟動 Agent，更新狀態為 ACTIVE",
-# )
-# async def start_agent(
-#     agent_id: str,
-#     request: StartAgentRequest | None = None,
-#     trading_service: TradingService = Depends(get_trading_service),
-# ):
-#     """
-#     啟動 Agent
-#
-#     Args:
-#         agent_id: Agent ID
-#         request: 啟動請求（可選）
-#         trading_service: TradingService 實例
-#
-#     Returns:
-#         啟動結果
-#
-#     Raises:
-#         404: Agent 不存在
-#         500: 啟動失敗
-#     """
-#     try:
-#         logger.info(f"Starting agent {agent_id}")
-#
-#         # 解析模式
-#         mode = None
-#         if request and request.mode:
-#             mode = parse_agent_mode(request.mode)
-#
-#         # 啟動 Agent
-#         result = await trading_service.start_agent(agent_id, mode)
-#
-#         return StartStopResponse(**result)
-#
-#     except AgentNotFoundError as e:
-#         logger.warning(f"Agent not found: {agent_id}")
-#         raise HTTPException(
-#             status_code=status.HTTP_404_NOT_FOUND,
-#             detail=f"Agent {agent_id} not found",
-#         ) from e
-#
-#     except TradingServiceError as e:
-#         logger.error(f"Failed to start agent {agent_id}: {e}")
-#         raise HTTPException(
-#             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-#             detail=str(e),
-#         ) from e
+    Args:
+        agent_id: Agent ID
+        interval_minutes: 循環間隔（分鐘），未指定時使用設定檔的預設值
+
+    Returns:
+        啟動結果
+
+    Raises:
+        404: Agent 不存在
+        409: Agent 已在運行中
+        500: 啟動失敗
+    """
+    from ..app import get_executor
+    from ..config import settings
+    from ...service.agent_executor import AlreadyRunningError
+
+    executor = get_executor()
+
+    # 如果未指定間隔，使用設定檔的預設值
+    if interval_minutes is None:
+        interval_minutes = settings.default_cycle_interval_minutes
+
+    try:
+        logger.info(f"Starting agent {agent_id} with interval {interval_minutes} minutes")
+
+        # 啟動循環執行
+        await executor.start(agent_id, interval_minutes)
+
+        return StartStopResponse(
+            success=True,
+            agent_id=agent_id,
+            status="running",
+            interval_minutes=interval_minutes,
+        )
+
+    except AgentNotFoundError as e:
+        logger.warning(f"Agent not found: {agent_id}")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Agent {agent_id} not found",
+        ) from e
+
+    except AlreadyRunningError as e:
+        logger.warning(f"Agent already running: {agent_id}")
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=str(e),
+        ) from e
+
+    except Exception as e:
+        logger.error(f"Failed to start agent {agent_id}: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=str(e),
+        ) from e
 
 
-# @router.post(
-#     "/{agent_id}/stop",
-#     response_model=StartStopResponse,
-#     status_code=status.HTTP_200_OK,
-#     summary="停止 Agent",
-#     description="停止 Agent，更新狀態為 INACTIVE",
-# )
-# async def stop_agent(
-#     agent_id: str,
-#     trading_service: TradingService = Depends(get_trading_service),
-# ):
-#     """
-#     停止 Agent
-#
-#     Args:
-#         agent_id: Agent ID
-#         trading_service: TradingService 實例
-#
-#     Returns:
-#         停止結果
-#
-#     Raises:
-#         404: Agent 不存在
-#         500: 停止失敗
-#     """
-#     try:
-#         logger.info(f"Stopping agent {agent_id}")
-#
-#         # 停止 Agent
-#         result = await trading_service.stop_agent(agent_id)
-#
-#         return StartStopResponse(**result)
-#
-#     except AgentNotFoundError as e:
-#         logger.warning(f"Agent not found: {agent_id}")
-#         raise HTTPException(
-#             status_code=status.HTTP_404_NOT_FOUND,
-#             detail=f"Agent {agent_id} not found",
-#         ) from e
-#
-#     except TradingServiceError as e:
-#         logger.error(f"Failed to stop agent {agent_id}: {e}")
-#         raise HTTPException(
-#             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-#             detail=str(e),
-#         ) from e
+@router.post(
+    "/{agent_id}/stop",
+    response_model=StartStopResponse,
+    status_code=status.HTTP_200_OK,
+    summary="停止 Agent 循環執行",
+    description="停止 Agent 循環執行",
+)
+async def stop_agent(
+    agent_id: str,
+):
+    """
+    停止 Agent 循環執行
+
+    Args:
+        agent_id: Agent ID
+
+    Returns:
+        停止結果
+
+    Raises:
+        404: Agent 未在運行中
+        500: 停止失敗
+    """
+    from ..app import get_executor
+    from ...service.agent_executor import NotRunningError
+
+    executor = get_executor()
+
+    try:
+        logger.info(f"Stopping agent {agent_id}")
+
+        # 停止循環執行
+        await executor.stop(agent_id)
+
+        return StartStopResponse(
+            success=True,
+            agent_id=agent_id,
+            status="stopped",
+        )
+
+    except NotRunningError as e:
+        logger.warning(f"Agent not running: {agent_id}")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(e),
+        ) from e
+
+    except Exception as e:
+        logger.error(f"Failed to stop agent {agent_id}: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=str(e),
+        ) from e
 
 
 @router.get(
@@ -377,7 +405,7 @@ async def execute_agent_task(
     response_model=AgentStatusResponse,
     status_code=status.HTTP_200_OK,
     summary="取得 Agent 狀態",
-    description="取得 Agent 當前狀態，包括是否運行中",
+    description="取得 Agent 當前狀態，包括是否運行中和循環執行狀態",
 )
 async def get_agent_status(
     agent_id: str,
@@ -391,19 +419,37 @@ async def get_agent_status(
         trading_service: TradingService 實例
 
     Returns:
-        Agent 狀態
+        Agent 狀態（包含運行時狀態）
 
     Raises:
         404: Agent 不存在
         500: 查詢失敗
     """
+    from ..app import get_executor
+
     try:
         logger.debug(f"Getting status for agent {agent_id}")
 
-        # 取得狀態
+        # 從 trading service 取得基本狀態
         status_data = await trading_service.get_agent_status(agent_id)
 
-        return AgentStatusResponse(**status_data)
+        # 從 executor 取得運行時狀態
+        executor = get_executor()
+        runtime_status = executor.get_status(agent_id)
+
+        # 合併狀態
+        combined_status = {
+            **status_data,
+            "current_mode": runtime_status["current_mode"],
+            "last_cycle_at": runtime_status["last_cycle_at"],
+            "cycle_count": runtime_status["cycle_count"],
+            "interval_minutes": runtime_status["interval_minutes"],
+        }
+
+        # 更新 is_running 欄位（從 executor 獲取更準確的狀態）
+        combined_status["is_running"] = runtime_status["is_running"]
+
+        return AgentStatusResponse(**combined_status)
 
     except AgentNotFoundError as e:
         logger.warning(f"Agent not found: {agent_id}")

@@ -11,8 +11,8 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from ..api.config import get_db_session
-from ..service.agents_service import AgentsService
+from ..config import get_db_session
+from ...service.agents_service import AgentsService
 
 
 # ==========================================
@@ -54,7 +54,9 @@ class AIModelsGroupedResponse(BaseModel):
 # ==========================================
 
 
-async def get_db_service(db_session: AsyncSession = Depends(get_db_session)) -> AgentsService:
+async def get_db_service(
+    db_session: AsyncSession = Depends(get_db_session),
+) -> AgentsService:
     """獲取資料庫服務依賴"""
     return AgentsService(db_session)
 

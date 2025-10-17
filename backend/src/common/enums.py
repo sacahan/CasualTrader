@@ -26,17 +26,6 @@ class AgentStatus(str, Enum):
     SUSPENDED = "suspended"  # 已暫停
 
 
-class AgentRuntimeStatus(str, Enum):
-    """Agent 執行時狀態枚舉 (僅存在於記憶體/前端)
-
-    用於標示 Agent 目前的執行狀態。
-    """
-
-    IDLE = "idle"  # 待命
-    RUNNING = "running"  # 執行中
-    STOPPED = "stopped"  # 已停止
-
-
 class AgentMode(str, Enum):
     """Agent 交易模式枚舉
 
@@ -64,16 +53,6 @@ class SessionStatus(str, Enum):
     COMPLETED = "completed"  # 已完成
     FAILED = "failed"  # 執行失敗
     TIMEOUT = "timeout"  # 執行逾時
-
-
-class ExecutionMode(str, Enum):
-    """執行模式枚舉
-
-    決定 Agent 的執行方式。
-    """
-
-    CONTINUOUS = "continuous"  # 連續執行
-    SINGLE_CYCLE = "single_cycle"  # 單次執行
 
 
 # ==========================================

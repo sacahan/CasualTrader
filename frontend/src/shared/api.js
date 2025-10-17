@@ -86,27 +86,26 @@ class APIClient {
 
   // ========== Agent Control APIs ==========
 
-  // TODO: 以下啟動/停止方法已暫時註解，因後端 API 已移除
-  // 未來需重新實現 Agent 生命週期管理
+  /**
+   * Start an agent
+   * Note: 後端路徑為 /api/agent-execution/{agent_id}/start
+   */
+  startAgent(agentId, config = {}) {
+    return this.request(`/api/agent-execution/${agentId}/start`, {
+      method: 'POST',
+      body: JSON.stringify(config),
+    });
+  }
 
-  // /**
-  //  * Start an agent
-  //  */
-  // startAgent(agentId, config = {}) {
-  //   return this.request(`/api/agents/${agentId}/start`, {
-  //     method: 'POST',
-  //     body: JSON.stringify(config),
-  //   });
-  // }
-
-  // /**
-  //  * Stop an agent
-  //  */
-  // stopAgent(agentId) {
-  //   return this.request(`/api/agents/${agentId}/stop`, {
-  //     method: 'POST',
-  //   });
-  // }
+  /**
+   * Stop an agent
+   * Note: 後端路徑為 /api/agent-execution/{agent_id}/stop
+   */
+  stopAgent(agentId) {
+    return this.request(`/api/agent-execution/${agentId}/stop`, {
+      method: 'POST',
+    });
+  }
 
   /**
    * Execute agent cycle
@@ -235,15 +234,35 @@ class APIClient {
 
   /**
    * Health check
+   * Note: 後端路徑為 /api/health
    */
   healthCheck() {
     return this.request('/api/health');
+  }
+
+  // ========== Market Data APIs ==========
+
+  /**
+   * Get market status
+   * Note: 後端路徑為 /api/trading/market/status
+   */
+  getMarketStatus() {
+    return this.request('/api/trading/market/status');
+  }
+
+  /**
+   * Get stock quote
+   * Note: 後端路徑為 /api/trading/market/quote/{ticker}
+   */
+  getStockQuote(ticker) {
+    return this.request(`/api/trading/market/quote/${ticker}`);
   }
 
   // ========== AI Models APIs ==========
 
   /**
    * Get available AI models
+   * Note: 後端路徑為 /api/models/available
    */
   getAvailableModels() {
     return this.request('/api/models/available');
@@ -251,6 +270,7 @@ class APIClient {
 
   /**
    * Get available AI models grouped
+   * Note: 後端路徑為 /api/models/available/grouped
    */
   getAvailableModelsGrouped() {
     return this.request('/api/models/available/grouped');
@@ -258,6 +278,7 @@ class APIClient {
 
   /**
    * Get specific AI model by key
+   * Note: 後端路徑為 /api/models/{model_key}
    */
   getModelByKey(modelKey) {
     return this.request(`/api/models/${modelKey}`);
@@ -265,6 +286,7 @@ class APIClient {
 
   /**
    * Get all AI models (including disabled)
+   * Note: 後端路徑為 /api/models/?include_disabled={true|false}
    */
   getAllModels(includeDisabled = false) {
     const params = new URLSearchParams({

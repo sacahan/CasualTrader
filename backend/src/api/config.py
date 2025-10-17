@@ -66,6 +66,11 @@ class Settings(BaseSettings):
         default=15, description="Default max turns for sub-agents"
     )
 
+    # Agent 循環執行配置
+    default_cycle_interval_minutes: int = Field(default=5, description="預設循環間隔（分鐘）")
+    skip_market_check: bool = Field(default=False, description="測試模式：跳過開市檢查")
+    agent_cycle_timeout: int = Field(default=600, description="單次循環超時（秒）")
+
     # WebSocket Settings
     ws_heartbeat_interval: int = Field(
         default=30, description="WebSocket heartbeat interval (seconds)"

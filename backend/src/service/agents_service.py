@@ -18,7 +18,13 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from ..database.models import Agent, Transaction, AgentHolding, AgentPerformance
+from ..database.models import (
+    Agent,
+    Transaction,
+    AgentHolding,
+    AgentPerformance,
+    AIModelConfig,
+)
 from ..common.enums import AgentMode, AgentStatus, TransactionAction, TransactionStatus
 
 logger = logging.getLogger(__name__)
@@ -140,9 +146,9 @@ class AgentsService:
             logger.error(f"Database error loading agent with holdings: {e}", exc_info=True)
             raise AgentDatabaseError(f"Failed to load agent with holdings: {str(e)}")
 
-    async def list_active_agents(self) -> list[Agent]:
+    async def list_agents(self) -> list[Agent]:
         """
-        取得所有 ACTIVE 狀態的 Agents
+        取得所有的 Agents
 
         Returns:
             Agent 列表
@@ -151,7 +157,7 @@ class AgentsService:
             AgentDatabaseError: 資料庫操作失敗
         """
         try:
-            stmt = select(Agent).where(Agent.status == AgentStatus.ACTIVE)
+            stmt = select(Agent)
             result = await self.session.execute(stmt)
             agents = list(result.scalars().all())
 
@@ -186,6 +192,107 @@ class AgentsService:
         except Exception as e:
             logger.error(f"Database error listing agents by status: {e}", exc_info=True)
             raise AgentDatabaseError(f"Failed to list agents by status: {str(e)}")
+
+    # ==========================================
+    # AI Model Operations
+    # ==========================================
+
+    async def list_ai_models(self, enabled_only: bool = True) -> list[dict[str, Any]]:
+        """
+        取得 AI 模型列表
+
+        Args:
+            enabled_only: 是否只返回已啟用的模型
+
+        Returns:
+            AI 模型配置列表（按 display_order 排序）
+
+        Raises:
+            AgentDatabaseError: 資料庫操作失敗
+        """
+        try:
+            stmt = select(AIModelConfig).order_by(AIModelConfig.display_order)
+
+            if enabled_only:
+                stmt = stmt.where(AIModelConfig.is_enabled)
+
+            result = await self.session.execute(stmt)
+            models = list(result.scalars().all())
+
+            # 轉換為字典格式
+            model_list = [
+                {
+                    "model_key": model.model_key,
+                    "display_name": model.display_name,
+                    "provider": model.provider,
+                    "group_name": model.group_name,
+                    "model_type": model.model_type,
+                    "litellm_prefix": model.litellm_prefix,
+                    "full_model_name": model.full_model_name,
+                    "max_tokens": model.max_tokens,
+                    "cost_per_1k_tokens": (
+                        float(model.cost_per_1k_tokens) if model.cost_per_1k_tokens else None
+                    ),
+                    "description": model.description,
+                    "display_order": model.display_order,
+                }
+                for model in models
+            ]
+
+            logger.info(f"Found {len(model_list)} AI models (enabled_only={enabled_only})")
+            return model_list
+
+        except Exception as e:
+            logger.error(f"Database error listing AI models: {e}", exc_info=True)
+            raise AgentDatabaseError(f"Failed to list AI models: {str(e)}")
+
+    async def get_ai_model_config(self, model_key: str) -> dict[str, Any] | None:
+        """
+        根據 model_key 取得 AI 模型配置
+
+        Args:
+            model_key: 模型唯一識別碼
+
+        Returns:
+            AI 模型配置字典，若不存在則返回 None
+
+        Raises:
+            AgentDatabaseError: 資料庫操作失敗
+        """
+        try:
+            stmt = select(AIModelConfig).where(
+                AIModelConfig.model_key == model_key, AIModelConfig.is_enabled
+            )
+            result = await self.session.execute(stmt)
+            model = result.scalar_one_or_none()
+
+            if not model:
+                logger.warning(f"AI model '{model_key}' not found or not enabled")
+                return None
+
+            # 轉換為字典格式
+            model_config = {
+                "model_key": model.model_key,
+                "display_name": model.display_name,
+                "provider": model.provider,
+                "group_name": model.group_name,
+                "model_type": model.model_type.value,
+                "litellm_prefix": model.litellm_prefix,
+                "full_model_name": model.full_model_name,
+                "max_tokens": model.max_tokens,
+                "cost_per_1k_tokens": (
+                    float(model.cost_per_1k_tokens) if model.cost_per_1k_tokens else None
+                ),
+                "description": model.description,
+                "display_order": model.display_order,
+            }
+
+            logger.info(f"Loaded AI model config: {model_key}")
+            return model_config
+
+        except Exception as e:
+            logger.error(f"Database error getting AI model config: {e}", exc_info=True)
+            raise AgentDatabaseError(f"Failed to get AI model config: {str(e)}")
 
     # ==========================================
     # Create Operations
@@ -374,9 +481,9 @@ class AgentsService:
                 total_amount=Decimal(str(total_amount)),
                 commission=Decimal(str(commission)),
                 status=status_enum,
-                execution_time=datetime.now()
-                if status_enum == TransactionStatus.COMPLETED
-                else None,
+                execution_time=(
+                    datetime.now() if status_enum == TransactionStatus.COMPLETED else None
+                ),
                 decision_reason=decision_reason,
             )
 

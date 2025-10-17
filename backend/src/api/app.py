@@ -14,15 +14,24 @@ from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from loguru import logger
 
-from .config import settings
+from ..service.agent_executor import AgentExecutor
+from .config import get_session_maker, settings
 from .docs import get_openapi_tags
 from .routers import agent_execution, agents, ai_models, trading, websocket_router
 from .websocket import websocket_manager
+
+# ==========================================
+# Global Agent Executor
+# ==========================================
+
+_executor: AgentExecutor | None = None
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """Application lifespan manager."""
+    global _executor
+
     # Startup
     logger.info("=" * 80)
     logger.info("🚀 CasualTrader API Server Starting...")
@@ -39,6 +48,20 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     await websocket_manager.startup()
     logger.success("WebSocket manager initialized successfully")
 
+    # Initialize Agent Executor
+    logger.info("Initializing Agent Executor...")
+    session_maker = get_session_maker()
+    # AgentExecutor 需要長期持有 session_maker 來創建 trading_service
+    # 而不是持有單個 TradingService 實例
+    _executor = AgentExecutor(
+        session_maker=session_maker,
+        websocket_manager=websocket_manager,
+        settings=settings,
+    )
+    logger.success("Agent Executor initialized successfully")
+    logger.info(f"Cycle interval: {settings.default_cycle_interval_minutes} minutes")
+    logger.info(f"Skip market check: {settings.skip_market_check}")
+
     logger.success("✅ CasualTrader API Server started successfully")
 
     yield
@@ -46,6 +69,13 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     # Shutdown
     logger.info("=" * 80)
     logger.info("⏹️ CasualTrader API Server Shutting Down...")
+
+    # Stop all running agents
+    if _executor:
+        logger.info("Stopping all running agents...")
+        await _executor.stop_all()
+        logger.success("All agents stopped successfully")
+
     logger.info("Closing WebSocket connections...")
     await websocket_manager.shutdown()
     logger.success("✅ CasualTrader API Server shut down successfully")
@@ -175,3 +205,33 @@ def create_app() -> FastAPI:
 
     logger.success("FastAPI application created successfully")
     return app
+
+
+# ==========================================
+# Dependency Injection
+# ==========================================
+
+
+def get_executor() -> AgentExecutor:
+    """
+    FastAPI dependency for Agent Executor.
+
+    Returns:
+        AgentExecutor: Global agent executor instance
+
+    Raises:
+        RuntimeError: If executor is not initialized
+
+    Example:
+        ```python
+        @router.post("/start")
+        async def start_agent(
+            agent_id: str,
+            executor: AgentExecutor = Depends(get_executor)
+        ):
+            await executor.start(agent_id)
+        ```
+    """
+    if _executor is None:
+        raise RuntimeError("Agent Executor not initialized")
+    return _executor

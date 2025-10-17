@@ -17,17 +17,6 @@ from pydantic import BaseModel, Field
 
 
 @dataclass
-class AutoAdjustSettings:
-    """Agent 自動調整設定"""
-
-    enabled: bool = True
-    triggers: str = "連續三天虧損超過2%; 單日跌幅超過3%; 最大回撤超過10%"
-    auto_apply: bool = True
-    max_adjustments_per_day: int = 3
-    min_hours_between_adjustments: int = 4
-
-
-@dataclass
 class TradingSettings:
     """交易相關設定"""
 
@@ -58,7 +47,6 @@ class AgentConfig:
     # 投資配置
     investment_preferences: list[str] = field(default_factory=list)
     trading_settings: TradingSettings = field(default_factory=TradingSettings)
-    auto_adjust: AutoAdjustSettings = field(default_factory=AutoAdjustSettings)
     max_position_size: int = 50  # 最大持倉比例 (%)
 
     # Agent 行為設定
@@ -144,9 +132,6 @@ class AgentCreationRequest(BaseModel):
 
     # 投資設定 (股票代碼列表)
     investment_preferences: list[str] = Field(default_factory=list)
-
-    # 自動調整設定 (可選)
-    auto_adjust: AutoAdjustSettings | None = None
 
     # 進階設定 (可選)
     max_position_size: float | None = Field(default=None, gt=0, le=100)

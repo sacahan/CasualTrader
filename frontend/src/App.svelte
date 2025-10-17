@@ -9,19 +9,15 @@
 
   import { onMount, onDestroy } from 'svelte';
   import { Navbar, NotificationToast } from './components/Layout/index.js';
-  import {
-    AgentCreationForm,
-    AgentCardSimple,
-    AgentDetailModal,
-  } from './components/Agent/index.js';
+  import { AgentCreationForm, AgentCard, AgentDetailModal } from './components/Agent/index.js';
   import { Button, Modal } from './components/UI/index.js';
   import {
     agents,
     selectedAgent,
     loading as agentsLoading,
     loadAgents,
-    // startAgent,  // TODO: 暫時註解，後端 API 已移除
-    // stopAgent,   // TODO: 暫時註解，後端 API 已移除
+    startAgent,
+    stopAgent,
     deleteAgent,
     updateAgent,
     selectAgent,
@@ -85,24 +81,23 @@
     showDetailModal = true;
   }
 
-  // TODO: 暫時註解，後端 API 已移除，未來需重新實現
-  // async function handleStartAgent(agent) {
-  //   try {
-  //     await startAgent(agent.agent_id);
-  //     notifySuccess(`Agent ${agent.name} 已啟動`);
-  //   } catch (error) {
-  //     notifyError(`啟動失敗: ${error.message}`);
-  //   }
-  // }
+  async function handleStartAgent(agent) {
+    try {
+      await startAgent(agent.agent_id);
+      notifySuccess(`Agent ${agent.name} 已啟動`);
+    } catch (error) {
+      notifyError(`啟動失敗: ${error.message}`);
+    }
+  }
 
-  // async function handleStopAgent(agent) {
-  //   try {
-  //     await stopAgent(agent.agent_id);
-  //     notifySuccess(`Agent ${agent.name} 已停止`);
-  //   } catch (error) {
-  //     notifyError(`停止失敗: ${error.message}`);
-  //   }
-  // }
+  async function handleStopAgent(agent) {
+    try {
+      await stopAgent(agent.agent_id);
+      notifySuccess(`Agent ${agent.name} 已停止`);
+    } catch (error) {
+      notifyError(`停止失敗: ${error.message}`);
+    }
+  }
 
   async function handleEditAgent(agent) {
     editingAgent = agent;
@@ -240,17 +235,15 @@
     {:else}
       <div class="grid grid-cols-1 gap-8 md:grid-cols-2 xl:grid-cols-2">
         {#each $agents as agent (agent.agent_id)}
-          <AgentCardSimple
+          <AgentCard
             {agent}
-            performanceData={agentPerformanceData[agent.agent_id] || []}
-            holdings={agentHoldings[agent.agent_id] || []}
             onclick={handleAgentSelect}
-            onedit={handleEditAgent}
             ondelete={handleDeleteAgent}
+            onstart={handleStartAgent}
+            onstop={handleStopAgent}
           />
-          <!-- TODO: 暫時移除 onstart 和 onstop props，待後端 API 重新實現 -->
-          <!-- onstart={handleStartAgent} -->
-          <!-- onstop={handleStopAgent} -->
+          <!-- 注意: performanceData 和 holdings 在詳細模態中使用 -->
+          <!-- 注意: 編輯功能通過詳細模態提供 -->
         {/each}
       </div>
     {/if}

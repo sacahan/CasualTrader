@@ -82,8 +82,13 @@ class Agent(Base):
     )  # RGB 格式，預設綠色
 
     # 投資配置
-    initial_funds: Mapped[Decimal] = mapped_column(Numeric(15, 2), nullable=False)
-    max_position_size: Mapped[Decimal] = mapped_column(Numeric(5, 2), default=Decimal("5.0"))
+    initial_funds: Mapped[Decimal] = mapped_column(
+        Numeric(15, 2), nullable=False, default=Decimal("0")
+    )
+    current_funds: Mapped[Decimal] = mapped_column(
+        Numeric(15, 2), nullable=False, default=Decimal("0")
+    )
+    max_position_size: Mapped[Decimal] = mapped_column(Numeric(5, 2), default=Decimal("50.0"))
 
     # Agent 狀態 (使用統一的 Enum)
     status: Mapped[AgentStatus] = mapped_column(String(20), default=AgentStatus.INACTIVE)

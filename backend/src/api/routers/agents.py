@@ -73,7 +73,7 @@ async def list_agents(
         logger.info("Listing all agents")
 
         # 獲取所有活躍的 agents
-        agents = await agents_service.list_active_agents()
+        agents = await agents_service.list_agents()
 
         # 轉換為字典格式
         result = []
@@ -90,7 +90,7 @@ async def list_agents(
                     else agent.current_mode
                 ),
                 "initial_funds": float(agent.initial_funds),
-                "current_funds": float(agent.current_funds) if agent.current_funds else None,
+                "current_funds": float(agent.current_funds),
                 "color_theme": agent.color_theme,
                 "created_at": agent.created_at.isoformat() if agent.created_at else None,
                 "updated_at": agent.updated_at.isoformat() if agent.updated_at else None,
