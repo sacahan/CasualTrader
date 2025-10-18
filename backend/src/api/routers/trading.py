@@ -6,6 +6,7 @@ Trading API Router
 
 from __future__ import annotations
 
+import os
 from datetime import datetime
 from typing import Any
 
@@ -20,6 +21,12 @@ from service.agents_service import (
 from api.config import get_db_session
 from api.holiday_client import TaiwanHolidayAPIClient
 from api.mcp_client import create_mcp_market_client
+from dotenv import load_dotenv
+
+load_dotenv(override=True)
+
+# 掠過市場檢查（用於測試環境）
+SKIP_MARKET_CHECK = os.getenv("SKIP_MARKET_CHECK", False) == "true"
 
 router = APIRouter(prefix="/api/trading", tags=["trading"])
 
@@ -503,7 +510,7 @@ async def get_market_status():
             holiday_name = holiday_info.name if holiday_info else None
 
             # 檢查是否為交易日
-            is_trading = await holiday_client.is_trading_day(today)
+            is_trading = SKIP_MARKET_CHECK or await holiday_client.is_trading_day(today)
 
             # 簡化版開盤判斷：交易日即視為開盤
             # 實際應該還要檢查當前時間是否在 09:00-13:30 之間
@@ -511,7 +518,7 @@ async def get_market_status():
             market_open_time = datetime.strptime("09:00", "%H:%M").time()
             market_close_time = datetime.strptime("13:30", "%H:%M").time()
 
-            is_open = (
+            is_open = SKIP_MARKET_CHECK or (
                 is_trading
                 and current_time >= market_open_time
                 and current_time <= market_close_time

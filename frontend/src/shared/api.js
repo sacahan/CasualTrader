@@ -258,6 +258,22 @@ class APIClient {
     return this.request(`/api/trading/market/quote/${ticker}`);
   }
 
+  /**
+   * Get market indices
+   * Note: 後端路徑為 /api/trading/market/indices
+   * @param {string} category - 指數類別 (major/sector/theme/all)
+   * @param {number} count - 顯示數量
+   * @param {string} format - 顯示格式 (detailed/simple)
+   */
+  getMarketIndices(category = 'major', count = 20, format = 'detailed') {
+    const params = new URLSearchParams({
+      category,
+      count: String(count),
+      format,
+    });
+    return this.request(`/api/trading/market/indices?${params}`);
+  }
+
   // ========== AI Models APIs ==========
 
   /**

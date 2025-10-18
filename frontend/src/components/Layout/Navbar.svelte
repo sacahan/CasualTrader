@@ -6,7 +6,7 @@
    */
 
   import { connected } from '../../stores/websocket.js';
-  import { isOpen } from '../../stores/market.js';
+  import { isOpen, twseIndex } from '../../stores/market.js';
   import { theme, toggleTheme } from '../../stores/theme.js';
 
   /**
@@ -38,6 +38,48 @@
 
       <!-- Status Indicators & Actions -->
       <div class="flex items-center gap-4">
+        <!-- TWSE Index -->
+        {#if $twseIndex}
+          <div class="flex items-center gap-2 border-r border-gray-600 pr-4">
+            <svg
+              class="h-4 w-4 text-gray-400"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                d="M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4h16v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4z"
+              />
+            </svg>
+            <div class="flex flex-col">
+              <span class="text-xs text-gray-400">大盤指數</span>
+              <div class="flex items-center gap-2">
+                <span
+                  class="text-sm font-semibold {$twseIndex.change_percent >= 0
+                    ? 'text-red-400'
+                    : 'text-green-400'}"
+                >
+                  {$twseIndex.current_value?.toLocaleString('zh-TW', {
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2,
+                  }) || '--'}
+                </span>
+                <span
+                  class="text-xs {$twseIndex.change_percent >= 0
+                    ? 'text-red-400'
+                    : 'text-green-400'}"
+                >
+                  {$twseIndex.change_percent >= 0 ? '▲' : '▼'}
+                  {Math.abs($twseIndex.change_percent || 0).toFixed(2)}%
+                </span>
+              </div>
+            </div>
+          </div>
+        {/if}
+
         <!-- Market Status -->
         <div class="flex items-center gap-2">
           <div class="status-dot {$isOpen ? 'status-running' : 'bg-gray-500'}"></div>

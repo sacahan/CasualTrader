@@ -28,23 +28,41 @@ export const error = writable(null);
 // 完全依賴後端 API 的市場狀態判斷（包含節假日偵測）
 export const isOpen = derived(marketStatus, ($marketStatus) => {
   if (!$marketStatus) return false;
-  return $marketStatus.is_trading_hours || false;
+  return $marketStatus.is_open || false;
 });
 
 // 衍生 store: 市場狀態描述
 export const marketStatusText = derived(marketStatus, ($marketStatus) => {
   if (!$marketStatus) return '載入中...';
 
-  const statusMap = {
-    open: '開盤中',
-    pre_market: '盤前',
-    after_market: '盤後',
-    closed: '休市',
-    weekend: '週末休市',
-    holiday: `休市 - ${$marketStatus.holiday_name || '國定假日'}`,
-  };
+  // 根據後端 API 實際回傳的欄位判斷狀態
+  if ($marketStatus.is_holiday) {
+    return `休市 - ${$marketStatus.holiday_name || '國定假日'}`;
+  }
 
-  return statusMap[$marketStatus.status] || '未知狀態';
+  if ($marketStatus.is_weekend) {
+    return '週末休市';
+  }
+
+  if (!$marketStatus.is_trading_day) {
+    return '休市';
+  }
+
+  if ($marketStatus.is_open) {
+    return '開盤中';
+  }
+
+  // 是交易日但未開盤，判斷是盤前還是盤後
+  const currentTime = $marketStatus.current_time || '';
+  if (currentTime && currentTime < '09:00:00') {
+    return '盤前';
+  }
+
+  if (currentTime && currentTime > '13:30:00') {
+    return '盤後';
+  }
+
+  return '休市';
 });
 
 // 衍生 store: 是否為節假日
@@ -57,6 +75,25 @@ export const isHoliday = derived(marketStatus, ($marketStatus) => {
 export const isTradingDay = derived(marketStatus, ($marketStatus) => {
   if (!$marketStatus) return false;
   return $marketStatus.is_trading_day || false;
+});
+
+// 衍生 store: 發行量加權指數（大盤指數）
+export const twseIndex = derived(marketIndices, ($marketIndices) => {
+  if (!$marketIndices || $marketIndices.length === 0) return null;
+
+  // 從指數列表中找到"發行量加權股價指數"
+  const index = $marketIndices.find((idx) => idx['指數'] === '發行量加權股價指數');
+
+  if (!index) return null;
+
+  // 將資料轉換為前端易用的格式
+  return {
+    index_name: index['指數'],
+    current_value: parseFloat(index['收盤指數']),
+    change: index['漲跌'] === '+' ? parseFloat(index['漲跌點數']) : -parseFloat(index['漲跌點數']),
+    change_percent: parseFloat(index['漲跌百分比']),
+    date: index['日期'],
+  };
 });
 
 /**
@@ -87,9 +124,11 @@ export async function loadMarketIndices() {
   error.set(null);
 
   try {
-    const data = await apiClient.getMarketIndices();
-    marketIndices.set(data.indices || []);
-    return data;
+    const result = await apiClient.getMarketIndices();
+    // 後端回傳格式: { success: true, data: { indices: [...] }, tool: "index_info" }
+    const indices = result.data?.indices || [];
+    marketIndices.set(indices);
+    return result;
   } catch (err) {
     error.set(extractErrorMessage(err));
     console.error('Failed to load market indices:', err);
@@ -144,10 +183,11 @@ export async function loadStockQuotes(tickers) {
  * 從快取中取得股票報價
  */
 export function getCachedQuote(ticker) {
-  let quotes;
-  stockQuotes.subscribe((value) => {
+  let quotes = {};
+  const unsubscribe = stockQuotes.subscribe((value) => {
     quotes = value;
-  })();
+  });
+  unsubscribe();
   return quotes[ticker] || null;
 }
 
@@ -172,14 +212,12 @@ export function clearError() {
 export function startMarketDataPolling(interval = 30000) {
   // 立即載入一次
   loadMarketStatus();
-  // TODO: 後端尚未實作 market indices 端點
-  // loadMarketIndices();
+  loadMarketIndices();
 
   // 設定定時刷新
   const timerId = setInterval(() => {
     loadMarketStatus();
-    // TODO: 後端尚未實作 market indices 端點
-    // loadMarketIndices();
+    loadMarketIndices();
   }, interval);
 
   // 返回停止函數
