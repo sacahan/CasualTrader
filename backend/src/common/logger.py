@@ -22,6 +22,24 @@ from loguru import logger
 # ==========================================
 
 
+def _filter_noisy_loggers(record):
+    """
+    過濾掉不需要的第三方庫日誌
+
+    Returns:
+        bool: True 表示保留日誌，False 表示過濾掉
+    """
+    # 過濾掉 aiosqlite 的 DEBUG 日誌
+    if record["name"].startswith("aiosqlite") and record["level"].name == "DEBUG":
+        return False
+
+    # 過濾掉 sqlite3 相關的 DEBUG 日誌
+    if "sqlite" in record["name"].lower() and record["level"].name == "DEBUG":
+        return False
+
+    return True
+
+
 def setup_logger(
     log_level: str = "INFO",
     log_file: Path | None = None,
@@ -54,6 +72,7 @@ def setup_logger(
             colorize=True,
             backtrace=True,
             diagnose=True,
+            filter=_filter_noisy_loggers,  # 添加過濾器
         )
 
     # File handler - JSON 格式
@@ -71,6 +90,7 @@ def setup_logger(
             backtrace=True,
             diagnose=True,
             enqueue=True,  # 非同步寫入
+            filter=_filter_noisy_loggers,  # 添加過濾器
         )
 
     logger.info(f"Logger initialized with level: {log_level}")
@@ -110,6 +130,9 @@ def intercept_standard_logging() -> None:
     # 攔截第三方套件的 logger
     for name in ["uvicorn", "uvicorn.error", "uvicorn.access", "fastapi", "sqlalchemy"]:
         logging.getLogger(name).handlers = [InterceptHandler()]
+
+    # 提高 aiosqlite 的日誌級別，避免過多的 DEBUG 訊息
+    logging.getLogger("aiosqlite").setLevel(logging.WARNING)
 
 
 # ==========================================

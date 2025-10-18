@@ -337,7 +337,17 @@ class AgentExecutor:
                 )
 
             except Exception as e:
-                logger.error(f"執行 {mode.value} 階段失敗 - Agent {agent_id}: {e}", exc_info=True)
+                logger.error(
+                    f"執行 {mode.value} 階段失敗 - Agent {agent_id}: {e}",
+                    exc_info=False,  # 改為 False 避免過多堆疊資訊
+                )
+
+                # 記錄詳細錯誤資訊以便診斷
+                if "is currently executing session" in str(e):
+                    logger.warning(
+                        f"階段 {mode.value} 被跳過 - Agent {agent_id} 有其他 session 正在執行中"
+                    )
+
                 # 繼續執行下一階段，不中斷整個循環
 
         # 清除當前階段標記

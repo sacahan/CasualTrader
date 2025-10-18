@@ -119,6 +119,12 @@ class TradingService:
                 agent_id, status=SessionStatus.RUNNING
             )
             if latest_session:
+                logger.warning(
+                    f"Agent {agent_id} is busy - Found RUNNING session: {latest_session.id}, "
+                    f"started at: {latest_session.start_time}, "
+                    f"current time: {datetime.now()}, "
+                    f"duration: {(datetime.now() - latest_session.start_time).total_seconds()}s"
+                )
                 raise AgentBusyError(
                     f"Agent {agent_id} is currently executing session {latest_session.id}"
                 )
@@ -136,12 +142,15 @@ class TradingService:
 
             # 4. 更新會話狀態為 RUNNING
             await self.session_service.update_session_status(session_id, SessionStatus.RUNNING)
+            logger.debug(f"Session {session_id} status updated to RUNNING")
 
             # 5. 取得或創建 TradingAgent 實例
             trading_agent = await self._get_or_create_agent(agent_id, agent_config)
 
             # 6. 執行任務 (max_turns 已移至 Runner.run() 中指定)
+            logger.info(f"Starting agent execution - session: {session_id}, mode: {execution_mode}")
             result = await trading_agent.run(mode=execution_mode, context=context)
+            logger.info(f"Agent execution completed - session: {session_id}")
 
             # 7. 計算執行時間
             end_time = datetime.now()
@@ -161,6 +170,7 @@ class TradingService:
                 end_time=end_time,
                 execution_time_ms=execution_time_ms,
             )
+            logger.debug(f"Session {session_id} status updated to COMPLETED")
 
             # 10. 記錄追蹤資訊
             if result.get("trace_id"):
@@ -185,7 +195,10 @@ class TradingService:
         except AgentNotFoundError:
             raise
         except Exception as e:
-            logger.error(f"Task execution failed for agent {agent_id}: {e}", exc_info=True)
+            logger.error(
+                f"Task execution failed for agent {agent_id}, session {session_id}: {e}",
+                exc_info=True,
+            )
 
             # 更新會話為失敗狀態
             if session_id:
@@ -199,8 +212,12 @@ class TradingService:
                         execution_time_ms=execution_time_ms,
                         error_message=str(e),
                     )
+                    logger.info(f"Session {session_id} marked as FAILED due to exception")
                 except Exception as update_error:
-                    logger.error(f"Failed to update session status: {update_error}")
+                    logger.error(
+                        f"Failed to update session {session_id} to FAILED status: {update_error}",
+                        exc_info=True,
+                    )
 
             raise TradingServiceError(f"Task execution failed: {str(e)}")
 
@@ -399,6 +416,100 @@ class TradingService:
         except Exception as e:
             logger.error(f"Failed to get statistics for agent {agent_id}: {e}", exc_info=True)
             raise TradingServiceError(f"Failed to get agent statistics: {str(e)}")
+
+    async def cleanup_stuck_sessions(
+        self, agent_id: str, timeout_minutes: int = 30
+    ) -> dict[str, Any]:
+        """
+        清理卡住的 RUNNING 會話
+
+        Args:
+            agent_id: Agent ID
+            timeout_minutes: 超時時間（分鐘），預設 30 分鐘
+
+        Returns:
+            清理結果：
+            {
+                "success": bool,
+                "agent_id": str,
+                "cleaned_sessions": list[str],
+                "count": int
+            }
+
+        Raises:
+            AgentNotFoundError: Agent 不存在
+            TradingServiceError: 清理失敗
+        """
+        try:
+            # 1. 驗證 Agent 存在
+            await self.agents_service.get_agent_config(agent_id)
+
+            # 2. 清理卡住的 session
+            cleaned_ids = await self.session_service.cleanup_stuck_sessions(
+                agent_id, timeout_minutes
+            )
+
+            return {
+                "success": True,
+                "agent_id": agent_id,
+                "cleaned_sessions": cleaned_ids,
+                "count": len(cleaned_ids),
+            }
+
+        except AgentNotFoundError:
+            raise
+        except Exception as e:
+            logger.error(
+                f"Failed to cleanup stuck sessions for agent {agent_id}: {e}", exc_info=True
+            )
+            raise TradingServiceError(f"Failed to get agent statistics: {str(e)}")
+
+    async def abort_running_sessions(
+        self, agent_id: str, reason: str = "Manually aborted"
+    ) -> dict[str, Any]:
+        """
+        強制中斷正在執行的會話
+
+        立即終止所有正在執行的 session，用於手動中斷
+
+        Args:
+            agent_id: Agent ID
+            reason: 中斷原因
+
+        Returns:
+            中斷結果：
+            {
+                "success": bool,
+                "agent_id": str,
+                "aborted_sessions": list[str],
+                "count": int
+            }
+
+        Raises:
+            AgentNotFoundError: Agent 不存在
+            TradingServiceError: 中斷失敗
+        """
+        try:
+            # 1. 驗證 Agent 存在
+            await self.agents_service.get_agent_config(agent_id)
+
+            # 2. 強制中斷所有 RUNNING session
+            aborted_ids = await self.session_service.abort_running_sessions(agent_id, reason)
+
+            return {
+                "success": True,
+                "agent_id": agent_id,
+                "aborted_sessions": aborted_ids,
+                "count": len(aborted_ids),
+            }
+
+        except AgentNotFoundError:
+            raise
+        except Exception as e:
+            logger.error(
+                f"Failed to abort running sessions for agent {agent_id}: {e}", exc_info=True
+            )
+            raise TradingServiceError(f"Failed to abort running sessions: {str(e)}")
 
     async def _get_or_create_agent(
         self, agent_id: str, agent_config: Agent | None = None

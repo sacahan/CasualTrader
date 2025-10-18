@@ -24,6 +24,10 @@ from service.trading_service import (
 )
 from api.config import get_db_session
 
+from ..app import get_executor
+from ..config import settings
+from service.agent_executor import NotRunningError, AlreadyRunningError
+
 router = APIRouter()
 
 
@@ -298,9 +302,6 @@ async def start_agent(
         409: Agent 已在運行中
         500: 啟動失敗
     """
-    from ..app import get_executor
-    from ..config import settings
-    from service.agent_executor import AlreadyRunningError
 
     executor = get_executor()
 
@@ -347,35 +348,62 @@ async def start_agent(
     "/{agent_id}/stop",
     response_model=StartStopResponse,
     status_code=status.HTTP_200_OK,
-    summary="停止 Agent 循環執行",
-    description="停止 Agent 循環執行",
+    summary="停止 Agent",
+    description="""
+    完整停止 Agent 的所有活動：
+    1. 停止循環執行排程器
+    2. 強制中斷所有正在執行的 session
+    3. 清理卡住的 session
+
+    使用者只需要呼叫這個端點就能完全停止 Agent。
+    """,
 )
 async def stop_agent(
     agent_id: str,
+    trading_service: TradingService = Depends(get_trading_service),
 ):
     """
-    停止 Agent 循環執行
+    停止 Agent（包含清理所有執行中的 session）
 
     Args:
         agent_id: Agent ID
+        trading_service: TradingService 實例
 
     Returns:
         停止結果
 
     Raises:
-        404: Agent 未在運行中
+        404: Agent 不存在
         500: 停止失敗
     """
-    from ..app import get_executor
-    from service.agent_executor import NotRunningError
 
     executor = get_executor()
 
     try:
-        logger.info(f"Stopping agent {agent_id}")
+        logger.info(f"Stopping agent {agent_id} (including all running sessions)")
 
-        # 停止循環執行
-        await executor.stop(agent_id)
+        # 1. 停止循環執行排程器
+        try:
+            await executor.stop(agent_id)
+            logger.info(f"Stopped executor for agent {agent_id}")
+        except NotRunningError:
+            logger.info(f"Executor already stopped for agent {agent_id}")
+
+        # 2. 強制中斷所有執行中的 session
+        abort_result = await trading_service.abort_running_sessions(
+            agent_id, reason="Agent stopped by user"
+        )
+        if abort_result["count"] > 0:
+            logger.info(
+                f"Aborted {abort_result['count']} running sessions: {abort_result['aborted_sessions']}"
+            )
+
+        # 3. 清理超時卡住的 session（預設 5 分鐘）
+        cleanup_result = await trading_service.cleanup_stuck_sessions(agent_id, timeout_minutes=5)
+        if cleanup_result["count"] > 0:
+            logger.info(
+                f"Cleaned up {cleanup_result['count']} stuck sessions: {cleanup_result['cleaned_sessions']}"
+            )
 
         return StartStopResponse(
             success=True,
@@ -383,11 +411,11 @@ async def stop_agent(
             status="stopped",
         )
 
-    except NotRunningError as e:
-        logger.warning(f"Agent not running: {agent_id}")
+    except AgentNotFoundError as e:
+        logger.warning(f"Agent not found: {agent_id}")
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=str(e),
+            detail=f"Agent {agent_id} not found",
         ) from e
 
     except Exception as e:
@@ -423,7 +451,6 @@ async def get_agent_status(
         404: Agent 不存在
         500: 查詢失敗
     """
-    from ..app import get_executor
 
     try:
         logger.debug(f"Getting status for agent {agent_id}")

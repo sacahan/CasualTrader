@@ -337,6 +337,130 @@ class AgentSessionService:
             logger.error(f"Failed to get latest session for agent {agent_id}: {e}", exc_info=True)
             raise SessionError(f"Failed to get latest session: {str(e)}")
 
+    async def abort_running_sessions(
+        self, agent_id: str, reason: str = "Manually aborted"
+    ) -> list[str]:
+        """
+        強制中斷所有正在執行的 RUNNING 會話
+
+        立即將所有 RUNNING 狀態的 session 標記為 FAILED，
+        用於手動中斷正在執行中的 session
+
+        Args:
+            agent_id: Agent ID
+            reason: 中斷原因
+
+        Returns:
+            被中斷的 session ID 列表
+        """
+        try:
+            # 查詢所有 RUNNING 狀態的 session（不管執行多久）
+            stmt = (
+                select(AgentSession)
+                .where(AgentSession.agent_id == agent_id)
+                .where(AgentSession.status == SessionStatus.RUNNING)
+            )
+
+            result = await self.db_session.execute(stmt)
+            running_sessions = list(result.scalars().all())
+
+            aborted_ids = []
+            for session in running_sessions:
+                duration = (datetime.now() - session.start_time).total_seconds()
+                logger.warning(
+                    f"Aborting running session {session.id} "
+                    f"(was running for {duration:.0f}s) - Reason: {reason}"
+                )
+
+                # 標記為 FAILED
+                session.status = SessionStatus.FAILED
+                session.end_time = datetime.now()
+                session.execution_time_ms = int(duration * 1000)
+                session.error_message = f"Aborted: {reason}"
+
+                aborted_ids.append(session.id)
+
+            if aborted_ids:
+                await self.db_session.commit()
+                logger.info(
+                    f"Aborted {len(aborted_ids)} running sessions for agent {agent_id}: {aborted_ids}"
+                )
+            else:
+                logger.debug(f"No running sessions found for agent {agent_id}")
+
+            return aborted_ids
+
+        except Exception as e:
+            await self.db_session.rollback()
+            logger.error(
+                f"Failed to abort running sessions for agent {agent_id}: {e}", exc_info=True
+            )
+            raise SessionError(f"Failed to abort running sessions: {str(e)}")
+
+    async def cleanup_stuck_sessions(self, agent_id: str, timeout_minutes: int = 30) -> list[str]:
+        """
+        清理卡住的 RUNNING 會話（超時的）
+
+        將執行時間超過 timeout_minutes 的 RUNNING session 標記為 FAILED
+        這是一個自動清理機制，用於處理異常卡住的 session
+
+        Args:
+            agent_id: Agent ID
+            timeout_minutes: 超時時間（分鐘）
+
+        Returns:
+            被清理的 session ID 列表
+        """
+        try:
+            from datetime import timedelta
+
+            # 計算超時時間點
+            timeout_threshold = datetime.now() - timedelta(minutes=timeout_minutes)
+
+            # 查詢所有 RUNNING 狀態的 session
+            stmt = (
+                select(AgentSession)
+                .where(AgentSession.agent_id == agent_id)
+                .where(AgentSession.status == SessionStatus.RUNNING)
+                .where(AgentSession.start_time < timeout_threshold)
+            )
+
+            result = await self.db_session.execute(stmt)
+            stuck_sessions = list(result.scalars().all())
+
+            cleaned_ids = []
+            for session in stuck_sessions:
+                duration = (datetime.now() - session.start_time).total_seconds()
+                logger.warning(
+                    f"Cleaning up stuck session {session.id} "
+                    f"(running for {duration:.0f}s, timeout: {timeout_minutes * 60}s)"
+                )
+
+                # 標記為 FAILED
+                session.status = SessionStatus.FAILED
+                session.end_time = datetime.now()
+                session.execution_time_ms = int(duration * 1000)
+                session.error_message = f"Session timeout after {timeout_minutes} minutes"
+
+                cleaned_ids.append(session.id)
+
+            if cleaned_ids:
+                await self.db_session.commit()
+                logger.info(
+                    f"Cleaned up {len(cleaned_ids)} stuck sessions for agent {agent_id}: {cleaned_ids}"
+                )
+            else:
+                logger.debug(f"No stuck sessions found for agent {agent_id}")
+
+            return cleaned_ids
+
+        except Exception as e:
+            await self.db_session.rollback()
+            logger.error(
+                f"Failed to cleanup stuck sessions for agent {agent_id}: {e}", exc_info=True
+            )
+            raise SessionError(f"Failed to cleanup stuck sessions: {str(e)}")
+
     async def count_agent_sessions(self, agent_id: str, status: SessionStatus | None = None) -> int:
         """
         計算 Agent 的會話數量
