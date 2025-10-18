@@ -19,19 +19,12 @@ from api.config import get_session_maker, settings
 from api.docs import get_openapi_tags
 from api.routers import agent_execution, agents, ai_models, trading, websocket_router
 from api.websocket import websocket_manager
-
-# ==========================================
-# Global Agent Executor
-# ==========================================
-
-_executor: AgentExecutor | None = None
+from api import dependencies
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """Application lifespan manager."""
-    global _executor
-
     # Setup logger first
     log_level = "DEBUG" if settings.debug else "INFO"
     log_file = Path(__file__).parent.parent.parent / "logs" / "casualtrader.log"
@@ -58,11 +51,13 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     session_maker = get_session_maker()
     # AgentExecutor 需要長期持有 session_maker 來創建 trading_service
     # 而不是持有單個 TradingService 實例
-    _executor = AgentExecutor(
+    executor = AgentExecutor(
         session_maker=session_maker,
         websocket_manager=websocket_manager,
         settings=settings,
     )
+    # Set the global executor in dependencies module
+    dependencies.set_executor(executor)
     logger.success("Agent Executor initialized successfully")
     logger.info(f"Cycle interval: {settings.default_cycle_interval_minutes} minutes")
     logger.info(f"Skip market check: {settings.skip_market_check}")
@@ -76,13 +71,12 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     logger.info("⏹️ CasualTrader API Server Shutting Down...")
 
     # Stop all running agents
-    if _executor:
-        try:
-            logger.info("Stopping all running agents...")
-            await _executor.stop_all()
-            logger.success("All agents stopped successfully")
-        except Exception as e:
-            logger.error(f"Error stopping agents: {e}")
+    try:
+        logger.info("Stopping all running agents...")
+        await executor.stop_all()
+        logger.success("All agents stopped successfully")
+    except Exception as e:
+        logger.error(f"Error stopping agents: {e}")
 
     # Close WebSocket connections
     try:
@@ -219,33 +213,3 @@ def create_app() -> FastAPI:
 
     logger.success("FastAPI application created successfully")
     return app
-
-
-# ==========================================
-# Dependency Injection
-# ==========================================
-
-
-def get_executor() -> AgentExecutor:
-    """
-    FastAPI dependency for Agent Executor.
-
-    Returns:
-        AgentExecutor: Global agent executor instance
-
-    Raises:
-        RuntimeError: If executor is not initialized
-
-    Example:
-        ```python
-        @router.post("/start")
-        async def start_agent(
-            agent_id: str,
-            executor: AgentExecutor = Depends(get_executor)
-        ):
-            await executor.start(agent_id)
-        ```
-    """
-    if _executor is None:
-        raise RuntimeError("Agent Executor not initialized")
-    return _executor

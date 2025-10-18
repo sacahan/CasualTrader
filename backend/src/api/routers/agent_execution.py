@@ -23,10 +23,9 @@ from service.trading_service import (
     TradingServiceError,
 )
 from api.config import get_db_session
-
-from ..app import get_executor
+from api.dependencies import get_executor
 from ..config import settings
-from service.agent_executor import NotRunningError, AlreadyRunningError
+from service.agent_executor import NotRunningError, AlreadyRunningError, AgentExecutor
 
 router = APIRouter()
 
@@ -286,6 +285,7 @@ async def execute_agent_task(
 async def start_agent(
     agent_id: str,
     interval_minutes: int | None = None,
+    executor: AgentExecutor = Depends(get_executor),
 ):
     """
     啟動 Agent 循環執行
@@ -293,6 +293,7 @@ async def start_agent(
     Args:
         agent_id: Agent ID
         interval_minutes: 循環間隔（分鐘），未指定時使用設定檔的預設值
+        executor: Agent executor (injected)
 
     Returns:
         啟動結果
@@ -302,8 +303,6 @@ async def start_agent(
         409: Agent 已在運行中
         500: 啟動失敗
     """
-
-    executor = get_executor()
 
     # 如果未指定間隔，使用設定檔的預設值
     if interval_minutes is None:
@@ -361,6 +360,7 @@ async def start_agent(
 async def stop_agent(
     agent_id: str,
     trading_service: TradingService = Depends(get_trading_service),
+    executor: AgentExecutor = Depends(get_executor),
 ):
     """
     停止 Agent（包含清理所有執行中的 session）
@@ -368,6 +368,7 @@ async def stop_agent(
     Args:
         agent_id: Agent ID
         trading_service: TradingService 實例
+        executor: Agent executor (injected)
 
     Returns:
         停止結果
@@ -376,8 +377,6 @@ async def stop_agent(
         404: Agent 不存在
         500: 停止失敗
     """
-
-    executor = get_executor()
 
     try:
         logger.info(f"Stopping agent {agent_id} (including all running sessions)")
@@ -436,6 +435,7 @@ async def stop_agent(
 async def get_agent_status(
     agent_id: str,
     trading_service: TradingService = Depends(get_trading_service),
+    executor: AgentExecutor = Depends(get_executor),
 ):
     """
     取得 Agent 狀態
@@ -443,6 +443,7 @@ async def get_agent_status(
     Args:
         agent_id: Agent ID
         trading_service: TradingService 實例
+        executor: Agent executor (injected)
 
     Returns:
         Agent 狀態（包含運行時狀態）
@@ -459,7 +460,6 @@ async def get_agent_status(
         status_data = await trading_service.get_agent_status(agent_id)
 
         # 從 executor 取得運行時狀態
-        executor = get_executor()
         runtime_status = executor.get_status(agent_id)
 
         # 合併狀態
