@@ -1,0 +1,43 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "Sync Backend Dependencies",
+            "type": "shell",
+            "command": "uv sync",
+            "options": {
+                "cwd": "${workspaceFolder}/backend"
+            },
+            "problemMatcher": [],
+            "presentation": {
+                "reveal": "silent",
+                "panel": "shared"
+            }
+        },
+        {
+            "label": "Install Frontend Dependencies",
+            "type": "shell",
+            "command": "npm install",
+            "options": {
+                "cwd": "${workspaceFolder}/frontend"
+            },
+            "problemMatcher": [],
+            "presentation": {
+                "reveal": "silent",
+                "panel": "shared"
+            }
+        },
+        {
+            "label": "Kill Port 8000",
+            "type": "shell",
+            "command": "lsof -ti:8000 | xargs kill -9 || true",
+            "problemMatcher": []
+        },
+        {
+            "label": "Kill Port 5173",
+            "type": "shell",
+            "command": "lsof -ti:5173 | xargs kill -9 || true",
+            "problemMatcher": []
+        }
+    ]
+}

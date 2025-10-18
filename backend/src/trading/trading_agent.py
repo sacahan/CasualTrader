@@ -26,6 +26,7 @@ try:
         CodeInterpreterTool,
     )
     from agents.mcp import MCPServerStdio
+    from openai.types.beta.assistant import ToolResourcesCodeInterpreter
 except ImportError as e:
     from common.logger import logger
 
@@ -54,7 +55,7 @@ load_dotenv()
 
 # 預設配置
 DEFAULT_MODEL = os.getenv("DEFAULT_AI_MODEL", "gpt-5-mini")
-DEFAULT_MAX_TURNS = os.getenv("DEFAULT_MAX_TURNS", 30)
+DEFAULT_MAX_TURNS = int(os.getenv("DEFAULT_MAX_TURNS", "30"))
 DEFAULT_AGENT_TIMEOUT = os.getenv("DEFAULT_AGENT_TIMEOUT", 300)  # 秒
 DEFAULT_TEMPERATURE = os.getenv("DEFAULT_MODEL_TEMPERATURE", 0.7)
 
@@ -169,6 +170,7 @@ class TradingAgent:
             all_tools = self.openai_tools + self.trading_tools + self.subagent_tools
 
             # 6. 創建 OpenAI Agent
+            # Note: max_turns 已從 Agent.__init__() 移除，現在在 Runner.run() 中指定
             self.agent = Agent(
                 name=self.agent_id,
                 model=self.agent_config.ai_model or DEFAULT_MODEL,
@@ -179,7 +181,6 @@ class TradingAgent:
                     temperature=DEFAULT_TEMPERATURE,
                     tool_choice="required",
                 ),
-                max_turns=DEFAULT_MAX_TURNS,
             )
 
             self.is_initialized = True
@@ -228,7 +229,9 @@ class TradingAgent:
 
     def _setup_openai_tools(self) -> list[Any]:
         """設置 OpenAI 內建工具（根據資料庫配置）"""
-        tools = [WebSearchTool(), CodeInterpreterTool(container={"type": "auto"})]
+        # 配置 CodeInterpreterTool 的正確方式
+        code_interpreter_config = ToolResourcesCodeInterpreter(file_ids=None)
+        tools = [WebSearchTool(), CodeInterpreterTool(tool_config=code_interpreter_config)]
 
         return tools
 
@@ -282,7 +285,25 @@ class TradingAgent:
             logger.error(f"載入 sub-agents 時發生錯誤: {e}")
 
         # 將 Sub-agents 包裝為工具
-        return [agent.as_tool() for agent in subagents]
+        tools = []
+        for agent in subagents:
+            # 根據 agent name 提供適當的工具名稱和描述
+            if agent.name == "Fundamental Analyst":
+                tool = agent.as_tool(
+                    tool_name="fundamental_analysis",
+                    tool_description="執行基本面分析，評估公司財務健康度和投資價值",
+                )
+            elif agent.name == "Risk Analyst":
+                tool = agent.as_tool(
+                    tool_name="risk_assessment", tool_description="執行風險評估，分析投資風險"
+                )
+            else:
+                tool = agent.as_tool(
+                    tool_name=agent.name.lower().replace(" ", "_"),
+                    tool_description=f"執行 {agent.name} 的任務",
+                )
+            tools.append(tool)
+        return tools
 
     async def run(
         self,
@@ -392,10 +413,10 @@ class TradingAgent:
             )
 
         # 持股比例限制
-        if self.agent_config.max_position_per_stock:
+        if self.agent_config.max_position_size:
             instructions_parts.extend(
                 [
-                    f"你對於每一隻股票的最大持股比例為 {self.agent_config.max_position_per_stock}%。",
+                    f"你對於每一隻股票的最大持股比例為 {self.agent_config.max_position_size}%。",
                 ]
             )
 

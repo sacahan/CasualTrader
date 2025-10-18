@@ -140,10 +140,8 @@ class TradingService:
             # 5. 取得或創建 TradingAgent 實例
             trading_agent = await self._get_or_create_agent(agent_id, agent_config)
 
-            # 6. 執行任務
-            result = await trading_agent.run(
-                mode=execution_mode, max_turns=max_turns, context=context
-            )
+            # 6. 執行任務 (max_turns 已移至 Runner.run() 中指定)
+            result = await trading_agent.run(mode=execution_mode, context=context)
 
             # 7. 計算執行時間
             end_time = datetime.now()
@@ -430,7 +428,7 @@ class TradingService:
 
         # 創建新的 TradingAgent 實例
         logger.info(f"Creating new TradingAgent instance for {agent_id}")
-        agent = TradingAgent(agent_id, agent_config)
+        agent = TradingAgent(agent_id, agent_config, self.agents_service)
         await agent.initialize()
 
         # 儲存到活躍列表

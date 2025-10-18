@@ -165,13 +165,13 @@
 
 <div class="min-h-screen bg-gray-900">
   <!-- Navbar -->
-  <Navbar title="AI 股票交易模擬器" />
+  <Navbar title="Casual Trader" />
 
   <!-- Main Content -->
   <main class="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
     <!-- Header -->
     <header class="mb-8 text-center">
-      <h1 class="text-3xl font-bold text-white sm:text-4xl">AI 股票交易模擬器</h1>
+      <h1 class="text-3xl font-bold text-white sm:text-4xl">AI 代理人股票交易模擬</h1>
       <p class="mt-2 text-gray-400">觀察不同 AI 交易策略的績效表現</p>
     </header>
 

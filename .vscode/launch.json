@@ -4,23 +4,15 @@
             "name": "啟動 Backend Server",
             "type": "debugpy",
             "request": "launch",
-            "module": "uvicorn",
-            "args": [
-                "src.api.app:create_app",
-                "--factory",
-                "--host",
-                "0.0.0.0",
-                "--port",
-                "8000",
-                "--reload"
-            ],
-            "cwd": "${workspaceFolder}/backend",
+            "program": "${workspaceFolder}/backend/run_server.py",
             "console": "integratedTerminal",
-            "python": "${workspaceFolder}/.venv/bin/python3",
+            "cwd": "${workspaceFolder}/backend",
+            "python": "${workspaceFolder}/.venv/bin/python",
             "env": {
                 "PYTHONPATH": "${workspaceFolder}/backend"
             },
-            "justMyCode": false
+            "justMyCode": false,
+            "preLaunchTask": "Sync Backend Dependencies"
         },
         {
             "name": "啟動 Frontend Server",
@@ -28,6 +20,20 @@
             "request": "launch",
             "command": "npm run dev",
             "cwd": "${workspaceFolder}/frontend"
+        }
+    ],
+    "compounds": [
+        {
+            "name": "啟動前後端 (Compound)",
+            "configurations": [
+                "啟動 Backend Server",
+                "啟動 Frontend Server"
+            ],
+            "presentation": {
+                "hidden": false,
+                "group": "development",
+                "order": 1
+            }
         }
     ]
 }
