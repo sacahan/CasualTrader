@@ -9,6 +9,7 @@ import os
 from datetime import datetime
 
 from dotenv import load_dotenv
+from pydantic import BaseModel
 
 from agents import Agent, function_tool, ModelSettings
 
@@ -18,6 +19,98 @@ load_dotenv()
 
 DEFAULT_MODEL = os.getenv("DEFAULT_AI_MODEL", "gpt-5-mini")
 DEFAULT_MAX_TURNS = os.getenv("DEFAULT_MAX_TURNS", 30)
+
+
+# ===== Pydantic Models for Tool Parameters =====
+
+
+class MarketData(BaseModel):
+    """市場數據模型"""
+
+    price_momentum: float = 50
+    market_breadth: float = 50
+    volatility: float = 50
+    put_call_ratio: float = 50
+
+
+class TradingData(BaseModel):
+    """交易數據模型"""
+
+    large_buy: float = 0
+    large_sell: float = 0
+    foreign_net: float = 0
+    institutional_net: float = 0
+
+
+class NewsItem(BaseModel):
+    """新聞項目模型"""
+
+    title: str
+    content: str
+    sentiment: float = 0  # -1 到 1
+    timestamp: str
+
+
+class SocialData(BaseModel):
+    """社群數據模型"""
+
+    mention_count: int = 0
+    positive_mentions: int = 0
+    negative_mentions: int = 0
+    trending: bool = False
+
+
+class IndexComponents(BaseModel):
+    """恐懼貪婪指數組成分數"""
+
+    price_momentum: float
+    market_breadth: float
+    volatility: float
+    put_call_ratio: float
+
+
+class FearGreedIndex(BaseModel):
+    """恐懼貪婪指數模型"""
+
+    index_value: float
+    level: str
+    components: IndexComponents
+    interpretation: str
+
+
+class MoneyFlow(BaseModel):
+    """資金流向模型"""
+
+    ticker: str
+    net_flow: float
+    flow_direction: str
+    large_order_ratio: float
+    foreign_attitude: str
+    institutional_attitude: str
+    interpretation: str
+
+
+class NewsSentiment(BaseModel):
+    """新聞情緒模型"""
+
+    ticker: str | None
+    news_count: int
+    positive_ratio: float
+    negative_ratio: float
+    sentiment_score: float
+    key_topics: list[str]
+    interpretation: str
+
+
+class SocialSentiment(BaseModel):
+    """社群情緒模型"""
+
+    ticker: str
+    mention_count: int
+    sentiment_ratio: float
+    trending_status: str
+    sentiment_score: float
+    interpretation: str
 
 
 def sentiment_agent_instructions() -> str:
@@ -114,7 +207,7 @@ def sentiment_agent_instructions() -> str:
 
 @function_tool
 def calculate_fear_greed_index(
-    market_data: str,
+    market_data: MarketData,
 ) -> str:
     """計算恐懼貪婪指數
 
@@ -136,10 +229,10 @@ def calculate_fear_greed_index(
     """
     logger.info("開始計算恐懼貪婪指數")
 
-    momentum_score = market_data.get("price_momentum", 50)
-    breadth_score = market_data.get("market_breadth", 50)
-    volatility_score = 100 - market_data.get("volatility", 50)  # 波動率越高越恐慌
-    put_call_score = 100 - market_data.get("put_call_ratio", 50)  # 賣權比越高越恐慌
+    momentum_score = market_data.price_momentum
+    breadth_score = market_data.market_breadth
+    volatility_score = 100 - market_data.volatility  # 波動率越高越恐慌
+    put_call_score = 100 - market_data.put_call_ratio  # 賣權比越高越恐慌
 
     logger.debug(
         f"組成分數 | 動能: {momentum_score:.1f} | 寬度: {breadth_score:.1f} | "
@@ -186,7 +279,7 @@ def calculate_fear_greed_index(
 @function_tool
 def analyze_money_flow(
     ticker: str,
-    trading_data: str,
+    trading_data: TradingData,
 ) -> str:
     """分析資金流向
 
@@ -211,10 +304,10 @@ def analyze_money_flow(
     """
     logger.info(f"開始分析資金流向 | 股票: {ticker}")
 
-    large_buy = trading_data.get("large_buy", 0)
-    large_sell = trading_data.get("large_sell", 0)
-    foreign_net = trading_data.get("foreign_net", 0)
-    institutional_net = trading_data.get("institutional_net", 0)
+    large_buy = trading_data.large_buy
+    large_sell = trading_data.large_sell
+    foreign_net = trading_data.foreign_net
+    institutional_net = trading_data.institutional_net
 
     logger.debug(
         f"交易數據 | 大買: {large_buy:,.0f} | 大賣: {large_sell:,.0f} | "
@@ -264,8 +357,8 @@ def analyze_money_flow(
 
 @function_tool
 def analyze_news_sentiment(
-    ticker: str,
-    news_data: str,
+    ticker: str | None,
+    news_data: list[NewsItem],
 ) -> str:
     """分析新聞情緒
 
@@ -290,6 +383,7 @@ def analyze_news_sentiment(
             }
     """
     target = ticker or "市場"
+
     logger.info(f"開始分析新聞情緒 | 標的: {target} | 新聞數: {len(news_data)}")
 
     if not news_data:
@@ -302,7 +396,7 @@ def analyze_news_sentiment(
         }
 
     news_count = len(news_data)
-    sentiments = [news.get("sentiment", 0) for news in news_data]
+    sentiments = [news.sentiment for news in news_data]
 
     positive_count = sum(1 for s in sentiments if s > 0.2)
     negative_count = sum(1 for s in sentiments if s < -0.2)
@@ -350,7 +444,7 @@ def analyze_news_sentiment(
 @function_tool
 def analyze_social_sentiment(
     ticker: str,
-    social_data: str,
+    social_data: SocialData,
 ) -> str:
     """分析社群媒體情緒
 
@@ -375,10 +469,10 @@ def analyze_social_sentiment(
     """
     logger.info(f"開始分析社群情緒 | 股票: {ticker}")
 
-    mention_count = social_data.get("mention_count", 0)
-    positive = social_data.get("positive_mentions", 0)
-    negative = social_data.get("negative_mentions", 0)
-    trending = social_data.get("trending", False)
+    mention_count = social_data.mention_count
+    positive = social_data.positive_mentions
+    negative = social_data.negative_mentions
+    trending = social_data.trending
 
     if mention_count == 0:
         logger.warning(f"無社群數據 | 股票: {ticker}")
@@ -441,10 +535,10 @@ def analyze_social_sentiment(
 
 @function_tool
 def generate_sentiment_signals(
-    fear_greed_index: str,
-    money_flow: str,
-    news_sentiment: str,
-    social_sentiment: str,
+    fear_greed_index: FearGreedIndex,
+    money_flow: MoneyFlow,
+    news_sentiment: NewsSentiment,
+    social_sentiment: SocialSentiment,
 ) -> str:
     """產生情緒交易訊號
 
@@ -472,7 +566,7 @@ def generate_sentiment_signals(
     reasoning = []
 
     # 分析恐懼貪婪指數
-    fg_value = fear_greed_index.get("index_value", 50)
+    fg_value = fear_greed_index.index_value
     if fg_value >= 80:
         signals.append("賣出")
         reasoning.append(f"恐懼貪婪指數過高 ({fg_value:.0f})，市場過熱")
@@ -483,7 +577,7 @@ def generate_sentiment_signals(
         confidence += 0.15
 
     # 分析資金流向
-    flow_direction = money_flow.get("flow_direction", "平衡")
+    flow_direction = money_flow.flow_direction
     if flow_direction == "流入":
         signals.append("買進")
         reasoning.append("資金持續流入，多方力量強勁")
@@ -494,7 +588,7 @@ def generate_sentiment_signals(
         confidence += 0.1
 
     # 分析新聞情緒
-    news_score = news_sentiment.get("sentiment_score", 0)
+    news_score = news_sentiment.sentiment_score
     if news_score > 50:
         signals.append("買進")
         reasoning.append(f"新聞情緒極度正面 ({news_score:.0f})")
@@ -505,7 +599,7 @@ def generate_sentiment_signals(
         confidence += 0.05
 
     # 分析社群情緒
-    social_score = social_sentiment.get("sentiment_score", 0)
+    social_score = social_sentiment.sentiment_score
     if social_score > 50:
         signals.append("買進")
         reasoning.append(f"社群高度看好 ({social_score:.0f})")

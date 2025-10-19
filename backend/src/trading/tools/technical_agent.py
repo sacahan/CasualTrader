@@ -9,6 +9,7 @@ import os
 from datetime import datetime
 
 from dotenv import load_dotenv
+from pydantic import BaseModel
 
 from agents import Agent, function_tool, ModelSettings
 
@@ -18,6 +19,54 @@ load_dotenv()
 
 DEFAULT_MODEL = os.getenv("DEFAULT_AI_MODEL", "gpt-5-mini")
 DEFAULT_MAX_TURNS = os.getenv("DEFAULT_MAX_TURNS", 30)
+
+
+# ===== Pydantic Models for Tool Parameters =====
+
+
+class PriceDataPoint(BaseModel):
+    """價格數據點模型"""
+
+    date: str
+    open: float
+    high: float
+    low: float
+    close: float
+    volume: int
+
+
+class PatternInfo(BaseModel):
+    """圖表型態資訊"""
+
+    pattern_name: str
+    pattern_type: str
+    confidence: float
+    description: str
+
+
+class ChartPatterns(BaseModel):
+    """圖表型態識別結果"""
+
+    ticker: str
+    patterns: list[PatternInfo]
+    pattern_count: int
+
+
+class TrendAnalysis(BaseModel):
+    """趨勢分析結果"""
+
+    ticker: str
+    direction: str
+    strength: float
+    short_term_momentum: float
+    mid_term_momentum: float
+
+
+class TechnicalIndicators(BaseModel):
+    """技術指標計算結果"""
+
+    ticker: str
+    indicators: dict[str, dict[str, float | str]]  # 指標名稱到指標值的映射
 
 
 def technical_agent_instructions() -> str:
@@ -111,8 +160,8 @@ def technical_agent_instructions() -> str:
 @function_tool
 def calculate_technical_indicators(
     ticker: str,
-    price_data: str,
-    indicators: str = "",
+    price_data: list[PriceDataPoint],
+    indicators: list[str] | None = None,
 ) -> str:
     """計算技術指標
 
@@ -141,7 +190,7 @@ def calculate_technical_indicators(
 
     indicators = indicators or ["ma", "rsi", "macd", "bollinger", "kd"]
     result = {"ticker": ticker, "indicators": {}}
-    latest_close = price_data[-1]["close"]
+    latest_close = price_data[-1].close
 
     logger.debug(f"計算指標: {', '.join(indicators)} | 最新收盤: {latest_close}")
 
@@ -188,7 +237,7 @@ def calculate_technical_indicators(
 @function_tool
 def identify_chart_patterns(
     ticker: str,
-    price_data: str,
+    price_data: list[PriceDataPoint],
     lookback_days: int = 60,
 ) -> str:
     """識別圖表型態
@@ -224,7 +273,7 @@ def identify_chart_patterns(
     patterns = []
 
     if len(price_data) >= 20:
-        recent_trend = price_data[-1]["close"] / price_data[-20]["close"]
+        recent_trend = price_data[-1].close / price_data[-20].close
 
         if recent_trend > 1.05:
             patterns.append(
@@ -257,7 +306,7 @@ def identify_chart_patterns(
 @function_tool
 def analyze_trend(
     ticker: str,
-    price_data: str,
+    price_data: list[PriceDataPoint],
 ) -> str:
     """分析趨勢方向和強度
 
@@ -281,8 +330,8 @@ def analyze_trend(
         logger.warning(f"數據不足 | 股票: {ticker} | 數據點數: {len(price_data)}")
         return {"error": "數據不足，需至少 20 筆數據", "ticker": ticker}
 
-    short_term = price_data[-5]["close"] / price_data[-10]["close"] - 1.0
-    mid_term = price_data[-10]["close"] / price_data[-20]["close"] - 1.0
+    short_term = price_data[-5].close / price_data[-10].close - 1.0
+    mid_term = price_data[-10].close / price_data[-20].close - 1.0
 
     logger.debug(f"動能指標 | 短期: {short_term:.2%} | 中期: {mid_term:.2%}")
 
@@ -307,7 +356,7 @@ def analyze_trend(
 @function_tool
 def analyze_support_resistance(
     ticker: str,
-    price_data: str,
+    price_data: list[PriceDataPoint],
 ) -> str:
     """分析支撐和壓力位
 
@@ -330,7 +379,7 @@ def analyze_support_resistance(
         logger.warning(f"缺少數據 | 股票: {ticker}")
         return {"error": "缺少價格數據", "ticker": ticker}
 
-    current_price = price_data[-1]["close"]
+    current_price = price_data[-1].close
 
     support_levels = [
         current_price * 0.95,
@@ -360,15 +409,15 @@ def analyze_support_resistance(
 @function_tool
 def generate_trading_signals(
     ticker: str,
-    technical_indicators: str,
-    trend_analysis: str,
-    patterns: str,
+    technical_indicators_json: str,
+    trend_analysis: TrendAnalysis,
+    patterns: ChartPatterns,
 ) -> str:
     """綜合分析產生交易訊號
 
     Args:
         ticker: 股票代號 (例如: "2330")
-        technical_indicators: 技術指標計算結果 (來自 calculate_technical_indicators)
+        technical_indicators_json: 技術指標計算結果的 JSON 字串 (來自 calculate_technical_indicators)
         trend_analysis: 趨勢分析結果 (來自 analyze_trend)
         patterns: 圖表型態識別結果 (來自 identify_chart_patterns)
 
@@ -384,22 +433,17 @@ def generate_trading_signals(
                 "timestamp": str           # ISO 格式時間戳
             }
     """
-    logger.info(
-        f"開始產生交易訊號 | 股票: {ticker} | "
-        f"趨勢方向: {trend_analysis.get('direction', 'unknown')}"
-    )
+    logger.info(f"開始產生交易訊號 | 股票: {ticker} | 趨勢方向: {trend_analysis.direction}")
 
     signals = []
     overall_signal = "觀望"
     confidence = 0.5
 
-    if trend_analysis.get("direction") == "上升":
+    if trend_analysis.direction == "上升":
         signals.append({"type": "trend", "signal": "看多"})
         confidence += 0.15
 
-    bullish_patterns = sum(
-        1 for p in patterns.get("patterns", []) if p["pattern_type"] == "bullish"
-    )
+    bullish_patterns = sum(1 for p in patterns.patterns if p.pattern_type == "bullish")
     if bullish_patterns > 0:
         signals.append({"type": "pattern", "signal": "看多"})
         confidence += 0.1

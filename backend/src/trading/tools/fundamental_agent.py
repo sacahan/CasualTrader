@@ -4,11 +4,12 @@
 """
 
 from __future__ import annotations
+
 import os
+from datetime import datetime
 
 from dotenv import load_dotenv
-
-from datetime import datetime
+from pydantic import BaseModel
 
 from agents import Agent, function_tool, ModelSettings
 
@@ -18,6 +19,101 @@ load_dotenv()
 
 DEFAULT_MODEL = os.getenv("DEFAULT_AI_MODEL", "gpt-5-mini")
 DEFAULT_MAX_TURNS = os.getenv("DEFAULT_MAX_TURNS", 30)
+
+
+# ===== Pydantic Models for Tool Parameters =====
+
+
+class FinancialData(BaseModel):
+    """財務數據模型"""
+
+    revenue: float = 0
+    net_income: float = 0
+    total_assets: float = 1
+    total_equity: float = 1
+    total_liabilities: float = 0
+    current_assets: float = 0
+    current_liabilities: float = 1
+    market_cap: float = 0
+
+
+class Profitability(BaseModel):
+    """獲利能力指標"""
+
+    roe: float
+    roa: float
+    net_margin: float
+
+
+class Solvency(BaseModel):
+    """償債能力指標"""
+
+    debt_ratio: float
+    current_ratio: float
+
+
+class Valuation(BaseModel):
+    """估值指標"""
+
+    pe_ratio: float
+    pb_ratio: float
+
+
+class FinancialRatios(BaseModel):
+    """財務比率模型"""
+
+    ticker: str
+    profitability: Profitability
+    solvency: Solvency
+    valuation: Valuation
+
+
+class FinancialHealth(BaseModel):
+    """財務體質分析"""
+
+    ticker: str
+    health_score: float
+    health_grade: str
+    strengths: list[str]
+    weaknesses: list[str]
+    assessment: str
+
+
+class ValuationAnalysis(BaseModel):
+    """估值分析"""
+
+    ticker: str
+    current_price: float
+    valuation_level: str
+    fair_value: float
+    discount_rate: float
+    pe_assessment: str
+    pb_assessment: str
+
+
+class HistoricalData(BaseModel):
+    """歷史數據模型"""
+
+    latest_revenue_growth: float = 0
+    latest_eps_growth: float = 0
+
+
+class GrowthAnalysis(BaseModel):
+    """成長分析"""
+
+    ticker: str
+    growth_score: float
+    growth_trend: str
+    revenue_growth: float
+    eps_growth: float
+    assessment: str
+
+
+class IndustryAverage(BaseModel):
+    """產業平均值"""
+
+    pe: float = 15.0
+    pb: float = 1.8
 
 
 def fundamental_agent_instructions() -> str:
@@ -118,30 +214,18 @@ def fundamental_agent_instructions() -> str:
 @function_tool
 def calculate_financial_ratios(
     ticker: str,
-    financial_data_json: str,
+    financial_data: FinancialData,
 ) -> str:
     """計算財務比率
 
     Args:
         ticker: 股票代號 (例如: "2330")
-        financial_data_json: 財務數據的JSON字符串,包含 revenue, net_income, total_assets 等
+        financial_data: 財務數據,包含 revenue, net_income, total_assets 等
 
     Returns:
         str: 財務比率結果的JSON字符串 (ROE, ROA, 負債比, 流動比率等)
     """
     logger.info(f"開始計算財務比率 | 股票: {ticker}")
-
-    try:
-        import json
-
-        financial_data = json.loads(financial_data_json)
-    except json.JSONDecodeError:
-        logger.warning(f"無法解析財務數據 | 股票: {ticker}")
-        return json.dumps({"error": "Invalid financial data JSON", "ticker": ticker})
-
-    if not financial_data:
-        logger.warning(f"缺少財務數據 | 股票: {ticker}")
-        return json.dumps({"error": "Missing financial data", "ticker": ticker})
 
     result = {
         "ticker": ticker,
@@ -150,10 +234,10 @@ def calculate_financial_ratios(
         "valuation": {},
     }
 
-    equity = financial_data.get("total_equity", 1)
-    assets = financial_data.get("total_assets", 1)
-    revenue = financial_data.get("revenue", 0)
-    net_income = financial_data.get("net_income", 0)
+    equity = financial_data.total_equity
+    assets = financial_data.total_assets
+    revenue = financial_data.revenue
+    net_income = financial_data.net_income
 
     result["profitability"] = {
         "roe": net_income / equity if equity > 0 else 0,
@@ -167,9 +251,9 @@ def calculate_financial_ratios(
         f"淨利率: {result['profitability']['net_margin']:.2%}"
     )
 
-    total_liabilities = financial_data.get("total_liabilities", 0)
-    current_assets = financial_data.get("current_assets", 0)
-    current_liabilities = financial_data.get("current_liabilities", 1)
+    total_liabilities = financial_data.total_liabilities
+    current_assets = financial_data.current_assets
+    current_liabilities = financial_data.current_liabilities
 
     result["solvency"] = {
         "debt_ratio": total_liabilities / assets if assets > 0 else 0,
@@ -181,7 +265,7 @@ def calculate_financial_ratios(
         f"流動比率: {result['solvency']['current_ratio']:.2f}"
     )
 
-    market_cap = financial_data.get("market_cap", 0)
+    market_cap = financial_data.market_cap
     result["valuation"] = {
         "pe_ratio": market_cap / net_income if net_income > 0 else 0,
         "pb_ratio": market_cap / equity if equity > 0 else 0,
@@ -194,12 +278,12 @@ def calculate_financial_ratios(
 @function_tool
 def analyze_financial_health(
     ticker: str,
-    financial_ratios: str,
+    financial_ratios: FinancialRatios,
 ) -> str:
     """分析財務體質
 
     Args:
-        symbol: 股票代號 (例如: "2330")
+        ticker: 股票代號 (例如: "2330")
         financial_ratios: 財務比率 (來自 calculate_financial_ratios)
 
     Returns:
@@ -207,15 +291,11 @@ def analyze_financial_health(
     """
     logger.info(f"開始分析財務體質 | 股票: {ticker}")
 
-    if "error" in financial_ratios:
-        logger.error(f"無法分析財務體質 | 股票: {ticker} | 原因: {financial_ratios.get('error')}")
-        return {"error": ..., "ticker": ticker}
-
     score = 0
     strengths = []
     weaknesses = []
 
-    roe = financial_ratios.get("profitability", {}).get("roe", 0)
+    roe = financial_ratios.profitability.roe
     if roe > 0.15:
         score += 25
         strengths.append(f"優異的 ROE ({roe:.1%})")
@@ -225,7 +305,7 @@ def analyze_financial_health(
     elif roe < 0.05:
         weaknesses.append(f"偏低的 ROE ({roe:.1%})")
 
-    debt_ratio = financial_ratios.get("solvency", {}).get("debt_ratio", 0)
+    debt_ratio = financial_ratios.solvency.debt_ratio
     if debt_ratio < 0.3:
         score += 25
         strengths.append(f"低負債比 ({debt_ratio:.1%})")
@@ -234,7 +314,7 @@ def analyze_financial_health(
     elif debt_ratio > 0.7:
         weaknesses.append(f"高負債比 ({debt_ratio:.1%})")
 
-    current_ratio = financial_ratios.get("solvency", {}).get("current_ratio", 0)
+    current_ratio = financial_ratios.solvency.current_ratio
     if current_ratio > 2.0:
         score += 25
         strengths.append(f"優異的流動比率 ({current_ratio:.2f})")
@@ -243,7 +323,7 @@ def analyze_financial_health(
     elif current_ratio < 1.0:
         weaknesses.append(f"流動比率偏低 ({current_ratio:.2f})")
 
-    net_margin = financial_ratios.get("profitability", {}).get("net_margin", 0)
+    net_margin = financial_ratios.profitability.net_margin
     if net_margin > 0.15:
         score += 25
         strengths.append(f"高淨利率 ({net_margin:.1%})")
@@ -282,13 +362,13 @@ def analyze_financial_health(
 def evaluate_valuation(
     ticker: str,
     current_price: float,
-    financial_ratios: str,
-    industry_avg: str = "",
+    financial_ratios: FinancialRatios,
+    industry_avg: IndustryAverage | None = None,
 ) -> str:
     """評估估值水準
 
     Args:
-        symbol: 股票代號 (例如: "2330")
+        ticker: 股票代號 (例如: "2330")
         current_price: 當前股價
         financial_ratios: 財務比率 (來自 calculate_financial_ratios)
         industry_avg: 產業平均值 (可選)
@@ -298,15 +378,11 @@ def evaluate_valuation(
     """
     logger.info(f"開始評估估值 | 股票: {ticker} | 當前價: {current_price}")
 
-    if "error" in financial_ratios:
-        logger.error(f"無法評估估值 | 股票: {ticker} | 原因: 財務比率錯誤")
-        return {"error": ..., "ticker": ticker}
+    pe_ratio = financial_ratios.valuation.pe_ratio
+    pb_ratio = financial_ratios.valuation.pb_ratio
 
-    pe_ratio = financial_ratios.get("valuation", {}).get("pe_ratio", 0)
-    pb_ratio = financial_ratios.get("valuation", {}).get("pb_ratio", 0)
-
-    industry_pe = industry_avg.get("pe", 15.0) if industry_avg else 15.0
-    industry_pb = industry_avg.get("pb", 1.8) if industry_avg else 1.8
+    industry_pe = industry_avg.pe if industry_avg else 15.0
+    industry_pb = industry_avg.pb if industry_avg else 1.8
 
     logger.debug(
         f"估值指標 | P/E: {pe_ratio:.2f} (產業: {industry_pe:.2f}) | "
@@ -356,12 +432,12 @@ def evaluate_valuation(
 @function_tool
 def analyze_growth_potential(
     ticker: str,
-    historical_data: str,
+    historical_data: HistoricalData,
 ) -> str:
     """分析成長潛力
 
     Args:
-        symbol: 股票代號 (例如: "2330")
+        ticker: 股票代號 (例如: "2330")
         historical_data: 歷史財務數據 (營收成長率、EPS 成長率)
 
     Returns:
@@ -369,13 +445,9 @@ def analyze_growth_potential(
     """
     logger.info(f"開始分析成長潛力 | 股票: {ticker}")
 
-    if not historical_data:
-        logger.warning(f"缺少歷史數據 | 股票: {ticker}")
-        return {"error": ..., "ticker": ticker}
-
     score = 0
-    revenue_growth = historical_data.get("latest_revenue_growth", 0)
-    eps_growth = historical_data.get("latest_eps_growth", 0)
+    revenue_growth = historical_data.latest_revenue_growth
+    eps_growth = historical_data.latest_eps_growth
 
     logger.debug(f"成長數據 | 營收成長: {revenue_growth:.1%} | EPS成長: {eps_growth:.1%}")
 
@@ -423,14 +495,14 @@ def analyze_growth_potential(
 @function_tool
 def generate_investment_rating(
     ticker: str,
-    financial_health: str,
-    valuation: str,
-    growth: str,
+    financial_health: FinancialHealth,
+    valuation: ValuationAnalysis,
+    growth: GrowthAnalysis,
 ) -> str:
     """產生投資評級
 
     Args:
-        symbol: 股票代號 (例如: "2330")
+        ticker: 股票代號 (例如: "2330")
         financial_health: 財務體質分析
         valuation: 估值分析
         growth: 成長分析
@@ -438,9 +510,9 @@ def generate_investment_rating(
     Returns:
         dict: 投資評級 (買進/持有/賣出建議)
     """
-    health_score = financial_health.get("health_score", 0)
-    valuation_level = valuation.get("valuation_level", "合理")
-    growth_score = growth.get("growth_score", 0)
+    health_score = financial_health.health_score
+    valuation_level = valuation.valuation_level
+    growth_score = growth.growth_score
 
     logger.info(
         f"開始產生投資評級 | 股票: {ticker} | 體質分數: {health_score} | "
@@ -456,20 +528,20 @@ def generate_investment_rating(
     if overall_score >= 75 and valuation_level == "便宜":
         rating, confidence = "強力買進", 0.85
         recommendation = "優質公司且估值便宜,建議積極買進"
-        key_reasons.extend(financial_health.get("strengths", []))
+        key_reasons.extend(financial_health.strengths)
     elif overall_score >= 60:
         rating, confidence = "買進", 0.70
         recommendation = "基本面穩健,建議逢低買進"
-        key_reasons.extend(financial_health.get("strengths", [])[:2])
+        key_reasons.extend(financial_health.strengths[:2])
     elif overall_score >= 40:
         rating, confidence = "持有", 0.60
         recommendation = "基本面普通,建議持有觀望"
     else:
         rating, confidence = "賣出", 0.75
         recommendation = "基本面轉弱,建議減碼"
-        key_reasons.extend(financial_health.get("weaknesses", []))
+        key_reasons.extend(financial_health.weaknesses)
 
-    target_price = valuation.get("fair_value", 0)
+    target_price = valuation.fair_value
 
     logger.info(
         f"投資評級產生完成 | 股票: {ticker} | 評級: {rating} | "

@@ -9,6 +9,7 @@ import os
 from datetime import datetime
 
 from dotenv import load_dotenv
+from pydantic import BaseModel, ConfigDict
 
 from agents import Agent, function_tool, ModelSettings
 
@@ -18,6 +19,82 @@ load_dotenv()
 
 DEFAULT_MODEL = os.getenv("DEFAULT_AI_MODEL", "gpt-5-mini")
 DEFAULT_MAX_TURNS = os.getenv("DEFAULT_MAX_TURNS", 30)
+
+
+# ===== Pydantic Models for Tool Parameters =====
+
+
+class PositionData(BaseModel):
+    """部位數據模型"""
+
+    quantity: int = 0
+    avg_cost: float = 0
+    current_price: float = 0
+
+
+class MarketData(BaseModel):
+    """市場數據模型"""
+
+    volatility: float = 0.25
+    beta: float = 1.0
+
+
+class Position(BaseModel):
+    """投資組合部位模型"""
+
+    ticker: str
+    value: float
+    sector: str = "其他"
+
+
+class PositionRisk(BaseModel):
+    """部位風險模型"""
+
+    ticker: str
+    position_value: float
+    unrealized_pnl: float
+    pnl_percent: float
+    volatility: float
+    beta: float
+    var_95: float
+    max_drawdown: float
+    risk_score: float
+
+
+class StressScenario(BaseModel):
+    """壓力測試情境"""
+
+    name: str
+    impact: float
+
+
+# 由於輸出模型不會作為參數傳入，不需要嚴格限制
+# 以下模型僅用於類型提示和文檔說明
+class Concentration(BaseModel):
+    """集中度分析模型(僅用於返回)"""
+
+    model_config = ConfigDict(extra="forbid")
+
+    hhi_index: float
+    effective_stocks: float
+    top5_concentration: float
+    max_position_weight: float
+    sector_concentration: dict[str, float]  # 產業名稱到權重的映射
+    concentration_level: str
+    risk_assessment: str
+
+
+class PortfolioRisk(BaseModel):
+    """投資組合風險模型(僅用於返回)"""
+
+    model_config = ConfigDict(extra="forbid")
+
+    total_value: float
+    portfolio_volatility: float
+    portfolio_beta: float
+    portfolio_var: float
+    overall_risk_score: float
+    risk_level: str
 
 
 def risk_agent_instructions() -> str:
@@ -111,8 +188,8 @@ def risk_agent_instructions() -> str:
 @function_tool
 def calculate_position_risk(
     ticker: str,
-    position_data: str,
-    market_data: str = "",
+    position_data: PositionData,
+    market_data: MarketData | None = None,
 ) -> str:
     """計算個別部位風險
 
@@ -126,9 +203,9 @@ def calculate_position_risk(
     """
     logger.info(f"開始計算部位風險 | 股票: {ticker}")
 
-    quantity = position_data.get("quantity", 0)
-    avg_cost = position_data.get("avg_cost", 0)
-    current_price = position_data.get("current_price", 0)
+    quantity = position_data.quantity
+    avg_cost = position_data.avg_cost
+    current_price = position_data.current_price
 
     position_value = quantity * current_price
     unrealized_pnl = (current_price - avg_cost) * quantity
@@ -139,8 +216,8 @@ def calculate_position_risk(
         f"成本: {avg_cost} | 現價: {current_price} | 未實現損益: {unrealized_pnl:,.0f}"
     )
 
-    volatility = market_data.get("volatility", 0.25) if market_data else 0.25
-    beta = market_data.get("beta", 1.0) if market_data else 1.0
+    volatility = market_data.volatility if market_data else 0.25
+    beta = market_data.beta if market_data else 1.0
 
     var_95 = position_value * volatility * 1.65
     max_drawdown = position_value * (volatility * 2)
@@ -166,7 +243,7 @@ def calculate_position_risk(
 
 @function_tool
 def analyze_portfolio_concentration(
-    positions: str,
+    positions: list[Position],
     total_value: float,
 ) -> str:
     """分析投資組合集中度
@@ -185,14 +262,14 @@ def analyze_portfolio_concentration(
         return {"error": "無效的投資組合數據"}
 
     weights = []
-    sector_weights: str = ""
+    sector_weights: dict = {}
 
     for pos in positions:
-        value = pos.get("value", 0)
+        value = pos.value
         weight = value / total_value if total_value > 0 else 0
         weights.append(weight)
 
-        sector = pos.get("sector", "其他")
+        sector = pos.sector
         sector_weights[sector] = sector_weights.get(sector, 0) + weight
 
     hhi = sum(w**2 for w in weights)
@@ -235,20 +312,22 @@ def analyze_portfolio_concentration(
 
 @function_tool
 def calculate_portfolio_risk(
-    position_risks: str,
-    concentration: str,
+    position_risks: list[PositionRisk],
+    concentration_json: str,
     total_value: float,
 ) -> str:
     """計算整體投資組合風險
 
     Args:
         position_risks: 個別部位風險列表
-        concentration: 集中度分析
+        concentration_json: 集中度分析結果的 JSON 字串
         total_value: 投資組合總值
 
     Returns:
         dict: 投資組合風險指標
     """
+    import json
+
     logger.info(
         f"開始計算投資組合整體風險 | 部位數: {len(position_risks)} | 總值: {total_value:,.0f}"
     )
@@ -262,11 +341,16 @@ def calculate_portfolio_risk(
     total_var = 0.0
 
     for risk in position_risks:
-        weight = risk.get("position_value", 0) / total_value if total_value > 0 else 0
-        total_volatility += risk.get("volatility", 0) * weight
-        total_beta += risk.get("beta", 0) * weight
-        total_var += risk.get("var_95", 0)
+        weight = risk.position_value / total_value if total_value > 0 else 0
+        total_volatility += risk.volatility * weight
+        total_beta += risk.beta * weight
+        total_var += risk.var_95
 
+    concentration = (
+        json.loads(concentration_json)
+        if isinstance(concentration_json, str)
+        else concentration_json
+    )
     hhi = concentration.get("hhi_index", 0)
     concentration_penalty = hhi * 50
 
@@ -308,8 +392,8 @@ def calculate_portfolio_risk(
 
 @function_tool
 def perform_stress_test(
-    positions: str,
-    scenarios: str = "",
+    positions: list[Position],
+    scenarios: list[StressScenario] | None = None,
 ) -> str:
     """執行壓力測試
 
@@ -325,19 +409,19 @@ def perform_stress_test(
     )
     if not scenarios:
         scenarios = [
-            {"name": "市場崩盤", "impact": -0.20},
-            {"name": "急劇修正", "impact": -0.10},
-            {"name": "溫和下跌", "impact": -0.05},
+            StressScenario(name="市場崩盤", impact=-0.20),
+            StressScenario(name="急劇修正", impact=-0.10),
+            StressScenario(name="溫和下跌", impact=-0.05),
         ]
 
     results = []
-    total_value = sum(pos.get("value", 0) for pos in positions)
+    total_value = sum(pos.value for pos in positions)
 
     logger.debug(f"壓力測試設定 | 總值: {total_value:,.0f} | 情境數: {len(scenarios)}")
 
     for scenario in scenarios:
-        scenario_name = scenario.get("name", "未命名情境")
-        impact = scenario.get("impact", 0)
+        scenario_name = scenario.name
+        impact = scenario.impact
 
         loss_amount = total_value * abs(impact)
         loss_percent = abs(impact) * 100
@@ -381,21 +465,34 @@ def perform_stress_test(
 
 @function_tool
 def generate_risk_recommendations(
-    portfolio_risk: str,
-    concentration: str,
-    position_risks: str,
+    portfolio_risk_json: str,
+    concentration_json: str,
+    position_risks: list[PositionRisk],
 ) -> str:
     """產生風險管理建議
 
     Args:
-        portfolio_risk: 投資組合風險
-        concentration: 集中度分析
+        portfolio_risk_json: 投資組合風險的 JSON 字串
+        concentration_json: 集中度分析的 JSON 字串
         position_risks: 部位風險列表
 
     Returns:
         dict: 風險管理建議
     """
+    import json
+
     logger.info("開始產生風險管理建議")
+
+    portfolio_risk = (
+        json.loads(portfolio_risk_json)
+        if isinstance(portfolio_risk_json, str)
+        else portfolio_risk_json
+    )
+    concentration = (
+        json.loads(concentration_json)
+        if isinstance(concentration_json, str)
+        else concentration_json
+    )
 
     recommendations = []
     risk_score = portfolio_risk.get("overall_risk_score", 50)
@@ -411,7 +508,7 @@ def generate_risk_recommendations(
             {"priority": "中", "action": "增加持股分散度", "reason": "投資組合過於集中"}
         )
 
-    high_risk_positions = [r for r in position_risks if r.get("risk_score", 0) > 70]
+    high_risk_positions = [r for r in position_risks if r.risk_score > 70]
     if high_risk_positions:
         recommendations.append(
             {
