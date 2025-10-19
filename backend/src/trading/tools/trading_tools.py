@@ -21,7 +21,7 @@ def create_trading_tools(agent_service, agent_id: str) -> list[Tool]:
     # 交易紀錄工具
     @function_tool
     async def record_trade(
-        symbol: str,
+        ticker: str,
         action: str,
         quantity: int,
         price: float,
@@ -32,7 +32,7 @@ def create_trading_tools(agent_service, agent_id: str) -> list[Tool]:
         記錄交易到資料庫
 
         Args:
-            symbol: 股票代號 (例如: "2330")
+            ticker: 股票代號 (例如: "2330")
             action: 交易動作 ("BUY" 或 "SELL")
             quantity: 交易股數
             price: 交易價格
@@ -58,7 +58,7 @@ def create_trading_tools(agent_service, agent_id: str) -> list[Tool]:
             # 創建交易記錄
             await agent_service.create_transaction(
                 agent_id=agent_id,
-                ticker=symbol,
+                ticker=ticker,
                 company_name=company_name,
                 action=action_upper,
                 quantity=quantity,
@@ -73,13 +73,13 @@ def create_trading_tools(agent_service, agent_id: str) -> list[Tool]:
             try:
                 await agent_service.update_agent_holdings(
                     agent_id=agent_id,
-                    ticker=symbol,
+                    ticker=ticker,
                     action=action_upper,
                     quantity=quantity,
                     price=price,
                     company_name=company_name,
                 )
-                logger.info(f"持股更新成功: {action_upper} {quantity} 股 {symbol}")
+                logger.info(f"持股更新成功: {action_upper} {quantity} 股 {ticker}")
             except Exception as holding_error:
                 logger.error(f"持股更新失敗: {holding_error}")
                 # 持股更新失敗不影響交易記錄
@@ -104,14 +104,14 @@ def create_trading_tools(agent_service, agent_id: str) -> list[Tool]:
                 await agent_service.update_agent_funds(
                     agent_id=agent_id,
                     amount_change=funds_change,
-                    transaction_type=f"{action_upper} {symbol}",
+                    transaction_type=f"{action_upper} {ticker}",
                 )
                 logger.info(f"資金更新成功: {funds_change:+.2f} 元")
             except Exception as funds_error:
                 logger.error(f"資金更新失敗: {funds_error}")
                 # 資金更新失敗不影響交易記錄
 
-            return f"✅ 交易記錄成功：{action_upper} {quantity} 股 {symbol} @ {price} 元，總金額：{total_amount:,.2f} 元，手續費：{commission:.2f} 元\n📊 持股、資金和績效已自動更新"
+            return f"✅ 交易記錄成功：{action_upper} {quantity} 股 {ticker} @ {price} 元，總金額：{total_amount:,.2f} 元，手續費：{commission:.2f} 元\n📊 持股、資金和績效已自動更新"
 
         except Exception as e:
             logger.error(f"記錄交易失敗: {e}", exc_info=True)
