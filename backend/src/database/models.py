@@ -293,39 +293,6 @@ class AgentPerformance(Base):
     )
 
 
-class MarketDataCache(Base):
-    """市場數據快取模型"""
-
-    __tablename__ = "market_data_cache"
-
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    cache_key: Mapped[str] = mapped_column(String(200), unique=True, nullable=False)
-    cache_data: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False)
-    expires_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now())
-
-    # 表約束
-    __table_args__ = (
-        Index("idx_cache_expires_at", "expires_at"),
-        Index("idx_cache_key", "cache_key"),
-    )
-
-
-class AgentConfigCache(Base):
-    """Agent 設定快取模型"""
-
-    __tablename__ = "agent_config_cache"
-
-    agent_id: Mapped[str] = mapped_column(String(50), ForeignKey("agents.id"), primary_key=True)
-    config_key: Mapped[str] = mapped_column(String(100), primary_key=True)
-    config_value: Mapped[str | None] = mapped_column(Text)
-    config_type: Mapped[str] = mapped_column(String(20), default="string")
-
-    updated_at: Mapped[datetime] = mapped_column(
-        DateTime, default=lambda: datetime.now(), onupdate=lambda: datetime.now()
-    )
-
-
 class AIModelConfig(Base):
     """AI 模型配置模型 - 統一管理可用的 AI 模型"""
 
@@ -391,8 +358,6 @@ def get_model_by_name(model_name: str) -> type[Base] | None:
         "holding": AgentHolding,
         "transaction": Transaction,
         "performance": AgentPerformance,
-        "cache": MarketDataCache,
-        "config": AgentConfigCache,
         "ai_model": AIModelConfig,
     }
     return model_mapping.get(model_name.lower())

@@ -11,6 +11,8 @@ from typing import Any
 from contextlib import AsyncExitStack
 from datetime import datetime
 
+from openai.types.shared import Reasoning
+
 from dotenv import load_dotenv
 
 # 現在可以正常導入 OpenAI Agents SDK
@@ -55,8 +57,8 @@ load_dotenv()
 # 預設配置
 DEFAULT_MODEL = os.getenv("DEFAULT_AI_MODEL", "gpt-5-mini")
 DEFAULT_MAX_TURNS = int(os.getenv("DEFAULT_MAX_TURNS", "30"))
-DEFAULT_AGENT_TIMEOUT = os.getenv("DEFAULT_AGENT_TIMEOUT", 300)  # 秒
-DEFAULT_TEMPERATURE = os.getenv("DEFAULT_MODEL_TEMPERATURE", 0.7)
+DEFAULT_AGENT_TIMEOUT = int(os.getenv("DEFAULT_AGENT_TIMEOUT", "300"))  # 秒
+DEFAULT_TEMPERATURE = float(os.getenv("DEFAULT_MODEL_TEMPERATURE", 0.7))
 
 # ==========================================
 # Custom Exceptions
@@ -82,21 +84,27 @@ class AgentExecutionError(TradingAgentError):
 
 
 # MCP 伺服器配置
-def mcp_server_params(name: str):
+def mcp_server_params(agent_id: str) -> list[tuple[str, dict[str, Any]]]:
     return [
-        {
-            "command": "uvx",
-            "args": [
-                "--from",
-                "/Users/sacahan/Documents/workspace/CasualMarket",
-                "casual-market-mcp",
-            ],
-        },
-        {
-            "command": "npx",
-            "args": ["-y", "mcp-memory-libsql"],
-            "env": {"LIBSQL_URL": f"file:./memory/{name}.db"},
-        },
+        (
+            "Casual Market MCP",
+            {
+                "command": "uvx",
+                "args": [
+                    "--from",
+                    "/Users/sacahan/Documents/workspace/CasualMarket",
+                    "casual-market-mcp",
+                ],
+            },
+        ),
+        (
+            "Memory MCP",
+            {
+                "command": "npx",
+                "args": ["-y", "mcp-memory-libsql"],
+                "env": {"LIBSQL_URL": f"file:./{agent_id}.db"},
+            },
+        ),
     ]
 
 
@@ -178,6 +186,7 @@ class TradingAgent:
                 mcp_servers=self.mcp_servers,
                 model_settings=ModelSettings(
                     temperature=DEFAULT_TEMPERATURE,
+                    reasoning=Reasoning(effort="high", summary="detailed"),
                     tool_choice="required",
                 ),
             )
@@ -210,9 +219,13 @@ class TradingAgent:
             self._exit_stack = AsyncExitStack()
 
             # 初始化 MCP servers 並註冊到 exit stack
-            for params in mcp_server_params(self.agent_id):
+            for name, params in mcp_server_params(self.agent_id):
                 server = await self._exit_stack.enter_async_context(
-                    MCPServerStdio(params, client_session_timeout_seconds=DEFAULT_AGENT_TIMEOUT)
+                    MCPServerStdio(
+                        params,
+                        name=name,
+                        client_session_timeout_seconds=DEFAULT_AGENT_TIMEOUT,
+                    )
                 )
                 servers.append(server)
 
@@ -390,7 +403,6 @@ class TradingAgent:
                 return {
                     "success": True,
                     "output": result.final_output,
-                    "used_turns": result.current_turn,
                     "trace_id": trace_id,
                     "mode": execution_mode.value if execution_mode else "unknown",
                 }

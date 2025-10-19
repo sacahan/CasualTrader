@@ -37,6 +37,10 @@ def _filter_noisy_loggers(record):
     if "sqlite" in record["name"].lower() and record["level"].name == "DEBUG":
         return False
 
+    # 過濾掉 httpcore._trace 的 DEBUG 日誌
+    if record["name"].startswith("httpcore._trace") and record["level"].name == "DEBUG":
+        return False
+
     return True
 
 
