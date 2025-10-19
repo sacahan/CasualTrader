@@ -11,7 +11,6 @@ from typing import Any
 from contextlib import AsyncExitStack
 from datetime import datetime
 
-from openai.types.shared import Reasoning
 
 from dotenv import load_dotenv
 
@@ -102,7 +101,7 @@ def mcp_server_params(agent_id: str) -> list[tuple[str, dict[str, Any]]]:
             {
                 "command": "npx",
                 "args": ["-y", "mcp-memory-libsql"],
-                "env": {"LIBSQL_URL": f"file:./{agent_id}.db"},
+                "env": {"LIBSQL_URL": f"file:./memory/{agent_id}.db"},
             },
         ),
     ]
@@ -186,7 +185,7 @@ class TradingAgent:
                 mcp_servers=self.mcp_servers,
                 model_settings=ModelSettings(
                     temperature=DEFAULT_TEMPERATURE,
-                    reasoning=Reasoning(effort="high", summary="detailed"),
+                    # reasoning=Reasoning(effort="high", summary="detailed"),
                     tool_choice="required",
                 ),
             )

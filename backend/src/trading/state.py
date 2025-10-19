@@ -9,7 +9,7 @@ import uuid
 from datetime import datetime
 from typing import Any
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 from trading.config import AgentConfig
 from common.enums import AgentMode, AgentStatus, SessionStatus
@@ -47,7 +47,7 @@ class AgentState(BaseModel):
     unrealized_pnl: float = 0.0
     realized_pnl: float = 0.0
 
-    model_config = {"arbitrary_types_allowed": True}
+    model_config = ConfigDict(arbitrary_types_allowed=True)
 
     def update_activity(self) -> None:
         """更新活動時間"""
@@ -74,7 +74,7 @@ class AgentExecutionContext(BaseModel):
     initial_input: dict[str, Any] = Field(default_factory=dict)
     user_message: str | None = None
 
-    model_config = {"arbitrary_types_allowed": True}
+    model_config = ConfigDict(arbitrary_types_allowed=True)
 
 
 class AgentExecutionResult(BaseModel):
@@ -103,7 +103,7 @@ class AgentExecutionResult(BaseModel):
     # 追蹤資料
     trace_data: dict[str, Any] = Field(default_factory=dict)
 
-    model_config = {"arbitrary_types_allowed": True}
+    model_config = ConfigDict(arbitrary_types_allowed=True)
 
     def calculate_execution_time(self) -> None:
         """計算執行時間"""
