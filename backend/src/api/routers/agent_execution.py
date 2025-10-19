@@ -14,7 +14,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from service.agents_service import AgentNotFoundError
-from common.enums import AgentMode, SessionStatus
+from common.enums import AgentMode, AgentStatus, SessionStatus
 from common.logger import logger
 from service.session_service import SessionError
 from service.trading_service import (
@@ -353,6 +353,7 @@ async def start_agent(
     1. 停止循環執行排程器
     2. 強制中斷所有正在執行的 session
     3. 清理卡住的 session
+    4. 更新 Agent 狀態為 INACTIVE
 
     使用者只需要呼叫這個端點就能完全停止 Agent。
     """,
@@ -403,6 +404,12 @@ async def stop_agent(
             logger.info(
                 f"Cleaned up {cleanup_result['count']} stuck sessions: {cleanup_result['cleaned_sessions']}"
             )
+
+        # 4. 更新 Agent 狀態為 INACTIVE
+        await trading_service.agents_service.update_agent_status(
+            agent_id, status=AgentStatus.INACTIVE
+        )
+        logger.info(f"Updated agent {agent_id} status to INACTIVE")
 
         return StartStopResponse(
             success=True,

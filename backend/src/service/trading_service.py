@@ -246,7 +246,7 @@ class TradingService:
         """
         try:
             # 1. 取得資料庫配置
-            agent_config = await self.agent_service.get_agent_config(agent_id)
+            agent_config = await self.agents_service.get_agent_config(agent_id)
 
             # 2. 檢查是否有運行中的會話
             running_session = await self.session_service.get_latest_session(
@@ -259,8 +259,12 @@ class TradingService:
             return {
                 "agent_id": agent_id,
                 "name": agent_config.name,
-                "status": agent_config.status.value,
-                "mode": agent_config.current_mode.value,
+                "status": agent_config.status
+                if isinstance(agent_config.status, str)
+                else agent_config.status.value,
+                "mode": agent_config.current_mode
+                if isinstance(agent_config.current_mode, str)
+                else agent_config.current_mode.value,
                 "is_initialized": is_initialized,
                 "is_running": running_session is not None,
                 "current_session_id": running_session.id if running_session else None,
@@ -310,7 +314,7 @@ class TradingService:
         """
         try:
             # 1. 驗證 Agent 存在
-            await self.agent_service.get_agent_config(agent_id)
+            await self.agents_service.get_agent_config(agent_id)
 
             # 2. 取得會話列表
             sessions = await self.session_service.list_agent_sessions(
@@ -322,8 +326,8 @@ class TradingService:
                 {
                     "session_id": s.id,
                     "session_type": s.session_type,
-                    "mode": s.mode.value if isinstance(s.mode, AgentMode) else s.mode,
-                    "status": s.status.value,
+                    "mode": s.mode if isinstance(s.mode, str) else s.mode.value,
+                    "status": s.status if isinstance(s.status, str) else s.status.value,
                     "start_time": s.start_time.isoformat(),
                     "end_time": s.end_time.isoformat() if s.end_time else None,
                     "execution_time_ms": s.execution_time_ms,
@@ -370,8 +374,10 @@ class TradingService:
                 "session_id": session.id,
                 "agent_id": session.agent_id,
                 "session_type": session.session_type,
-                "mode": session.mode.value if isinstance(session.mode, AgentMode) else session.mode,
-                "status": session.status.value,
+                "mode": session.mode if isinstance(session.mode, str) else session.mode.value,
+                "status": session.status
+                if isinstance(session.status, str)
+                else session.status.value,
                 "start_time": session.start_time.isoformat(),
                 "end_time": session.end_time.isoformat() if session.end_time else None,
                 "execution_time_ms": session.execution_time_ms,
@@ -401,7 +407,7 @@ class TradingService:
         """
         try:
             # 1. 驗證 Agent 存在
-            await self.agent_service.get_agent_config(agent_id)
+            await self.agents_service.get_agent_config(agent_id)
 
             # 2. 取得會話統計
             stats = await self.session_service.get_session_statistics(agent_id)

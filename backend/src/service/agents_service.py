@@ -403,6 +403,11 @@ class AgentsService:
             if mode is not None:
                 agent.current_mode = mode
 
+            # 更新時間戳記
+            agent.updated_at = datetime.now()
+            if status is not None:
+                agent.last_active_at = datetime.now()
+
             await self.session.commit()
 
             log_msg = f"Updated agent {agent_id}"
@@ -719,6 +724,7 @@ class AgentsService:
                 performance.win_rate = win_rate
                 performance.total_trades = total_trades
                 performance.winning_trades = completed_trades
+                performance.updated_at = datetime.now()
             else:
                 # 創建新記錄
                 performance = AgentPerformance(
@@ -777,6 +783,11 @@ class AgentsService:
                 )
 
             agent.current_funds = Decimal(str(new_funds))
+
+            # 更新時間戳記
+            agent.updated_at = datetime.now()
+            agent.last_active_at = datetime.now()
+
             await self.session.commit()
 
             logger.info(

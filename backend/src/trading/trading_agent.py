@@ -26,7 +26,6 @@ try:
         CodeInterpreterTool,
     )
     from agents.mcp import MCPServerStdio
-    from openai.types.beta.assistant import ToolResourcesCodeInterpreter
 except ImportError as e:
     from common.logger import logger
 
@@ -229,9 +228,30 @@ class TradingAgent:
 
     def _setup_openai_tools(self) -> list[Any]:
         """設置 OpenAI 內建工具（根據資料庫配置）"""
-        # 配置 CodeInterpreterTool 的正確方式
-        code_interpreter_config = ToolResourcesCodeInterpreter(file_ids=None)
-        tools = [WebSearchTool(), CodeInterpreterTool(tool_config=code_interpreter_config)]
+        # ✅ 正確配置方式（基於測試驗證）
+
+        # WebSearchTool: 提供網路搜尋功能
+        web_search_tool = WebSearchTool(
+            user_location=None,  # 可選：用戶位置，用於本地化搜尋結果
+            filters=None,  # 可選：搜尋過濾器
+            search_context_size="medium",  # 搜尋上下文大小：'low'、'medium'、'high'
+        )
+
+        # CodeInterpreterTool: 提供程式碼執行功能
+        # 必須指定 type 和 container 設置，container.type 必須為 "auto"
+        code_interpreter_tool = CodeInterpreterTool(
+            tool_config={
+                "type": "code_interpreter",
+                "container": {
+                    "type": "auto"  # OpenAI 自動選擇最適合的容器
+                },
+            }
+        )
+
+        tools = [web_search_tool, code_interpreter_tool]
+        logger.debug(
+            "OpenAI tools configured: WebSearchTool(context=medium), CodeInterpreterTool(container=auto)"
+        )
 
         return tools
 
@@ -428,8 +448,31 @@ class TradingAgent:
 你可以使用各種工具來幫助你完成任務，包括：
 
 **🌐 OpenAI 內建工具：**
-• 網路搜尋 (WebSearchTool) - 獲取最新市場資訊、新聞、產業動態
-• 程式碼執行 (CodeInterpreterTool) - 進行複雜的數據計算、統計分析、圖表繪製
+
+1. **網路搜尋 (WebSearchTool)**
+   • 功能：獲取最新市場資訊、新聞、產業動態、經濟數據
+   • 使用時機：當需要最新資訊時，Agent 會自動調用此工具進行網路搜尋
+   • 能力範圍：
+     - 股票市場研究和即時行情分析
+     - 新聞事件和最新產業動態
+     - 經濟數據和官方報告查詢
+     - 技術發展和創新趨勢
+     - 公司基本面和財務資訊
+   • 配置：medium 搜尋上下文（平衡的搜尋結果和詳細度）
+   • 注意：僅支持 OpenAI 模型，需要有效的互聯網連接
+
+2. **程式碼執行 (CodeInterpreterTool)**
+   • 功能：執行 Python 程式碼進行複雜的數據計算、統計分析、圖表繪製
+   • 使用時機：當需要進行計算或數據處理時，Agent 會自動調用此工具
+   • 能力範圍：
+     - 數值計算和數學運算
+     - 數據分析和統計計算（NumPy, Pandas）
+     - 技術指標計算（MA, RSI, MACD, 布林帶等）
+     - 財務建模和估值分析（DCF, P/E ratio）
+     - 投資組合優化和風險評估
+     - 圖表繪製和數據可視化
+   • 容器：auto（OpenAI 自動選擇最適合的執行環境）
+   • 常用庫：NumPy, Pandas, Matplotlib, SciPy 等科學計算工具
 
 **📊 台灣股市數據工具 (Casual Market MCP)：**
 • get_taiwan_stock_price(symbol) - 查詢台灣股票即時價格、漲跌幅、成交量

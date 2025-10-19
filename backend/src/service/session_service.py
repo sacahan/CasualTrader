@@ -141,10 +141,23 @@ class AgentSessionService:
             session = await self.get_session(session_id)
 
             session.status = status
-            if end_time:
+
+            # 如果是終止狀態，必須設置 end_time
+            if status in [SessionStatus.COMPLETED, SessionStatus.FAILED, SessionStatus.TIMEOUT]:
+                if end_time is None:
+                    end_time = datetime.now()
                 session.end_time = end_time
+
+                # 自動計算執行時間
+                if execution_time_ms is None and session.start_time:
+                    execution_time_ms = int((end_time - session.start_time).total_seconds() * 1000)
+                session.execution_time_ms = execution_time_ms
+            elif end_time:
+                session.end_time = end_time
+
             if execution_time_ms is not None:
                 session.execution_time_ms = execution_time_ms
+
             if error_message:
                 session.error_message = error_message
 
@@ -188,6 +201,17 @@ class AgentSessionService:
             session.final_output = final_output
             if tools_called:
                 session.tools_called = tools_called
+
+            # 如果還沒設置 end_time，現在設置
+            if session.end_time is None:
+                session.end_time = datetime.now()
+
+            # 計算執行時間
+            if session.execution_time_ms is None and session.start_time:
+                execution_time_ms = int(
+                    (session.end_time - session.start_time).total_seconds() * 1000
+                )
+                session.execution_time_ms = execution_time_ms
 
             await self.db_session.commit()
             await self.db_session.refresh(session)

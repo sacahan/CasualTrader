@@ -276,6 +276,12 @@ class AgentPerformance(Base):
     total_trades: Mapped[int] = mapped_column(Integer, default=0)
     winning_trades: Mapped[int] = mapped_column(Integer, default=0)
 
+    # 時間戳記
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now())
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, default=lambda: datetime.now(), onupdate=lambda: datetime.now()
+    )
+
     # 關聯關係
     agent: Mapped[Agent] = relationship("Agent", back_populates="performance_records")
 
