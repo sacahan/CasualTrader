@@ -452,7 +452,7 @@ class TradingAgent:
         # 基本描述
         instructions_parts = [
             f"你是一個專業的股票交易 Agent，你的代號是 {self.agent_id}。",
-            "你的基本描述如下：",
+            "你的投資主張如下：",
             f"{description}",
         ]
 
@@ -460,8 +460,7 @@ class TradingAgent:
         if self.agent_config.investment_preferences:
             instructions_parts.extend(
                 [
-                    "你偏好以下的股票代號：",
-                    f"{self.agent_config.investment_preferences}",
+                    f"你對這些這些公司特別感興趣（股票代號）：{self.agent_config.investment_preferences}。",
                 ]
             )
 
@@ -469,7 +468,7 @@ class TradingAgent:
         if self.agent_config.max_position_size:
             instructions_parts.extend(
                 [
-                    f"你對於每一隻股票的最大持股比例為 {self.agent_config.max_position_size}%。",
+                    f"無論你多麼看好特定公司，你對於每一隻股票的最大持股比例最多為 {self.agent_config.max_position_size}%。",
                 ]
             )
 
@@ -478,30 +477,15 @@ class TradingAgent:
             + """
 請根據以上描述作為你的根本指導。
 
-你可以使用各種工具來幫助你完成任務，包括：
-
-**📊 台灣股市數據工具 (Casual Market MCP)：**
-• buy_taiwan_stock(symbol, quantity, price) - 模擬買入台灣股票
-• sell_taiwan_stock(symbol, quantity, price) - 模擬賣出台灣股票
-
-**💰 投資組合管理工具：**
-• get_portfolio_status() - 查詢當前投資組合狀態，包括現金餘額、持股明細、總資產價值、資產配置比例
-• record_trade(symbol, action, quantity, price, decision_reason, company_name) - 記錄交易到資料庫，自動更新持股、資金和績效指標
-
-**🤖 專業分析 Sub-Agents：**
-• Technical Analyst - 技術分析專家
-• Sentiment Analyst - 情緒分析專家
-• Fundamental Analyst - 基本面分析專家
-• Risk Analyst - 風險評估專家
-
 **⚠️ 重要執行原則：**
-1. 決策前必須先使用投資組合管理工具了解資產狀況
-2. 充分利用專業分析 Sub-Agents 的能力，做出全面評估
-3. 善用持久記憶工具累積知識和經驗
-4. 每筆交易都要詳細記錄決策理由
-5. 決策理由應包含：分析過程、市場判斷、風險考量、Sub-Agents 建議
-6. 注意交易日檢查，避免在休市日執行操作
-7. 最終目標是最大化投資回報，同時嚴格控制風險
+1. 你應該使用各種工具來幫助你完成任務：
+    - 決策前必須先使用投資組合管理工具了解資產狀況
+    - 充分利用專業分析 Sub-Agents 的能力，做出全面評估
+    - 善用持久記憶工具累積知識和經驗
+2. 每筆交易都要詳細記錄決策理由
+3. 決策理由應包含：分析過程、市場判斷、風險考量、Sub-Agents 建議
+4. 注意交易日檢查，避免在休市日執行操作
+5. 最終目標是最大化投資回報，同時嚴格控制風險
 
 請始終保持理性、謹慎，運用所有可用工具做出明智的投資決策。
         """
@@ -555,7 +539,6 @@ class TradingAgent:
 ---
 
 可用工具：
-• OpenAI 內建工具 - 網路搜尋、程式碼執行
 • 台灣股市數據工具 (Casual Market MCP) - 市場指數、股票價格、資金流向、除權息資訊、買賣交易
 • 投資組合管理工具 - 查詢投資組合狀態、記錄調整決策
 • 持久記憶工具 (Memory MCP) - 儲存和回想平衡分析
@@ -577,7 +560,6 @@ class TradingAgent:
 ---
 
 可用工具：
-• OpenAI 內建工具 - 網路搜尋、程式碼執行
 • 台灣股市數據工具 (Casual Market MCP) - 市場指數、歷史數據、資金動向、熱門標的、股票資訊
 • 投資組合管理工具 - 查詢投資組合以評估相關性
 • 持久記憶工具 (Memory MCP) - 儲存機會分析和投資線索

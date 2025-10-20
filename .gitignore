@@ -4,6 +4,10 @@
 .specpilot-debug.log
 workspaces/
 
+# DB files
+casualtrader.db
+backend/memory/
+
 # Node.js
 node_modules/
 npm-debug.log*
