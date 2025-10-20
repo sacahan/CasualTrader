@@ -41,6 +41,14 @@ def _filter_noisy_loggers(record):
     if record["name"].startswith("httpcore._trace") and record["level"].name == "DEBUG":
         return False
 
+    # 過濾掉 OpenAI SDK 的 DEBUG 日誌
+    if record["name"].startswith("openai") and record["level"].name == "DEBUG":
+        return False
+
+    # 過濾掉 httpx 和 httpcore 的 DEBUG 日誌
+    if record["name"].startswith(("httpx", "httpcore")) and record["level"].name == "DEBUG":
+        return False
+
     return True
 
 
@@ -135,8 +143,11 @@ def intercept_standard_logging() -> None:
     for name in ["uvicorn", "uvicorn.error", "uvicorn.access", "fastapi", "sqlalchemy"]:
         logging.getLogger(name).handlers = [InterceptHandler()]
 
-    # 提高 aiosqlite 的日誌級別，避免過多的 DEBUG 訊息
+    # 提高第三方套件的日誌級別，避免過多的 DEBUG 訊息
     logging.getLogger("aiosqlite").setLevel(logging.WARNING)
+    logging.getLogger("openai").setLevel(logging.WARNING)
+    logging.getLogger("httpx").setLevel(logging.WARNING)
+    logging.getLogger("httpcore").setLevel(logging.WARNING)
 
 
 # ==========================================

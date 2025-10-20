@@ -11,7 +11,6 @@ from typing import Any
 from contextlib import AsyncExitStack
 from datetime import datetime
 
-
 from dotenv import load_dotenv
 
 # 現在可以正常導入 OpenAI Agents SDK
@@ -38,7 +37,7 @@ from trading.tools.technical_agent import get_technical_agent
 from trading.tools.sentiment_agent import get_sentiment_agent
 from trading.tools.fundamental_agent import get_fundamental_agent
 from trading.tools.risk_agent import get_risk_agent
-from trading.tools.trading_tools import create_trading_tools
+from trading.tools.trading_tools import create_trading_tools, get_portfolio_status
 
 from common.enums import AgentStatus, AgentMode
 from common.logger import logger
@@ -173,10 +172,9 @@ class TradingAgent:
             self.subagent_tools = await self._load_subagents_as_tools()
 
             # 5. 合併所有 tools
-            all_tools = self.openai_tools + self.trading_tools + self.subagent_tools
+            all_tools = self.trading_tools + self.subagent_tools
 
             # 6. 創建 OpenAI Agent
-            # Note: max_turns 已從 Agent.__init__() 移除，現在在 Runner.run() 中指定
             self.agent = Agent(
                 name=self.agent_id,
                 model=self.agent_config.ai_model or DEFAULT_MODEL,
@@ -273,7 +271,7 @@ class TradingAgent:
 
     async def _load_subagents_as_tools(self) -> list[Tool]:
         """載入 Sub-agents (從 tools/ 目錄，根據資料庫配置）"""
-        subagents = []
+        tools = []
 
         try:
             # 統一的 subagent 配置參數
@@ -281,60 +279,84 @@ class TradingAgent:
                 "model_name": self.agent_config.ai_model or DEFAULT_MODEL,  # 從資料庫載入
                 "mcp_servers": self.mcp_servers,  # 傳入相同的 MCP servers
                 "openai_tools": self.openai_tools,  # 傳入相同的 OpenAI tools
-                "max_turns": DEFAULT_MAX_TURNS,
             }
 
             # 生成所有 Sub-agents
             try:
                 technical_agent = await get_technical_agent(**subagent_config)
-                subagents.append(technical_agent)
-                logger.info("技術分析 agent 載入成功")
+                tools.append(
+                    technical_agent.as_tool(
+                        tool_name="Technical Analyst",
+                        tool_description="""
+• 技術分析專家
+    - 進行技術指標分析（MA, RSI, MACD, KD, 布林帶等）
+    - 識別圖表型態和趨勢
+    - 提供買賣點建議
+                        """,
+                        max_turns=DEFAULT_MAX_TURNS,
+                    )
+                )
+                logger.info("技術分析 Sub Agent Tool 載入成功")
             except Exception as e:
                 logger.warning(f"技術分析 agent 載入失敗: {e}")
 
             try:
                 sentiment_agent = await get_sentiment_agent(**subagent_config)
-                subagents.append(sentiment_agent)
-                logger.info("情緒分析 agent 載入成功")
+                tools.append(
+                    sentiment_agent.as_tool(
+                        tool_name="Sentiment Analyst",
+                        tool_description="""
+• 情緒分析專家
+    - 分析市場情緒和投資人心理
+    - 追蹤社交媒體和新聞輿論
+    - 評估市場氛圍對股價的影響
+                        """,
+                        max_turns=DEFAULT_MAX_TURNS,
+                    )
+                )
+                logger.info("情緒分析 Sub Agent Tool 載入成功")
             except Exception as e:
                 logger.warning(f"情緒分析 agent 載入失敗: {e}")
 
             try:
                 fundamental_agent = await get_fundamental_agent(**subagent_config)
-                subagents.append(fundamental_agent)
-                logger.info("基本面分析 agent 載入成功")
+                tools.append(
+                    fundamental_agent.as_tool(
+                        tool_name="Fundamental Analyst",
+                        tool_description="""
+• 基本面分析專家
+    - 研究公司財務報表和營運狀況
+    - 評估本益比、股價淨值比等估值指標
+    - 分析產業競爭力和成長潛力
+                        """,
+                        max_turns=DEFAULT_MAX_TURNS,
+                    )
+                )
+                logger.info("基本面分析 Sub Agent Tool 載入成功")
             except Exception as e:
                 logger.warning(f"基本面分析 agent 載入失敗: {e}")
 
             try:
                 risk_agent = await get_risk_agent(**subagent_config)
-                subagents.append(risk_agent)
-                logger.info("風險評估 agent 載入成功")
+                tools.append(
+                    risk_agent.as_tool(
+                        tool_name="Risk Analyst",
+                        tool_description="""
+• 風險評估專家
+    - 評估投資風險和波動性
+    - 計算風險調整後報酬
+    - 提供資產配置和避險建議
+                        """,
+                        max_turns=DEFAULT_MAX_TURNS,
+                    )
+                )
+                logger.info("風險評估 Sub Agent Tool 載入成功")
             except Exception as e:
                 logger.warning(f"風險評估 agent 載入失敗: {e}")
 
         except Exception as e:
             logger.error(f"載入 sub-agents 時發生錯誤: {e}")
 
-        # 將 Sub-agents 包裝為工具
-        tools = []
-        for agent in subagents:
-            # 根據 agent name 提供適當的工具名稱和描述
-            if agent.name == "Fundamental Analyst":
-                tool = agent.as_tool(
-                    tool_name="fundamental_analysis",
-                    tool_description="執行基本面分析，評估公司財務健康度和投資價值",
-                )
-            elif agent.name == "Risk Analyst":
-                tool = agent.as_tool(
-                    tool_name="risk_assessment", tool_description="執行風險評估，分析投資風險"
-                )
-            else:
-                tool = agent.as_tool(
-                    tool_name=agent.name.lower().replace(" ", "_"),
-                    tool_description=f"執行 {agent.name} 的任務",
-                )
-            tools.append(tool)
         return tools
 
     async def run(
@@ -458,43 +480,7 @@ class TradingAgent:
 
 你可以使用各種工具來幫助你完成任務，包括：
 
-**🌐 OpenAI 內建工具：**
-
-1. **網路搜尋 (WebSearchTool)**
-   • 功能：獲取最新市場資訊、新聞、產業動態、經濟數據
-   • 使用時機：當需要最新資訊時，Agent 會自動調用此工具進行網路搜尋
-   • 能力範圍：
-     - 股票市場研究和即時行情分析
-     - 新聞事件和最新產業動態
-     - 經濟數據和官方報告查詢
-     - 技術發展和創新趨勢
-     - 公司基本面和財務資訊
-   • 配置：medium 搜尋上下文（平衡的搜尋結果和詳細度）
-   • 注意：僅支持 OpenAI 模型，需要有效的互聯網連接
-
-2. **程式碼執行 (CodeInterpreterTool)**
-   • 功能：執行 Python 程式碼進行複雜的數據計算、統計分析、圖表繪製
-   • 使用時機：當需要進行計算或數據處理時，Agent 會自動調用此工具
-   • 能力範圍：
-     - 數值計算和數學運算
-     - 數據分析和統計計算（NumPy, Pandas）
-     - 技術指標計算（MA, RSI, MACD, 布林帶等）
-     - 財務建模和估值分析（DCF, P/E ratio）
-     - 投資組合優化和風險評估
-     - 圖表繪製和數據可視化
-   • 容器：auto（OpenAI 自動選擇最適合的執行環境）
-   • 常用庫：NumPy, Pandas, Matplotlib, SciPy 等科學計算工具
-
 **📊 台灣股市數據工具 (Casual Market MCP)：**
-• get_taiwan_stock_price(symbol) - 查詢台灣股票即時價格、漲跌幅、成交量
-• get_market_index_info(category, count, format) - 取得市場指數資訊（加權指數、類股指數等）
-• get_market_historical_index() - 查詢歷史指數資料，進行技術分析與回測
-• check_taiwan_trading_day(date) - 檢查是否為交易日，避免在休市日執行交易
-• get_taiwan_holiday_info(date) - 取得節假日資訊
-• get_foreign_investment_by_industry() - 查詢外資各產業持股狀況
-• get_top_foreign_holdings() - 取得外資持股前20名
-• get_dividend_rights_schedule(symbol) - 查詢除權息行事曆
-• get_etf_regular_investment_ranking() - 取得ETF定期定額排名
 • buy_taiwan_stock(symbol, quantity, price) - 模擬買入台灣股票
 • sell_taiwan_stock(symbol, quantity, price) - 模擬賣出台灣股票
 
@@ -502,35 +488,11 @@ class TradingAgent:
 • get_portfolio_status() - 查詢當前投資組合狀態，包括現金餘額、持股明細、總資產價值、資產配置比例
 • record_trade(symbol, action, quantity, price, decision_reason, company_name) - 記錄交易到資料庫，自動更新持股、資金和績效指標
 
-**🧠 持久記憶工具 (Memory MCP)：**
-• 使用記憶工具儲存和回想：
-    - 市場分析結果和趨勢判斷
-    - 技術指標計算和圖表分析
-    - 基本面研究和公司評估
-    - 風險評估和投資決策邏輯
-    - 過往交易經驗和教訓
-• 你的記憶會在不同執行週期間保持，請善用此能力累積知識
-
 **🤖 專業分析 Sub-Agents：**
-• technical_agent - 技術分析專家
-    - 進行技術指標分析（MA, RSI, MACD, KD, 布林帶等）
-    - 識別圖表型態和趨勢
-    - 提供買賣點建議
-
-• sentiment_agent - 情緒分析專家
-    - 分析市場情緒和投資人心理
-    - 追蹤社交媒體和新聞輿論
-    - 評估市場氛圍對股價的影響
-
-• fundamental_agent - 基本面分析專家
-    - 研究公司財務報表和營運狀況
-    - 評估本益比、股價淨值比等估值指標
-    - 分析產業競爭力和成長潛力
-
-• risk_agent - 風險評估專家
-    - 評估投資風險和波動性
-    - 計算風險調整後報酬
-    - 提供資產配置和避險建議
+• Technical Analyst - 技術分析專家
+• Sentiment Analyst - 情緒分析專家
+• Fundamental Analyst - 基本面分析專家
+• Risk Analyst - 風險評估專家
 
 **⚠️ 重要執行原則：**
 1. 決策前必須先使用投資組合管理工具了解資產狀況
@@ -562,13 +524,16 @@ class TradingAgent:
 
         # 根據模式添加指導
         task_prompts = {
-            AgentMode.TRADING: """
+            AgentMode.TRADING: f"""
 **🎯 交易執行模式 (TRADING MODE)**
 
 目的：分析市場機會並執行交易。
 
+---
+{get_portfolio_status(self.agent_service, self.agent_id)}
+---
+
 可用工具：
-• OpenAI 內建工具 - 網路搜尋、程式碼執行
 • 台灣股市數據工具 (Casual Market MCP) - 市場指數、股票價格、資金流向、除權息資訊、交易日檢查、買賣交易
 • 投資組合管理工具 - 查詢投資組合狀態、記錄交易決策
 • 持久記憶工具 (Memory MCP) - 儲存和回想分析結論
@@ -580,10 +545,14 @@ class TradingAgent:
 • 交易後必須記錄決策理由
 • 將分析過程利用持久記憶工具存入知識庫供下次參考
 """,
-            AgentMode.REBALANCING: """
+            AgentMode.REBALANCING: f"""
 **⚖️ 投資組合重新平衡模式 (REBALANCING MODE)**
 
 目的：檢視投資組合並根據策略進行重新平衡調整。
+
+---
+{get_portfolio_status(self.agent_service, self.agent_id)}
+---
 
 可用工具：
 • OpenAI 內建工具 - 網路搜尋、程式碼執行
@@ -598,10 +567,14 @@ class TradingAgent:
 • 考量交易成本和稅務影響
 • 調整理由利用持久記憶工具存入知識庫累積詳細記錄
 """,
-            AgentMode.OBSERVATION: """
+            AgentMode.OBSERVATION: f"""
 **🔍 市場觀察與機會發掘模式 (OBSERVATION MODE)**
 
 目的：研究市場機會並識別符合投資策略的潛在標的。
+
+---
+{get_portfolio_status(self.agent_service, self.agent_id)}
+---
 
 可用工具：
 • OpenAI 內建工具 - 網路搜尋、程式碼執行

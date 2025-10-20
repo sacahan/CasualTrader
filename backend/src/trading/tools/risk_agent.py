@@ -529,10 +529,9 @@ def generate_risk_recommendations(
 
 
 async def get_risk_agent(
-    model_name: str = DEFAULT_MODEL,
-    mcp_servers: str = "",
-    openai_tools: str = "",
-    max_turns: int = DEFAULT_MAX_TURNS,
+    model_name: str = None,
+    mcp_servers: list | None = None,
+    openai_tools: list | None = None,
 ) -> Agent:
     """創建風險管理 Agent
 
@@ -540,7 +539,6 @@ async def get_risk_agent(
         model_name: 使用的 AI 模型名稱
         mcp_servers: MCP servers 實例列表（MCPServerStdio 對象），從 TradingAgent 傳入
         openai_tools: 從 TradingAgent 傳入的共用工具（WebSearchTool, CodeInterpreterTool）
-        max_turns: 最大執行回合數
 
     Returns:
         Agent: 配置好的風險管理 Agent
@@ -568,13 +566,14 @@ async def get_risk_agent(
         f"Creating Agent with model={model_name}, mcp_servers={len(mcp_servers) if mcp_servers else 0}, tools={len(all_tools)}"
     )
     analyst = Agent(
-        name="Risk Manager",
+        name="Risk Analyst",
         instructions=risk_agent_instructions(),
         model=model_name,
         mcp_servers=mcp_servers,
         tools=all_tools,
         model_settings=ModelSettings(
             tool_choice="required",
+            max_completion_tokens=500,  # 控制回答長度，避免過度冗長
         ),
     )
     logger.info("Risk Manager Agent created successfully")

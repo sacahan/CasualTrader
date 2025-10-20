@@ -560,10 +560,9 @@ def generate_investment_rating(
 
 
 async def get_fundamental_agent(
-    model_name: str = DEFAULT_MODEL,
-    mcp_servers: str = "",
-    openai_tools: str = "",
-    max_turns: int = DEFAULT_MAX_TURNS,
+    model_name: str = None,
+    mcp_servers: list | None = None,
+    openai_tools: list | None = None,
 ) -> Agent:
     """創建基本面分析 Agent
 
@@ -571,7 +570,6 @@ async def get_fundamental_agent(
         model_name: 使用的 AI 模型名稱
         mcp_servers: MCP servers 實例列表（MCPServerStdio 對象），從 TradingAgent 傳入
         openai_tools: 從 TradingAgent 傳入的共用工具（WebSearchTool, CodeInterpreterTool）
-        max_turns: 最大執行回合數
 
     Returns:
         Agent: 配置好的基本面分析 Agent
@@ -607,7 +605,7 @@ async def get_fundamental_agent(
         # max_turns=max_turns,
         model_settings=ModelSettings(
             tool_choice="required",  # 強制使用工具
-            # max_completion_tokens=500,  # 控制回答長度，避免過度冗長
+            max_completion_tokens=500,  # 控制回答長度，避免過度冗長
         ),
     )
     logger.info("Fundamental Analyst Agent created successfully")
