@@ -689,7 +689,7 @@ async def get_sentiment_agent(
         f"mcp_servers={len(mcp_servers) if mcp_servers else 0}, tools={len(all_tools)}"
     )
     analyst = Agent(
-        name="Sentiment Analyst",
+        name="sentiment_analyst",
         instructions=sentiment_agent_instructions(),
         model=model_name,
         mcp_servers=mcp_servers,

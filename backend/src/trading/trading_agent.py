@@ -182,7 +182,7 @@ class TradingAgent:
                 tools=all_tools,
                 mcp_servers=self.mcp_servers,
                 model_settings=ModelSettings(
-                    temperature=DEFAULT_TEMPERATURE,
+                    # temperature=DEFAULT_TEMPERATURE,
                     # reasoning=Reasoning(effort="high", summary="detailed"),
                     tool_choice="required",
                 ),
@@ -286,7 +286,7 @@ class TradingAgent:
                 technical_agent = await get_technical_agent(**subagent_config)
                 tools.append(
                     technical_agent.as_tool(
-                        tool_name="Technical Analyst",
+                        tool_name="technical_analyst",
                         tool_description="""
 • 技術分析專家
     - 進行技術指標分析（MA, RSI, MACD, KD, 布林帶等）
@@ -304,7 +304,7 @@ class TradingAgent:
                 sentiment_agent = await get_sentiment_agent(**subagent_config)
                 tools.append(
                     sentiment_agent.as_tool(
-                        tool_name="Sentiment Analyst",
+                        tool_name="sentiment_analyst",
                         tool_description="""
 • 情緒分析專家
     - 分析市場情緒和投資人心理
@@ -322,7 +322,7 @@ class TradingAgent:
                 fundamental_agent = await get_fundamental_agent(**subagent_config)
                 tools.append(
                     fundamental_agent.as_tool(
-                        tool_name="Fundamental Analyst",
+                        tool_name="fundamental_analyst",
                         tool_description="""
 • 基本面分析專家
     - 研究公司財務報表和營運狀況
@@ -340,7 +340,7 @@ class TradingAgent:
                 risk_agent = await get_risk_agent(**subagent_config)
                 tools.append(
                     risk_agent.as_tool(
-                        tool_name="Risk Analyst",
+                        tool_name="risk_analyst",
                         tool_description="""
 • 風險評估專家
     - 評估投資風險和波動性
@@ -412,7 +412,7 @@ class TradingAgent:
             trace_id = gen_trace_id()
             with trace(workflow_name=f"TradingAgent-{self.agent_id}", trace_id=trace_id):
                 # 構建任務提示（可以根據 mode 調整）
-                task_prompt = self._build_task_prompt(execution_mode, context)
+                task_prompt = await self._build_task_prompt(execution_mode, context)
 
                 # 執行 Agent
                 result = await Runner.run(self.agent, task_prompt, max_turns=DEFAULT_MAX_TURNS)
@@ -494,7 +494,7 @@ class TradingAgent:
 
         return instructions.strip()
 
-    def _build_task_prompt(self, mode: AgentMode, context: dict[str, Any] | None) -> str:
+    async def _build_task_prompt(self, mode: AgentMode, context: dict[str, Any] | None) -> str:
         """
         根據執行模式構建任務提示
 
@@ -506,6 +506,9 @@ class TradingAgent:
             完整的任務提示
         """
 
+        # 獲取投資組合狀態（現在使用 await）
+        portfolio_status = await get_portfolio_status(self.agent_service, self.agent_id)
+
         # 根據模式添加指導
         task_prompts = {
             AgentMode.TRADING: f"""
@@ -514,7 +517,7 @@ class TradingAgent:
 目的：分析市場機會並執行交易。
 
 ---
-{get_portfolio_status(self.agent_service, self.agent_id)}
+{portfolio_status}
 ---
 
 可用工具：
@@ -527,7 +530,7 @@ class TradingAgent:
 • 必須有充分的分析支持才能執行交易
 • 遵守最大持股比例限制
 • 交易後必須記錄決策理由
-• 將分析過程利用持久記憶工具存入知識庫供下次參考
+• 將決策過程利用持久記憶工具存入知識庫以供未來參考
 """,
             AgentMode.REBALANCING: f"""
 **⚖️ 投資組合重新平衡模式 (REBALANCING MODE)**
@@ -535,7 +538,7 @@ class TradingAgent:
 目的：檢視投資組合並根據策略進行重新平衡調整。
 
 ---
-{get_portfolio_status(self.agent_service, self.agent_id)}
+{portfolio_status}
 ---
 
 可用工具：
@@ -548,7 +551,7 @@ class TradingAgent:
 • 焦點在現有持股調整，不需要識別新的投資機會
 • 調整應符合投資策略和偏好設定
 • 考量交易成本和稅務影響
-• 調整理由利用持久記憶工具存入知識庫累積詳細記錄
+• 將調整理由利用持久記憶工具存入知識庫以供未來參考
 """,
             AgentMode.OBSERVATION: f"""
 **🔍 市場觀察與機會發掘模式 (OBSERVATION MODE)**
@@ -556,7 +559,7 @@ class TradingAgent:
 目的：研究市場機會並識別符合投資策略的潛在標的。
 
 ---
-{get_portfolio_status(self.agent_service, self.agent_id)}
+{portfolio_status}
 ---
 
 可用工具：
@@ -567,16 +570,18 @@ class TradingAgent:
 
 限制：
 • 本模式不執行交易，僅識別和研究機會
+• 識別新的投資機會必須排除已經買入的標的
 • 評估標的應考量與投資策略的一致性
-• 記錄分析過程和進場條件供未來參考
-• 利用持久記憶工具累積知識庫
+• 將分析過程和進場條件利用持久記憶工具存入知識庫以供未來參考
 """,
         }
 
-        return (
+        action_message = (
             task_prompts[mode]
             + f"\n\n目前的日期時間：{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
         )
+        logger.info(f"Action message for {self.agent_id}: {action_message.strip()}")
+        return action_message.strip()
 
     async def stop(self) -> None:
         """

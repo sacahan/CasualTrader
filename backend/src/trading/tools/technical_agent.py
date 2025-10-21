@@ -505,7 +505,7 @@ async def get_technical_agent(
         f"Creating Agent with model={model_name}, mcp_servers={len(mcp_servers)}, tools={len(all_tools)}"
     )
     analyst = Agent(
-        name="Technical Analyst",
+        name="technical_analyst",
         instructions=technical_agent_instructions(),
         model=model_name,
         mcp_servers=mcp_servers,

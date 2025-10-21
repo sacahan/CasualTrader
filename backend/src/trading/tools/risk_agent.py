@@ -566,7 +566,7 @@ async def get_risk_agent(
         f"Creating Agent with model={model_name}, mcp_servers={len(mcp_servers) if mcp_servers else 0}, tools={len(all_tools)}"
     )
     analyst = Agent(
-        name="Risk Analyst",
+        name="risk_analyst",
         instructions=risk_agent_instructions(),
         model=model_name,
         mcp_servers=mcp_servers,

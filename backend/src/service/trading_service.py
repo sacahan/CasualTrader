@@ -221,6 +221,23 @@ class TradingService:
 
             raise TradingServiceError(f"Task execution failed: {str(e)}")
 
+        finally:
+            # 清理 Agent 資源和 MCP servers（無論成功或失敗都要清理）
+            if agent_id in self.active_agents:
+                trading_agent = self.active_agents.get(agent_id)
+                if trading_agent is not None:
+                    try:
+                        await trading_agent.cleanup()
+                        logger.info(f"Cleaned up MCP servers and Agent resources for {agent_id}")
+                    except Exception as cleanup_error:
+                        logger.warning(
+                            f"Error during agent cleanup for {agent_id}: {cleanup_error}",
+                            exc_info=False,
+                        )
+                # 移除活躍 Agent，強制重新初始化下一個模式
+                del self.active_agents[agent_id]
+                logger.debug(f"Removed {agent_id} from active_agents cache")
+
     async def get_agent_status(self, agent_id: str) -> dict[str, Any]:
         """
         取得 Agent 當前狀態
@@ -523,6 +540,10 @@ class TradingService:
         """
         取得或創建 TradingAgent 實例
 
+        NOTE: 為了避免 MCP servers cancel scope 在不同異步任務中被進入/退出的問題，
+        我們不再緩存 Agent 實例。每次執行都創建新的 Agent 實例，
+        並在執行完後立即清理。
+
         Args:
             agent_id: Agent ID
             agent_config: Agent 配置
@@ -533,22 +554,13 @@ class TradingService:
         Raises:
             AgentInitializationError: 初始化失敗
         """
-        # 如果已經在記憶體中，直接返回
-        if agent_id in self.active_agents:
-            agent = self.active_agents[agent_id]
-            if agent.is_initialized:
-                return agent
-            # 如果存在但未初始化，重新初始化
-            logger.info(f"Re-initializing agent {agent_id}")
-            await agent.initialize()
-            return agent
-
-        # 創建新的 TradingAgent 實例
-        logger.info(f"Creating new TradingAgent instance for {agent_id}")
+        # 不再從緩存中取得 Agent，而是每次都創建新實例
+        # 這確保了每個執行上下文都有自己的 MCP servers
+        logger.info(f"Creating new TradingAgent instance for {agent_id} (not reusing cached)")
         agent = TradingAgent(agent_id, agent_config, self.agents_service)
         await agent.initialize()
 
-        # 儲存到活躍列表
+        # 暫存到 active_agents 以便清理時使用
         self.active_agents[agent_id] = agent
 
         return agent

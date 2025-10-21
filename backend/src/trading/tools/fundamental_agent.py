@@ -597,7 +597,7 @@ async def get_fundamental_agent(
         f"Creating Agent with model={model_name}, mcp_servers={len(mcp_servers)}, tools={len(all_tools)}"
     )
     analyst = Agent(
-        name="Fundamental Analyst",
+        name="fundamental_analyst",
         instructions=fundamental_agent_instructions(),
         model=model_name,
         mcp_servers=mcp_servers,
