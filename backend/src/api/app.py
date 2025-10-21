@@ -15,7 +15,7 @@ from fastapi.staticfiles import StaticFiles
 
 from common.logger import logger, setup_logger
 from service.agent_executor import AgentExecutor
-from api.config import get_session_maker, settings
+from api.config import settings
 from api.docs import get_openapi_tags
 from api.routers import agent_execution, agents, ai_models, trading, websocket_router
 from api.websocket import websocket_manager
@@ -48,19 +48,10 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 
     # Initialize Agent Executor
     logger.info("Initializing Agent Executor...")
-    session_maker = get_session_maker()
-    # AgentExecutor 需要長期持有 session_maker 來創建 trading_service
-    # 而不是持有單個 TradingService 實例
-    executor = AgentExecutor(
-        session_maker=session_maker,
-        websocket_manager=websocket_manager,
-        settings=settings,
-    )
+    executor = AgentExecutor()
     # Set the global executor in dependencies module
     dependencies.set_executor(executor)
     logger.success("Agent Executor initialized successfully")
-    logger.info(f"Cycle interval: {settings.default_cycle_interval_minutes} minutes")
-    logger.info(f"Skip market check: {settings.skip_market_check}")
 
     logger.success("✅ CasualTrader API Server started successfully")
 
