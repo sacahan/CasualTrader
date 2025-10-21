@@ -176,7 +176,7 @@ def get_logger(name: str | None = None):
 
 
 # 預設初始化
-_default_log_file = Path(__file__).parent.parent.parent / "logs" / "casualtrader.log"
+_default_log_file = Path(__file__).parent.parent.parent / "logs" / "backend.log"
 setup_logger(log_level="INFO", log_file=_default_log_file)
 intercept_standard_logging()
 
