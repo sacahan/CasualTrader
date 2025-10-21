@@ -21,7 +21,9 @@
     holdings = [],
     selected = false,
     onclick = undefined,
-    onstart = undefined,
+    onobserve = undefined,
+    ontrade = undefined,
+    onrebalance = undefined,
     onstop = undefined,
     onedit = undefined,
     ondelete = undefined,
@@ -179,9 +181,19 @@
     onclick?.(agent);
   }
 
-  function handleStart(e) {
+  function handleObserve(e) {
     e.stopPropagation();
-    onstart?.(agent);
+    onobserve?.(agent, 'OBSERVATION');
+  }
+
+  function handleTrade(e) {
+    e.stopPropagation();
+    ontrade?.(agent, 'TRADING');
+  }
+
+  function handleRebalance(e) {
+    e.stopPropagation();
+    onrebalance?.(agent, 'REBALANCING');
   }
 
   function handleStop(e) {
@@ -329,36 +341,83 @@
   </div>
 
   <!-- 操作按鈕 -->
-  <div class="flex gap-3">
+  <div class="flex gap-2 flex-col">
+    <!-- 模式選擇按鈕 -->
     {#if canStart}
-      <Button
-        variant="primary"
-        size="md"
-        fullWidth
-        onclick={handleStart}
-        disabled={!$isOpen}
-        style="background-color: rgb({agentColor}); border-color: rgb({agentColor});"
-      >
-        <svg class="mr-2 h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            stroke-width="2"
-            d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"
-          />
-          <path
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            stroke-width="2"
-            d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-          />
-        </svg>
-        開始交易
-      </Button>
+      <div class="grid grid-cols-3 gap-2">
+        <Button
+          variant="secondary"
+          size="sm"
+          fullWidth
+          onclick={handleObserve}
+          disabled={!$isOpen}
+          title="觀察模式：分析市場無交易"
+        >
+          <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
+            />
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
+            />
+          </svg>
+          <span class="hidden sm:inline">觀察</span>
+        </Button>
+        <Button
+          variant="secondary"
+          size="sm"
+          fullWidth
+          onclick={handleTrade}
+          disabled={!$isOpen}
+          title="交易模式：執行交易決策"
+        >
+          <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              d="M13 10V3L4 14h7v7l9-11h-7z"
+            />
+          </svg>
+          <span class="hidden sm:inline">交易</span>
+        </Button>
+        <Button
+          variant="secondary"
+          size="sm"
+          fullWidth
+          onclick={handleRebalance}
+          disabled={!$isOpen}
+          title="再平衡模式：調整投資組合"
+        >
+          <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"
+            />
+          </svg>
+          <span class="hidden sm:inline">平衡</span>
+        </Button>
+      </div>
     {/if}
 
+    <!-- 停止按鈕（總是顯示當 Agent 運行中） -->
     {#if canStop}
-      <Button variant="secondary" size="md" fullWidth onclick={handleStop} disabled={!$isOpen}>
+      <Button
+        variant="danger"
+        size="md"
+        fullWidth
+        onclick={handleStop}
+        disabled={!$isOpen}
+        title="停止執行"
+      >
         <svg class="mr-2 h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path
             stroke-linecap="round"
@@ -373,7 +432,7 @@
             d="M9 10a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1h-4a1 1 0 01-1-1v-4z"
           />
         </svg>
-        停止交易
+        停止
       </Button>
     {/if}
   </div>

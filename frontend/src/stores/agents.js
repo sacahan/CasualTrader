@@ -244,14 +244,14 @@ export async function stopAgent(agentId) {
 }
 
 /**
- * 執行 agent 週期
+ * 執行 agent 單一模式
  */
 export async function executeAgent(agentId, mode = 'TRADING') {
   loading.set(true);
   error.set(null);
 
   try {
-    const result = await apiClient.executeAgent(agentId, mode);
+    const result = await apiClient.startMode(agentId, mode);
     return result;
   } catch (err) {
     error.set(extractErrorMessage(err));

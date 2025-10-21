@@ -98,6 +98,17 @@ class APIClient {
   }
 
   /**
+   * Start an agent in a specific mode
+   * Note: 後端新路徑為 /agents/{agent_id}/start (支持 mode 參數)
+   */
+  startMode(agentId, mode) {
+    return this.request(`/agents/${agentId}/start`, {
+      method: 'POST',
+      body: JSON.stringify({ mode }),
+    });
+  }
+
+  /**
    * Stop an agent
    * Note: 後端路徑為 /api/agent-execution/{agent_id}/stop
    */
