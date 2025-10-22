@@ -85,7 +85,7 @@ class AgentExecutionError(TradingAgentError):
 def mcp_server_params(agent_id: str) -> list[tuple[str, dict[str, Any]]]:
     return [
         (
-            "Casual Market MCP",
+            "casual_market_mcp",
             {
                 "command": "uvx",
                 "args": [
@@ -96,7 +96,7 @@ def mcp_server_params(agent_id: str) -> list[tuple[str, dict[str, Any]]]:
             },
         ),
         (
-            "Memory MCP",
+            "memory_mcp",
             {
                 "command": "npx",
                 "args": ["-y", "mcp-memory-libsql"],
@@ -171,7 +171,7 @@ class TradingAgent:
             # 4. 載入 Sub-agents (從 tools/ 目錄，傳入共享配置)
             self.subagent_tools = await self._load_subagents_as_tools()
 
-            # 5. 合併所有 tools
+            # 5. 合併所有 tools (不包括 OpenAI 內建工具)
             all_tools = self.trading_tools + self.subagent_tools
 
             # 6. 創建 OpenAI Agent
@@ -481,7 +481,7 @@ class TradingAgent:
 1. 你應該使用各種工具來幫助你完成任務：
     - 決策前必須先使用投資組合管理工具了解資產狀況
     - 充分利用專業分析 Sub-Agents 的能力，做出全面評估
-    - 善用持久記憶工具累積知識和經驗
+    - 善用持久記憶工具(memory_mcp)累積知識和經驗
 2. 每筆交易都要詳細記錄決策理由
 3. 決策理由應包含：分析過程、市場判斷、風險考量、Sub-Agents 建議
 4. 注意交易日檢查，避免在休市日執行操作
@@ -521,16 +521,16 @@ class TradingAgent:
 ---
 
 可用工具：
-• 台灣股市數據工具 (Casual Market MCP) - 市場指數、股票價格、資金流向、除權息資訊、交易日檢查、買賣交易
-• 投資組合管理工具 - 查詢投資組合狀態、記錄交易決策
-• 持久記憶工具 (Memory MCP) - 儲存和回想分析結論
-• 專業分析 Sub-Agents - 技術分析、基本面分析、情緒分析、風險評估
+• casual_market_mcp (台灣股市數據工具) - 市場指數、股票價格、資金流向、除權息資訊、交易日檢查、買賣交易
+• 投資組合管理工具 (record_trade_tool、get_portfolio_status_tool) - 查詢投資組合狀態、記錄交易決策
+• memory_mcp (持久記憶工具) - 儲存和回想分析結論
+• 專業分析 Sub-Agents - technical_analyst、fundamental_analyst、sentiment_analyst、risk_analyst
 
 限制：
 • 必須有充分的分析支持才能執行交易
 • 遵守最大持股比例限制
 • 交易後必須記錄決策理由
-• 將決策過程利用持久記憶工具存入知識庫以供未來參考
+• 將決策過程利用 memory_mcp 存入知識庫以供未來參考
 """,
             AgentMode.REBALANCING: f"""
 **⚖️ 投資組合重新平衡模式 (REBALANCING MODE)**
@@ -542,16 +542,16 @@ class TradingAgent:
 ---
 
 可用工具：
-• 台灣股市數據工具 (Casual Market MCP) - 市場指數、股票價格、資金流向、除權息資訊、買賣交易
-• 投資組合管理工具 - 查詢投資組合狀態、記錄調整決策
-• 持久記憶工具 (Memory MCP) - 儲存和回想平衡分析
-• 專業分析 Sub-Agents - 技術分析、基本面分析、情緒分析、風險評估
+• casual_market_mcp (台灣股市數據工具) - 市場指數、股票價格、資金流向、除權息資訊、交易日檢查、買賣交易
+• 投資組合管理工具 (record_trade_tool、get_portfolio_status_tool) - 查詢投資組合狀態、記錄交易決策
+• memory_mcp (持久記憶工具) - 儲存和回想分析結論
+• 專業分析 Sub-Agents - technical_analyst、fundamental_analyst、sentiment_analyst、risk_analyst
 
 限制：
 • 焦點在現有持股調整，不需要識別新的投資機會
 • 調整應符合投資策略和偏好設定
 • 考量交易成本和稅務影響
-• 將調整理由利用持久記憶工具存入知識庫以供未來參考
+• 將調整理由利用 memory_mcp 存入知識庫以供未來參考
 """,
             AgentMode.OBSERVATION: f"""
 **🔍 市場觀察與機會發掘模式 (OBSERVATION MODE)**
@@ -563,16 +563,16 @@ class TradingAgent:
 ---
 
 可用工具：
-• 台灣股市數據工具 (Casual Market MCP) - 市場指數、歷史數據、資金動向、熱門標的、股票資訊
-• 投資組合管理工具 - 查詢投資組合以評估相關性
-• 持久記憶工具 (Memory MCP) - 儲存機會分析和投資線索
-• 專業分析 Sub-Agents - 技術分析、基本面分析、情緒分析、風險評估
+• casual_market_mcp (台灣股市數據工具) - 市場指數、股票價格、資金流向、除權息資訊、交易日檢查、買賣交易
+• 投資組合管理工具 (record_trade_tool、get_portfolio_status_tool) - 查詢投資組合狀態、記錄交易決策
+• memory_mcp (持久記憶工具) - 儲存和回想分析結論
+• 專業分析 Sub-Agents - technical_analyst、fundamental_analyst、sentiment_analyst、risk_analyst
 
 限制：
 • 本模式不執行交易，僅識別和研究機會
 • 識別新的投資機會必須排除已經買入的標的
-• 評估標的應考量與投資策略的一致性
-• 將分析過程和進場條件利用持久記憶工具存入知識庫以供未來參考
+• 評估投資標的應該保持與投資主張的一致性
+• 將分析過程和進場條件利用 memory_mcp 存入知識庫以供未來參考
 """,
         }
 

@@ -197,7 +197,20 @@ def create_trading_tools(agent_service, agent_id: str) -> list[Tool]:
         decision_reason: str,
         company_name: str = None,
     ) -> str:
-        """記錄交易到資料庫"""
+        """
+        記錄交易到資料庫
+
+        Args:
+            ticker: 股票代號 (例如: "2330")
+            action: 交易動作 ("BUY" 或 "SELL")
+            quantity: 交易股數
+            price: 交易價格
+            decision_reason: 交易決策理由
+            company_name: 公司名稱 (可選)
+
+        Returns:
+            交易記錄結果訊息
+        """
         return await record_trade(
             agent_service=agent_service,
             agent_id=agent_id,
@@ -211,7 +224,12 @@ def create_trading_tools(agent_service, agent_id: str) -> list[Tool]:
 
     @function_tool
     async def get_portfolio_status_tool() -> str:
-        """取得當前投資組合狀態"""
+        """
+        取得當前投資組合狀態
+
+        Returns:
+            投資組合詳細資訊的文字描述
+        """
         return await get_portfolio_status(agent_service=agent_service, agent_id=agent_id)
 
     tools.extend([record_trade_tool, get_portfolio_status_tool])

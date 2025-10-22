@@ -376,3 +376,68 @@ async def test_e2e_agent_correctly_not_mocked_in_call():
     # 驗證 run() 被調用
     mock_agent.run.assert_called_once()
     assert result["success"] is True
+
+
+@pytest.mark.asyncio
+async def test_e2e_agent_initialize_must_be_called():
+    """
+    場景 8: 驗證 Agent 初始化流程
+
+    這個測試驗證了關鍵的 bug 修復：
+    - TradingAgent 必須在執行前調用 initialize()
+    - initialize() 加載 MCP servers, tools, sub-agents 等
+    - 如果跳過 initialize()，agent.run() 會檢查 is_initialized 並拋出錯誤
+
+    這個測試捕獲了為什麼之前會看到錯誤的原因：
+    "Agent agent-43cc7808 not initialized. Call initialize() first."
+
+    關鍵修復：在 execute_single_mode() 中添加 await agent.initialize()
+    """
+    mock_db_session = AsyncMock()
+    service = TradingService(mock_db_session)
+
+    # 建立一個真實行為的 mock Agent
+    # 使用 spec_set 確保只有實際存在的方法可以被調用
+    mock_agent = MagicMock(spec=TradingAgent)
+    mock_agent.is_initialized = False
+    mock_agent.initialize = AsyncMock()
+    mock_agent.run = AsyncMock(return_value={"output": "test"})
+    mock_agent.cleanup = AsyncMock()
+
+    # 使 initialize() 和 run() 異步
+    async def async_initialize():
+        mock_agent.is_initialized = True
+
+    async def async_run(**kwargs):
+        if not mock_agent.is_initialized:
+            raise Exception("Agent agent-43cc7808 not initialized. Call initialize() first.")
+        return {"output": "test"}
+
+    mock_agent.initialize = AsyncMock(side_effect=async_initialize)
+    mock_agent.run = AsyncMock(side_effect=async_run)
+
+    mock_agent_config = MagicMock(id="test-agent")
+    mock_session = MagicMock(id="session-123")
+
+    service.agents_service.get_agent_config = AsyncMock(return_value=mock_agent_config)
+    service.session_service.create_session = AsyncMock(return_value=mock_session)
+    service.session_service.update_session_status = AsyncMock()
+    service._get_or_create_agent = AsyncMock(return_value=mock_agent)
+
+    # 執行 - 應該成功，因為 initialize() 被調用了
+    result = await service.execute_single_mode(
+        agent_id="test-agent",
+        mode=AgentMode.OBSERVATION,
+    )
+
+    # 驗證 initialize() 被調用（這是修復的關鍵）
+    mock_agent.initialize.assert_called_once()
+
+    # 驗證 run() 被正確調用
+    mock_agent.run.assert_called_once()
+
+    # 驗證執行成功
+    assert result["success"] is True
+
+    # 驗證資源清理
+    mock_agent.cleanup.assert_called_once()

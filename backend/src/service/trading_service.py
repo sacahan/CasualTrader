@@ -133,11 +133,15 @@ class TradingService:
             # 6. 標記為活躍
             self.active_agents[agent_id] = agent
 
-            # 7. 執行指定模式
+            # 7. 初始化 Agent（載入工具、Sub-agents 等）
+            logger.info(f"Initializing agent {agent_id}")
+            await agent.initialize()
+
+            # 8. 執行指定模式
             logger.info(f"Executing {mode.value} for agent {agent_id}")
             result = await agent.run(mode=mode)
 
-            # 8. 更新會話狀態為 COMPLETED
+            # 9. 更新會話狀態為 COMPLETED
             await self.session_service.update_session_status(session_id, SessionStatus.COMPLETED)
             execution_time_ms = int((datetime.now() - start_time).total_seconds() * 1000)
 
