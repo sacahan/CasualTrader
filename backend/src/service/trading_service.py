@@ -178,7 +178,8 @@ class TradingService:
             # 確保資源清理（即使發生異常）
             if agent_id in self.active_agents:
                 try:
-                    await agent.cleanup()
+                    if agent is not None:
+                        await agent.cleanup()
                     logger.debug(f"Cleaned up agent {agent_id}")
                 except Exception as cleanup_error:
                     logger.error(f"Error cleaning up agent {agent_id}: {cleanup_error}")
@@ -256,12 +257,23 @@ class TradingService:
 
         Returns:
             TradingAgent 實例
+
+        Raises:
+            TypeError: 如果 agents_service 類型不正確
         """
+        # 防禦性驗證 - 確保依賴注入正確
+        if not isinstance(self.agents_service, AgentsService):
+            raise TypeError(
+                f"agents_service must be AgentsService instance, "
+                f"got {type(self.agents_service).__name__}"
+            )
+
         if agent_id in self.active_agents:
             return self.active_agents[agent_id]
 
         logger.debug(f"Creating TradingAgent for {agent_id}")
-        agent = TradingAgent(agent_id, agent_config, self.db_session)
+        agent = TradingAgent(agent_id, agent_config, self.agents_service)
+        self.active_agents[agent_id] = agent
         return agent
 
     async def cleanup(self) -> None:
