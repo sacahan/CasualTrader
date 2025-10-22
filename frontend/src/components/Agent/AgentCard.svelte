@@ -10,9 +10,11 @@
 
   import { onMount } from 'svelte';
   import { Button } from '../UI/index.js';
-  import { AGENT_STATUS, AGENT_RUNTIME_STATUS } from '../../shared/constants.js';
+  import { AGENT_STATUS, AGENT_RUNTIME_STATUS, WS_EVENT_TYPES } from '../../shared/constants.js';
   import { formatCurrency } from '../../shared/utils.js';
   import { isOpen } from '../../stores/market.js';
+  import { addEventListener, removeEventListener } from '../../stores/websocket.js';
+  import { executionRetryManager } from '../../shared/retry.js';
 
   // Props
   let {
@@ -76,16 +78,91 @@
   // 是否可以停止
   let canStop = $derived(agent.runtime_status === AGENT_RUNTIME_STATUS.RUNNING);
 
+  // 本地狀態 - 執行加載和錯誤
+  let isExecuting = $state(false);
+  let executionError = $state(null);
+  let executionResult = $state(null);
+  let showRetryButton = $state(false);
+  let retryCount = $state(0);
+
   // Canvas for mini chart
   let chartCanvas;
   let chartInstance;
 
+  // WebSocket 事件監聽取消函數
+  let unsubscribeExecStarted;
+  let unsubscribeExecCompleted;
+  let unsubscribeExecFailed;
+  let unsubscribeExecStopped;
+
   onMount(() => {
+    // 設置 WebSocket 事件監聽
+    unsubscribeExecStarted = addEventListener(WS_EVENT_TYPES.EXECUTION_STARTED, (payload) => {
+      // 只監聽本 Agent 的事件
+      if (payload.agent_id === agent.agent_id) {
+        isExecuting = true;
+        executionError = null;
+        executionResult = null;
+      }
+    });
+
+    unsubscribeExecCompleted = addEventListener(WS_EVENT_TYPES.EXECUTION_COMPLETED, (payload) => {
+      if (payload.agent_id === agent.agent_id) {
+        isExecuting = false;
+        executionResult = {
+          success: true,
+          time_ms: payload.execution_time_ms,
+          mode: payload.mode,
+        };
+
+        // 成功時重置重試計數和狀態
+        executionRetryManager.reset(agent.agent_id);
+        showRetryButton = false;
+        retryCount = 0;
+      }
+    });
+
+    unsubscribeExecFailed = addEventListener(WS_EVENT_TYPES.EXECUTION_FAILED, (payload) => {
+      if (payload.agent_id === agent.agent_id) {
+        isExecuting = false;
+        executionError = payload.error;
+
+        // 更新重試計數
+        const failureCount = executionRetryManager.getRetryCount(agent.agent_id) + 1;
+        retryCount = failureCount;
+
+        // 檢查是否可以重試
+        if (executionRetryManager.canRetry(agent.agent_id)) {
+          executionRetryManager.recordRetry(agent.agent_id, payload.error);
+          showRetryButton = true;
+        } else {
+          // 已達最大重試次數
+          showRetryButton = false;
+          executionError = `執行失敗 (已重試 ${failureCount} 次): ${payload.error}`;
+        }
+      }
+    });
+
+    unsubscribeExecStopped = addEventListener(WS_EVENT_TYPES.EXECUTION_STOPPED, (payload) => {
+      if (payload.agent_id === agent.agent_id) {
+        isExecuting = false;
+      }
+    });
+
+    // 初始化圖表
     if (chartCanvas && performanceData.length > 0) {
       renderMiniChart();
     }
 
+    // 返回清理函數
     return () => {
+      // 取消訂閱
+      unsubscribeExecStarted?.();
+      unsubscribeExecCompleted?.();
+      unsubscribeExecFailed?.();
+      unsubscribeExecStopped?.();
+
+      // 銷毀圖表
       if (chartInstance) {
         chartInstance.destroy();
       }
@@ -171,17 +248,33 @@
 
   function handleObserve(e) {
     e.stopPropagation();
+    showRetryButton = false;
+    executionResult = null;
     onobserve?.(agent, 'OBSERVATION');
   }
 
   function handleTrade(e) {
     e.stopPropagation();
+    showRetryButton = false;
+    executionResult = null;
     ontrade?.(agent, 'TRADING');
   }
 
   function handleRebalance(e) {
     e.stopPropagation();
+    showRetryButton = false;
+    executionResult = null;
     onrebalance?.(agent, 'REBALANCING');
+  }
+
+  function handleRetry(e) {
+    e.stopPropagation();
+    // 根據最後失敗的模式重試（暫時使用 TRADING 作為預設）
+    // 實際實現需要記住上一次的模式
+    const lastMode = agent.current_mode || 'TRADING';
+    showRetryButton = false;
+    executionError = null;
+    ontrade?.(agent, lastMode);
   }
 
   function handleStop(e) {
@@ -338,7 +431,8 @@
           size="sm"
           fullWidth
           onclick={handleObserve}
-          disabled={!$isOpen}
+          disabled={!$isOpen || isExecuting}
+          loading={isExecuting}
           title="觀察模式：分析市場無交易"
         >
           <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -362,7 +456,8 @@
           size="sm"
           fullWidth
           onclick={handleTrade}
-          disabled={!$isOpen}
+          disabled={!$isOpen || isExecuting}
+          loading={isExecuting}
           title="交易模式：執行交易決策"
         >
           <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -380,7 +475,8 @@
           size="sm"
           fullWidth
           onclick={handleRebalance}
-          disabled={!$isOpen}
+          disabled={!$isOpen || isExecuting}
+          loading={isExecuting}
           title="再平衡模式：調整投資組合"
         >
           <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -403,7 +499,8 @@
         size="md"
         fullWidth
         onclick={handleStop}
-        disabled={!$isOpen}
+        disabled={!$isOpen || isExecuting}
+        loading={isExecuting}
         title="停止執行"
       >
         <svg class="mr-2 h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -422,6 +519,47 @@
         </svg>
         停止
       </Button>
+    {/if}
+
+    <!-- 執行狀態提示 -->
+    {#if isExecuting}
+      <div class="mt-2 p-2 bg-blue-50 border border-blue-200 rounded text-sm text-blue-800">
+        <div class="flex items-center gap-2">
+          <div
+            class="animate-spin h-4 w-4 border-2 border-blue-500 border-t-transparent rounded-full"
+          ></div>
+          <span>執行中...</span>
+        </div>
+      </div>
+    {/if}
+
+    {#if executionError}
+      <div class="mt-2 p-2 bg-red-50 border border-red-200 rounded text-sm text-red-800">
+        <div class="font-semibold">
+          執行失敗{retryCount > 0
+            ? ` (重試 ${retryCount}/${executionRetryManager.maxRetries})`
+            : ''}
+        </div>
+        <div class="text-xs mt-1">{executionError}</div>
+        {#if showRetryButton}
+          <button
+            type="button"
+            onclick={handleRetry}
+            class="mt-2 px-2 py-1 bg-red-600 text-white text-xs rounded hover:bg-red-700 transition-colors"
+          >
+            重試
+          </button>
+        {/if}
+      </div>
+    {/if}
+
+    {#if executionResult && executionResult.success}
+      <div class="mt-2 p-2 bg-green-50 border border-green-200 rounded text-sm text-green-800">
+        <div class="font-semibold">✓ 執行完成</div>
+        <div class="text-xs mt-1">
+          {executionResult.mode} 模式 (耗時 {executionResult.time_ms}ms)
+        </div>
+      </div>
     {/if}
   </div>
 </div>

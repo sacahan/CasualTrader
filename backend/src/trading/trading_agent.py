@@ -83,18 +83,28 @@ class AgentExecutionError(TradingAgentError):
 
 # MCP 伺服器配置
 def mcp_server_params(agent_id: str) -> list[tuple[str, dict[str, Any]]]:
+    # return [
+    #     (
+    #         "casual_market_mcp",
+    #         {
+    #             "command": "uvx",
+    #             "args": [
+    #                 "--from",
+    #                 "/Users/sacahan/Documents/workspace/CasualMarket",
+    #                 "casual-market-mcp",
+    #             ],
+    #         },
+    #     ),
+    #     (
+    #         "memory_mcp",
+    #         {
+    #             "command": "npx",
+    #             "args": ["-y", "mcp-memory-libsql"],
+    #             "env": {"LIBSQL_URL": f"file:./memory/{agent_id}.db"},
+    #         },
+    #     ),
+    # ]
     return [
-        (
-            "casual_market_mcp",
-            {
-                "command": "uvx",
-                "args": [
-                    "--from",
-                    "/Users/sacahan/Documents/workspace/CasualMarket",
-                    "casual-market-mcp",
-                ],
-            },
-        ),
         (
             "memory_mcp",
             {

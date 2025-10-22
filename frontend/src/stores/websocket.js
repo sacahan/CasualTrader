@@ -211,20 +211,39 @@ export function removeEventListener(eventType, callback) {
  * 分發事件給監聽器
  */
 function handleEvent(data) {
-  const { event_type, payload } = data;
+  // 相容後端的 "type" 字段和舊版 "event_type" 字段
+  const eventType = data.type || data.event_type;
+  const payload = data.payload || data;
+
+  if (!eventType) {
+    console.warn('Received message without event type:', data);
+    return;
+  }
 
   // 觸發通用監聽器
-  const listeners = eventListeners.get(event_type) || [];
+  const listeners = eventListeners.get(eventType) || [];
   listeners.forEach((callback) => {
     try {
       callback(payload);
     } catch (error) {
-      console.error(`Error in event listener for ${event_type}:`, error);
+      console.error(`Error in event listener for ${eventType}:`, error);
     }
   });
 
   // 處理內建事件
-  switch (event_type) {
+  switch (eventType) {
+    case WS_EVENT_TYPES.EXECUTION_STARTED:
+      handleExecutionStarted(payload);
+      break;
+    case WS_EVENT_TYPES.EXECUTION_COMPLETED:
+      handleExecutionCompleted(payload);
+      break;
+    case WS_EVENT_TYPES.EXECUTION_FAILED:
+      handleExecutionFailed(payload);
+      break;
+    case WS_EVENT_TYPES.EXECUTION_STOPPED:
+      handleExecutionStopped(payload);
+      break;
     case WS_EVENT_TYPES.AGENT_STATUS:
       handleAgentStatusUpdate(payload);
       break;
@@ -244,12 +263,95 @@ function handleEvent(data) {
       handleErrorEvent(payload);
       break;
     default:
-      console.warn(`Unhandled event type: ${event_type}`, payload);
+      console.warn(`Unhandled event type: ${eventType}`, payload);
   }
 }
 
 /**
- * 處理 Agent 狀態更新事件
+ * 處理執行開始事件
+ */
+function handleExecutionStarted(payload) {
+  const { agent_id, session_id, mode } = payload;
+
+  // 更新 agent 狀態為 RUNNING
+  agents.update((list) =>
+    list.map((agent) =>
+      agent.agent_id === agent_id ? { ...agent, runtime_status: 'running', session_id } : agent
+    )
+  );
+
+  addNotification({
+    type: 'info',
+    message: `Agent ${agent_id} 開始執行 ${mode} 模式...`,
+  });
+
+  console.warn(`[WS] Execution started for agent ${agent_id}`);
+}
+
+/**
+ * 處理執行完成事件
+ */
+function handleExecutionCompleted(payload) {
+  const { agent_id, execution_time_ms } = payload;
+
+  // 更新 agent 狀態為 IDLE
+  agents.update((list) =>
+    list.map((agent) =>
+      agent.agent_id === agent_id ? { ...agent, runtime_status: 'idle' } : agent
+    )
+  );
+
+  addNotification({
+    type: 'success',
+    message: `Agent ${agent_id} 執行完成 (耗時 ${execution_time_ms}ms)`,
+  });
+
+  console.warn(`[WS] Execution completed for agent ${agent_id}`);
+}
+
+/**
+ * 處理執行失敗事件
+ */
+function handleExecutionFailed(payload) {
+  const { agent_id, error } = payload;
+
+  // 更新 agent 狀態為 STOPPED
+  agents.update((list) =>
+    list.map((agent) =>
+      agent.agent_id === agent_id ? { ...agent, runtime_status: 'stopped' } : agent
+    )
+  );
+
+  addNotification({
+    type: 'error',
+    message: `Agent ${agent_id} 執行失敗: ${error}`,
+  });
+
+  console.error(`[WS] Execution failed for agent ${agent_id}:`, error);
+}
+
+/**
+ * 處理執行停止事件
+ */
+function handleExecutionStopped(payload) {
+  const { agent_id, status } = payload;
+
+  // 更新 agent 狀態為 STOPPED
+  agents.update((list) =>
+    list.map((agent) =>
+      agent.agent_id === agent_id ? { ...agent, runtime_status: 'stopped' } : agent
+    )
+  );
+
+  addNotification({
+    type: 'warning',
+    message: `Agent ${agent_id} 已停止 (狀態: ${status})`,
+  });
+
+  console.warn(`[WS] Execution stopped for agent ${agent_id}`);
+}
+
+/**
  */
 function handleAgentStatusUpdate(payload) {
   const { agent_id, status, current_mode } = payload;

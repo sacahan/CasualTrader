@@ -84,6 +84,12 @@ export const RECONNECT_DELAY_MS = 1000;
 
 // WebSocket Event Types
 export const WS_EVENT_TYPES = {
+  // Execution Events
+  EXECUTION_STARTED: 'execution_started',
+  EXECUTION_COMPLETED: 'execution_completed',
+  EXECUTION_FAILED: 'execution_failed',
+  EXECUTION_STOPPED: 'execution_stopped',
+  // Status Events
   AGENT_STATUS: 'agent_status',
   TRADE_EXECUTION: 'trade_execution',
   STRATEGY_CHANGE: 'strategy_change',

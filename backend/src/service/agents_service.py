@@ -274,7 +274,9 @@ class AgentsService:
                 "display_name": model.display_name,
                 "provider": model.provider,
                 "group_name": model.group_name,
-                "model_type": model.model_type.value,
+                "model_type": model.model_type
+                if isinstance(model.model_type, str)
+                else model.model_type.value,
                 "litellm_prefix": model.litellm_prefix,
                 "full_model_name": model.full_model_name,
                 "max_tokens": model.max_tokens,

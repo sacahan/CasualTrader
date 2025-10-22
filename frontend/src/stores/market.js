@@ -125,9 +125,10 @@ export async function loadMarketIndices() {
 
   try {
     const result = await apiClient.getMarketIndices();
-    // 後端回傳格式: { success: true, data: { indices: [...] }, tool: "index_info" }
-    const indices = result.data?.indices || [];
-    marketIndices.set(indices);
+    // 後端回傳格式: { success: true, data: { 日期, 指數, 收盤指數, ... }, tool: "index_info" }
+    // 轉換為陣列格式以便 twseIndex 衍生 store 處理
+    const indicesArray = result.data ? [result.data] : [];
+    marketIndices.set(indicesArray);
     return result;
   } catch (err) {
     error.set(extractErrorMessage(err));

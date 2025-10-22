@@ -87,24 +87,22 @@ class APIClient {
   // ========== Agent Control APIs ==========
 
   /**
-   * Start an agent
-   * Note: 後端路徑為 /api/agent-execution/{agent_id}/start
+   * Start an agent in a specific mode (async, returns session_id)
+   * Note: 後端路徑為 POST /api/agent-execution/{agent_id}/start
+   * 回應包含: { success, session_id, mode, message }
+   * @param {string} agentId - Agent ID
+   * @param {string} mode - 執行模式 (OBSERVATION | TRADING | REBALANCING)
+   * @param {number} maxTurns - 最大輪數 (可選)
+   * @returns {Promise<{success: boolean, session_id: string, mode: string, message: string}>}
    */
-  startAgent(agentId, config = {}) {
+  startAgent(agentId, mode = 'OBSERVATION', maxTurns = null) {
+    const body = {
+      mode,
+      ...(maxTurns && { max_turns: maxTurns }),
+    };
     return this.request(`/api/agent-execution/${agentId}/start`, {
       method: 'POST',
-      body: JSON.stringify(config),
-    });
-  }
-
-  /**
-   * Start an agent in a specific mode
-   * Note: 後端路徑為 /api/agent-execution/{agent_id}/start (支持 mode 參數)
-   */
-  startMode(agentId, mode) {
-    return this.request(`/api/agent-execution/${agentId}/start`, {
-      method: 'POST',
-      body: JSON.stringify({ mode }),
+      body: JSON.stringify(body),
     });
   }
 
@@ -115,22 +113,6 @@ class APIClient {
   stopAgent(agentId) {
     return this.request(`/api/agent-execution/${agentId}/stop`, {
       method: 'POST',
-    });
-  }
-
-  /**
-   * Execute agent cycle
-   * Note: 後端路徑為 /api/agent-execution/{agent_id}/execute
-   */
-  executeAgent(agentId, task = '執行交易週期', mode = null, context = null) {
-    const body = {
-      task,
-      mode,
-      context,
-    };
-    return this.request(`/api/agent-execution/${agentId}/execute`, {
-      method: 'POST',
-      body: JSON.stringify(body),
     });
   }
 
@@ -147,9 +129,11 @@ class APIClient {
    * Note: 後端路徑為 /api/agent-execution/{agent_id}/history
    */
   getExecutionHistory(agentId, limit = 20, statusFilter = null) {
-    const params = new URLSearchParams({ limit: String(limit) });
-    if (statusFilter) params.append('status_filter', statusFilter);
-    return this.request(`/api/agent-execution/${agentId}/history?${params}`);
+    let endpoint = `/api/agent-execution/${agentId}/history?limit=${limit}`;
+    if (statusFilter) {
+      endpoint += `&status_filter=${statusFilter}`;
+    }
+    return this.request(endpoint);
   }
 
   /**
@@ -172,12 +156,12 @@ class APIClient {
 
   /**
    * Switch agent mode
-   * Note: 後端已實現 POST /api/agents/{agent_id}/mode
+   * Note: 後端路徑為 POST /api/agents/{agent_id}/mode
+   * mode 作為查詢參數傳遞
    */
   switchAgentMode(agentId, mode) {
-    return this.request(`/api/agents/${agentId}/mode`, {
+    return this.request(`/api/agents/${agentId}/mode?mode=${mode}`, {
       method: 'POST',
-      body: JSON.stringify({ mode }),
     });
   }
 
@@ -206,11 +190,7 @@ class APIClient {
    * Note: 後端已實現 GET /api/trading/agents/{agent_id}/trades
    */
   getTrades(agentId, limit = 50, offset = 0) {
-    const params = new URLSearchParams({
-      limit: String(limit),
-      offset: String(offset),
-    });
-    return this.request(`/api/trading/agents/${agentId}/trades?${params}`);
+    return this.request(`/api/trading/agents/${agentId}/trades?limit=${limit}&offset=${offset}`);
   }
 
   /**
@@ -234,11 +214,9 @@ class APIClient {
    * Note: 後端已實現 GET /api/trading/agents/{agent_id}/transactions
    */
   getTransactions(agentId, limit = 50, offset = 0) {
-    const params = new URLSearchParams({
-      limit: String(limit),
-      offset: String(offset),
-    });
-    return this.request(`/api/trading/agents/${agentId}/transactions?${params}`);
+    return this.request(
+      `/api/trading/agents/${agentId}/transactions?limit=${limit}&offset=${offset}`
+    );
   }
 
   // ========== System APIs ==========
@@ -272,17 +250,9 @@ class APIClient {
   /**
    * Get market indices
    * Note: 後端路徑為 /api/trading/market/indices
-   * @param {string} category - 指數類別 (major/sector/theme/all)
-   * @param {number} count - 顯示數量
-   * @param {string} format - 顯示格式 (detailed/simple)
    */
-  getMarketIndices(category = 'major', count = 20, format = 'detailed') {
-    const params = new URLSearchParams({
-      category,
-      count: String(count),
-      format,
-    });
-    return this.request(`/api/trading/market/indices?${params}`);
+  getMarketIndices() {
+    return this.request('/api/trading/market/indices');
   }
 
   // ========== AI Models APIs ==========
@@ -316,10 +286,7 @@ class APIClient {
    * Note: 後端路徑為 /api/models/?include_disabled={true|false}
    */
   getAllModels(includeDisabled = false) {
-    const params = new URLSearchParams({
-      include_disabled: String(includeDisabled),
-    });
-    return this.request(`/api/models/?${params}`);
+    return this.request(`/api/models/?include_disabled=${includeDisabled}`);
   }
 }
 
