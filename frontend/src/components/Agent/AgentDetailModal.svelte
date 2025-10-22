@@ -7,7 +7,7 @@
    * 可以編輯 Agent 屬性和刪除 Agent
    */
 
-  import { Button, Modal } from '../UI/index.js';
+  import { Modal } from '../UI/index.js';
   import { PerformanceChart } from '../Chart/index.js';
   import { formatCurrency, formatDateTime } from '../../shared/utils.js';
 

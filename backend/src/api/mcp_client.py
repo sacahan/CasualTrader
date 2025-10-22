@@ -161,23 +161,14 @@ class MCPMarketClient:
     # 市場指數
     # ==========================================
 
-    async def get_market_indices(
-        self, category: str = "major", count: int = 20, format: str = "detailed"
-    ) -> dict[str, Any]:
+    async def get_market_indices(self) -> dict[str, Any]:
         """
         獲取市場指數資訊
 
-        Args:
-            category: 指數類別 (major/sector/theme/all)
-            count: 顯示數量
-            format: 顯示格式 (detailed/simple)
-
         Returns:
-            市場指數資訊
+            市場指數資訊，包含發行量加權股價指數的即時資訊
         """
-        return await self.call_tool(
-            "get_market_index_info", {"category": category, "count": count, "format": format}
-        )
+        return await self.call_tool("get_market_index_info", {})
 
     async def get_historical_index(self) -> dict[str, Any]:
         """
@@ -418,30 +409,34 @@ class MCPMarketClient:
 
         return await self.call_tool("get_stock_monthly_trading", args)
 
-    async def get_margin_trading_info(self, symbol: str) -> dict[str, Any]:
+    async def get_margin_trading_info(self) -> dict[str, Any]:
         """
-        獲取融資融券資訊
-
-        Args:
-            symbol: 股票代碼
+        獲取市場融資融券統計資訊
 
         Returns:
-            融資融券資訊
+            融資融券資訊，包含整體市場籌碼面分析
         """
-        return await self.call_tool("get_margin_trading_info", {"symbol": symbol})
+        return await self.call_tool("get_margin_trading_info", {})
 
     # ==========================================
     # 外資動向
     # ==========================================
 
-    async def get_foreign_investment_by_industry(self) -> dict[str, Any]:
+    async def get_foreign_investment_by_industry(self, count: int | None = None) -> dict[str, Any]:
         """
         獲取外資產業持股分布
 
+        Args:
+            count: 限制返回的產業數量（可選，預設為 10）
+
         Returns:
-            外資產業持股
+            外資產業持股資訊
         """
-        return await self.call_tool("get_foreign_investment_by_industry", {})
+        args = {}
+        if count is not None:
+            args["count"] = count
+
+        return await self.call_tool("get_foreign_investment_by_industry", args)
 
     async def get_top_foreign_holdings(self) -> dict[str, Any]:
         """

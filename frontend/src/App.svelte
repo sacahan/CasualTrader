@@ -82,15 +82,6 @@
     showDetailModal = true;
   }
 
-  async function handleStartAgent(agent) {
-    try {
-      await startAgent(agent.agent_id);
-      notifySuccess(`Agent ${agent.name} 已啟動`);
-    } catch (error) {
-      notifyError(`啟動失敗: ${error.message}`);
-    }
-  }
-
   async function handleObserveAgent(agent, mode) {
     try {
       await executeAgent(agent.agent_id, mode);
@@ -155,16 +146,6 @@
       notifySuccess(`Agent ${agent.name} 已刪除`);
     } catch (error) {
       notifyError(`刪除失敗: ${error.message}`);
-    }
-  }
-
-  async function handleAgentEdit(agent, updates) {
-    try {
-      await updateAgent(agent.agent_id, updates);
-      notifySuccess(`Agent ${agent.name} 已更新`);
-      await loadAgents(); // 重新載入列表
-    } catch (error) {
-      notifyError(`更新失敗: ${error.message}`);
     }
   }
 

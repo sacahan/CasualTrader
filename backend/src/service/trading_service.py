@@ -135,7 +135,7 @@ class TradingService:
 
             # 7. 執行指定模式
             logger.info(f"Executing {mode.value} for agent {agent_id}")
-            result = await agent.run_mode(mode, max_turns=max_turns)
+            result = await agent.run(mode=mode)
 
             # 8. 更新會話狀態為 COMPLETED
             await self.session_service.update_session_status(session_id, SessionStatus.COMPLETED)
@@ -162,9 +162,8 @@ class TradingService:
             if session_id:
                 try:
                     await self.session_service.update_session_status(
-                        session_id, SessionStatus.FAILED
+                        session_id, SessionStatus.FAILED, error_message=str(e)
                     )
-                    await self.session_service.set_session_error(session_id, str(e))
                 except Exception as cleanup_error:
                     logger.error(f"Error updating session {session_id}: {cleanup_error}")
 

@@ -114,7 +114,7 @@ class TestResourceCleanup:
             ):
                 with patch("service.trading_service.TradingAgent") as MockAgent:
                     mock_agent = AsyncMock()
-                    mock_agent.run_mode = AsyncMock(return_value={"status": "success"})
+                    mock_agent.run = AsyncMock(return_value={"status": "success"})
                     mock_agent.cleanup = AsyncMock()
                     MockAgent.return_value = mock_agent
 

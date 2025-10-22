@@ -30,9 +30,6 @@
   } = $props();
 
   // 計算資產相關數據
-  let initialFunds = $derived(agent.initial_funds || 1000000);
-  let currentFunds = $derived(agent.current_funds || agent.initial_funds || 1000000);
-
   // 計算總資產
   let totalAssets = $derived.by(() => {
     const portfolioValue = agent.portfolio?.total_value || 0;
@@ -52,15 +49,6 @@
       agent.portfolio?.total_value || agent.current_funds || agent.initial_funds || 1000000;
     const initial = agent.initial_funds || 1000000;
     return assets - initial;
-  });
-
-  // 計算損益百分比
-  let pnlPercent = $derived.by(() => {
-    const initial = agent.initial_funds || 1000000;
-    const assets =
-      agent.portfolio?.total_value || agent.current_funds || agent.initial_funds || 1000000;
-    const profit = assets - initial;
-    return initial > 0 ? (profit / initial) * 100 : 0;
   });
 
   // 判斷是否盈利

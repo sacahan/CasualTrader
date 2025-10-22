@@ -609,41 +609,29 @@ async def get_stock_quote(ticker: str):
     summary="取得市場指數",
     description="獲取市場指數資訊（透過 MCP Server）",
 )
-async def get_market_indices(category: str = "major", count: int = 20, format: str = "detailed"):
+async def get_market_indices():
     """
     取得市場指數
 
-    Args:
-        category: 指數類別
-            - "major": 主要指數（加權指數、櫃買指數等）
-            - "sector": 類股指數
-            - "theme": 主題指數
-            - "all": 所有指數
-        count: 顯示數量（預設 20）
-        format: 顯示格式
-            - "detailed": 詳細資訊
-            - "simple": 簡易資訊
-
     Returns:
-        市場指數資訊列表，每項包含：
-        - index_name: 指數名稱
-        - current_value: 當前指數值
-        - change: 漲跌點數
-        - change_percent: 漲跌幅 (%)
-        - volume: 成交量
-        - last_update: 最後更新時間
+        市場指數資訊，包含：
+        - 日期: 資料日期
+        - 指數: 指數名稱
+        - 收盤指數: 當前指數值
+        - 漲跌: 漲跌符號
+        - 漲跌點數: 漲跌點數
+        - 漲跌百分比: 漲跌幅 (%)
+        - 特殊處理註記: 特殊情況說明
 
     Note:
         此端點整合 casual-market MCP Server 獲取市場指數
     """
     try:
-        logger.info(f"Getting market indices (category={category}, count={count}, format={format})")
+        logger.info("Getting market indices")
 
         # 使用上下文管理器確保連接正確關閉
         async with create_mcp_market_client() as mcp_client:
-            result = await mcp_client.get_market_indices(
-                category=category, count=count, format=format
-            )
+            result = await mcp_client.get_market_indices()
 
             # 檢查結果是否成功
             if not result.get("success", False):
