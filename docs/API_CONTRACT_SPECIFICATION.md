@@ -49,6 +49,7 @@ class AgentResponse(BaseModel):
 所有 API 響應遵循以下模式：
 
 **成功响應** (2xx):
+
 ```json
 {
   "success": true,
@@ -58,6 +59,7 @@ class AgentResponse(BaseModel):
 ```
 
 **錯誤響應** (4xx, 5xx):
+
 ```json
 {
   "detail": "人類可讀的錯誤訊息",
@@ -204,11 +206,13 @@ interface AIModel {
 **描述**: 獲取系統中所有 Agent 的列表
 
 **請求**:
+
 ```
 GET /api/agents
 ```
 
 **回應** (200):
+
 ```json
 [
   {
@@ -242,6 +246,7 @@ GET /api/agents
 ```
 
 **錯誤** (500):
+
 ```json
 {
   "detail": "Failed to list agents",
@@ -256,14 +261,17 @@ GET /api/agents
 **描述**: 根據 ID 獲取特定 Agent 的詳細資訊
 
 **請求**:
+
 ```
 GET /api/agents/agent_123
 ```
 
 **路徑參數**:
+
 - `agent_id` (string, required): Agent ID
 
 **回應** (200):
+
 ```json
 {
   "id": "agent_123",
@@ -314,6 +322,7 @@ GET /api/agents/agent_123
 ```
 
 **錯誤** (404):
+
 ```json
 {
   "detail": "Agent not found",
@@ -328,6 +337,7 @@ GET /api/agents/agent_123
 **描述**: 建立一個新的交易 Agent
 
 **請求**:
+
 ```json
 {
   "name": "積極型投資者",
@@ -352,11 +362,13 @@ GET /api/agents/agent_123
 ```
 
 **必須欄位**:
+
 - `name` (string, 1-100 字): 代理人名稱
 - `strategy_prompt` (string, ≥10 字): 策略提示語
 - `ai_model` (string): AI 模型鑰匙 (必須存在於資料庫)
 
 **可選欄位**:
+
 - `description` (string, ≤500 字): 代理人描述
 - `color_theme` (string, RGB 格式): 預設 "34, 197, 94"
 - `initial_funds` (number, > 0): 預設 1000000
@@ -367,6 +379,7 @@ GET /api/agents/agent_123
 - `custom_instructions` (string): 預設空
 
 **回應** (201):
+
 ```json
 {
   "id": "agent_124",
@@ -391,6 +404,7 @@ GET /api/agents/agent_123
 ```
 
 **驗證錯誤** (422):
+
 ```json
 {
   "detail": "Validation error",
@@ -409,6 +423,7 @@ GET /api/agents/agent_123
 **描述**: 更新現有 Agent 的配置
 
 **請求**:
+
 ```json
 {
   "name": "保守型投資者 v2",
@@ -441,6 +456,7 @@ GET /api/agents/agent_123
 **描述**: 刪除指定的 Agent
 
 **請求**:
+
 ```
 DELETE /api/agents/agent_123
 ```
@@ -456,6 +472,7 @@ DELETE /api/agents/agent_123
 **描述**: 切換 Agent 的交易模式
 
 **請求**:
+
 ```json
 {
   "mode": "TRADING"
@@ -463,12 +480,15 @@ DELETE /api/agents/agent_123
 ```
 
 **路徑參數**:
+
 - `agent_id` (string, required): Agent ID
 
 **查詢參數**:
+
 - `mode` (string, required): 新模式 (OBSERVATION | TRADING | REBALANCING)
 
 **回應** (200):
+
 ```json
 {
   "success": true,
@@ -486,11 +506,13 @@ DELETE /api/agents/agent_123
 **描述**: 重置 Agent (清除投資組合和交易歷史)
 
 **請求**:
+
 ```
 POST /api/agents/agent_123/reset
 ```
 
 **回應** (200):
+
 ```json
 {
   "success": true,
@@ -510,6 +532,7 @@ POST /api/agents/agent_123/reset
 **描述**: 立即返回 session_id，在後台執行 Agent。狀態更新透過 WebSocket 推送。
 
 **請求**:
+
 ```json
 {
   "mode": "OBSERVATION",
@@ -518,13 +541,16 @@ POST /api/agents/agent_123/reset
 ```
 
 **路徑參數**:
+
 - `agent_id` (string, required): Agent ID
 
 **請求欄位**:
+
 - `mode` (string, required): 執行模式 (OBSERVATION | TRADING | REBALANCING)
 - `max_turns` (number, optional): 最大輪數 (1-50)
 
 **回應** (202 Accepted):
+
 ```json
 {
   "success": true,
@@ -541,11 +567,13 @@ POST /api/agents/agent_123/reset
 **描述**: 停止 Agent 正在執行的任務，等待完成後返回。
 
 **請求**:
+
 ```
 POST /api/agent_execution/agent_123/stop
 ```
 
 **回應** (200):
+
 ```json
 {
   "success": true,
@@ -564,11 +592,13 @@ POST /api/agent_execution/agent_123/stop
 **描述**: 獲取 Agent 的完整投資組合資訊
 
 **請求**:
+
 ```
 GET /api/trading/agents/agent_123/portfolio
 ```
 
 **回應** (200):
+
 ```json
 {
   "cash": 50000,
@@ -602,6 +632,7 @@ GET /api/trading/agents/agent_123/portfolio
 **描述**: 獲取 Agent 的所有持股明細
 
 **回應** (200):
+
 ```json
 [
   {
@@ -632,10 +663,12 @@ GET /api/trading/agents/agent_123/portfolio
 **描述**: 獲取 Agent 的交易歷史記錄
 
 **查詢參數**:
+
 - `limit` (number, optional): 返回筆數，預設 50
 - `offset` (number, optional): 分頁起點，預設 0
 
 **回應** (200):
+
 ```json
 {
   "total": 42,
@@ -683,6 +716,7 @@ GET /api/trading/agents/agent_123/portfolio
 **描述**: 獲取 Agent 的績效分析指標
 
 **回應** (200):
+
 ```json
 {
   "total_return": 0.05,
@@ -704,6 +738,7 @@ GET /api/trading/agents/agent_123/portfolio
 **描述**: 獲取台灣股市開盤狀態（基於交易日檢查）
 
 **回應** (200):
+
 ```json
 {
   "is_trading_day": true,
@@ -722,9 +757,11 @@ GET /api/trading/agents/agent_123/portfolio
 **描述**: 獲取股票即時報價（透過 MCP Server）
 
 **路徑參數**:
+
 - `ticker` (string, required): 股票代號 (如 "2330")
 
 **回應** (200):
+
 ```json
 {
   "ticker": "2330",
@@ -746,6 +783,7 @@ GET /api/trading/agents/agent_123/portfolio
 **描述**: 獲取市場指數資訊（透過 MCP Server）
 
 **回應** (200):
+
 ```json
 {
   "taiex": {
@@ -774,6 +812,7 @@ GET /api/trading/agents/agent_123/portfolio
 **描述**: 獲取所有可用(已啟用)的 AI 模型列表，按 display_order 排序
 
 **回應** (200):
+
 ```json
 {
   "total": 8,
@@ -826,6 +865,7 @@ GET /api/trading/agents/agent_123/portfolio
 **描述**: 獲取按 group_name 分組的 AI 模型列表
 
 **回應** (200):
+
 ```json
 {
   "groups": {
@@ -859,11 +899,13 @@ GET /api/trading/agents/agent_123/portfolio
 **描述**: 根據 model_key 獲取特定模型的詳細資訊
 
 **路徑參數**:
+
 - `model_key` (string, required): 模型鑰匙 (如 "gpt-4o")
 
 **回應** (200): 單個模型物件
 
 **錯誤** (404):
+
 ```json
 {
   "detail": "Model not found",
@@ -878,6 +920,7 @@ GET /api/trading/agents/agent_123/portfolio
 **描述**: 獲取所有 AI 模型列表，可選包含已禁用的模型
 
 **查詢參數**:
+
 - `include_disabled` (boolean, optional): 是否包含已禁用的模型，預設 false
 
 **回應** (200): 同 available，但可能包含已禁用的模型
