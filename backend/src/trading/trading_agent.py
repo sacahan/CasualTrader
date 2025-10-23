@@ -25,6 +25,7 @@ try:
         WebSearchTool,
         CodeInterpreterTool,
     )
+
     from agents.mcp import MCPServerStdio
 except ImportError as e:
     from common.logger import logger
@@ -81,41 +82,6 @@ class AgentExecutionError(TradingAgentError):
     pass
 
 
-# MCP 伺服器配置
-def mcp_server_params(agent_id: str) -> list[tuple[str, dict[str, Any]]]:
-    # return [
-    #     (
-    #         "casual_market_mcp",
-    #         {
-    #             "command": "uvx",
-    #             "args": [
-    #                 "--from",
-    #                 "/Users/sacahan/Documents/workspace/CasualMarket",
-    #                 "casual-market-mcp",
-    #             ],
-    #         },
-    #     ),
-    #     (
-    #         "memory_mcp",
-    #         {
-    #             "command": "npx",
-    #             "args": ["-y", "mcp-memory-libsql"],
-    #             "env": {"LIBSQL_URL": f"file:./memory/{agent_id}.db"},
-    #         },
-    #     ),
-    # ]
-    return [
-        (
-            "memory_mcp",
-            {
-                "command": "npx",
-                "args": ["-y", "mcp-memory-libsql"],
-                "env": {"LIBSQL_URL": f"file:./memory/{agent_id}.db"},
-            },
-        ),
-    ]
-
-
 # ==========================================
 # TradingAgent
 # ==========================================
@@ -150,7 +116,11 @@ class TradingAgent:
         self.agent_service = agent_service
         self.agent = None
         self.is_initialized = False
-        self._exit_stack = None  # 用於管理 MCP servers 生命週期
+        self._exit_stack = (
+            AsyncExitStack()
+        )  # 創建並保存 AsyncExitStack 實例以管理 MCP servers 生命週期
+        self.casual_market_mcp = None
+        self.memory_mcp = None
 
         logger.info(f"TradingAgent created: {agent_id}")
 
@@ -168,9 +138,15 @@ class TradingAgent:
             logger.debug(f"Agent {self.agent_id} already initialized, skipping...")
             return
 
+        # 檢查 agent_config 是否已設置
+        if not self.agent_config:
+            raise AgentConfigurationError(
+                f"Agent config must be set before initialization for {self.agent_id}"
+            )
+
         try:
             # 1. 初始化 MCP Servers
-            self.mcp_servers = await self._setup_mcp_servers()
+            await self._setup_mcp_servers()
 
             # 2. 初始化 OpenAI Tools
             self.openai_tools = self._setup_openai_tools()
@@ -190,7 +166,7 @@ class TradingAgent:
                 model=self.agent_config.ai_model or DEFAULT_MODEL,
                 instructions=self._build_instructions(self.agent_config.description),
                 tools=all_tools,
-                mcp_servers=self.mcp_servers,
+                mcp_servers=[self.memory_mcp],
                 model_settings=ModelSettings(
                     # temperature=DEFAULT_TEMPERATURE,
                     # reasoning=Reasoning(effort="high", summary="detailed"),
@@ -210,41 +186,59 @@ class TradingAgent:
             logger.error(f"Failed to initialize agent {self.agent_id}: {e}", exc_info=True)
             raise AgentInitializationError(f"Agent initialization failed: {str(e)}")
 
-    async def _setup_mcp_servers(self) -> list[MCPServerStdio]:
+    async def _setup_mcp_servers(self):
         """
-        初始化 MCP 伺服器列表
+        初始化 MCP 伺服器並註冊到 exit stack
 
-        Returns:
-            MCP 伺服器實例列表
-
-        Note:
-            未來可以根據 Agent 配置動態載入不同的 MCP 伺服器
+        Raises:
+            Exception: 初始化失敗
         """
-        servers = []
         try:
-            # 創建並保存 AsyncExitStack 實例以管理 MCP servers 生命週期
-            self._exit_stack = AsyncExitStack()
-
             # 初始化 MCP servers 並註冊到 exit stack
-            for name, params in mcp_server_params(self.agent_id):
-                server = await self._exit_stack.enter_async_context(
-                    MCPServerStdio(
-                        params,
-                        name=name,
-                        client_session_timeout_seconds=DEFAULT_AGENT_TIMEOUT,
-                    )
+            self.casual_market_mcp = await self._exit_stack.enter_async_context(
+                MCPServerStdio(
+                    name="casual_market_mcp",
+                    params={
+                        "command": "uvx",
+                        "args": [
+                            "--from",
+                            "/Users/sacahan/Documents/workspace/CasualMarket",
+                            "casual-market-mcp",
+                        ],
+                    },
+                    client_session_timeout_seconds=DEFAULT_AGENT_TIMEOUT,
                 )
-                servers.append(server)
+            )
+            logger.debug("casual_market_mcp server initialized")
 
-            logger.debug(f"{len(servers)} MCP servers initialized")
+            # 構建絕對路徑以確保資料庫文件位置正確
+            memory_db_path = os.path.join(
+                os.path.dirname(os.path.dirname(os.path.dirname(__file__))),
+                "memory",
+                f"{self.agent_id}.db",
+            )
+            # 確保 memory 目錄存在
+            os.makedirs(os.path.dirname(memory_db_path), exist_ok=True)
+
+            self.memory_mcp = await self._exit_stack.enter_async_context(
+                MCPServerStdio(
+                    name="memory_mcp",
+                    params={
+                        "command": "npx",
+                        "args": ["-y", "mcp-memory-libsql"],
+                        "env": {"LIBSQL_URL": f"file:{memory_db_path}"},
+                    },
+                    client_session_timeout_seconds=DEFAULT_AGENT_TIMEOUT,
+                )
+            )
+            logger.debug(f"memory_mcp server initialized (db: {memory_db_path})")
+
         except Exception as e:
             logger.warning(f"Failed to initialize MCP server: {e}")
             # 如果初始化失敗，清理已創建的資源
             if self._exit_stack:
                 await self._exit_stack.aclose()
                 self._exit_stack = None
-
-        return servers
 
     def _setup_openai_tools(self) -> list[Any]:
         """設置 OpenAI 內建工具（根據資料庫配置）"""
@@ -277,7 +271,10 @@ class TradingAgent:
 
     def _setup_trading_tools(self) -> list[Tool]:
         """設置交易相關工具"""
-        return create_trading_tools(self.agent_service, self.agent_id)
+
+        return create_trading_tools(
+            self.agent_service, self.agent_id, casual_market_mcp=self.casual_market_mcp
+        )
 
     async def _load_subagents_as_tools(self) -> list[Tool]:
         """載入 Sub-agents (從 tools/ 目錄，根據資料庫配置）"""
@@ -287,15 +284,23 @@ class TradingAgent:
             # 統一的 subagent 配置參數
             subagent_config = {
                 "model_name": self.agent_config.ai_model or DEFAULT_MODEL,  # 從資料庫載入
-                "mcp_servers": self.mcp_servers,  # 傳入相同的 MCP servers
+                "mcp_servers": [
+                    self.memory_mcp,
+                    self.casual_market_mcp,
+                ],  # 提供 持久記憶 和 市場數據 MCP
                 "openai_tools": self.openai_tools,  # 傳入相同的 OpenAI tools
             }
+
+            logger.debug(
+                f"Loading subagents with config: model={subagent_config['model_name']}, "
+                f"mcp_servers={len(subagent_config['mcp_servers'])} available"
+            )
 
             # 生成所有 Sub-agents
             try:
                 technical_agent = await get_technical_agent(**subagent_config)
-                tools.append(
-                    technical_agent.as_tool(
+                if technical_agent:
+                    tool = technical_agent.as_tool(
                         tool_name="technical_analyst",
                         tool_description="""
 • 技術分析專家
@@ -305,62 +310,145 @@ class TradingAgent:
                         """,
                         max_turns=DEFAULT_MAX_TURNS,
                     )
-                )
-                logger.info("技術分析 Sub Agent Tool 載入成功")
+                    if tool:
+                        tools.append(tool)
+                        logger.info("技術分析 Sub Agent Tool 載入成功")
+                    else:
+                        logger.error("技術分析 agent.as_tool() 返回 None")
+                else:
+                    logger.error("get_technical_agent() 返回 None")
             except Exception as e:
-                logger.warning(f"技術分析 agent 載入失敗: {e}")
+                logger.warning(f"技術分析 agent 載入失敗: {e}", exc_info=True)
 
             try:
                 sentiment_agent = await get_sentiment_agent(**subagent_config)
-                tools.append(
-                    sentiment_agent.as_tool(
+                if sentiment_agent:
+                    tool = sentiment_agent.as_tool(
                         tool_name="sentiment_analyst",
                         tool_description="""
 • 情緒分析專家
     - 分析市場情緒和投資人心理
     - 追蹤社交媒體和新聞輿論
     - 評估市場氛圍對股價的影響
-                        """,
+                            """,
                         max_turns=DEFAULT_MAX_TURNS,
                     )
-                )
-                logger.info("情緒分析 Sub Agent Tool 載入成功")
+                    if tool:
+                        tools.append(tool)
+                        logger.info("情緒分析 Sub Agent Tool 載入成功")
+                    else:
+                        logger.error("情緒分析 agent.as_tool() 返回 None")
+                else:
+                    logger.error("get_sentiment_agent() 返回 None")
             except Exception as e:
-                logger.warning(f"情緒分析 agent 載入失敗: {e}")
+                logger.warning(f"情緒分析 agent 載入失敗: {e}", exc_info=True)
 
             try:
                 fundamental_agent = await get_fundamental_agent(**subagent_config)
-                tools.append(
-                    fundamental_agent.as_tool(
+                if fundamental_agent:
+                    tool = fundamental_agent.as_tool(
                         tool_name="fundamental_analyst",
                         tool_description="""
 • 基本面分析專家
     - 研究公司財務報表和營運狀況
     - 評估本益比、股價淨值比等估值指標
     - 分析產業競爭力和成長潛力
-                        """,
+                            """,
                         max_turns=DEFAULT_MAX_TURNS,
                     )
-                )
-                logger.info("基本面分析 Sub Agent Tool 載入成功")
+                    if tool:
+                        tools.append(tool)
+                        logger.info("基本面分析 Sub Agent Tool 載入成功")
+                    else:
+                        logger.error("基本面分析 agent.as_tool() 返回 None")
+                else:
+                    logger.error("get_fundamental_agent() 返回 None")
             except Exception as e:
-                logger.warning(f"基本面分析 agent 載入失敗: {e}")
+                logger.warning(f"基本面分析 agent 載入失敗: {e}", exc_info=True)
 
             try:
                 risk_agent = await get_risk_agent(**subagent_config)
-                tools.append(
-                    risk_agent.as_tool(
+                if risk_agent:
+                    tool = risk_agent.as_tool(
                         tool_name="risk_analyst",
                         tool_description="""
 • 風險評估專家
     - 評估投資風險和波動性
     - 計算風險調整後報酬
     - 提供資產配置和避險建議
-                        """,
+                            """,
                         max_turns=DEFAULT_MAX_TURNS,
                     )
-                )
-                logger.info("風險評估 Sub Agent Tool 載入成功")
+                    if tool:
+                        tools.append(tool)
+                        logger.info("風險評估 Sub Agent Tool 載入成功")
+                    else:
+                        logger.error("風險評估 agent.as_tool() 返回 None")
+                else:
+                    logger.error("get_risk_agent() 返回 None")
+            except Exception as e:
+                logger.warning(f"風險評估 agent 載入失敗: {e}", exc_info=True)
+
+            try:
+                sentiment_agent = await get_sentiment_agent(**subagent_config)
+                if sentiment_agent:
+                    tools.append(
+                        sentiment_agent.as_tool(
+                            tool_name="sentiment_analyst",
+                            tool_description="""
+• 情緒分析專家
+    - 分析市場情緒和投資人心理
+    - 追蹤社交媒體和新聞輿論
+    - 評估市場氛圍對股價的影響
+                            """,
+                            max_turns=DEFAULT_MAX_TURNS,
+                        )
+                    )
+                    logger.info("情緒分析 Sub Agent Tool 載入成功")
+                else:
+                    logger.warning("情緒分析 agent 返回 None")
+            except Exception as e:
+                logger.warning(f"情緒分析 agent 載入失敗: {e}")
+
+            try:
+                fundamental_agent = await get_fundamental_agent(**subagent_config)
+                if fundamental_agent:
+                    tools.append(
+                        fundamental_agent.as_tool(
+                            tool_name="fundamental_analyst",
+                            tool_description="""
+• 基本面分析專家
+    - 研究公司財務報表和營運狀況
+    - 評估本益比、股價淨值比等估值指標
+    - 分析產業競爭力和成長潛力
+                            """,
+                            max_turns=DEFAULT_MAX_TURNS,
+                        )
+                    )
+                    logger.info("基本面分析 Sub Agent Tool 載入成功")
+                else:
+                    logger.warning("基本面分析 agent 返回 None")
+            except Exception as e:
+                logger.warning(f"基本面分析 agent 載入失敗: {e}")
+
+            try:
+                risk_agent = await get_risk_agent(**subagent_config)
+                if risk_agent:
+                    tools.append(
+                        risk_agent.as_tool(
+                            tool_name="risk_analyst",
+                            tool_description="""
+• 風險評估專家
+    - 評估投資風險和波動性
+    - 計算風險調整後報酬
+    - 提供資產配置和避險建議
+                            """,
+                            max_turns=DEFAULT_MAX_TURNS,
+                        )
+                    )
+                    logger.info("風險評估 Sub Agent Tool 載入成功")
+                else:
+                    logger.warning("風險評估 agent 返回 None")
             except Exception as e:
                 logger.warning(f"風險評估 agent 載入失敗: {e}")
 
@@ -372,7 +460,6 @@ class TradingAgent:
     async def run(
         self,
         mode: AgentMode | None = None,
-        agent_config: Agent | None = None,
         context: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         """
@@ -380,7 +467,6 @@ class TradingAgent:
 
         Args:
             mode: 執行模式
-            agent_config: Agent 配置
             context: 額外上下文（可選）
 
         Returns:
@@ -402,10 +488,11 @@ class TradingAgent:
                 f"Agent {self.agent_id} not initialized. Call initialize() first."
             )
 
+        if not self.agent_config:
+            raise AgentConfigurationError(f"Agent config not set for {self.agent_id}")
+
         # 使用預設模式或指定模式
-        execution_mode = mode or (
-            self.agent_config.current_mode if self.agent_config else AgentMode.OBSERVATION
-        )
+        execution_mode = mode or self.agent_config.current_mode or AgentMode.OBSERVATION
 
         logger.info(
             f"Starting agent execution: {self.agent_id} "
@@ -428,7 +515,7 @@ class TradingAgent:
                 result = await Runner.run(self.agent, task_prompt, max_turns=DEFAULT_MAX_TURNS)
 
                 logger.info(
-                    f"Agent {self.agent_id} execution completed: {result} (trace_id: {trace_id})"
+                    f"*** Agent {self.agent_id} execution completed: {result} (trace_id: {trace_id}) ***"
                 )
 
                 return {
@@ -491,7 +578,7 @@ class TradingAgent:
 1. 你應該使用各種工具來幫助你完成任務：
     - 決策前必須先使用投資組合管理工具了解資產狀況
     - 充分利用專業分析 Sub-Agents 的能力，做出全面評估
-    - 善用持久記憶工具(memory_mcp)累積知識和經驗
+    - 主動使用持久記憶工具(memory_mcp)累積知識和經驗
 2. 每筆交易都要詳細記錄決策理由
 3. 決策理由應包含：分析過程、市場判斷、風險考量、Sub-Agents 建議
 4. 注意交易日檢查，避免在休市日執行操作
@@ -531,8 +618,8 @@ class TradingAgent:
 ---
 
 可用工具：
-• casual_market_mcp (台灣股市數據工具) - 市場指數、股票價格、資金流向、除權息資訊、交易日檢查、買賣交易
 • 投資組合管理工具 (record_trade_tool、get_portfolio_status_tool) - 查詢投資組合狀態、記錄交易決策
+• 模擬交易工具 (buy_taiwan_stock_tool、sell_taiwan_stock_tool) - 執行台灣股票模擬買賣交易
 • memory_mcp (持久記憶工具) - 儲存和回想分析結論
 • 專業分析 Sub-Agents - technical_analyst、fundamental_analyst、sentiment_analyst、risk_analyst
 
@@ -540,7 +627,7 @@ class TradingAgent:
 • 必須有充分的分析支持才能執行交易
 • 遵守最大持股比例限制
 • 交易後必須記錄決策理由
-• 將決策過程利用 memory_mcp 存入知識庫以供未來參考
+• 主動將決策過程利用 memory_mcp 存入知識庫以供未來參考
 """,
             AgentMode.REBALANCING: f"""
 **⚖️ 投資組合重新平衡模式 (REBALANCING MODE)**
@@ -552,8 +639,8 @@ class TradingAgent:
 ---
 
 可用工具：
-• casual_market_mcp (台灣股市數據工具) - 市場指數、股票價格、資金流向、除權息資訊、交易日檢查、買賣交易
 • 投資組合管理工具 (record_trade_tool、get_portfolio_status_tool) - 查詢投資組合狀態、記錄交易決策
+• 模擬交易工具 (buy_taiwan_stock_tool、sell_taiwan_stock_tool) - 執行台灣股票模擬買賣交易
 • memory_mcp (持久記憶工具) - 儲存和回想分析結論
 • 專業分析 Sub-Agents - technical_analyst、fundamental_analyst、sentiment_analyst、risk_analyst
 
@@ -561,7 +648,7 @@ class TradingAgent:
 • 焦點在現有持股調整，不需要識別新的投資機會
 • 調整應符合投資策略和偏好設定
 • 考量交易成本和稅務影響
-• 將調整理由利用 memory_mcp 存入知識庫以供未來參考
+• 主動將調整理由利用 memory_mcp 存入知識庫以供未來參考
 """,
             AgentMode.OBSERVATION: f"""
 **🔍 市場觀察與機會發掘模式 (OBSERVATION MODE)**
@@ -573,7 +660,6 @@ class TradingAgent:
 ---
 
 可用工具：
-• casual_market_mcp (台灣股市數據工具) - 市場指數、股票價格、資金流向、除權息資訊、交易日檢查、買賣交易
 • 投資組合管理工具 (record_trade_tool、get_portfolio_status_tool) - 查詢投資組合狀態、記錄交易決策
 • memory_mcp (持久記憶工具) - 儲存和回想分析結論
 • 專業分析 Sub-Agents - technical_analyst、fundamental_analyst、sentiment_analyst、risk_analyst
@@ -582,7 +668,7 @@ class TradingAgent:
 • 本模式不執行交易，僅識別和研究機會
 • 識別新的投資機會必須排除已經買入的標的
 • 評估投資標的應該保持與投資主張的一致性
-• 將分析過程和進場條件利用 memory_mcp 存入知識庫以供未來參考
+• 主動將分析過程和進場條件利用 memory_mcp 存入知識庫以供未來參考
 """,
         }
 

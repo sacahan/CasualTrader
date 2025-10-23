@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from agents import function_tool, Tool
+from agents.mcp import MCPServerStdio
 
 from common.logger import logger
 
@@ -33,13 +34,10 @@ async def record_trade(
         交易記錄結果訊息
     """
     try:
-        if not agent_service:
-            return "錯誤：無法存取資料庫服務"
-
         # 驗證交易動作
         action_upper = action.upper()
         if action_upper not in ["BUY", "SELL"]:
-            return f"錯誤：無效的交易動作 '{action}'，請使用 'BUY' 或 'SELL'"
+            raise ValueError(f"無效的交易動作 '{action}'，請使用 'BUY' 或 'SELL'")
 
         # 計算總金額和手續費
         total_amount = float(quantity * price)
@@ -105,7 +103,7 @@ async def record_trade(
 
     except Exception as e:
         logger.error(f"記錄交易失敗: {e}", exc_info=True)
-        return f"錯誤：記錄交易失敗 - {str(e)}"
+        raise
 
 
 # 頂層投資組合查詢函數
@@ -119,38 +117,46 @@ async def get_portfolio_status(agent_service, agent_id: str) -> str:
 
     Returns:
         投資組合詳細資訊的文字描述
+
+    Raises:
+        Exception: 如果無法取得必要的配置或持股資訊
     """
-    try:
-        if not agent_service:
-            return "錯誤：無法存取資料庫服務"
+    if not agent_service:
+        raise ValueError("agent_service 不能為 None")
 
-        # 取得 Agent 配置（包含資金資訊）
-        agent_config = await agent_service.get_agent_config(agent_id)
+    # 取得 Agent 配置（包含資金資訊）
+    agent_config = await agent_service.get_agent_config(agent_id)
+    if not agent_config:
+        raise ValueError(f"Agent {agent_id} 的配置不存在")
 
-        # 取得持股明細
-        holdings = await agent_service.get_agent_holdings(agent_id)
+    # 取得持股明細
+    holdings = await agent_service.get_agent_holdings(agent_id)
+    logger.debug(f"Retrieved {len(holdings)} holdings for agent {agent_id}")
 
-        # 計算投資組合資訊
-        cash_balance = float(agent_config.current_funds or agent_config.initial_funds)
-        total_stock_value = 0.0
-        position_details = []
+    # 計算投資組合資訊
+    cash_balance = float(agent_config.current_funds or agent_config.initial_funds)
+    total_stock_value = 0.0
+    position_details = []
 
-        for holding in holdings:
-            market_value = float(
-                holding.quantity * holding.average_cost
-            )  # 簡化：使用平均成本作為當前價值
-            total_stock_value += market_value
+    for holding in holdings:
+        if holding is None:
+            logger.error("WARNING: get_agent_holdings() 返回了 None 元素！這表示數據庫查詢有問題")
+            raise ValueError("持股列表包含 None 元素，這表示數據庫操作有誤")
 
-            position_details.append(
-                f"  • {holding.ticker} ({holding.company_name or '未知公司'}): "
-                f"{holding.quantity} 股，平均成本 {holding.average_cost:.2f} 元，"
-                f"市值 {market_value:,.2f} 元"
-            )
+        market_value = float(holding.quantity * holding.average_cost)
+        total_stock_value += market_value
 
-        total_portfolio_value = cash_balance + total_stock_value
+        company_name = holding.company_name or "未知公司"
+        position_details.append(
+            f"  • {holding.ticker} ({company_name}): "
+            f"{holding.quantity} 股，平均成本 {holding.average_cost:.2f} 元，"
+            f"市值 {market_value:,.2f} 元"
+        )
 
-        # 組合回報訊息
-        portfolio_summary = f"""
+    total_portfolio_value = cash_balance + total_stock_value
+
+    # 組合回報訊息
+    portfolio_summary = f"""
 📊 **投資組合狀態摘要** (Agent: {agent_id})
 
 💰 **資金狀況**
@@ -167,25 +173,23 @@ async def get_portfolio_status(agent_service, agent_id: str) -> str:
 • 股票比例：{(total_stock_value / total_portfolio_value * 100):.1f}%
 """
 
-        return portfolio_summary.strip()
-
-    except Exception as e:
-        logger.error(f"取得投資組合狀態失敗: {e}", exc_info=True)
-        return f"錯誤：無法取得投資組合狀態 - {str(e)}"
+    return portfolio_summary.strip()
 
 
-def create_trading_tools(agent_service, agent_id: str) -> list[Tool]:
+def create_trading_tools(
+    agent_service, agent_id: str, casual_market_mcp: MCPServerStdio
+) -> list[Tool]:
     """
     創建交易工具的工廠函數
 
     Args:
         agent_service: Agent 服務實例
         agent_id: Agent ID
+        casual_market_mcp: Casual Market MCP 實例（可選，用於模擬交易）
 
     Returns:
         交易工具列表
     """
-    tools = []
 
     # 用裝飾器包裝頂層函數以用作工具
     @function_tool
@@ -232,5 +236,98 @@ def create_trading_tools(agent_service, agent_id: str) -> list[Tool]:
         """
         return await get_portfolio_status(agent_service=agent_service, agent_id=agent_id)
 
-    tools.extend([record_trade_tool, get_portfolio_status_tool])
-    return tools
+    @function_tool
+    async def buy_taiwan_stock_tool(
+        symbol: str,
+        quantity: int,
+        price: float = None,
+    ) -> str:
+        """
+        模擬買入台灣股票
+
+        Args:
+            symbol: 股票代號 (例如: "2330")
+            quantity: 購買股數，必須是1000的倍數 (台股最小單位為1000股)
+            price: 指定價格 (可選，不指定則為市價)
+
+        Returns:
+            交易結果訊息
+        """
+        try:
+            # 調用 casual_market_mcp 的 buy_taiwan_stock 工具
+            result = await casual_market_mcp.session.call_tool(
+                "buy_taiwan_stock",
+                {
+                    "symbol": symbol,
+                    "quantity": quantity,
+                    "price": price,
+                },
+            )
+
+            # 解析結果並格式化回傳
+            if result and hasattr(result, "content"):
+                content = result.content[0] if result.content else {}
+                if isinstance(content, dict) and content.get("success"):
+                    data = content.get("data", {})
+                    return f"✅ 模擬買入成功：{data.get('symbol')} {data.get('quantity')} 股 @ {data.get('price')} 元，總金額：{data.get('total_amount'):,.2f} 元"
+                else:
+                    error = content.get("error", "未知錯誤")
+                    return f"❌ 模擬買入失敗：{error}"
+
+            return f"✅ 模擬買入指令已送出：{symbol} {quantity} 股"
+
+        except Exception as e:
+            logger.error(f"模擬買入失敗: {e}", exc_info=True)
+            raise
+
+    @function_tool
+    async def sell_taiwan_stock_tool(
+        symbol: str,
+        quantity: int,
+        price: float = None,
+    ) -> str:
+        """
+        模擬賣出台灣股票
+
+        Args:
+            symbol: 股票代號 (例如: "2330")
+            quantity: 賣出股數，必須是1000的倍數 (台股最小單位為1000股)
+            price: 指定價格 (可選，不指定則為市價)
+
+        Returns:
+            交易結果訊息
+        """
+        try:
+            # 調用 casual_market_mcp 的 sell_taiwan_stock 工具
+            result = await casual_market_mcp.session.call_tool(
+                "sell_taiwan_stock",
+                {
+                    "symbol": symbol,
+                    "quantity": quantity,
+                    "price": price,
+                },
+            )
+
+            # 解析結果並格式化回傳
+            if result and hasattr(result, "content"):
+                content = result.content[0] if result.content else {}
+                if isinstance(content, dict) and content.get("success"):
+                    data = content.get("data", {})
+                    return f"✅ 模擬賣出成功：{data.get('symbol')} {data.get('quantity')} 股 @ {data.get('price')} 元，總金額：{data.get('total_amount'):,.2f} 元"
+                else:
+                    error = content.get("error", "未知錯誤")
+                    return f"❌ 模擬賣出失敗：{error}"
+
+            return f"✅ 模擬賣出指令已送出：{symbol} {quantity} 股"
+
+        except Exception as e:
+            logger.error(f"模擬賣出失敗: {e}", exc_info=True)
+            raise
+
+    # 將模擬交易工具加入列表
+    return [
+        record_trade_tool,
+        get_portfolio_status_tool,
+        buy_taiwan_stock_tool,
+        sell_taiwan_stock_tool,
+    ]
