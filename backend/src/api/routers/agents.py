@@ -6,6 +6,7 @@ Agents API Router
 
 from __future__ import annotations
 
+import json
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -76,6 +77,14 @@ async def list_agents(
         # 轉換為字典格式
         result = []
         for agent in agents:
+            # 解析 investment_preferences JSON 字符串為列表
+            investment_prefs = []
+            if agent.investment_preferences:
+                try:
+                    investment_prefs = json.loads(agent.investment_preferences)
+                except (json.JSONDecodeError, TypeError):
+                    investment_prefs = []
+
             agent_dict = {
                 "id": agent.id,
                 "name": agent.name,
@@ -89,7 +98,11 @@ async def list_agents(
                 ),
                 "initial_funds": float(agent.initial_funds),
                 "current_funds": float(agent.current_funds),
+                "max_position_size": float(agent.max_position_size)
+                if agent.max_position_size
+                else None,
                 "color_theme": agent.color_theme,
+                "investment_preferences": investment_prefs,
                 "created_at": agent.created_at.isoformat() if agent.created_at else None,
                 "updated_at": agent.updated_at.isoformat() if agent.updated_at else None,
             }
@@ -147,6 +160,14 @@ async def get_agent(
         # 獲取持股資訊
         holdings = await agents_service.get_agent_holdings(agent_id)
 
+        # 解析 investment_preferences JSON 字符串為列表
+        investment_prefs = []
+        if agent.investment_preferences:
+            try:
+                investment_prefs = json.loads(agent.investment_preferences)
+            except (json.JSONDecodeError, TypeError):
+                investment_prefs = []
+
         # 組裝回應
         agent_dict = {
             "id": agent.id,
@@ -165,7 +186,7 @@ async def get_agent(
             if agent.max_position_size
             else None,
             "color_theme": agent.color_theme,
-            "investment_preferences": agent.investment_preferences,
+            "investment_preferences": investment_prefs,
             "created_at": agent.created_at.isoformat() if agent.created_at else None,
             "updated_at": agent.updated_at.isoformat() if agent.updated_at else None,
             "holdings": [
@@ -257,6 +278,14 @@ async def create_agent(
 
         logger.success(f"Agent created successfully: {agent.id}")
 
+        # 解析 investment_preferences JSON 字符串為列表
+        investment_prefs = []
+        if agent.investment_preferences:
+            try:
+                investment_prefs = json.loads(agent.investment_preferences)
+            except (json.JSONDecodeError, TypeError):
+                investment_prefs = []
+
         # 返回創建的 agent 資訊
         return {
             "id": agent.id,
@@ -270,7 +299,11 @@ async def create_agent(
                 else agent.current_mode
             ),
             "initial_funds": float(agent.initial_funds),
+            "max_position_size": float(agent.max_position_size)
+            if agent.max_position_size
+            else None,
             "color_theme": agent.color_theme,
+            "investment_preferences": investment_prefs,
             "created_at": agent.created_at.isoformat() if agent.created_at else None,
         }
 
@@ -347,7 +380,9 @@ async def update_agent(
         if request.max_position_size is not None:
             update_data["max_position_size"] = request.max_position_size
         if request.investment_preferences is not None:
-            update_data["investment_preferences"] = request.investment_preferences
+            # 序列化投資偏好為 JSON
+            preferences_json = json.dumps(request.investment_preferences, ensure_ascii=False)
+            update_data["investment_preferences"] = preferences_json
 
         # 更新 agent
         for key, value in update_data.items():
@@ -358,6 +393,14 @@ async def update_agent(
         await agents_service.session.refresh(agent)
 
         logger.success(f"Agent updated successfully: {agent_id}")
+
+        # 解析 investment_preferences JSON 字符串為列表
+        investment_prefs = []
+        if agent.investment_preferences:
+            try:
+                investment_prefs = json.loads(agent.investment_preferences)
+            except (json.JSONDecodeError, TypeError):
+                investment_prefs = []
 
         # 返回更新後的資訊
         return {
@@ -375,6 +418,7 @@ async def update_agent(
             "max_position_size": float(agent.max_position_size)
             if agent.max_position_size
             else None,
+            "investment_preferences": investment_prefs,
             "updated_at": agent.updated_at.isoformat() if agent.updated_at else None,
         }
 

@@ -425,70 +425,90 @@
   <div class="flex gap-2 flex-col">
     <!-- 模式選擇按鈕 -->
     {#if canStart}
-      <div class="grid grid-cols-3 gap-2">
-        <Button
-          variant="secondary"
-          size="sm"
-          fullWidth
+      <div class="grid grid-cols-3 gap-3">
+        <!-- 觀察按鈕 -->
+        <button
           onclick={handleObserve}
           disabled={!$isOpen || isExecuting}
-          loading={isExecuting}
+          class="mode-button group"
+          style="--btn-base-color: rgb({agentColor}); --btn-light-color: rgba({agentColor}, 0.8);"
           title="觀察模式：分析市場無交易"
         >
-          <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              stroke-width="2"
-              d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
-            />
-            <path
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              stroke-width="2"
-              d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
-            />
-          </svg>
-          <span class="hidden sm:inline">觀察</span>
-        </Button>
-        <Button
-          variant="secondary"
-          size="sm"
-          fullWidth
+          <div class="button-wrapper">
+            <svg
+              class="h-5 w-5 transition-transform duration-300 group-hover:scale-110"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
+              />
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
+              />
+            </svg>
+            <span class="hidden sm:inline text-sm font-semibold">觀察</span>
+          </div>
+        </button>
+
+        <!-- 交易按鈕 -->
+        <button
           onclick={handleTrade}
           disabled={!$isOpen || isExecuting}
-          loading={isExecuting}
+          class="mode-button group"
+          style="--btn-base-color: rgb({agentColor}); --btn-light-color: rgba({agentColor}, 0.8);"
           title="交易模式：執行交易決策"
         >
-          <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              stroke-width="2"
-              d="M13 10V3L4 14h7v7l9-11h-7z"
-            />
-          </svg>
-          <span class="hidden sm:inline">交易</span>
-        </Button>
-        <Button
-          variant="secondary"
-          size="sm"
-          fullWidth
+          <div class="button-wrapper">
+            <svg
+              class="h-5 w-5 transition-transform duration-300 group-hover:scale-110"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                d="M13 10V3L4 14h7v7l9-11h-7z"
+              />
+            </svg>
+            <span class="hidden sm:inline text-sm font-semibold">交易</span>
+          </div>
+        </button>
+
+        <!-- 平衡按鈕 -->
+        <button
           onclick={handleRebalance}
           disabled={!$isOpen || isExecuting}
-          loading={isExecuting}
+          class="mode-button group"
+          style="--btn-base-color: rgb({agentColor}); --btn-light-color: rgba({agentColor}, 0.8);"
           title="再平衡模式：調整投資組合"
         >
-          <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              stroke-width="2"
-              d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"
-            />
-          </svg>
-          <span class="hidden sm:inline">平衡</span>
-        </Button>
+          <div class="button-wrapper">
+            <svg
+              class="h-5 w-5 transition-transform duration-300 group-hover:scale-110"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"
+              />
+            </svg>
+            <span class="hidden sm:inline text-sm font-semibold">平衡</span>
+          </div>
+        </button>
       </div>
     {/if}
 
@@ -592,6 +612,100 @@
     }
     50% {
       opacity: 0.5;
+    }
+  }
+
+  /* 模式按鈕美化樣式 - 使用動態agentColor */
+  .mode-button {
+    position: relative;
+    padding: 0.75rem 1rem;
+    border-radius: 0.75rem;
+    font-weight: 600;
+    color: white;
+    border: none;
+    cursor: pointer;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    /* 使用動態顏色變數，base色到深色的漸層 */
+    background: linear-gradient(135deg, var(--btn-light-color) 0%, var(--btn-base-color) 100%);
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+    overflow: hidden;
+    font-size: 0.875rem;
+  }
+
+  .mode-button:not(:disabled) {
+    transform-origin: center;
+  }
+
+  .mode-button:not(:disabled):hover {
+    transform: scale(1.05);
+    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.5);
+  }
+
+  .mode-button:not(:disabled):active {
+    transform: scale(0.95);
+    animation: buttonPulse 0.4s ease-out;
+  }
+
+  .mode-button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
+  .mode-button:focus {
+    outline: none;
+    /* 使用 --btn-base-color 進行focus ring */
+    box-shadow: 0 0 0 3px rgba(0, 0, 0, 0.2);
+  }
+
+  /* 光澤效果 - hover時增加 */
+  .mode-button::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+    transition: left 0.5s ease;
+    z-index: 1;
+  }
+
+  .mode-button:not(:disabled):hover::before {
+    left: 100%;
+  }
+
+  /* 按鈕內容包裝 */
+  .button-wrapper {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.375rem;
+    position: relative;
+    z-index: 10;
+  }
+
+  .button-wrapper svg {
+    transition: transform 0.3s ease;
+  }
+
+  .mode-button:not(:disabled):hover .button-wrapper svg {
+    transform: scale(1.1) rotate(5deg);
+  }
+
+  .mode-button:not(:disabled):active .button-wrapper svg {
+    transform: scale(0.95);
+  }
+
+  /* 執行中的脈衝動畫 */
+  @keyframes buttonPulse {
+    0% {
+      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+    }
+    50% {
+      box-shadow: 0 8px 30px rgba(0, 0, 0, 0.6);
+    }
+    100% {
+      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
     }
   }
 </style>
