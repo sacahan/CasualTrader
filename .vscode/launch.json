@@ -1,4 +1,5 @@
 {
+    "version": "0.2.0",
     "configurations": [
         {
             "name": "啟動 Backend Server",
@@ -7,12 +8,17 @@
             "program": "${workspaceFolder}/backend/run_server.py",
             "console": "integratedTerminal",
             "cwd": "${workspaceFolder}/backend",
-            "python": "${workspaceFolder}/.venv/bin/python",
             "env": {
-                "PYTHONPATH": "${workspaceFolder}/backend"
+                "PYTHONPATH": "${workspaceFolder}/backend",
+                "PATH": "${workspaceFolder}/.venv/bin:${env:PATH}"
             },
             "justMyCode": false,
-            "preLaunchTask": "Sync Backend Dependencies"
+            "preLaunchTask": "Sync Backend Dependencies",
+            "showReturnValue": true,
+            "stopOnEntry": false,
+            "pythonArgs": [
+                "-u"
+            ]
         },
         {
             "name": "啟動 Frontend Server",

@@ -30,9 +30,6 @@ class AIModelResponse(BaseModel):
     model_type: str = Field(..., description="模型類型 (openai/litellm)")
     litellm_prefix: str | None = Field(None, description="LiteLLM 前綴")
     full_model_name: str = Field(..., description="完整模型名稱")
-    max_tokens: int | None = Field(None, description="最大 token 數")
-    cost_per_1k_tokens: float | None = Field(None, description="每 1K tokens 成本")
-    description: str | None = Field(None, description="模型描述")
     display_order: int | None = Field(None, description="顯示順序")
 
 

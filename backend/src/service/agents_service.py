@@ -227,11 +227,6 @@ class AgentsService:
                     "model_type": model.model_type,
                     "litellm_prefix": model.litellm_prefix,
                     "full_model_name": model.full_model_name,
-                    "max_tokens": model.max_tokens,
-                    "cost_per_1k_tokens": (
-                        float(model.cost_per_1k_tokens) if model.cost_per_1k_tokens else None
-                    ),
-                    "description": model.description,
                     "display_order": model.display_order,
                 }
                 for model in models
@@ -279,11 +274,6 @@ class AgentsService:
                 else model.model_type.value,
                 "litellm_prefix": model.litellm_prefix,
                 "full_model_name": model.full_model_name,
-                "max_tokens": model.max_tokens,
-                "cost_per_1k_tokens": (
-                    float(model.cost_per_1k_tokens) if model.cost_per_1k_tokens else None
-                ),
-                "description": model.description,
                 "display_order": model.display_order,
             }
 

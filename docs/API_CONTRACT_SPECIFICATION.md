@@ -1,7 +1,7 @@
 # API 契約規範 (Frontend-Backend Contract)
 
-**版本**: 1.0
-**最後更新**: 2025-10-22
+**版本**: 1.1
+**最後更新**: 2025-10-26
 **狀態**: Active
 
 ## 概述
@@ -188,9 +188,6 @@ interface AIModel {
   model_type: string;              // 模型類型
   litellm_prefix?: string;         // LiteLLM 前綴
   full_model_name: string;         // 完整模型名稱
-  max_tokens?: number;             // 最大 token 數
-  cost_per_1k_tokens?: number;     // 每 1K tokens 成本
-  description?: string;            // 描述
   display_order?: number;          // 顯示順序
 }
 ```
@@ -824,9 +821,6 @@ GET /api/trading/agents/agent_123/portfolio
       "group_name": "OpenAI",
       "model_type": "openai",
       "full_model_name": "gpt-4-turbo-preview",
-      "max_tokens": 128000,
-      "cost_per_1k_tokens": 0.01,
-      "description": "Advanced reasoning model",
       "display_order": 1
     },
     {
@@ -836,9 +830,6 @@ GET /api/trading/agents/agent_123/portfolio
       "group_name": "OpenAI",
       "model_type": "openai",
       "full_model_name": "gpt-4-turbo-mini",
-      "max_tokens": 128000,
-      "cost_per_1k_tokens": 0.0001,
-      "description": "Lightweight model",
       "display_order": 2
     },
     {
@@ -849,9 +840,6 @@ GET /api/trading/agents/agent_123/portfolio
       "model_type": "litellm",
       "litellm_prefix": "claude-3.5-sonnet",
       "full_model_name": "claude-3.5-sonnet-20250514",
-      "max_tokens": 200000,
-      "cost_per_1k_tokens": 0.003,
-      "description": "Latest Claude model",
       "display_order": 3
     }
   ]
@@ -1148,4 +1136,5 @@ describe('API Contract Validation', () => {
 
 | 版本 | 日期 | 變更 |
 |------|------|------|
+| 1.1 | 2025-10-26 | 移除 AIModel 中的 max_tokens、cost_per_1k_tokens、description 欄位 |
 | 1.0 | 2025-10-22 | 初始版本，包含所有實現的端點 |

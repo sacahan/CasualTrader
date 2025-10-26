@@ -13,32 +13,26 @@ from datetime import datetime
 
 from dotenv import load_dotenv
 
-# 現在可以正常導入 OpenAI Agents SDK
-try:
-    from agents import (
-        Agent,
-        ModelSettings,
-        Runner,
-        gen_trace_id,
-        trace,
-        Tool,
-        WebSearchTool,
-        CodeInterpreterTool,
-    )
-
-    from agents.mcp import MCPServerStdio
-except ImportError as e:
-    from common.logger import logger
-
-    logger.error(f"Failed to import OpenAI Agents SDK: {e}")
-    raise
+# 導入 OpenAI Agents SDK
+from agents import (
+    Agent,
+    ModelSettings,
+    Runner,
+    gen_trace_id,
+    trace,
+    Tool,
+    WebSearchTool,
+    CodeInterpreterTool,
+)
+from agents.mcp import MCPServerStdio
+from agents.extensions.visualization import draw_graph
 
 # 導入所有 sub-agents
-from trading.tools.technical_agent import get_technical_agent
-from trading.tools.sentiment_agent import get_sentiment_agent
-from trading.tools.fundamental_agent import get_fundamental_agent
-from trading.tools.risk_agent import get_risk_agent
-from trading.tools.trading_tools import create_trading_tools, get_portfolio_status
+from .tools.technical_agent import get_technical_agent
+from .tools.sentiment_agent import get_sentiment_agent
+from .tools.fundamental_agent import get_fundamental_agent
+from .tools.risk_agent import get_risk_agent
+from .tools.trading_tools import create_trading_tools, get_portfolio_status
 
 from common.enums import AgentStatus, AgentMode
 from common.logger import logger
@@ -48,6 +42,7 @@ from service.agents_service import (
     AgentNotFoundError,
     AgentDatabaseError,
 )
+from agents.extensions.models.litellm_model import LitellmModel
 
 from database.models import Agent as AgentConfig
 
@@ -106,7 +101,8 @@ class TradingAgent:
 
         Args:
             agent_id: Agent ID
-            db_service: 資料庫服務實例
+            agent_config: Agent 配置
+            agent_service: Agent 服務實例
 
         Note:
             初始化後需要呼叫 initialize() 完成 Agent 設定
@@ -160,24 +156,40 @@ class TradingAgent:
             # 5. 合併所有 tools (不包括 OpenAI 內建工具)
             all_tools = self.trading_tools + self.subagent_tools
 
-            # 6. 創建 OpenAI Agent
+            # 6. 創建 LiteLLM 模型
+            llm_model = await self._create_llm_model()
+
+            # 7. 設定 GitHub Copilot 的 ModelSettings（如果適用）
+            model_settings = None
+            if getattr(self.agent_config, "llm_provider", "openai").lower() == "github_copilot":
+                model_settings = ModelSettings(
+                    tool_choice="required",
+                    extra_headers={
+                        "editor-version": "vscode/1.85.1",
+                        "Copilot-Integration-Id": "vscode-chat",
+                    },
+                )
+
+            # 8. 創建 OpenAI Agent（使用 LiteLLM 模型）
             self.agent = Agent(
                 name=self.agent_id,
-                model=self.agent_config.ai_model or DEFAULT_MODEL,
+                model=llm_model,
                 instructions=self._build_instructions(self.agent_config.description),
                 tools=all_tools,
                 mcp_servers=[self.memory_mcp],
-                model_settings=ModelSettings(
-                    # temperature=DEFAULT_TEMPERATURE,
-                    # reasoning=Reasoning(effort="high", summary="detailed"),
+                model_settings=model_settings
+                or ModelSettings(
                     tool_choice="required",
                 ),
             )
 
+            # 9. 繪製 Agent 結構圖
+            await self._save_agent_graph()
+
             self.is_initialized = True
             logger.info(
                 f"Agent initialized successfully: {self.agent_id} "
-                f"(model: {self.agent_config.ai_model})"
+                f"(model: {self.agent_config.ai_model}, provider: {getattr(self.agent_config, 'llm_provider', 'openai')})"
             )
 
         except (AgentNotFoundError, AgentConfigurationError):
@@ -185,6 +197,30 @@ class TradingAgent:
         except Exception as e:
             logger.error(f"Failed to initialize agent {self.agent_id}: {e}", exc_info=True)
             raise AgentInitializationError(f"Agent initialization failed: {str(e)}")
+
+    async def _save_agent_graph(self) -> None:
+        """
+        繪製並保存 Agent 結構圖
+
+        內部方法，用於 initialize() 的 Step 9。
+        將 Agent 的結構圖保存為 SVG 文件到 logs 目錄。
+
+        Raises:
+            Exception: 圖形生成失敗（非阻塞）
+        """
+        try:
+            # 指定輸出目錄為 backend/logs
+            output_dir = os.path.join(
+                os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "logs"
+            )
+            os.makedirs(output_dir, exist_ok=True)
+
+            graph_filepath = os.path.join(output_dir, f"trading_agent_graph_{self.agent_id}")
+            draw_graph(self.agent, filename=graph_filepath)
+
+            logger.info(f"Agent graph saved: {graph_filepath}.svg")
+        except Exception as graph_error:
+            logger.warning(f"Failed to generate agent graph: {graph_error}")
 
     async def _setup_mcp_servers(self):
         """
@@ -239,6 +275,68 @@ class TradingAgent:
             if self._exit_stack:
                 await self._exit_stack.aclose()
                 self._exit_stack = None
+
+    async def _create_llm_model(self) -> LitellmModel:
+        """
+        創建 LiteLLM 模型，使用 ai_model_configs 表配置
+
+        所有提供商和模型配置必須在 ai_model_configs 表中定義。
+        不支持 fallback - 配置缺失會立即失敗，便於及早發現問題。
+
+        Returns:
+            LitellmModel 實例
+
+        Raises:
+            AgentConfigurationError: 如果模型配置或 API 密鑰未設置
+        """
+        if not self.agent_config.ai_model:
+            raise AgentConfigurationError(f"Agent {self.agent_id} has no ai_model configured")
+
+        model_name = self.agent_config.ai_model
+
+        # 必須從 ai_model_configs 表查詢完整的模型配置
+        if not self.agent_service:
+            raise AgentConfigurationError("Cannot create LLM model: agent_service not available")
+
+        model_config = await self.agent_service.get_ai_model_config(model_name)
+
+        if not model_config:
+            raise AgentConfigurationError(
+                f"Model '{model_name}' not found in ai_model_configs table or not enabled. "
+                f"Please configure the model in the database."
+            )
+
+        # 從配置中獲取必要的欄位
+        litellm_prefix = model_config.get("litellm_prefix")
+        full_model_name = model_config.get("full_model_name")
+        api_key_env_var = model_config.get("api_key_env_var")
+        provider = model_config.get("provider")
+
+        if not litellm_prefix or not full_model_name or not api_key_env_var:
+            raise AgentConfigurationError(
+                f"Model '{model_name}' configuration incomplete in ai_model_configs table. "
+                f"Required fields: litellm_prefix, full_model_name, api_key_env_var. "
+                f"Got: litellm_prefix={litellm_prefix}, full_model_name={full_model_name}, "
+                f"api_key_env_var={api_key_env_var}"
+            )
+
+        # 從環境變數讀取 API 密鑰
+        api_key = os.getenv(api_key_env_var)
+        if not api_key:
+            raise AgentConfigurationError(
+                f"API key for provider '{provider}' not set. "
+                f"Set environment variable: {api_key_env_var}"
+            )
+
+        # 構建完整的 LiteLLM 模型字符串
+        model_str = f"{litellm_prefix}/{full_model_name}"
+
+        logger.info(
+            f"Creating LiteLLM model: {model_str} "
+            f"(provider: {provider}, api_key_env: {api_key_env_var})"
+        )
+
+        return LitellmModel(model=model_str, api_key=api_key)
 
     def _setup_openai_tools(self) -> list[Any]:
         """設置 OpenAI 內建工具（根據資料庫配置）"""

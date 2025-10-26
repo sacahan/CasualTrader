@@ -50,11 +50,14 @@ CasualTrader 是一個即時、可視化的 AI 股票交易模擬器，使用 Op
 
 ### AI 與工具層
 
-- **支援的 AI 模型**:
-  - OpenAI: GPT-4o, GPT-4o-mini, GPT-4-turbo
-  - Anthropic: Claude Sonnet 4.5, Claude Opus 4
-  - Google: Gemini 2.5 Pro, Gemini 2.0 Flash
-  - 其他: DeepSeek, Grok
+- **LLM 提供商整合**: LiteLLM (支持 100+ 模型)
+  - **主流提供商**:
+    - OpenAI: GPT-4o, GPT-4o-mini, GPT-4-turbo ✅
+    - Google Gemini: Gemini-pro, Gemini-2-flash ✅
+    - GitHub Copilot: GPT-5-mini ✅
+    - Anthropic: Claude-3-opus, Claude-3-sonnet ✅
+    - Together: Llama-3-70b 及其他開源模型 ✅
+  - **功能**: 自動重試、成本跟蹤、故障轉移
 - **資料來源**: casual-market-mcp (21 個台灣股市專業工具)
 - **協議標準**: Model Context Protocol (MCP)
 

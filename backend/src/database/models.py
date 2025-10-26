@@ -77,6 +77,9 @@ class Agent(Base):
     name: Mapped[str] = mapped_column(String(200), nullable=False)
     description: Mapped[str | None] = mapped_column(Text)
     ai_model: Mapped[str] = mapped_column(String(50), default="gpt-4o-mini")
+    llm_provider: Mapped[str] = mapped_column(
+        String(50), default="openai", doc="LLM provider: openai, gemini, together, ollama"
+    )
     color_theme: Mapped[str] = mapped_column(
         String(20), default="34, 197, 94"
     )  # RGB 格式，預設綠色
@@ -319,12 +322,9 @@ class AIModelConfig(Base):
 
     # API 配置
     api_base_url: Mapped[str | None] = mapped_column(String(500))
-    max_tokens: Mapped[int | None] = mapped_column(Integer)
-    cost_per_1k_tokens: Mapped[Decimal | None] = mapped_column(Numeric(10, 6))
 
     # 顯示和排序
     display_order: Mapped[int] = mapped_column(Integer, default=999)
-    description: Mapped[str | None] = mapped_column(Text)
 
     # 時間戳記
     created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now())
