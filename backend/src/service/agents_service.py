@@ -226,7 +226,6 @@ class AgentsService:
                     "group_name": model.group_name,
                     "model_type": model.model_type,
                     "litellm_prefix": model.litellm_prefix,
-                    "full_model_name": model.full_model_name,
                     "display_order": model.display_order,
                 }
                 for model in models
@@ -273,7 +272,6 @@ class AgentsService:
                 if isinstance(model.model_type, str)
                 else model.model_type.value,
                 "litellm_prefix": model.litellm_prefix,
-                "full_model_name": model.full_model_name,
                 "display_order": model.display_order,
             }
 

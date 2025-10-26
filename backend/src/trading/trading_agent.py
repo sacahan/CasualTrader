@@ -308,15 +308,15 @@ class TradingAgent:
 
         # 從配置中獲取必要的欄位
         litellm_prefix = model_config.get("litellm_prefix")
-        full_model_name = model_config.get("full_model_name")
+        model_key = model_config.get("model_key")
         api_key_env_var = model_config.get("api_key_env_var")
         provider = model_config.get("provider")
 
-        if not litellm_prefix or not full_model_name or not api_key_env_var:
+        if not litellm_prefix or not model_key or not api_key_env_var:
             raise AgentConfigurationError(
                 f"Model '{model_name}' configuration incomplete in ai_model_configs table. "
-                f"Required fields: litellm_prefix, full_model_name, api_key_env_var. "
-                f"Got: litellm_prefix={litellm_prefix}, full_model_name={full_model_name}, "
+                f"Required fields: litellm_prefix, model_key, api_key_env_var. "
+                f"Got: litellm_prefix={litellm_prefix}, model_key={model_key}, "
                 f"api_key_env_var={api_key_env_var}"
             )
 
@@ -329,7 +329,7 @@ class TradingAgent:
             )
 
         # 構建完整的 LiteLLM 模型字符串
-        model_str = f"{litellm_prefix}/{full_model_name}"
+        model_str = f"{litellm_prefix}{model_key}"
 
         logger.info(
             f"Creating LiteLLM model: {model_str} "

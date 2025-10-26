@@ -187,7 +187,6 @@ interface AIModel {
   group_name: string;              // 分組名稱
   model_type: string;              // 模型類型
   litellm_prefix?: string;         // LiteLLM 前綴
-  full_model_name: string;         // 完整模型名稱
   display_order?: number;          // 顯示順序
 }
 ```
@@ -820,7 +819,6 @@ GET /api/trading/agents/agent_123/portfolio
       "provider": "openai",
       "group_name": "OpenAI",
       "model_type": "openai",
-      "full_model_name": "gpt-4-turbo-preview",
       "display_order": 1
     },
     {
@@ -829,7 +827,6 @@ GET /api/trading/agents/agent_123/portfolio
       "provider": "openai",
       "group_name": "OpenAI",
       "model_type": "openai",
-      "full_model_name": "gpt-4-turbo-mini",
       "display_order": 2
     },
     {
@@ -838,8 +835,7 @@ GET /api/trading/agents/agent_123/portfolio
       "provider": "litellm",
       "group_name": "Anthropic",
       "model_type": "litellm",
-      "litellm_prefix": "claude-3.5-sonnet",
-      "full_model_name": "claude-3.5-sonnet-20250514",
+      "litellm_prefix": "claude",
       "display_order": 3
     }
   ]

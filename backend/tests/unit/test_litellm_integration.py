@@ -93,7 +93,6 @@ class TestTradingAgentWithLiteLLM:
                 "model_key": "gpt-4o-mini",
                 "provider": "openai",
                 "litellm_prefix": "openai",
-                "full_model_name": "gpt-4o-mini",
                 "api_key_env_var": "OPENAI_API_KEY",
             }
         )
@@ -125,7 +124,6 @@ class TestTradingAgentWithLiteLLM:
                 "model_key": "gemini-pro",
                 "provider": "gemini",
                 "litellm_prefix": "gemini",
-                "full_model_name": "gemini-pro",
                 "api_key_env_var": "GOOGLE_API_KEY",
             }
         )
@@ -155,7 +153,6 @@ class TestTradingAgentWithLiteLLM:
                 "model_key": "gpt-5-mini",
                 "provider": "github_copilot",
                 "litellm_prefix": "github_copilot",
-                "full_model_name": "gpt-5-mini",
                 "api_key_env_var": "GITHUB_COPILOT_TOKEN",
             }
         )
@@ -185,7 +182,6 @@ class TestTradingAgentWithLiteLLM:
                 "model_key": "gpt-4o-mini",
                 "provider": "openai",
                 "litellm_prefix": "openai",
-                "full_model_name": "gpt-4o-mini",
                 "api_key_env_var": "OPENAI_API_KEY",
             }
         )
@@ -229,7 +225,6 @@ class TestLiteLLMProviderSupport:
                 "model_key": model,
                 "provider": provider,
                 "litellm_prefix": provider,
-                "full_model_name": model,
                 "api_key_env_var": env_var,
             }
         )
@@ -364,7 +359,7 @@ class TestLiteLLMConfigValidation:
             return_value={
                 "model_key": "incomplete-model",
                 "provider": "openai",
-                # Missing: litellm_prefix, full_model_name, api_key_env_var
+                # Missing: litellm_prefix, model_key, api_key_env_var
             }
         )
 

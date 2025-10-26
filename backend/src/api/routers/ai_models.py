@@ -29,7 +29,6 @@ class AIModelResponse(BaseModel):
     group_name: str = Field(..., description="模型分組名稱")
     model_type: str = Field(..., description="模型類型 (openai/litellm)")
     litellm_prefix: str | None = Field(None, description="LiteLLM 前綴")
-    full_model_name: str = Field(..., description="完整模型名稱")
     display_order: int | None = Field(None, description="顯示順序")
 
 

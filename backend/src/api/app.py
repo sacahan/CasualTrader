@@ -32,53 +32,90 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 
     # Startup
     logger.info("=" * 80)
-    logger.info("🚀 CasualTrader API Server Starting...")
-    logger.info(f"Environment: {settings.environment}")
-    logger.info(f"Debug Mode: {settings.debug}")
-    logger.info(f"API Host: {settings.api_host}:{settings.api_port}")
-    logger.info(f"CORS Origins: {settings.cors_origins}")
-    logger.info(f"Max Agents: {settings.max_agents}")
-    logger.info(f"Database: {settings.database_url}")
+    logger.info("🚀 CasualTrader API Server Starting")
     logger.info("=" * 80)
+    logger.info("")
 
-    # Initialize WebSocket manager
-    logger.info("Initializing WebSocket manager...")
-    await websocket_manager.startup()
-    logger.success("WebSocket manager initialized successfully")
+    # Configuration
+    logger.info("📋 Configuration:")
+    logger.info(f"   Environment: {settings.environment}")
+    logger.info(f"   Debug Mode: {'Enabled' if settings.debug else 'Disabled'}")
+    logger.info(f"   Log Level: {log_level}")
+    logger.info(f"   API Host: {settings.api_host}:{settings.api_port}")
+    logger.info(f"   Database: {settings.database_url}")
+    logger.info(f"   Max Agents: {settings.max_agents}")
+    logger.info("")
 
-    # Initialize Agent Executor
-    logger.info("Initializing Agent Executor...")
-    executor = AgentExecutor()
-    # Set the global executor in dependencies module
-    dependencies.set_executor(executor)
-    logger.success("Agent Executor initialized successfully")
+    # CORS Settings
+    logger.info("🔐 CORS Settings:")
+    if settings.debug:
+        logger.info("   Allowed Origins: *")
+    else:
+        for origin in settings.cors_origins:
+            logger.info(f"   - {origin}")
+    logger.info(f"   Allow Credentials: {'Yes' if settings.cors_allow_credentials else 'No'}")
+    logger.info("")
 
-    logger.success("✅ CasualTrader API Server started successfully")
+    # Initialize services
+    logger.info("⚙️  Initializing Services:")
+
+    # WebSocket Manager
+    try:
+        logger.info("   • WebSocket Manager... ", end="")
+        await websocket_manager.startup()
+        logger.success(" ✓")
+    except Exception as e:
+        logger.error(f" ✗\n     Error: {e}")
+        raise
+
+    # Agent Executor
+    try:
+        logger.info("   • Agent Executor... ", end="")
+        executor = AgentExecutor()
+        dependencies.set_executor(executor)
+        logger.success(" ✓")
+    except Exception as e:
+        logger.error(f" ✗\n     Error: {e}")
+        raise
+
+    logger.info("")
+    logger.info("=" * 80)
+    logger.success("✅ Server started successfully!")
+    logger.info("=" * 80)
+    logger.info("")
 
     yield
 
     # Shutdown
+    logger.info("")
     logger.info("=" * 80)
-    logger.info("⏹️ CasualTrader API Server Shutting Down...")
+    logger.info("⏹️  CasualTrader API Server Shutting Down")
+    logger.info("=" * 80)
+    logger.info("")
+
+    logger.info("🧹 Cleaning Up:")
 
     # Stop all running agents
     try:
-        logger.info("Stopping all running agents...")
+        logger.info("   • Stopping agents... ", end="")
         await executor.stop_all()
-        logger.success("All agents stopped successfully")
+        logger.success(" ✓")
     except Exception as e:
-        logger.error(f"Error stopping agents: {e}")
+        logger.error(f" ✗\n     Error: {e}")
 
     # Close WebSocket connections
     try:
-        logger.info("Closing WebSocket connections...")
+        logger.info("   • Closing WebSocket connections... ", end="")
         await websocket_manager.shutdown()
-        logger.success("WebSocket connections closed")
+        logger.success(" ✓")
     except Exception as e:
-        logger.error(f"Error closing WebSocket connections: {e}")
+        logger.error(f" ✗\n     Error: {e}")
 
-    logger.success("✅ CasualTrader API Server shut down successfully")
+    logger.info("")
     logger.info("=" * 80)
+    logger.success("✅ Server shut down successfully!")
+    logger.info("=" * 80)
+    logger.info("")
 
 
 def create_app() -> FastAPI:
@@ -158,7 +195,7 @@ def create_app() -> FastAPI:
         )
 
     # CORS middleware
-    logger.info(f"Configuring CORS with origins: {settings.cors_origins}")
+    logger.info("🔐 Configuring CORS middleware...")
     app.add_middleware(
         CORSMiddleware,
         allow_origins=settings.cors_origins if not settings.debug else ["*"],
@@ -166,9 +203,10 @@ def create_app() -> FastAPI:
         allow_methods=["*"],
         allow_headers=["*"],
     )
+    logger.success("   ✓ CORS middleware configured")
 
     # Include routers
-    logger.info("Registering API routers...")
+    logger.info("📡 Registering API routes...")
     app.include_router(agents.router)
     app.include_router(trading.router)
     app.include_router(
@@ -176,16 +214,9 @@ def create_app() -> FastAPI:
     )
     app.include_router(ai_models.router, prefix="/api")
     app.include_router(websocket_router.router, tags=["websocket"])
-    logger.info("✓ All routers registered")
+    logger.success("   ✓ All API routes registered")
 
-    # Static files (for frontend)
-    frontend_dist = Path(__file__).parent.parent.parent / "frontend" / "dist"
-    if frontend_dist.exists():
-        logger.info(f"Mounting frontend static files from: {frontend_dist}")
-        app.mount("/", StaticFiles(directory=str(frontend_dist), html=True), name="frontend")
-    else:
-        logger.warning(f"Frontend dist directory not found: {frontend_dist}")
-
+    # Health check endpoint (must be before static files mounting)
     @app.get("/api/health", tags=["system"], summary="健康檢查")
     async def health_check():
         """
@@ -202,5 +233,16 @@ def create_app() -> FastAPI:
             "debug": settings.debug,
         }
 
-    logger.success("FastAPI application created successfully")
+    # Static files (for frontend)
+    # NOTE: Must be mounted AFTER all API routes to avoid catching API requests
+    logger.info("📁 Setting up static files...")
+    frontend_dist = Path(__file__).parent.parent.parent.parent / "frontend" / "dist"
+    if frontend_dist.exists():
+        logger.info(f"   Mounting: {frontend_dist}")
+        app.mount("/", StaticFiles(directory=str(frontend_dist), html=True), name="frontend")
+        logger.success("   ✓ Frontend static files mounted")
+    else:
+        logger.warning(f"   ⚠ Frontend dist not found: {frontend_dist}")
+
+    logger.success("✅ FastAPI application created successfully!\n")
     return app

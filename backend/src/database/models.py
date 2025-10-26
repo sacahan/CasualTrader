@@ -313,15 +313,11 @@ class AIModelConfig(Base):
     # 模型類型和配置
     model_type: Mapped[ModelType] = mapped_column(String(20), nullable=False)
     litellm_prefix: Mapped[str | None] = mapped_column(String(100))
-    full_model_name: Mapped[str] = mapped_column(String(200), nullable=False)
 
     # 啟用和權限
     is_enabled: Mapped[bool] = mapped_column(default=True, nullable=False)
     requires_api_key: Mapped[bool] = mapped_column(default=True, nullable=False)
     api_key_env_var: Mapped[str | None] = mapped_column(String(100))
-
-    # API 配置
-    api_base_url: Mapped[str | None] = mapped_column(String(500))
 
     # 顯示和排序
     display_order: Mapped[int] = mapped_column(Integer, default=999)
