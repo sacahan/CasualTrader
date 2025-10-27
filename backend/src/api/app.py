@@ -15,11 +15,12 @@ from fastapi.staticfiles import StaticFiles
 
 from common.logger import logger, setup_logger
 from service.agent_executor import AgentExecutor
-from api.config import settings
+from api.config import settings, get_engine
 from api.docs import get_openapi_tags
 from api.routers import agent_execution, agents, ai_models, trading, websocket_router
 from api.websocket import websocket_manager
 from api import dependencies
+from database.init import ensure_tables_exist
 
 
 @asynccontextmanager
@@ -58,6 +59,16 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 
     # Initialize services
     logger.info("⚙️  Initializing Services:")
+
+    # Database
+    try:
+        logger.info("   • Database... ", end="")
+        engine = get_engine()
+        await ensure_tables_exist(engine)
+        logger.success(" ✓")
+    except Exception as e:
+        logger.error(f" ✗\n     Error: {e}")
+        raise
 
     # WebSocket Manager
     try:

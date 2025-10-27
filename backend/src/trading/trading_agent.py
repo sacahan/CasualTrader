@@ -159,9 +159,13 @@ class TradingAgent:
             # 6. 創建 LiteLLM 模型
             llm_model = await self._create_llm_model()
 
-            # 7. 設定 GitHub Copilot 的 ModelSettings（如果適用）
+            # 7. 獲取 LLM 提供商（從 ai_model_configs 查詢）
+            model_config = await self.agent_service.get_ai_model_config(self.agent_config.ai_model)
+            provider = model_config.get("provider", "openai") if model_config else "openai"
+
+            # 8. 設定 GitHub Copilot 的 ModelSettings（如果適用）
             model_settings = None
-            if getattr(self.agent_config, "llm_provider", "openai").lower() == "github_copilot":
+            if provider.lower() == "github_copilot":
                 model_settings = ModelSettings(
                     tool_choice="required",
                     extra_headers={
@@ -170,7 +174,7 @@ class TradingAgent:
                     },
                 )
 
-            # 8. 創建 OpenAI Agent（使用 LiteLLM 模型）
+            # 9. 創建 OpenAI Agent（使用 LiteLLM 模型）
             self.agent = Agent(
                 name=self.agent_id,
                 model=llm_model,
@@ -183,13 +187,13 @@ class TradingAgent:
                 ),
             )
 
-            # 9. 繪製 Agent 結構圖
+            # 10. 繪製 Agent 結構圖
             await self._save_agent_graph()
 
             self.is_initialized = True
             logger.info(
                 f"Agent initialized successfully: {self.agent_id} "
-                f"(model: {self.agent_config.ai_model}, provider: {getattr(self.agent_config, 'llm_provider', 'openai')})"
+                f"(model: {self.agent_config.ai_model}, provider: {provider})"
             )
 
         except (AgentNotFoundError, AgentConfigurationError):

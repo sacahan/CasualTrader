@@ -1,8 +1,8 @@
 #!/usr/bin/env python
 """
-測試從 OBSERVATION 模式切換到 TRADING 模式的修復
+測試從 OBSERVATION 模式切換到 TRADING 模式的場景
 
-這個測試驗證 AsyncExitStack 和 MCP servers cancel scope 問題是否已解決。
+這個端到端測試驗證 AsyncExitStack 和 MCP servers cancel scope 問題是否已解決。
 """
 
 import asyncio

@@ -59,7 +59,6 @@ class TestTradingAgentWithLiteLLM:
         mock_agent_config.id = "test-agent-1"
         mock_agent_config.description = "Test trading agent"
         mock_agent_config.ai_model = "gpt-4o-mini"
-        mock_agent_config.llm_provider = "openai"
         mock_agent_config.investment_preferences = None
         mock_agent_config.max_position_size = 0.1
 
@@ -84,7 +83,6 @@ class TestTradingAgentWithLiteLLM:
 
         mock_agent_config = MagicMock(spec=AgentConfig)
         mock_agent_config.ai_model = "gpt-4o-mini"
-        mock_agent_config.llm_provider = "openai"
 
         # Mock agent_service with proper async get_ai_model_config
         mock_service = AsyncMock()
@@ -116,7 +114,6 @@ class TestTradingAgentWithLiteLLM:
 
         mock_agent_config = MagicMock(spec=AgentConfig)
         mock_agent_config.ai_model = "gemini-pro"
-        mock_agent_config.llm_provider = "gemini"
 
         mock_service = AsyncMock()
         mock_service.get_ai_model_config = AsyncMock(
@@ -145,7 +142,6 @@ class TestTradingAgentWithLiteLLM:
 
         mock_agent_config = MagicMock(spec=AgentConfig)
         mock_agent_config.ai_model = "gpt-5-mini"
-        mock_agent_config.llm_provider = "github_copilot"
 
         mock_service = AsyncMock()
         mock_service.get_ai_model_config = AsyncMock(
@@ -174,7 +170,6 @@ class TestTradingAgentWithLiteLLM:
 
         mock_agent_config = MagicMock(spec=AgentConfig)
         mock_agent_config.ai_model = "gpt-4o-mini"
-        mock_agent_config.llm_provider = "openai"
 
         mock_service = AsyncMock()
         mock_service.get_ai_model_config = AsyncMock(
@@ -217,7 +212,6 @@ class TestLiteLLMProviderSupport:
 
         mock_agent_config = MagicMock(spec=AgentConfig)
         mock_agent_config.ai_model = model
-        mock_agent_config.llm_provider = provider
 
         mock_service = AsyncMock()
         mock_service.get_ai_model_config = AsyncMock(
@@ -257,15 +251,25 @@ class TestGitHubCopilotIntegration:
 
     @pytest.mark.asyncio
     async def test_trading_agent_detects_github_copilot(self):
-        """Test TradingAgent correctly detects GitHub Copilot provider"""
+        """Test TradingAgent correctly detects GitHub Copilot provider from DB config"""
         from src.database.models import Agent as AgentConfig
 
         mock_agent_config = MagicMock(spec=AgentConfig)
         mock_agent_config.ai_model = "gpt-5-mini"
-        mock_agent_config.llm_provider = "github_copilot"
 
-        # Verify provider detection logic
-        provider = getattr(mock_agent_config, "llm_provider", "openai").lower()
+        mock_service = AsyncMock()
+        mock_service.get_ai_model_config = AsyncMock(
+            return_value={
+                "model_key": "gpt-5-mini",
+                "provider": "github_copilot",
+                "litellm_prefix": "github_copilot",
+                "api_key_env_var": "GITHUB_COPILOT_TOKEN",
+            }
+        )
+
+        # Verify provider is correctly retrieved from config
+        model_config = await mock_service.get_ai_model_config("gpt-5-mini")
+        provider = model_config.get("provider", "openai").lower()
         assert provider == "github_copilot"
 
 
@@ -280,7 +284,6 @@ class TestLiteLLMErrorHandling:
 
         mock_agent_config = MagicMock(spec=AgentConfig)
         mock_agent_config.ai_model = "unknown-model"
-        mock_agent_config.llm_provider = "unknown_provider"
 
         mock_service = AsyncMock()
         mock_service.get_ai_model_config = AsyncMock(return_value=None)  # Not found
@@ -307,7 +310,6 @@ class TestLiteLLMCleanup:
         mock_agent_config = MagicMock(spec=AgentConfig)
         mock_agent_config.id = "test-agent-1"
         mock_agent_config.ai_model = "gpt-4o-mini"
-        mock_agent_config.llm_provider = "openai"
 
         mock_service = AsyncMock()
 

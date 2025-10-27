@@ -25,8 +25,6 @@ class Settings(BaseSettings):
     # API Server Settings
     api_host: str = Field(default="0.0.0.0", description="API server host")
     api_port: int = Field(default=8000, description="API server port")
-    api_reload: bool = Field(default=True, description="Enable auto-reload")
-    api_workers: int = Field(default=1, description="Number of workers")
 
     # CORS Settings
     cors_origins: list[str] = Field(
@@ -62,24 +60,12 @@ class Settings(BaseSettings):
         default=300,
         description="Default execution timeout for main agent (seconds), applies to all sub-agents",
     )
-    default_subagent_max_turns: int = Field(
-        default=15, description="Default max turns for sub-agents"
-    )
-
-    # Agent 循環執行配置
-    default_cycle_interval_minutes: int = Field(default=5, description="預設循環間隔（分鐘）")
-    skip_market_check: bool = Field(default=False, description="測試模式：跳過開市檢查")
-    agent_cycle_timeout: int = Field(default=600, description="單次循環超時（秒）")
 
     # WebSocket Settings
     ws_heartbeat_interval: int = Field(
         default=30, description="WebSocket heartbeat interval (seconds)"
     )
     ws_max_connections: int = Field(default=100, description="Maximum WebSocket connections")
-
-    # Rate Limiting
-    rate_limit_enabled: bool = Field(default=False, description="Enable rate limiting")
-    rate_limit_per_minute: int = Field(default=60, description="Rate limit per minute")
 
     # Environment
     environment: str = Field(default="development", description="Environment name")
