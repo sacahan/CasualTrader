@@ -25,7 +25,6 @@ from agents import (
     CodeInterpreterTool,
 )
 from agents.mcp import MCPServerStdio
-from agents.extensions.visualization import draw_graph
 
 # 導入所有 sub-agents
 from .tools.technical_agent import get_technical_agent
@@ -36,6 +35,7 @@ from .tools.trading_tools import create_trading_tools, get_portfolio_status
 
 from common.enums import AgentStatus, AgentMode
 from common.logger import logger
+from common.agent_utils import save_agent_graph
 from service.agents_service import (
     AgentsService,
     AgentConfigurationError,
@@ -165,7 +165,7 @@ class TradingAgent:
 
             # 8. 設定 GitHub Copilot 的 ModelSettings（headers 必須在此層級設置）
             extra_headers = {}
-            if provider and provider.lower() == "github_copilot":
+            if provider and provider.lower() == "GitHub Copilot".lower():
                 extra_headers = {
                     "editor-version": "vscode/1.85.1",
                     "Copilot-Integration-Id": "vscode-chat",
@@ -182,11 +182,16 @@ class TradingAgent:
                 model_settings=ModelSettings(
                     tool_choice="required",
                     extra_headers=extra_headers if extra_headers else None,
+                    include_usage=True,  # 追蹤使用數據
                 ),
             )
 
             # 10. 繪製 Agent 結構圖
-            await self._save_agent_graph()
+            # save_agent_graph(
+            #     agent=self.agent,
+            #     agent_id=self.agent_id,
+            #     output_dir=None,  # 使用預設的 backend/logs 目錄
+            # )
 
             self.is_initialized = True
             logger.info(
@@ -199,30 +204,6 @@ class TradingAgent:
         except Exception as e:
             logger.error(f"Failed to initialize agent {self.agent_id}: {e}", exc_info=True)
             raise AgentInitializationError(f"Agent initialization failed: {str(e)}")
-
-    async def _save_agent_graph(self) -> None:
-        """
-        繪製並保存 Agent 結構圖
-
-        內部方法，用於 initialize() 的 Step 9。
-        將 Agent 的結構圖保存為 SVG 文件到 logs 目錄。
-
-        Raises:
-            Exception: 圖形生成失敗（非阻塞）
-        """
-        try:
-            # 指定輸出目錄為 backend/logs
-            output_dir = os.path.join(
-                os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "logs"
-            )
-            os.makedirs(output_dir, exist_ok=True)
-
-            graph_filepath = os.path.join(output_dir, f"{self.agent_id}")
-            draw_graph(self.agent, filename=graph_filepath)
-
-            logger.info(f"Agent graph saved: {graph_filepath}.svg")
-        except Exception as graph_error:
-            logger.warning(f"Failed to generate agent graph: {graph_error}")
 
     async def _setup_mcp_servers(self):
         """
@@ -416,6 +397,9 @@ class TradingAgent:
                         logger.info("技術分析 Sub Agent Tool 載入成功")
                     else:
                         logger.error("技術分析 agent.as_tool() 返回 None")
+
+                    # 繪製 Sub-Agent 圖形
+                    save_agent_graph(technical_agent, "technical_agent", None)
                 else:
                     logger.error("get_technical_agent() 返回 None")
             except Exception as e:
@@ -439,6 +423,9 @@ class TradingAgent:
                         logger.info("情緒分析 Sub Agent Tool 載入成功")
                     else:
                         logger.error("情緒分析 agent.as_tool() 返回 None")
+
+                    # 繪製 Sub-Agent 圖形
+                    save_agent_graph(sentiment_agent, "sentiment_agent", None)
                 else:
                     logger.error("get_sentiment_agent() 返回 None")
             except Exception as e:
@@ -462,6 +449,9 @@ class TradingAgent:
                         logger.info("基本面分析 Sub Agent Tool 載入成功")
                     else:
                         logger.error("基本面分析 agent.as_tool() 返回 None")
+
+                    # 繪製 Sub-Agent 圖形
+                    save_agent_graph(fundamental_agent, "fundamental_agent", None)
                 else:
                     logger.error("get_fundamental_agent() 返回 None")
             except Exception as e:
@@ -485,6 +475,9 @@ class TradingAgent:
                         logger.info("風險評估 Sub Agent Tool 載入成功")
                     else:
                         logger.error("風險評估 agent.as_tool() 返回 None")
+
+                    # 繪製 Sub-Agent 圖形
+                    save_agent_graph(risk_agent, "risk_agent", None)
                 else:
                     logger.error("get_risk_agent() 返回 None")
             except Exception as e:

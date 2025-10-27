@@ -12,10 +12,15 @@ Features:
 
 from __future__ import annotations
 
+import os
 import sys
 from pathlib import Path
 
 from loguru import logger
+
+# 禁用 LiteLLM 的詳細輸出 - 使用官方推薦的環境變數方式
+# 根據 LiteLLM 官方文檔：https://github.com/BerriAI/litellm
+os.environ["LITELLM_LOG"] = "ERROR"
 
 # ==========================================
 # Logger 配置
@@ -49,8 +54,12 @@ def _filter_noisy_loggers(record):
     if record["name"].startswith(("httpx", "httpcore")) and record["level"].name == "DEBUG":
         return False
 
-    # 過濾掉 litellm.utils 的所有日誌（包括 DEBUG）
-    if record["name"].startswith("litellm.utils"):
+    # 過濾掉 agents SDK 的 DEBUG 日誌
+    if record["name"].startswith("agents") and record["level"].name == "DEBUG":
+        return False
+
+    # 過濾掉 litellm 的 DEBUG 日誌
+    if record["name"].startswith("litellm") and record["level"].name == "DEBUG":
         return False
 
     return True
@@ -152,6 +161,7 @@ def intercept_standard_logging() -> None:
     logging.getLogger("openai").setLevel(logging.WARNING)
     logging.getLogger("httpx").setLevel(logging.WARNING)
     logging.getLogger("httpcore").setLevel(logging.WARNING)
+    logging.getLogger("agents").setLevel(logging.WARNING)  # Agents SDK 日誌級別調整為 WARNING
 
 
 # ==========================================
