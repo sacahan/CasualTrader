@@ -24,7 +24,7 @@
     executeAgent,
   } from './stores/agents.js';
   import { connectWebSocket, disconnectWebSocket } from './stores/websocket.js';
-  import { loadMarketStatus, startMarketDataPolling } from './stores/market.js';
+  import { loadMarketStatus, loadMarketIndices } from './stores/market.js';
   import { notifySuccess, notifyError } from './stores/notifications.js';
   import { apiClient } from './shared/api.js';
 
@@ -41,9 +41,6 @@
   let agentHoldings = $state({});
   let agentTransactions = $state({});
 
-  // 市場資料刷新定時器
-  let stopMarketPolling = null;
-
   onMount(async () => {
     // 連接 WebSocket
     connectWebSocket();
@@ -51,9 +48,7 @@
     // 載入初始資料
     await loadAgents();
     await loadMarketStatus();
-
-    // 啟動市場資料定時刷新
-    stopMarketPolling = startMarketDataPolling(30000); // 30 秒刷新一次
+    await loadMarketIndices();
   });
 
   // 函數定義 - 移到根層級以符合 eslint no-inner-declarations 規則
@@ -173,11 +168,6 @@
   onDestroy(() => {
     // 斷開 WebSocket
     disconnectWebSocket();
-
-    // 停止市場資料刷新
-    if (stopMarketPolling) {
-      stopMarketPolling();
-    }
   });
 </script>
 

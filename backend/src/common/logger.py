@@ -49,6 +49,10 @@ def _filter_noisy_loggers(record):
     if record["name"].startswith(("httpx", "httpcore")) and record["level"].name == "DEBUG":
         return False
 
+    # 過濾掉 litellm.utils 的所有日誌（包括 DEBUG）
+    if record["name"].startswith("litellm.utils"):
+        return False
+
     return True
 
 

@@ -163,16 +163,14 @@ class TradingAgent:
             model_config = await self.agent_service.get_ai_model_config(self.agent_config.ai_model)
             provider = model_config.get("provider", "openai") if model_config else "openai"
 
-            # 8. 設定 GitHub Copilot 的 ModelSettings（如果適用）
-            model_settings = None
-            if provider.lower() == "github_copilot":
-                model_settings = ModelSettings(
-                    tool_choice="required",
-                    extra_headers={
-                        "editor-version": "vscode/1.85.1",
-                        "Copilot-Integration-Id": "vscode-chat",
-                    },
-                )
+            # 8. 設定 GitHub Copilot 的 ModelSettings（headers 必須在此層級設置）
+            extra_headers = {}
+            if provider and provider.lower() == "github_copilot":
+                extra_headers = {
+                    "editor-version": "vscode/1.85.1",
+                    "Copilot-Integration-Id": "vscode-chat",
+                }
+                logger.info(f"Configuring GitHub Copilot headers for agent: {self.agent_id}")
 
             # 9. 創建 OpenAI Agent（使用 LiteLLM 模型）
             self.agent = Agent(
@@ -181,9 +179,9 @@ class TradingAgent:
                 instructions=self._build_instructions(self.agent_config.description),
                 tools=all_tools,
                 mcp_servers=[self.memory_mcp],
-                model_settings=model_settings
-                or ModelSettings(
+                model_settings=ModelSettings(
                     tool_choice="required",
+                    extra_headers=extra_headers if extra_headers else None,
                 ),
             )
 
@@ -219,7 +217,7 @@ class TradingAgent:
             )
             os.makedirs(output_dir, exist_ok=True)
 
-            graph_filepath = os.path.join(output_dir, f"trading_agent_graph_{self.agent_id}")
+            graph_filepath = os.path.join(output_dir, f"{self.agent_id}")
             draw_graph(self.agent, filename=graph_filepath)
 
             logger.info(f"Agent graph saved: {graph_filepath}.svg")
@@ -340,6 +338,7 @@ class TradingAgent:
             f"(provider: {provider}, api_key_env: {api_key_env_var})"
         )
 
+        # 返回 LitellmModel - headers 將通過 ModelSettings 傳遞
         return LitellmModel(model=model_str, api_key=api_key)
 
     def _setup_openai_tools(self) -> list[Any]:

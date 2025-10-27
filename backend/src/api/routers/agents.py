@@ -73,53 +73,84 @@ async def list_agents(
 
         # 獲取所有活躍的 agents
         agents = await agents_service.list_agents()
+        logger.debug(f"Queried agents from database: {len(agents)} agents found")
 
         # 轉換為字典格式
         result = []
         for agent in agents:
-            # 解析 investment_preferences JSON 字符串為列表
-            investment_prefs = []
-            if agent.investment_preferences:
-                try:
-                    investment_prefs = json.loads(agent.investment_preferences)
-                except (json.JSONDecodeError, TypeError):
-                    investment_prefs = []
+            try:
+                # 解析 investment_preferences JSON 字符串為列表
+                investment_prefs = []
+                if agent.investment_preferences:
+                    try:
+                        investment_prefs = json.loads(agent.investment_preferences)
+                    except (json.JSONDecodeError, TypeError) as json_err:
+                        logger.warning(
+                            f"Failed to parse investment_preferences for agent {agent.id}: {json_err}",
+                            extra={"investment_prefs_raw": agent.investment_preferences},
+                        )
+                        investment_prefs = []
 
-            agent_dict = {
-                "id": agent.id,
-                "name": agent.name,
-                "description": agent.description,
-                "ai_model": agent.ai_model,
-                "status": agent.status.value if hasattr(agent.status, "value") else agent.status,
-                "current_mode": (
-                    agent.current_mode.value
-                    if hasattr(agent.current_mode, "value")
-                    else agent.current_mode
-                ),
-                "initial_funds": float(agent.initial_funds),
-                "current_funds": float(agent.current_funds),
-                "max_position_size": float(agent.max_position_size)
-                if agent.max_position_size
-                else None,
-                "color_theme": agent.color_theme,
-                "investment_preferences": investment_prefs,
-                "created_at": agent.created_at.isoformat() if agent.created_at else None,
-                "updated_at": agent.updated_at.isoformat() if agent.updated_at else None,
-            }
-            result.append(agent_dict)
+                agent_dict = {
+                    "id": agent.id,
+                    "name": agent.name,
+                    "description": agent.description,
+                    "ai_model": agent.ai_model,
+                    "status": agent.status.value
+                    if hasattr(agent.status, "value")
+                    else agent.status,
+                    "current_mode": (
+                        agent.current_mode.value
+                        if hasattr(agent.current_mode, "value")
+                        else agent.current_mode
+                    ),
+                    "initial_funds": float(agent.initial_funds),
+                    "current_funds": float(agent.current_funds),
+                    "max_position_size": float(agent.max_position_size)
+                    if agent.max_position_size
+                    else None,
+                    "color_theme": agent.color_theme,
+                    "investment_preferences": investment_prefs,
+                    "created_at": agent.created_at.isoformat() if agent.created_at else None,
+                    "updated_at": agent.updated_at.isoformat() if agent.updated_at else None,
+                }
+                result.append(agent_dict)
+            except AttributeError as attr_err:
+                # Catch detached instance or missing attribute errors
+                logger.error(
+                    f"Error accessing agent properties for agent ID {getattr(agent, 'id', 'UNKNOWN')}: {attr_err}",
+                    exc_info=True,
+                )
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail=f"Error processing agent data: {str(attr_err)}",
+                ) from attr_err
+            except Exception as agent_err:
+                logger.error(
+                    f"Unexpected error processing agent {getattr(agent, 'id', 'UNKNOWN')}: {agent_err}",
+                    exc_info=True,
+                )
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail=f"Error processing agent data: {str(agent_err)}",
+                ) from agent_err
 
-        logger.info(f"Found {len(result)} agents")
+        logger.info(f"Successfully formatted {len(result)} agents for response")
         return result
 
     except AgentDatabaseError as e:
-        logger.error(f"Database error while listing agents: {e}")
+        logger.error(f"Database error while listing agents: {e}", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=str(e),
         ) from e
 
+    except HTTPException:
+        # Re-raise HTTPException as-is
+        raise
+
     except Exception as e:
-        logger.error(f"Unexpected error while listing agents: {e}")
+        logger.error(f"Unexpected error while listing agents: {e}", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to list agents: {str(e)}",

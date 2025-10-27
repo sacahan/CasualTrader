@@ -46,8 +46,8 @@ class Settings(BaseSettings):
 
     # Database Settings
     database_url: str = Field(
-        default="sqlite+aiosqlite:///casualtrader.db",
-        description="Database connection URL (relative to backend directory)",
+        default="",  # Will be set by @field_validator
+        description="Database connection URL",
     )
     database_echo: bool = Field(default=False, description="Echo SQL queries")
 
@@ -82,6 +82,17 @@ class Settings(BaseSettings):
         default=10, description="MCP Casual Market API timeout (seconds)"
     )
     mcp_casual_market_retries: int = Field(default=5, description="MCP Casual Market API retries")
+
+    @field_validator("database_url", mode="before")
+    @classmethod
+    def set_database_url(cls, v: Any) -> str:
+        """Set database URL to absolute path in backend directory."""
+        if v:  # If explicitly set via env var
+            return v
+        # Use absolute path to backend directory
+        backend_dir = Path(__file__).parent.parent.parent
+        db_path = backend_dir / "casualtrader.db"
+        return f"sqlite+aiosqlite:///{db_path}"
 
     @field_validator("cors_origins", mode="before")
     @classmethod

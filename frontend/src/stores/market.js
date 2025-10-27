@@ -205,24 +205,3 @@ export function clearQuotesCache() {
 export function clearError() {
   error.set(null);
 }
-
-/**
- * 啟動市場資料自動刷新
- * @param {number} interval - 刷新間隔(毫秒),預設 30 秒
- */
-export function startMarketDataPolling(interval = 30000) {
-  // 立即載入一次
-  loadMarketStatus();
-  loadMarketIndices();
-
-  // 設定定時刷新
-  const timerId = setInterval(() => {
-    loadMarketStatus();
-    loadMarketIndices();
-  }, interval);
-
-  // 返回停止函數
-  return () => {
-    clearInterval(timerId);
-  };
-}

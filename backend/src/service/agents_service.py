@@ -155,11 +155,25 @@ class AgentsService:
             AgentDatabaseError: 資料庫操作失敗
         """
         try:
+            logger.debug("Executing list_agents query")
             stmt = select(Agent)
             result = await self.session.execute(stmt)
             agents = list(result.scalars().all())
 
-            logger.info(f"Found {len(agents)} active agents")
+            logger.info(f"Found {len(agents)} active agents in database")
+
+            # 驗證 agents 的完整性
+            if agents:
+                for agent in agents:
+                    logger.debug(
+                        f"Agent retrieved: {agent.id}",
+                        extra={
+                            "agent_id": agent.id,
+                            "agent_name": agent.name,
+                            "has_investment_prefs": bool(agent.investment_preferences),
+                        },
+                    )
+
             return agents
 
         except Exception as e:
@@ -226,6 +240,7 @@ class AgentsService:
                     "group_name": model.group_name,
                     "model_type": model.model_type,
                     "litellm_prefix": model.litellm_prefix,
+                    "api_key_env_var": model.api_key_env_var,
                     "display_order": model.display_order,
                 }
                 for model in models
@@ -272,6 +287,7 @@ class AgentsService:
                 if isinstance(model.model_type, str)
                 else model.model_type.value,
                 "litellm_prefix": model.litellm_prefix,
+                "api_key_env_var": model.api_key_env_var,
                 "display_order": model.display_order,
             }
 

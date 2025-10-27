@@ -57,7 +57,6 @@ export {
   getCachedQuote,
   clearQuotesCache,
   clearError as clearMarketError,
-  startMarketDataPolling,
 } from './market.js';
 
 // Notifications Store

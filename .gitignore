@@ -113,3 +113,8 @@ dmypy.json
 .Trashes
 ehthumbs.db
 Thumbs.db
+
+# logs
+logs/
+*.log
+backend/src/logs/
