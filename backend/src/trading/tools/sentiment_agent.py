@@ -12,6 +12,7 @@ from dotenv import load_dotenv
 from pydantic import BaseModel
 
 from agents import Agent, function_tool, ModelSettings
+from agents.extensions.models.litellm_model import LitellmModel
 
 from common.logger import logger
 
@@ -633,14 +634,16 @@ def generate_sentiment_signals(
 
 
 async def get_sentiment_agent(
-    model_name: str = None,
+    llm_model: LitellmModel = None,
+    extra_headers: dict[str, str] = None,
     mcp_servers: list | None = None,
     openai_tools: list | None = None,
 ) -> Agent:
     """創建市場情緒分析 Agent
 
     Args:
-        model_name: 使用的 AI 模型名稱
+        llm_model: 使用的語言模型實例 (LitellmModel)，如果為 None，則使用預設模型
+        extra_headers: 額外的 HTTP 標頭，用於模型 API 請求
         mcp_servers: MCP servers 實例列表（MCPServerStdio 對象），從 TradingAgent 傳入
         openai_tools: 從 TradingAgent 傳入的共用工具（WebSearchTool, CodeInterpreterTool）
 
@@ -651,7 +654,7 @@ async def get_sentiment_agent(
         Timeout 由主 TradingAgent 的 execution_timeout 統一控制，
         sub-agent 作為 Tool 執行時會受到主 Agent 的 timeout 限制。
     """
-    logger.info(f"get_sentiment_agent() called with model={model_name}")
+    logger.info(f"get_sentiment_agent() called with model={llm_model}")
 
     logger.debug("Creating custom tools with function_tool")
     custom_tools = [
@@ -667,18 +670,18 @@ async def get_sentiment_agent(
     logger.debug(f"Total tools (custom + shared): {len(all_tools)}")
 
     logger.info(
-        f"Creating Agent with model={model_name}, "
-        f"mcp_servers={len(mcp_servers) if mcp_servers else 0}, tools={len(all_tools)}"
+        f"Creating Agent with model={llm_model}, mcp_servers={len(mcp_servers)}, tools={len(all_tools)}"
     )
     analyst = Agent(
         name="sentiment_analyst",
         instructions=sentiment_agent_instructions(),
-        model=model_name,
+        model=llm_model,
         mcp_servers=mcp_servers,
         tools=all_tools,
         model_settings=ModelSettings(
             tool_choice="required",
             max_completion_tokens=500,  # 控制回答長度，避免過度冗長
+            extra_headers=extra_headers if extra_headers else None,  # 傳遞額外標頭
         ),
     )
     logger.info("Sentiment Analyst Agent created successfully")

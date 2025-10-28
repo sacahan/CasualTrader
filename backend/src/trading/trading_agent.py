@@ -23,6 +23,7 @@ from agents import (
     Tool,
     WebSearchTool,
     CodeInterpreterTool,
+    set_tracing_export_api_key,
 )
 from agents.mcp import MCPServerStdio
 
@@ -53,6 +54,9 @@ DEFAULT_MODEL = os.getenv("DEFAULT_AI_MODEL", "gpt-5-mini")
 DEFAULT_MAX_TURNS = int(os.getenv("DEFAULT_MAX_TURNS", "30"))
 DEFAULT_AGENT_TIMEOUT = int(os.getenv("DEFAULT_AGENT_TIMEOUT", "300"))  # 秒
 DEFAULT_TEMPERATURE = float(os.getenv("DEFAULT_MODEL_TEMPERATURE", 0.7))
+
+# 設置追蹤 API 金鑰（用於監控和日誌）
+set_tracing_export_api_key(os.getenv("OPENAI_API_KEY"))
 
 # ==========================================
 # Custom Exceptions
@@ -110,6 +114,8 @@ class TradingAgent:
         self.agent_id = agent_id
         self.agent_config = agent_config
         self.agent_service = agent_service
+        self.llm_model = None
+        self.extra_headers = None
         self.agent = None
         self.is_initialized = False
         self._exit_stack = (
@@ -150,43 +156,32 @@ class TradingAgent:
             # 3. 初始化 Trading Tools
             self.trading_tools = self._setup_trading_tools()
 
-            # 4. 載入 Sub-agents (從 tools/ 目錄，傳入共享配置)
+            # 4. 創建 LiteLLM 模型
+            self.llm_model, self.extra_headers = await self._create_llm_model()
+
+            # 5. 載入 Sub-agents (從 tools/ 目錄，傳入共享配置)
             self.subagent_tools = await self._load_subagents_as_tools()
 
-            # 5. 合併所有 tools (不包括 OpenAI 內建工具)
+            # 6. 合併所有 tools (不包括 OpenAI 內建工具)
             all_tools = self.trading_tools + self.subagent_tools
 
-            # 6. 創建 LiteLLM 模型
-            llm_model = await self._create_llm_model()
-
-            # 7. 獲取 LLM 提供商（從 ai_model_configs 查詢）
-            model_config = await self.agent_service.get_ai_model_config(self.agent_config.ai_model)
-            provider = model_config.get("provider", "openai") if model_config else "openai"
-
-            # 8. 設定 GitHub Copilot 的 ModelSettings（headers 必須在此層級設置）
-            extra_headers = {}
-            if provider and provider.lower() == "GitHub Copilot".lower():
-                extra_headers = {
-                    "editor-version": "vscode/1.85.1",
-                    "Copilot-Integration-Id": "vscode-chat",
-                }
-                logger.info(f"Configuring GitHub Copilot headers for agent: {self.agent_id}")
-
-            # 9. 創建 OpenAI Agent（使用 LiteLLM 模型）
+            # 7. 創建 OpenAI Agent（使用 LiteLLM 模型）
             self.agent = Agent(
                 name=self.agent_id,
-                model=llm_model,
+                model=self.llm_model,
                 instructions=self._build_instructions(self.agent_config.description),
                 tools=all_tools,
                 mcp_servers=[self.memory_mcp],
                 model_settings=ModelSettings(
-                    tool_choice="required",
-                    extra_headers=extra_headers if extra_headers else None,
+                    tool_choice="required",  # 強制使用工具
+                    extra_headers=self.extra_headers
+                    if self.extra_headers
+                    else None,  # GitHub Copilot headers
                     include_usage=True,  # 追蹤使用數據
                 ),
             )
 
-            # 10. 繪製 Agent 結構圖
+            # 8. 繪製 Agent 結構圖
             # save_agent_graph(
             #     agent=self.agent,
             #     agent_id=self.agent_id,
@@ -196,7 +191,7 @@ class TradingAgent:
             self.is_initialized = True
             logger.info(
                 f"Agent initialized successfully: {self.agent_id} "
-                f"(model: {self.agent_config.ai_model}, provider: {provider})"
+                f"(model: {self.agent_config.ai_model})"
             )
 
         except (AgentNotFoundError, AgentConfigurationError):
@@ -259,7 +254,7 @@ class TradingAgent:
                 await self._exit_stack.aclose()
                 self._exit_stack = None
 
-    async def _create_llm_model(self) -> LitellmModel:
+    async def _create_llm_model(self) -> tuple[LitellmModel, dict[str, str] | None]:
         """
         創建 LiteLLM 模型，使用 ai_model_configs 表配置
 
@@ -267,7 +262,7 @@ class TradingAgent:
         不支持 fallback - 配置缺失會立即失敗，便於及早發現問題。
 
         Returns:
-            LitellmModel 實例
+            Tuple 包含 LitellmModel 實例和可選的額外 headers 字典
 
         Raises:
             AgentConfigurationError: 如果模型配置或 API 密鑰未設置
@@ -303,6 +298,16 @@ class TradingAgent:
                 f"api_key_env_var={api_key_env_var}"
             )
 
+        extra_headers = None
+        if provider and provider.lower() == "GitHub Copilot".lower():
+            extra_headers = {
+                "editor-version": "vscode/1.85.1",  # Editor version
+                "editor-plugin-version": "copilot/1.155.0",  # Plugin version
+                "Copilot-Integration-Id": "vscode-chat",  # Integration ID
+                "user-agent": "GithubCopilot/1.155.0",  # User agent
+            }
+            logger.info(f"Configuring GitHub Copilot headers for agent: {self.agent_id}")
+
         # 從環境變數讀取 API 密鑰
         api_key = os.getenv(api_key_env_var)
         if not api_key:
@@ -320,7 +325,8 @@ class TradingAgent:
         )
 
         # 返回 LitellmModel - headers 將通過 ModelSettings 傳遞
-        return LitellmModel(model=model_str, api_key=api_key)
+        # return LitellmModel(model=model_str, api_key=api_key), extra_headers
+        return LitellmModel(model=model_str), extra_headers
 
     def _setup_openai_tools(self) -> list[Any]:
         """設置 OpenAI 內建工具（根據資料庫配置）"""
@@ -365,18 +371,14 @@ class TradingAgent:
         try:
             # 統一的 subagent 配置參數
             subagent_config = {
-                "model_name": self.agent_config.ai_model or DEFAULT_MODEL,  # 從資料庫載入
+                "llm_model": self.llm_model,
+                "extra_headers": self.extra_headers,
                 "mcp_servers": [
                     self.memory_mcp,
                     self.casual_market_mcp,
                 ],  # 提供 持久記憶 和 市場數據 MCP
                 "openai_tools": self.openai_tools,  # 傳入相同的 OpenAI tools
             }
-
-            logger.debug(
-                f"Loading subagents with config: model={subagent_config['model_name']}, "
-                f"mcp_servers={len(subagent_config['mcp_servers'])} available"
-            )
 
             # 生成所有 Sub-agents
             try:
@@ -482,69 +484,6 @@ class TradingAgent:
                     logger.error("get_risk_agent() 返回 None")
             except Exception as e:
                 logger.warning(f"風險評估 agent 載入失敗: {e}", exc_info=True)
-
-            try:
-                sentiment_agent = await get_sentiment_agent(**subagent_config)
-                if sentiment_agent:
-                    tools.append(
-                        sentiment_agent.as_tool(
-                            tool_name="sentiment_analyst",
-                            tool_description="""
-• 情緒分析專家
-    - 分析市場情緒和投資人心理
-    - 追蹤社交媒體和新聞輿論
-    - 評估市場氛圍對股價的影響
-                            """,
-                            max_turns=DEFAULT_MAX_TURNS,
-                        )
-                    )
-                    logger.info("情緒分析 Sub Agent Tool 載入成功")
-                else:
-                    logger.warning("情緒分析 agent 返回 None")
-            except Exception as e:
-                logger.warning(f"情緒分析 agent 載入失敗: {e}")
-
-            try:
-                fundamental_agent = await get_fundamental_agent(**subagent_config)
-                if fundamental_agent:
-                    tools.append(
-                        fundamental_agent.as_tool(
-                            tool_name="fundamental_analyst",
-                            tool_description="""
-• 基本面分析專家
-    - 研究公司財務報表和營運狀況
-    - 評估本益比、股價淨值比等估值指標
-    - 分析產業競爭力和成長潛力
-                            """,
-                            max_turns=DEFAULT_MAX_TURNS,
-                        )
-                    )
-                    logger.info("基本面分析 Sub Agent Tool 載入成功")
-                else:
-                    logger.warning("基本面分析 agent 返回 None")
-            except Exception as e:
-                logger.warning(f"基本面分析 agent 載入失敗: {e}")
-
-            try:
-                risk_agent = await get_risk_agent(**subagent_config)
-                if risk_agent:
-                    tools.append(
-                        risk_agent.as_tool(
-                            tool_name="risk_analyst",
-                            tool_description="""
-• 風險評估專家
-    - 評估投資風險和波動性
-    - 計算風險調整後報酬
-    - 提供資產配置和避險建議
-                            """,
-                            max_turns=DEFAULT_MAX_TURNS,
-                        )
-                    )
-                    logger.info("風險評估 Sub Agent Tool 載入成功")
-                else:
-                    logger.warning("風險評估 agent 返回 None")
-            except Exception as e:
-                logger.warning(f"風險評估 agent 載入失敗: {e}")
 
         except Exception as e:
             logger.error(f"載入 sub-agents 時發生錯誤: {e}")
