@@ -77,6 +77,7 @@ class TradingService:
         agent_id: str,
         mode: AgentMode,
         max_turns: int | None = None,
+        session_id: str | None = None,
     ) -> dict[str, Any]:
         """
         執行單一模式（執行完後立即返回，不再循環轉換）
@@ -85,6 +86,7 @@ class TradingService:
             agent_id: Agent ID
             mode: 執行模式 (OBSERVATION/TRADING/REBALANCING)
             max_turns: 最大輪數（可選）
+            session_id: 既存的 session ID（可選）。如果提供，使用該 session 而不創建新的
 
         Returns:
             執行結果：
@@ -102,7 +104,6 @@ class TradingService:
             AgentBusyError: Agent 正在執行中
             TradingServiceError: 執行失敗
         """
-        session_id = None
         start_time = datetime.now()
         agent = None
 
@@ -114,17 +115,24 @@ class TradingService:
             if agent_id in self.active_agents:
                 raise AgentBusyError(f"Agent {agent_id} is already running")
 
-            # 3. 創建執行會話
-            session = await self.session_service.create_session(
-                agent_id=agent_id,
-                session_type="manual_mode",
-                mode=mode,
-                initial_input={},
-            )
-            session_id = session.id
-            logger.info(f"🆕 Created session {session_id} for agent {agent_id} ({mode.value}) 🎯")
+            # 3. 取得或創建執行會話
+            if session_id:
+                # 使用既存的 session（由 API 層創建）
+                session = await self.session_service.get_session(session_id)
+                logger.info(f"Using existing session {session_id} for agent {agent_id}")
+            else:
+                # 創建新會話（直接調用服務層時使用）
+                session = await self.session_service.create_session(
+                    agent_id=agent_id,
+                    mode=mode,
+                    initial_input={},
+                )
+                session_id = session.id
+                logger.info(
+                    f"🆕 Created session {session_id} for agent {agent_id} ({mode.value}) 🎯"
+                )
 
-            # 4. 更新會話狀態為 RUNNING
+            # 4. 更新會Session狀態為 RUNNING
             await self.session_service.update_session_status(session_id, SessionStatus.RUNNING)
 
             # 5. 取得或創建 TradingAgent 實例

@@ -68,7 +68,6 @@ class AgentSessionService:
     async def create_session(
         self,
         agent_id: str,
-        session_type: str,
         mode: str,
         initial_input: dict[str, Any] | None = None,
     ) -> AgentSession:
@@ -77,7 +76,6 @@ class AgentSessionService:
 
         Args:
             agent_id: Agent ID
-            session_type: 會話類型（如 "manual_task", "scheduled_task"）
             mode: 執行模式（AgentMode）
             initial_input: 初始輸入資料
 
@@ -90,7 +88,6 @@ class AgentSessionService:
         try:
             session = AgentSession(
                 agent_id=agent_id,
-                session_type=session_type,
                 mode=mode,
                 status=SessionStatus.PENDING,
                 initial_input=initial_input or {},
@@ -101,10 +98,7 @@ class AgentSessionService:
             await self.db_session.commit()
             await self.db_session.refresh(session)
 
-            logger.info(
-                f"Created session: {session.id} for agent {agent_id} "
-                f"(type: {session_type}, mode: {mode})"
-            )
+            logger.info(f"Created session: {session.id} for agent {agent_id} (mode: {mode})")
             return session
 
         except Exception as e:
@@ -142,10 +136,14 @@ class AgentSessionService:
 
             session.status = status
 
+            # 明確設置 updated_at（遵循 timestamp.instructions.md）
+            now = datetime.now()
+            session.updated_at = now
+
             # 如果是終止狀態，必須設置 end_time
             if status in [SessionStatus.COMPLETED, SessionStatus.FAILED, SessionStatus.TIMEOUT]:
                 if end_time is None:
-                    end_time = datetime.now()
+                    end_time = now
                 session.end_time = end_time
 
                 # 自動計算執行時間
@@ -178,7 +176,7 @@ class AgentSessionService:
         self,
         session_id: str,
         final_output: dict[str, Any],
-        tools_called: str | None = None,
+        tools_called: list[str] | None = None,
     ) -> AgentSession:
         """
         更新會話輸出結果
@@ -186,7 +184,7 @@ class AgentSessionService:
         Args:
             session_id: Session ID
             final_output: 最終輸出資料
-            tools_called: 呼叫的工具列表（文字）
+            tools_called: 呼叫的工具列表（例如: ['get_stock_price', 'analyze_trend']）
 
         Returns:
             更新後的 AgentSession
@@ -202,9 +200,13 @@ class AgentSessionService:
             if tools_called:
                 session.tools_called = tools_called
 
+            # 明確設置 updated_at（遵循 timestamp.instructions.md）
+            now = datetime.now()
+            session.updated_at = now
+
             # 如果還沒設置 end_time，現在設置
             if session.end_time is None:
-                session.end_time = datetime.now()
+                session.end_time = now
 
             # 計算執行時間
             if session.execution_time_ms is None and session.start_time:
@@ -225,41 +227,6 @@ class AgentSessionService:
             await self.db_session.rollback()
             logger.error(f"Failed to update session output {session_id}: {e}", exc_info=True)
             raise SessionError(f"Failed to update session output: {str(e)}")
-
-    async def record_session_trace(
-        self, session_id: str, trace_data: dict[str, Any]
-    ) -> AgentSession:
-        """
-        記錄會話追蹤資訊
-
-        Args:
-            session_id: Session ID
-            trace_data: 追蹤資料（包含 trace_id, spans 等）
-
-        Returns:
-            更新後的 AgentSession
-
-        Raises:
-            SessionNotFoundError: Session 不存在
-            SessionError: 記錄失敗
-        """
-        try:
-            session = await self.get_session(session_id)
-
-            session.trace_data = trace_data
-
-            await self.db_session.commit()
-            await self.db_session.refresh(session)
-
-            logger.debug(f"Recorded trace data for session {session_id}")
-            return session
-
-        except SessionNotFoundError:
-            raise
-        except Exception as e:
-            await self.db_session.rollback()
-            logger.error(f"Failed to record trace for session {session_id}: {e}", exc_info=True)
-            raise SessionError(f"Failed to record trace: {str(e)}")
 
     async def get_session(self, session_id: str) -> AgentSession:
         """

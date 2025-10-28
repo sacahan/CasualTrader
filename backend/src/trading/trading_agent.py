@@ -172,7 +172,7 @@ class TradingAgent:
                 model=self.llm_model,
                 instructions=self._build_instructions(self.agent_config.description),
                 tools=all_tools,
-                mcp_servers=[self.memory_mcp],
+                # mcp_servers=[self.memory_mcp],
                 model_settings=ModelSettings(
                     tool_choice="required",  # 強制使用工具
                     extra_headers=self.extra_headers
@@ -183,11 +183,11 @@ class TradingAgent:
             )
 
             # 8. 繪製 Agent 結構圖
-            # save_agent_graph(
-            #     agent=self.agent,
-            #     agent_id=self.agent_id,
-            #     output_dir=None,  # 使用預設的 backend/logs 目錄
-            # )
+            save_agent_graph(
+                agent=self.agent,
+                agent_id=self.agent_id,
+                output_dir=None,  # 使用預設的 backend/logs 目錄
+            )
 
             self.is_initialized = True
             logger.info(

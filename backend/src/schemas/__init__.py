@@ -9,6 +9,7 @@ from .agent import (
     CreateAgentRequest,
     EnabledTools,
     PortfolioSnapshot,
+    SessionResponse,
     StartAgentRequest,
     UpdateAgentRequest,
     UpdateModeRequest,
@@ -26,6 +27,7 @@ __all__ = [
     "PortfolioSnapshot",
     "AgentResponse",
     "AgentListResponse",
+    "SessionResponse",
     # Trading schemas
     "TradeRecord",
     # WebSocket schemas

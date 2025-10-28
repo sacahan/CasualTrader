@@ -264,7 +264,6 @@ async def test_e2e_session_lifecycle():
     # 驗證會話創建
     service.session_service.create_session.assert_called_once_with(
         agent_id="test-agent",
-        session_type="manual_mode",
         mode=AgentMode.OBSERVATION,
         initial_input={},
     )

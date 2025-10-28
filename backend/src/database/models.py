@@ -134,7 +134,6 @@ class AgentSession(Base):
 
     id: Mapped[str] = mapped_column(String(50), primary_key=True, default=lambda: str(uuid.uuid4()))
     agent_id: Mapped[str] = mapped_column(String(50), ForeignKey("agents.id"), nullable=False)
-    session_type: Mapped[str] = mapped_column(String(50), nullable=False)
     mode: Mapped[AgentMode] = mapped_column(String(30), nullable=False)
 
     # 執行狀態
@@ -146,11 +145,25 @@ class AgentSession(Base):
     # 執行內容
     initial_input: Mapped[dict[str, Any] | None] = mapped_column(JSON)
     final_output: Mapped[dict[str, Any] | None] = mapped_column(JSON)
-    tools_called: Mapped[str | None] = mapped_column(Text)
+    tools_called: Mapped[list[str] | None] = mapped_column(
+        JSON, doc="呼叫的工具列表，例如: ['get_stock_price', 'analyze_trend']"
+    )
     error_message: Mapped[str | None] = mapped_column(Text)
 
-    # 追蹤資訊
-    trace_data: Mapped[dict[str, Any] | None] = mapped_column(JSON)
+    # 審計時間戳記 (遵循 timestamp.instructions.md 標準)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime,
+        default=lambda: datetime.now(),
+        nullable=False,
+        doc="Record creation timestamp (UTC)",
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime,
+        default=lambda: datetime.now(),
+        onupdate=lambda: datetime.now(),
+        nullable=False,
+        doc="Last record update timestamp (UTC)",
+    )
 
     # 關聯關係
     agent: Mapped[Agent] = relationship("Agent", back_populates="sessions")
@@ -162,6 +175,7 @@ class AgentSession(Base):
         Index("idx_sessions_agent_id", "agent_id"),
         Index("idx_sessions_status", "status"),
         Index("idx_sessions_start_time", "start_time"),
+        Index("idx_sessions_created_at", "created_at"),
     )
 
 

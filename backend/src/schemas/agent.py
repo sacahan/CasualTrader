@@ -140,6 +140,27 @@ class AgentResponse(BaseModel):
     performance: dict[str, Any] | None = None  # 績效資料
 
 
+class SessionResponse(BaseModel):
+    """
+    會話詳細資訊回應模型。
+    用於 API 返回會話執行結果。
+    """
+
+    id: str  # 會話 ID
+    agent_id: str  # Agent ID
+    mode: str  # 執行模式
+    status: str  # 會話狀態
+    start_time: datetime  # 開始時間
+    end_time: datetime | None = None  # 結束時間
+    execution_time_ms: int | None = None  # 執行耗時（毫秒）
+    initial_input: dict[str, Any] | None = None  # 初始輸入
+    final_output: dict[str, Any] | None = None  # 最終輸出
+    tools_called: list[str] | None = None  # 呼叫的工具列表
+    error_message: str | None = None  # 錯誤訊息
+    created_at: datetime  # 建立時間
+    updated_at: datetime  # 更新時間
+
+
 class AgentListResponse(BaseModel):
     """
     代理人列表回應模型。

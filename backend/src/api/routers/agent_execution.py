@@ -26,6 +26,7 @@ from service.trading_service import (
     TradingService,
     TradingServiceError,
 )
+from service.session_service import AgentSessionService
 from api.config import get_db_session
 from api.websocket import websocket_manager
 
@@ -99,6 +100,7 @@ async def _execute_in_background(
     trading_service: TradingService,
     agent_id: str,
     mode: AgentMode,
+    session_id: str,
     max_turns: int | None = None,
 ) -> None:
     """
@@ -111,15 +113,18 @@ async def _execute_in_background(
         trading_service: TradingService 實例
         agent_id: Agent ID
         mode: 執行模式
+        session_id: 既存的 session ID（由 API 層創建）
         max_turns: 最大輪數
     """
     try:
         logger.info(f"[Background] Starting execution for agent {agent_id} ({mode.value})")
 
+        # 使用既存的 session_id，避免重複創建
         result = await trading_service.execute_single_mode(
             agent_id=agent_id,
             mode=mode,
             max_turns=max_turns,
+            session_id=session_id,
         )
 
         # ✅ 執行成功 - 推送完成事件
@@ -210,7 +215,6 @@ async def start_agent_mode(
         await trading_service.agents_service.get_agent_config(agent_id)
         session = await trading_service.session_service.create_session(
             agent_id=agent_id,
-            session_type="manual_mode",
             mode=mode,
             initial_input={},
         )
@@ -220,11 +224,13 @@ async def start_agent_mode(
 
         # 💡 核心改變：在後台啟動執行，立即返回 session_id
         # 使用 asyncio.create_task 在後台執行，不阻塞 HTTP 回應
+        # 傳遞 session_id 給後台任務，避免重複創建
         asyncio.create_task(
             _execute_in_background(
                 trading_service=trading_service,
                 agent_id=agent_id,
                 mode=mode,
+                session_id=session_id,
                 max_turns=request.max_turns,
             )
         )
@@ -326,6 +332,69 @@ async def stop_agent(
 
     except TradingServiceError as e:
         logger.error(f"Failed to stop agent {agent_id}: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=str(e),
+        ) from e
+
+
+@router.get(
+    "/{agent_id}/sessions/{session_id}",
+    response_model=dict,
+    status_code=status.HTTP_200_OK,
+    summary="取得會話詳細資訊",
+    description="取得單個會話的執行結果，包含呼叫的工具列表",
+)
+async def get_session_detail(
+    agent_id: str,
+    session_id: str,
+    session_service: AgentSessionService = Depends(
+        lambda db_session=Depends(get_db_session): AgentSessionService(db_session)
+    ),
+):
+    """
+    取得會話詳細資訊
+
+    Args:
+        agent_id: Agent ID（用於驗證）
+        session_id: Session ID
+
+    Returns:
+        會話詳細資訊，包含執行結果、呼叫的工具列表等
+
+    Raises:
+        404: Session 不存在
+        500: 查詢失敗
+    """
+    try:
+        session = await session_service.get_session(session_id)
+
+        if session.agent_id != agent_id:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Session {session_id} not found for agent {agent_id}",
+            )
+
+        return {
+            "id": session.id,
+            "agent_id": session.agent_id,
+            "mode": session.mode,
+            "status": session.status,
+            "start_time": session.start_time,
+            "end_time": session.end_time,
+            "execution_time_ms": session.execution_time_ms,
+            "initial_input": session.initial_input,
+            "final_output": session.final_output,
+            "tools_called": session.tools_called,
+            "error_message": session.error_message,
+            "created_at": session.created_at,
+            "updated_at": session.updated_at,
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to get session {session_id}: {e}", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=str(e),
