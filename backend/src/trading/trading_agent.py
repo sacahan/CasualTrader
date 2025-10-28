@@ -370,6 +370,10 @@ class TradingAgent:
 
         try:
             # 統一的 subagent 配置參數
+            # 注意：不傳遞 openai_tools，因為 WebSearchTool 和 CodeInterpreterTool
+            # 只支援 OpenAI Responses API，不支援 ChatCompletions API
+            # Sub-agents 使用 LitellmModel 呼叫 ChatCompletions API，
+            # 因此只能使用自訂工具，不能使用託管工具
             subagent_config = {
                 "llm_model": self.llm_model,
                 "extra_headers": self.extra_headers,
@@ -377,7 +381,6 @@ class TradingAgent:
                     self.memory_mcp,
                     self.casual_market_mcp,
                 ],  # 提供 持久記憶 和 市場數據 MCP
-                "openai_tools": self.openai_tools,  # 傳入相同的 OpenAI tools
             }
 
             # 生成所有 Sub-agents

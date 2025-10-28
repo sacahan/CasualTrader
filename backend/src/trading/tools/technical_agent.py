@@ -458,7 +458,6 @@ async def get_technical_agent(
     llm_model: LitellmModel = None,
     extra_headers: dict[str, str] = None,
     mcp_servers: list | None = None,
-    openai_tools: list | None = None,
 ) -> Agent:
     """創建技術分析 Agent
 
@@ -466,30 +465,28 @@ async def get_technical_agent(
         llm_model: 使用的語言模型實例 (LitellmModel)，如果為 None，則使用預設模型
         extra_headers: 額外的 HTTP 標頭，用於模型 API 請求
         mcp_servers: MCP servers 實例列表（MCPServerStdio 對象），從 TradingAgent 傳入
-        openai_tools: 從 TradingAgent 傳入的共用工具（WebSearchTool, CodeInterpreterTool）
 
     Returns:
         Agent: 配置好的技術分析 Agent
 
     Note:
-        Timeout 由主 TradingAgent 的 execution_timeout 統一控制，
-        sub-agent 作為 Tool 執行時會受到主 Agent 的 timeout 限制。
+        - 不使用 WebSearchTool 和 CodeInterpreterTool（託管工具不支援 ChatCompletions API）
+        - 只使用自訂工具進行技術分析
+        - Timeout 由主 TradingAgent 的 execution_timeout 統一控制
+        - Sub-agent 作為 Tool 執行時會受到主 Agent 的 timeout 限制
     """
 
     logger.info(f"get_technical_agent() called with model={llm_model}")
 
     logger.debug("Creating custom tools with function_tool")
-    custom_tools = [
+    all_tools = [
         calculate_technical_indicators,
         identify_chart_patterns,
         analyze_trend,
         analyze_support_resistance,
         generate_trading_signals,
     ]
-
-    # 合併自訂工具和共用工具
-    all_tools = custom_tools + (openai_tools or [])
-    logger.debug(f"Total tools (custom + shared): {len(all_tools)}")
+    logger.debug(f"Total tools: {len(all_tools)}")
 
     logger.info(
         f"Creating Agent with model={llm_model}, mcp_servers={len(mcp_servers)}, tools={len(all_tools)}"
