@@ -383,18 +383,25 @@ class AgentsService:
         agent_id: str,
         status: AgentStatus | None = None,
         mode: AgentMode | None = None,
-    ) -> None:
+    ) -> bool:
         """
         更新 Agent 狀態
+
+        遵循 timestamp.instructions.md 的原則：
+        - EXPLICIT_OVER_IMPLICIT: 明確設置狀態變更
+        - CONSISTENCY_AND_ACCURACY: 總是更新 updated_at 和 last_active_at
+
+        此方法會自行消化所有異常，不向外部拋出。
+        調用者無需處理異常。
 
         Args:
             agent_id: Agent ID
             status: 新狀態
             mode: 新模式（可選）
 
-        Raises:
-            AgentNotFoundError: Agent 不存在
-            AgentDatabaseError: 資料庫操作失敗
+        Returns:
+            True: 更新成功
+            False: 更新失敗（異常已記錄）
         """
         try:
             stmt = select(Agent).where(Agent.id == agent_id)
@@ -402,7 +409,8 @@ class AgentsService:
             agent = result.scalar_one_or_none()
 
             if not agent:
-                raise AgentNotFoundError(f"Agent '{agent_id}' not found")
+                logger.warning(f"Agent '{agent_id}' not found for status update")
+                return False
 
             if status is not None:
                 agent.status = status
@@ -422,13 +430,18 @@ class AgentsService:
             if mode:
                 log_msg += f" mode to {mode.value}"
             logger.info(log_msg)
+            return True
 
-        except AgentNotFoundError:
-            raise
         except Exception as e:
             await self.session.rollback()
-            logger.error(f"Database error updating agent status: {e}", exc_info=True)
-            raise AgentDatabaseError(f"Failed to update agent status: {str(e)}")
+            logger.error(
+                f"Error updating agent {agent_id} status: {e}",
+                exc_info=True,
+                extra={"agent_id": agent_id, "new_status": status.value if status else None}
+                if status
+                else {"agent_id": agent_id},
+            )
+            return False
 
     # ==========================================
     # Trading Operations

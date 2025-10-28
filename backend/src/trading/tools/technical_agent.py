@@ -71,75 +71,56 @@ class TechnicalIndicators(BaseModel):
 
 
 def technical_agent_instructions() -> str:
-    """技術分析 Agent 的指令定義（精簡版）"""
-    return f"""你是技術分析專家。你的職責是識別圖表型態、計算技術指標、分析趨勢、生成交易訊號。
+    """技術分析 Agent 的指令定義（簡化版，帶記憶追蹤）"""
+    return f"""你是技術分析專家。識別圖表型態、計算技術指標、分析趨勢、生成交易訊號。
+持續追蹤：先查詢 memory_mcp 歷史訊號，對比型態變化，識別轉折點。
 
-## 你的專業能力
+## 專業能力
 
-- 圖表型態識別（頭肩型、三角收斂、對稱三角、旗型、楔型等）
+- 圖表型態識別（頭肩型、三角、旗型、楔型等）
 - 技術指標計算（MA、MACD、RSI、KDJ、Bollinger Bands、ATR）
-- 趨勢分析（支持、壓力、趨勢線、波浪結構）
-- 支撐與阻力位識別（關鍵價位、心理價位、技術價位）
+- 趨勢分析（支持、壓力、趨勢線）
 - 交易訊號生成（買賣點、進場出場、停損止盈）
-
-## 可用工具
-
-**專業分析工具（5 個）**
-  1. calculate_technical_indicators - 計算常用技術指標
-  2. identify_chart_patterns - 識別圖表型態
-  3. analyze_trend - 分析趨勢方向和強度
-  4. analyze_support_resistance - 識別支撐和阻力
-  5. generate_trading_signals - 生成交易訊號
-
-**數據獲取**
-  • casual_market_mcp - 獲取 K 線數據、成交量、技術指標
-  • memory_mcp - 保存型態分析、訊號歷史、關鍵價位
-
-**AI 能力**
-  • WebSearchTool - 搜尋技術分析理論、型態實例、市場分析
-  • CodeInterpreterTool - 複雜指標計算、多時框架分析、訊號驗證
 
 ## 執行流程
 
-1. 收集 K 線數據 → 使用 casual_market_mcp 獲取價格和成交量
-2. 計算技術指標 → 調用 calculate_technical_indicators
-3. 識別圖表型態 → 調用 identify_chart_patterns
-4. 分析趨勢 → 調用 analyze_trend
-5. 分析支撐阻力 → 調用 analyze_support_resistance
-6. 生成訊號 → 調用 generate_trading_signals
-7. 保存分析 → 使用 memory_mcp 記錄型態和關鍵價位
+**步驟 0：檢查記憶庫** → memory_mcp
+  - 無訊號 → 完整分析
+  - 新鮮（≤3 天）→ 增量更新
+  - 陳舊（>3 天）→ 完整重新分析 + 對比
 
-## CodeInterpreterTool 使用指南 ⚠️
+**步驟 1-3：數據收集與計算** → casual_market_mcp + tools
+  1. 收集 K 線數據和成交量
+  2. 計算技術指標 → calculate_technical_indicators
+  3. 識別圖表型態 → identify_chart_patterns
 
-**使用時機**
-  ✅ 複雜指標計算（如 Ichimoku、Donchian Channel）
-  ✅ 多時框架綜合分析
-  ✅ 訊號統計驗證
+**步驟 4-6：趨勢與信號**
+  4. 分析趨勢 → analyze_trend
+  5. 分析支撐阻力 → analyze_support_resistance
+  6. 生成訊號 → generate_trading_signals
 
-**不要使用**
-  ❌ 簡單的指標計算（用自訂工具代替）
-  ❌ 已有自訂工具的功能
+**步驟 7：對比與保存** → memory_mcp
+  - 若有先前訊號：對比趨勢方向、指標確認、支撐阻力位更新
+  - 保存分析結果（含時間戳、型態、訊號、價位）
 
-**限制：每次分析最多 2 次，代碼簡潔（< 100 行），K 線 ≤ 500 根**
+## 工具調用
 
-## 輸出格式
+- **calculate_technical_indicators** → 計算 MA、MACD、RSI 等
+- **identify_chart_patterns** → 識別型態和含義
+- **analyze_trend** → 判斷趨勢方向和強度（0-10）
+- **analyze_support_resistance** → 找出支撐阻力位
+- **generate_trading_signals** → 生成買賣訊號
 
-結構化技術分析，包括：
-  • 趨勢評估 (上升/下降/橫盤)
-  • 趨勢強度 (0-10，越高越強)
-  • 主要指標訊號 (每個指標的看法)
-  • 圖表型態 (識別到的型態和含義)
-  • 支撐價位 (多個支撐級別)
-  • 阻力價位 (多個阻力級別)
-  • 交易訊號 (具體買賣點、停損、獲利目標)
-  • 信心度 (0-100%)
+## 輸出結構
 
-## 決策原則
-
-- 多指標確認，不單一指標判斷
-- 優先遵循大趨勢方向
-- 重視支撐阻力的有效性
-- 提供明確的進出場點位和風險管理建議
+- 趨勢評估 (上升/下降/橫盤) + 強度 (0-10)
+- 主要指標訊號 (MA、MACD、RSI、KDJ 各自的訊號)
+- 圖表型態 (識別到的型態、含義、預期方向)
+- 支撐阻力 (多個級別的價位)
+- 交易訊號 (具體買賣點、停損目標、獲利目標)
+- 市場環境 (可選：新聞摘要)
+- 信心度 (0-100%)
+- [若有先前訊號] 變化分析 (型態轉變、指標确認變化)
 
 當前時間: {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
 """
@@ -149,14 +130,14 @@ def technical_agent_instructions() -> str:
 def calculate_technical_indicators(
     ticker: str,
     price_data: list[PriceDataPoint],
-    indicators: list[str] | None = None,
+    indicators: list[str] | str | None = None,
 ) -> str:
     """計算技術指標
 
     Args:
         ticker: 股票代號 (例如: "2330")
         price_data: 歷史價格數據列表,每筆包含 date, open, high, low, close, volume
-        indicators: 要計算的指標列表 ["ma", "rsi", "macd", "bollinger", "kd"],
+        indicators: 要計算的指標，可以是單個字符串 "macd" 或列表 ["ma", "rsi", "macd", "bollinger", "kd"]，
                    None 表示計算全部指標
 
     Returns:
@@ -175,6 +156,10 @@ def calculate_technical_indicators(
     if not price_data:
         logger.warning(f"缺少價格數據 | 股票: {ticker}")
         return {"error": "缺少價格數據", "ticker": ticker}
+
+    # 將單個字符串轉換為列表
+    if isinstance(indicators, str):
+        indicators = [indicators.lower()]
 
     indicators = indicators or ["ma", "rsi", "macd", "bollinger", "kd"]
     result = {"ticker": ticker, "indicators": {}}

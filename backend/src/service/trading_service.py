@@ -13,7 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from trading.trading_agent import TradingAgent
 from service.agents_service import AgentsService, AgentNotFoundError
-from common.enums import AgentMode, SessionStatus
+from common.enums import AgentMode, AgentStatus, SessionStatus
 from common.logger import logger
 from service.session_service import AgentSessionService
 
@@ -122,7 +122,7 @@ class TradingService:
                 initial_input={},
             )
             session_id = session.id
-            logger.info(f"Created session {session_id} for agent {agent_id} ({mode.value})")
+            logger.info(f"🆕 Created session {session_id} for agent {agent_id} ({mode.value}) 🎯")
 
             # 4. 更新會話狀態為 RUNNING
             await self.session_service.update_session_status(session_id, SessionStatus.RUNNING)
@@ -143,9 +143,14 @@ class TradingService:
 
             # 9. 更新會話狀態為 COMPLETED
             await self.session_service.update_session_status(session_id, SessionStatus.COMPLETED)
-            execution_time_ms = int((datetime.now() - start_time).total_seconds() * 1000)
 
-            logger.info(f"Completed {mode.value} for agent {agent_id} in {execution_time_ms}ms")
+            # 10. 更新 Agent 狀態為 INACTIVE（執行完成）
+            await self.agents_service.update_agent_status(agent_id, status=AgentStatus.INACTIVE)
+
+            execution_time_ms = int((datetime.now() - start_time).total_seconds() * 1000)
+            logger.info(
+                f"✅ Completed {mode.value} for agent {agent_id} in {execution_time_ms}ms 🚀"
+            )
 
             return {
                 "success": True,
@@ -170,6 +175,9 @@ class TradingService:
                     )
                 except Exception as cleanup_error:
                     logger.error(f"Error updating session {session_id}: {cleanup_error}")
+
+            # 更新 Agent 狀態為 INACTIVE（即使執行失敗）
+            await self.agents_service.update_agent_status(agent_id, status=AgentStatus.INACTIVE)
 
             execution_time_ms = int((datetime.now() - start_time).total_seconds() * 1000)
             raise TradingServiceError(f"Failed to execute {mode.value}: {str(e)}") from e
@@ -231,6 +239,9 @@ class TradingService:
                 logger.error(f"Error cleaning up agent {agent_id}: {e}")
             finally:
                 del self.active_agents[agent_id]
+
+            # 更新 Agent 狀態為 INACTIVE（停止）
+            await self.agents_service.update_agent_status(agent_id, status=AgentStatus.INACTIVE)
 
             return {
                 "success": True,

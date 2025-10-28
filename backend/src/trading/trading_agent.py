@@ -123,6 +123,7 @@ class TradingAgent:
         )  # 創建並保存 AsyncExitStack 實例以管理 MCP servers 生命週期
         self.casual_market_mcp = None
         self.memory_mcp = None
+        self.chrome_devtools_mcp = None
 
         logger.info(f"TradingAgent created: {agent_id}")
 
@@ -208,7 +209,7 @@ class TradingAgent:
             Exception: 初始化失敗
         """
         try:
-            # 初始化 MCP servers 並註冊到 exit stack
+            # Casual Market MCP Server
             self.casual_market_mcp = await self._exit_stack.enter_async_context(
                 MCPServerStdio(
                     name="casual_market_mcp",
@@ -223,7 +224,7 @@ class TradingAgent:
                     client_session_timeout_seconds=DEFAULT_AGENT_TIMEOUT,
                 )
             )
-            logger.debug("casual_market_mcp server initialized")
+            logger.info("casual_market_mcp server initialized")
 
             # 構建絕對路徑以確保資料庫文件位置正確
             memory_db_path = os.path.join(
@@ -234,6 +235,7 @@ class TradingAgent:
             # 確保 memory 目錄存在
             os.makedirs(os.path.dirname(memory_db_path), exist_ok=True)
 
+            # Memory MCP Server
             self.memory_mcp = await self._exit_stack.enter_async_context(
                 MCPServerStdio(
                     name="memory_mcp",
@@ -245,7 +247,27 @@ class TradingAgent:
                     client_session_timeout_seconds=DEFAULT_AGENT_TIMEOUT,
                 )
             )
-            logger.debug(f"memory_mcp server initialized (db: {memory_db_path})")
+            logger.info(f"memory_mcp server initialized (db: {memory_db_path})")
+
+            # Chrome DevTools MCP
+            # 提供瀏覽器自動化功能：網頁導航、數據抓取、網路監控等
+            # ⚠️ 注意：take_screenshot 工具返回 base64 圖像，與 SDK input_image 型態不相容
+            # 其他 26 個工具（navigate_page, evaluate_script, take_snapshot 等）都返回文本，可正常使用
+            try:
+                self.chrome_devtools_mcp = await self._exit_stack.enter_async_context(
+                    MCPServerStdio(
+                        name="chrome-devtools",
+                        params={
+                            "command": "npx",
+                            "args": ["-y", "chrome-devtools-mcp@latest"],
+                        },
+                        client_session_timeout_seconds=DEFAULT_AGENT_TIMEOUT,
+                    )
+                )
+                logger.info("chrome_devtools_mcp server initialized")
+            except Exception as e:
+                logger.warning(f"Failed to initialize chrome_devtools_mcp: {e}")
+                self.chrome_devtools_mcp = None  # 設為 None 以避免後續錯誤
 
         except Exception as e:
             logger.warning(f"Failed to initialize MCP server: {e}")
@@ -374,13 +396,15 @@ class TradingAgent:
             # 只支援 OpenAI Responses API，不支援 ChatCompletions API
             # Sub-agents 使用 LitellmModel 呼叫 ChatCompletions API，
             # 因此只能使用自訂工具，不能使用託管工具
+            mcp_servers = [self.memory_mcp, self.casual_market_mcp]
+            # 只在初始化成功時才加入 chrome-devtools-mcp
+            if self.chrome_devtools_mcp:
+                mcp_servers.append(self.chrome_devtools_mcp)
+
             subagent_config = {
                 "llm_model": self.llm_model,
                 "extra_headers": self.extra_headers,
-                "mcp_servers": [
-                    self.memory_mcp,
-                    self.casual_market_mcp,
-                ],  # 提供 持久記憶 和 市場數據 MCP
+                "mcp_servers": mcp_servers,  # 共享 MCP servers（動態構建）
             }
 
             # 生成所有 Sub-agents
