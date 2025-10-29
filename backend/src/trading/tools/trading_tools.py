@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import json
+
 from agents import function_tool, Tool
 from agents.mcp import MCPServerStdio
 
@@ -265,13 +267,25 @@ def create_trading_tools(
             )
 
             # 解析結果並格式化回傳
-            if result and hasattr(result, "content"):
-                content = result.content[0] if result.content else {}
-                if isinstance(content, dict) and content.get("success"):
-                    data = content.get("data", {})
-                    return f"✅ 模擬買入成功：{data.get('symbol')} {data.get('quantity')} 股 @ {data.get('price')} 元，總金額：{data.get('total_amount'):,.2f} 元"
+            if result and hasattr(result, "content") and result.content:
+                # 提取 TextContent 物件的文本內容
+                content_item = result.content[0]
+                text_content = (
+                    content_item.text if hasattr(content_item, "text") else str(content_item)
+                )
+
+                # 解析 JSON
+                try:
+                    data = json.loads(text_content)
+                except json.JSONDecodeError:
+                    # 如果解析失敗，嘗試直接使用內容
+                    return f"✅ 模擬買入指令已送出：{symbol} {quantity} 股"
+
+                if data.get("success"):
+                    trading_data = data.get("data", {})
+                    return f"✅ 模擬買入成功：{trading_data.get('symbol')} {trading_data.get('quantity')} 股 @ {trading_data.get('price')} 元，總金額：{trading_data.get('total_amount'):,.2f} 元"
                 else:
-                    error = content.get("error", "未知錯誤")
+                    error = data.get("error", "未知錯誤")
                     return f"❌ 模擬買入失敗：{error}"
 
             return f"✅ 模擬買入指令已送出：{symbol} {quantity} 股"
@@ -309,13 +323,25 @@ def create_trading_tools(
             )
 
             # 解析結果並格式化回傳
-            if result and hasattr(result, "content"):
-                content = result.content[0] if result.content else {}
-                if isinstance(content, dict) and content.get("success"):
-                    data = content.get("data", {})
-                    return f"✅ 模擬賣出成功：{data.get('symbol')} {data.get('quantity')} 股 @ {data.get('price')} 元，總金額：{data.get('total_amount'):,.2f} 元"
+            if result and hasattr(result, "content") and result.content:
+                # 提取 TextContent 物件的文本內容
+                content_item = result.content[0]
+                text_content = (
+                    content_item.text if hasattr(content_item, "text") else str(content_item)
+                )
+
+                # 解析 JSON
+                try:
+                    data = json.loads(text_content)
+                except json.JSONDecodeError:
+                    # 如果解析失敗，嘗試直接使用內容
+                    return f"✅ 模擬賣出指令已送出：{symbol} {quantity} 股"
+
+                if data.get("success"):
+                    trading_data = data.get("data", {})
+                    return f"✅ 模擬賣出成功：{trading_data.get('symbol')} {trading_data.get('quantity')} 股 @ {trading_data.get('price')} 元，總金額：{trading_data.get('total_amount'):,.2f} 元"
                 else:
-                    error = content.get("error", "未知錯誤")
+                    error = data.get("error", "未知錯誤")
                     return f"❌ 模擬賣出失敗：{error}"
 
             return f"✅ 模擬賣出指令已送出：{symbol} {quantity} 股"

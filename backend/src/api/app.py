@@ -188,8 +188,11 @@ def create_app() -> FastAPI:
             response = await call_next(request)
             logger.info(f"← {request.method} {request.url.path} - Status: {response.status_code}")
             return response
-        except Exception as e:
-            logger.error(f"✗ {request.method} {request.url.path} - Error: {e!s}")
+        except Exception:
+            # Use exc_info=True to avoid string formatting issues with exception messages
+            logger.error(
+                f"✗ {request.method} {request.url.path} - Exception occurred", exc_info=True
+            )
             raise
 
     # Global exception handler

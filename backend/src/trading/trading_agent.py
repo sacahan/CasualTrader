@@ -57,6 +57,7 @@ DEFAULT_TEMPERATURE = float(os.getenv("DEFAULT_MODEL_TEMPERATURE", 0.7))
 
 # 設置追蹤 API 金鑰（用於監控和日誌）
 set_tracing_export_api_key(os.getenv("OPENAI_API_KEY"))
+TAVILY_API_KEY = os.getenv("TAVILY_API_KEY")
 
 # ==========================================
 # Custom Exceptions
@@ -123,7 +124,7 @@ class TradingAgent:
         )  # 創建並保存 AsyncExitStack 實例以管理 MCP servers 生命週期
         self.casual_market_mcp = None
         self.memory_mcp = None
-        self.chrome_devtools_mcp = None
+        self.tavily_mcp = None
 
         logger.info(f"TradingAgent created: {agent_id}")
 
@@ -172,7 +173,7 @@ class TradingAgent:
                 model=self.llm_model,
                 instructions=self._build_instructions(self.agent_config.description),
                 tools=all_tools,
-                # mcp_servers=[self.memory_mcp],
+                mcp_servers=[self.memory_mcp],
                 model_settings=ModelSettings(
                     tool_choice="required",  # 強制使用工具
                     extra_headers=self.extra_headers
@@ -220,6 +221,7 @@ class TradingAgent:
                             "/Users/sacahan/Documents/workspace/CasualMarket",
                             "casual-market-mcp",
                         ],
+                        "env": {"MARKET_MCP_RATE_LIMITING_ENABLED": "false"},
                     },
                     client_session_timeout_seconds=DEFAULT_AGENT_TIMEOUT,
                 )
@@ -249,25 +251,19 @@ class TradingAgent:
             )
             logger.info(f"memory_mcp server initialized (db: {memory_db_path})")
 
-            # Chrome DevTools MCP
-            # 提供瀏覽器自動化功能：網頁導航、數據抓取、網路監控等
-            # ⚠️ 注意：take_screenshot 工具返回 base64 圖像，與 SDK input_image 型態不相容
-            # 其他 26 個工具（navigate_page, evaluate_script, take_snapshot 等）都返回文本，可正常使用
-            try:
-                self.chrome_devtools_mcp = await self._exit_stack.enter_async_context(
-                    MCPServerStdio(
-                        name="chrome-devtools",
-                        params={
-                            "command": "npx",
-                            "args": ["-y", "chrome-devtools-mcp@latest"],
-                        },
-                        client_session_timeout_seconds=DEFAULT_AGENT_TIMEOUT,
-                    )
+            # Tavily MCP Server
+            self.tavily_mcp = await self._exit_stack.enter_async_context(
+                MCPServerStdio(
+                    name="tavily_mcp",
+                    params={
+                        "command": "npx",
+                        "args": ["-y", "tavily-mcp@latest"],
+                        "env": {"TAVILY_API_KEY": f"{TAVILY_API_KEY}"},
+                    },
+                    client_session_timeout_seconds=DEFAULT_AGENT_TIMEOUT,
                 )
-                logger.info("chrome_devtools_mcp server initialized")
-            except Exception as e:
-                logger.warning(f"Failed to initialize chrome_devtools_mcp: {e}")
-                self.chrome_devtools_mcp = None  # 設為 None 以避免後續錯誤
+            )
+            logger.info("tavily_mcp server initialized")
 
         except Exception as e:
             logger.warning(f"Failed to initialize MCP server: {e}")
@@ -396,10 +392,7 @@ class TradingAgent:
             # 只支援 OpenAI Responses API，不支援 ChatCompletions API
             # Sub-agents 使用 LitellmModel 呼叫 ChatCompletions API，
             # 因此只能使用自訂工具，不能使用託管工具
-            mcp_servers = [self.memory_mcp, self.casual_market_mcp]
-            # 只在初始化成功時才加入 chrome-devtools-mcp
-            if self.chrome_devtools_mcp:
-                mcp_servers.append(self.chrome_devtools_mcp)
+            mcp_servers = [self.memory_mcp, self.casual_market_mcp, self.tavily_mcp]
 
             subagent_config = {
                 "llm_model": self.llm_model,
