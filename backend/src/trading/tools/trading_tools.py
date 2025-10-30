@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from typing import Any
 
 from agents import function_tool, Tool
 from agents.mcp import MCPServerStdio
@@ -9,7 +10,44 @@ from common.logger import logger
 from common.enums import TransactionStatus
 
 
+# ==========================================
+# 參數驗證 Helper 函數
+# ==========================================
+
+
+def parse_and_validate_params(
+    **kwargs,
+) -> dict[str, Any]:
+    """
+    解析和驗證 AI Agent 傳入的參數。
+
+    處理兩種情況：
+    1. 直接的參數：symbol="2330", quantity=1000
+    2. JSON 字串參數：args='{"symbol":"2330","quantity":1000}'
+
+    Args:
+        **kwargs: 傳入的所有參數
+
+    Returns:
+        解析後的參數字典
+    """
+    # 嘗試從 'args' 參數中解析 JSON（AI Agent 有時會這樣做）
+    if "args" in kwargs and isinstance(kwargs["args"], str):
+        try:
+            parsed = json.loads(kwargs["args"])
+            logger.debug(f"成功從 JSON 字串解析參數: {parsed}")
+            return parsed
+        except json.JSONDecodeError:
+            logger.warning(f"無法解析 args 中的 JSON: {kwargs['args']}")
+
+    # 返回原始參數（已去除 'args' 鍵如果存在）
+    result = {k: v for k, v in kwargs.items() if k != "args"}
+    return result
+
+
+# ==========================================
 # 頂層交易記錄函數
+# ==========================================
 async def record_trade(
     agent_service,
     agent_id: str,
@@ -195,7 +233,7 @@ def create_trading_tools(
     """
 
     # 用裝飾器包裝頂層函數以用作工具
-    @function_tool
+    @function_tool(strict_mode=False)
     async def record_trade_tool(
         ticker: str,
         action: str,
@@ -229,7 +267,7 @@ def create_trading_tools(
             company_name=company_name,
         )
 
-    @function_tool
+    @function_tool(strict_mode=False)
     async def get_portfolio_status_tool() -> str:
         """
         取得當前投資組合狀態
@@ -239,31 +277,54 @@ def create_trading_tools(
         """
         return await get_portfolio_status(agent_service=agent_service, agent_id=agent_id)
 
-    @function_tool
+    @function_tool(strict_mode=False)
     async def buy_taiwan_stock_tool(
         symbol: str,
         quantity: int,
-        price: float = None,
+        price: float | None = None,
+        **kwargs,
     ) -> str:
         """
         模擬買入台灣股票
 
+        此工具用於執行台灣股票的模擬買入交易。您必須提供股票代號和購買股數。
+
         Args:
-            symbol: 股票代號 (例如: "2330")
-            quantity: 購買股數，必須是1000的倍數 (台股最小單位為1000股)
-            price: 指定價格 (可選，不指定則為市價)
+            symbol: 股票代號，例如 "2330" (台積電) 或 "0050" (元大台灣50)。【必需】
+            quantity: 購買股數，必須是1000的倍數 (台股最小交易單位為1張/1000股)。【必需】
+                     常見數量：1000 (1張)、2000 (2張)、3000 (3張) 等。
+                     例如想買5張台積電就傳 quantity=5000
+            price: 指定買入價格，單位為新台幣 (可選，不指定則以市價執行)。
+                   例如 price=520.0 表示最高願意出價520元
 
         Returns:
-            交易結果訊息
+            str: 交易結果訊息，包含成功/失敗狀態、股票代號、股數、執行價格和總金額
+
+        Examples:
+            - 以市價買入台積電1張：buy_taiwan_stock_tool(symbol="2330", quantity=1000)
+            - 以指定價格買入5張台積電：buy_taiwan_stock_tool(symbol="2330", quantity=5000, price=520.0)
         """
         try:
+            # 由於 symbol 和 quantity 已經是必需參數（在函數簽名中沒有默認值），
+            # 我們可以直接使用它們
+            _symbol = symbol
+            _quantity = quantity
+            _price = price
+
+            # 轉換資料型別
+            try:
+                _quantity = int(_quantity)
+                _price = float(_price) if _price else None
+            except (ValueError, TypeError) as e:
+                return f"❌ 參數型別錯誤：{e}"
+
             # 調用 casual_market_mcp 的 buy_taiwan_stock 工具
             result = await casual_market_mcp.session.call_tool(
                 "buy_taiwan_stock",
                 {
-                    "symbol": symbol,
-                    "quantity": quantity,
-                    "price": price,
+                    "symbol": _symbol,
+                    "quantity": _quantity,
+                    "price": _price,
                 },
             )
 
@@ -280,51 +341,86 @@ def create_trading_tools(
                     data = json.loads(text_content)
                 except json.JSONDecodeError:
                     # 如果解析失敗，嘗試直接使用內容
-                    return f"✅ 模擬買入指令已送出：{symbol} {quantity} 股"
+                    return f"✅ 模擬買入指令已送出：{_symbol} {_quantity} 股"
 
                 if data.get("success"):
                     trading_data = data.get("data", {})
-                    price = trading_data.get("price") or "市價"
-                    total_amount = trading_data.get("total_amount")
+                    executed_price = trading_data.get("price")
+
+                    # 如果沒有執行價格，使用函數參數的 price（或標記為市價）
+                    if executed_price is None:
+                        executed_price = _price if _price else "市價"
+
+                    # 計算總金額
+                    if executed_price != "市價" and isinstance(executed_price, (int, float)):
+                        calculated_total = _quantity * executed_price
+                    else:
+                        # 如果無法計算，使用 trading_data 中的值或提取的值
+                        calculated_total = trading_data.get("total_amount")
+
                     total_amount_str = (
-                        f"{total_amount:,.2f}" if total_amount is not None else "0.00"
+                        f"{calculated_total:,.2f}" if calculated_total is not None else "未知"
                     )
-                    return f"✅ 模擬買入成功：{trading_data.get('symbol')} {trading_data.get('quantity')} 股 @ {price} 元，總金額：{total_amount_str} 元"
+
+                    return f"✅ 模擬買入成功：{_symbol} {_quantity} 股 @ {executed_price} 元，總金額：{total_amount_str} 元"
                 else:
                     error = data.get("error", "未知錯誤")
                     return f"❌ 模擬買入失敗：{error}"
 
-            return f"✅ 模擬買入指令已送出：{symbol} {quantity} 股"
+            return f"✅ 模擬買入指令已送出：{_symbol} {_quantity} 股"
 
         except Exception as e:
             logger.error(f"模擬買入失敗: {e}", exc_info=True)
             raise
 
-    @function_tool
+    @function_tool(strict_mode=False)
     async def sell_taiwan_stock_tool(
         symbol: str,
         quantity: int,
-        price: float = None,
+        price: float | None = None,
+        **kwargs,
     ) -> str:
         """
         模擬賣出台灣股票
 
+        此工具用於執行台灣股票的模擬賣出交易。您必須提供股票代號和賣出股數。
+
         Args:
-            symbol: 股票代號 (例如: "2330")
-            quantity: 賣出股數，必須是1000的倍數 (台股最小單位為1000股)
-            price: 指定價格 (可選，不指定則為市價)
+            symbol: 股票代號，例如 "2330" (台積電) 或 "0050" (元大台灣50)。【必需】
+            quantity: 賣出股數，必須是1000的倍數 (台股最小交易單位為1張/1000股)。【必需】
+                     常見數量：1000 (1張)、2000 (2張)、3000 (3張) 等。
+                     例如想賣5張台積電就傳 quantity=5000
+            price: 指定賣出價格，單位為新台幣 (可選，不指定則以市價執行)。
+                   例如 price=530.0 表示最低願意出價530元
 
         Returns:
-            交易結果訊息
+            str: 交易結果訊息，包含成功/失敗狀態、股票代號、股數、執行價格和總金額
+
+        Examples:
+            - 以市價賣出台積電1張：sell_taiwan_stock_tool(symbol="2330", quantity=1000)
+            - 以指定價格賣出5張台積電：sell_taiwan_stock_tool(symbol="2330", quantity=5000, price=530.0)
         """
         try:
+            # 由於 symbol 和 quantity 已經是必需參數（在函數簽名中沒有默認值），
+            # 我們可以直接使用它們
+            _symbol = symbol
+            _quantity = quantity
+            _price = price
+
+            # 轉換資料型別
+            try:
+                _quantity = int(_quantity)
+                _price = float(_price) if _price else None
+            except (ValueError, TypeError) as e:
+                return f"❌ 參數型別錯誤：{e}"
+
             # 調用 casual_market_mcp 的 sell_taiwan_stock 工具
             result = await casual_market_mcp.session.call_tool(
                 "sell_taiwan_stock",
                 {
-                    "symbol": symbol,
-                    "quantity": quantity,
-                    "price": price,
+                    "symbol": _symbol,
+                    "quantity": _quantity,
+                    "price": _price,
                 },
             )
 
@@ -341,21 +437,33 @@ def create_trading_tools(
                     data = json.loads(text_content)
                 except json.JSONDecodeError:
                     # 如果解析失敗，嘗試直接使用內容
-                    return f"✅ 模擬賣出指令已送出：{symbol} {quantity} 股"
+                    return f"✅ 模擬賣出指令已送出：{_symbol} {_quantity} 股"
 
                 if data.get("success"):
                     trading_data = data.get("data", {})
-                    price = trading_data.get("price") or "市價"
-                    total_amount = trading_data.get("total_amount")
+                    executed_price = trading_data.get("price")
+
+                    # 如果沒有執行價格，使用函數參數的 price（或標記為市價）
+                    if executed_price is None:
+                        executed_price = _price if _price else "市價"
+
+                    # 計算總金額
+                    if executed_price != "市價" and isinstance(executed_price, (int, float)):
+                        calculated_total = _quantity * executed_price
+                    else:
+                        # 如果無法計算，使用 trading_data 中的值或提取的值
+                        calculated_total = trading_data.get("total_amount")
+
                     total_amount_str = (
-                        f"{total_amount:,.2f}" if total_amount is not None else "0.00"
+                        f"{calculated_total:,.2f}" if calculated_total is not None else "未知"
                     )
-                    return f"✅ 模擬賣出成功：{trading_data.get('symbol')} {trading_data.get('quantity')} 股 @ {price} 元，總金額：{total_amount_str} 元"
+
+                    return f"✅ 模擬賣出成功：{_symbol} {_quantity} 股 @ {executed_price} 元，總金額：{total_amount_str} 元"
                 else:
                     error = data.get("error", "未知錯誤")
                     return f"❌ 模擬賣出失敗：{error}"
 
-            return f"✅ 模擬賣出指令已送出：{symbol} {quantity} 股"
+            return f"✅ 模擬賣出指令已送出：{_symbol} {_quantity} 股"
 
         except Exception as e:
             logger.error(f"模擬賣出失敗: {e}", exc_info=True)

@@ -168,27 +168,34 @@ class TradingAgent:
             all_tools = self.trading_tools + self.subagent_tools
 
             # 7. 創建 OpenAI Agent（使用 LiteLLM 模型）
+            # GitHub Copilot 不支援 tool_choice 參數
+            model_settings_dict = {
+                "include_usage": True,  # 追蹤使用數據
+            }
+
+            # 只有非 GitHub Copilot 模型才支援 tool_choice
+            model_name = self.llm_model.model if self.llm_model else ""
+            if "github_copilot" not in model_name.lower():
+                model_settings_dict["tool_choice"] = "required"
+
+            if self.extra_headers:
+                model_settings_dict["extra_headers"] = self.extra_headers
+
             self.agent = Agent(
                 name=self.agent_id,
                 model=self.llm_model,
                 instructions=self._build_instructions(self.agent_config.description),
                 tools=all_tools,
                 mcp_servers=[self.memory_mcp],
-                model_settings=ModelSettings(
-                    tool_choice="required",  # 強制使用工具
-                    extra_headers=self.extra_headers
-                    if self.extra_headers
-                    else None,  # GitHub Copilot headers
-                    include_usage=True,  # 追蹤使用數據
-                ),
+                model_settings=ModelSettings(**model_settings_dict),
             )
 
             # 8. 繪製 Agent 結構圖
-            save_agent_graph(
-                agent=self.agent,
-                agent_id=self.agent_id,
-                output_dir=None,  # 使用預設的 backend/logs 目錄
-            )
+            # save_agent_graph(
+            #     agent=self.agent,
+            #     agent_id=self.agent_id,
+            #     output_dir=None,  # 使用預設的 backend/logs 目錄
+            # )
 
             self.is_initialized = True
             logger.info(
@@ -334,8 +341,8 @@ class TradingAgent:
                 f"Set environment variable: {api_key_env_var}"
             )
 
-        # 構建完整的 LiteLLM 模型字符串
-        model_str = f"{litellm_prefix}/{model_key}"
+        # 構建完整的 LiteLLM 模型字符串，格式為 "provider/model"，其中 "provider/" 可選
+        model_str = f"{litellm_prefix}{model_key}"
 
         logger.info(
             f"Creating LiteLLM model: {model_str} "
@@ -677,7 +684,7 @@ class TradingAgent:
 • 專業分析 Sub-Agents - technical_analyst、fundamental_analyst、sentiment_analyst、risk_analyst
 
 限制：
-• 必須有充分的分析支持才能執行交易
+• 必須根據現價進行交易，例如現價為每股1050元，則只能以1050元執行買入或賣出
 • 遵守最大持股比例限制
 • 交易後必須記錄決策理由
 • 主動將決策過程利用 memory_mcp 存入知識庫以供未來參考

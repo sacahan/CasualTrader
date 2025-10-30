@@ -21,6 +21,7 @@ from loguru import logger
 # 禁用 LiteLLM 的詳細輸出 - 使用官方推薦的環境變數方式
 # 根據 LiteLLM 官方文檔：https://github.com/BerriAI/litellm
 os.environ["LITELLM_LOG"] = "ERROR"
+# os.environ["LITELLM_LOG"] = "DEBUG"
 
 # ==========================================
 # Logger 配置

@@ -6,6 +6,8 @@
 from __future__ import annotations
 
 import os
+import json
+from typing import Any
 from datetime import datetime
 
 from dotenv import load_dotenv
@@ -20,6 +22,46 @@ load_dotenv()
 
 DEFAULT_MODEL = os.getenv("DEFAULT_AI_MODEL", "gpt-5-mini")
 DEFAULT_MAX_TURNS = os.getenv("DEFAULT_MAX_TURNS", 30)
+
+
+# ==========================================
+# 參數驗證和容錯 Helper 函數
+# ==========================================
+
+
+def parse_tool_params(
+    **kwargs,
+) -> dict[str, Any]:
+    """
+    解析和驗證 AI Agent 傳入的參數。
+
+    處理多種情況：
+    1. 直接的參數：ticker="2330", price_data=[...]
+    2. JSON 字串參數：args='{"ticker":"2330","price_data":[...]}'
+    3. 單個 'input' 參數（某些 sub-agent 呼叫方式）
+
+    Args:
+        **kwargs: 傳入的所有參數
+
+    Returns:
+        解析後的參數字典
+    """
+    # 嘗試從 'args' 參數中解析 JSON
+    if "args" in kwargs and isinstance(kwargs["args"], str):
+        try:
+            parsed = json.loads(kwargs["args"])
+            logger.debug(f"成功從 JSON 字串解析參數: {parsed}")
+            return parsed
+        except json.JSONDecodeError:
+            logger.debug(f"無法解析 args 中的 JSON: {kwargs['args']}")
+
+    # 移除無效的參數（例如 input_image）
+    result = {}
+    for k, v in kwargs.items():
+        if k not in ["args", "input", "input_image"]:
+            result[k] = v
+
+    return result
 
 
 # ===== Pydantic Models for Tool Parameters =====
@@ -126,11 +168,12 @@ def technical_agent_instructions() -> str:
 """
 
 
-@function_tool
+@function_tool(strict_mode=False)
 def calculate_technical_indicators(
-    ticker: str,
-    price_data: list[PriceDataPoint],
-    indicators: list[str] | str | None = None,
+    ticker: str = None,
+    price_data: list = None,
+    indicators: list = None,
+    **kwargs,
 ) -> str:
     """計算技術指標
 
@@ -139,6 +182,7 @@ def calculate_technical_indicators(
         price_data: 歷史價格數據列表,每筆包含 date, open, high, low, close, volume
         indicators: 要計算的指標，可以是單個字符串 "macd" 或列表 ["ma", "rsi", "macd", "bollinger", "kd"]，
                    None 表示計算全部指標
+        **kwargs: 額外參數（用於容錯）
 
     Returns:
         dict: 包含各項技術指標的計算結果
@@ -151,67 +195,101 @@ def calculate_technical_indicators(
                 }
             }
     """
-    logger.info(f"開始計算技術指標 | 股票: {ticker} | 數據點數: {len(price_data)}")
+    try:
+        # 參數驗證和容錯
+        params = parse_tool_params(
+            ticker=ticker, price_data=price_data, indicators=indicators, **kwargs
+        )
 
-    if not price_data:
-        logger.warning(f"缺少價格數據 | 股票: {ticker}")
-        return {"error": "缺少價格數據", "ticker": ticker}
+        _ticker = params.get("ticker") or ticker
+        _price_data = params.get("price_data") or price_data
+        _indicators = params.get("indicators") or indicators
 
-    # 將單個字符串轉換為列表
-    if isinstance(indicators, str):
-        indicators = [indicators.lower()]
+        # 驗證必要參數
+        if not _ticker:
+            logger.warning("缺少必要參數: ticker")
+            return {"error": "缺少必要參數: ticker"}
 
-    indicators = indicators or ["ma", "rsi", "macd", "bollinger", "kd"]
-    result = {"ticker": ticker, "indicators": {}}
-    latest_close = price_data[-1].close
+        if not _price_data:
+            logger.warning("缺少必要參數: price_data")
+            return {"error": "缺少必要參數: price_data", "ticker": _ticker}
 
-    logger.debug(f"計算指標: {', '.join(indicators)} | 最新收盤: {latest_close}")
+        # 轉換字典為 PriceDataPoint 物件
+        if _price_data and isinstance(_price_data[0], dict):
+            _price_data = [
+                PriceDataPoint(**item) if isinstance(item, dict) else item for item in _price_data
+            ]
 
-    if "ma" in indicators:
-        result["indicators"]["ma"] = {
-            "ma5": latest_close * 0.98,
-            "ma10": latest_close * 0.97,
-            "ma20": latest_close * 0.95,
-            "ma60": latest_close * 0.92,
+        logger.info(f"開始計算技術指標 | 股票: {_ticker} | 數據點數: {len(_price_data)}")
+
+        if not _price_data:
+            logger.warning(f"缺少價格數據 | 股票: {_ticker}")
+            return {"error": "缺少價格數據", "ticker": _ticker}
+
+        # 將單個字符串轉換為列表
+        if isinstance(_indicators, str):
+            _indicators = [_indicators.lower()]
+
+        _indicators = _indicators or ["ma", "rsi", "macd", "bollinger", "kd"]
+        result = {"ticker": _ticker, "indicators": {}}
+        latest_close = _price_data[-1].close
+
+        logger.debug(f"計算指標: {', '.join(_indicators)} | 最新收盤: {latest_close}")
+
+        if "ma" in _indicators:
+            result["indicators"]["ma"] = {
+                "ma5": latest_close * 0.98,
+                "ma10": latest_close * 0.97,
+                "ma20": latest_close * 0.95,
+                "ma60": latest_close * 0.92,
+            }
+
+        if "rsi" in _indicators:
+            rsi_value = 55.0
+            status = "超買" if rsi_value >= 70 else "超賣" if rsi_value <= 30 else "中性"
+            result["indicators"]["rsi"] = {"value": rsi_value, "status": status}
+
+        if "macd" in _indicators:
+            result["indicators"]["macd"] = {
+                "macd": 0.5,
+                "signal": 0.3,
+                "histogram": 0.2,
+                "status": "多頭",
+            }
+
+        if "bollinger" in _indicators:
+            result["indicators"]["bollinger"] = {
+                "upper": latest_close * 1.02,
+                "middle": latest_close,
+                "lower": latest_close * 0.98,
+            }
+
+        if "kd" in _indicators:
+            result["indicators"]["kd"] = {
+                "k": 60.0,
+                "d": 55.0,
+                "status": "偏強",
+            }
+
+        logger.info(f"技術指標計算完成 | 股票: {_ticker} | 指標數: {len(result['indicators'])}")
+
+        return result
+
+    except Exception as e:
+        logger.error(f"計算技術指標失敗: {e}", exc_info=True)
+        return {
+            "error": str(e),
+            "ticker": ticker,
+            "indicators": {},
         }
 
-    if "rsi" in indicators:
-        rsi_value = 55.0
-        status = "超買" if rsi_value >= 70 else "超賣" if rsi_value <= 30 else "中性"
-        result["indicators"]["rsi"] = {"value": rsi_value, "status": status}
 
-    if "macd" in indicators:
-        result["indicators"]["macd"] = {
-            "macd": 0.5,
-            "signal": 0.3,
-            "histogram": 0.2,
-            "status": "多頭",
-        }
-
-    if "bollinger" in indicators:
-        result["indicators"]["bollinger"] = {
-            "upper": latest_close * 1.02,
-            "middle": latest_close,
-            "lower": latest_close * 0.98,
-        }
-
-    if "kd" in indicators:
-        result["indicators"]["kd"] = {
-            "k": 60.0,
-            "d": 55.0,
-            "status": "偏強",
-        }
-
-    logger.info(f"技術指標計算完成 | 股票: {ticker} | 指標數: {len(result['indicators'])}")
-
-    return result
-
-
-@function_tool
+@function_tool(strict_mode=False)
 def identify_chart_patterns(
-    ticker: str,
-    price_data: list[PriceDataPoint],
+    ticker: str = None,
+    price_data: list = None,
     lookback_days: int = 60,
+    **kwargs,
 ) -> str:
     """識別圖表型態
 
@@ -219,6 +297,7 @@ def identify_chart_patterns(
         ticker: 股票代號 (例如: "2330")
         price_data: 歷史價格數據列表
         lookback_days: 回溯分析天數,預設 60 天
+        **kwargs: 額外參數（用於容錯）
 
     Returns:
         dict: 識別到的圖表型態
@@ -235,57 +314,98 @@ def identify_chart_patterns(
                 "pattern_count": int
             }
     """
-    logger.info(
-        f"開始識別圖表型態 | 股票: {ticker} | 數據點數: {len(price_data)} | 回溯: {lookback_days}天"
-    )
+    try:
+        # 參數驗證和容錯
+        params = parse_tool_params(
+            ticker=ticker, price_data=price_data, lookback_days=lookback_days, **kwargs
+        )
 
-    if not price_data or len(price_data) < 20:
-        logger.warning(f"數據不足 | 股票: {ticker} | 數據點數: {len(price_data)}")
-        return {"error": "數據不足", "ticker": ticker}
+        _ticker = params.get("ticker") or ticker
+        _price_data = params.get("price_data") or price_data
+        _lookback_days = params.get("lookback_days") or lookback_days
 
-    patterns = []
+        # 驗證必要參數
+        if not _ticker:
+            logger.warning("缺少必要參數: ticker")
+            return {"error": "缺少必要參數: ticker"}
 
-    if len(price_data) >= 20:
-        recent_trend = price_data[-1].close / price_data[-20].close
+        if not _price_data:
+            logger.warning("缺少必要參數: price_data")
+            return {"error": "缺少必要參數: price_data", "ticker": _ticker}
 
-        if recent_trend > 1.05:
-            patterns.append(
-                {
-                    "pattern_name": "上升趨勢",
-                    "pattern_type": "bullish",
-                    "confidence": 0.75,
-                    "description": f"價格上漲 {(recent_trend - 1) * 100:.2f}%",
-                }
-            )
-        elif recent_trend < 0.95:
-            patterns.append(
-                {
-                    "pattern_name": "下降趨勢",
-                    "pattern_type": "bearish",
-                    "confidence": 0.75,
-                    "description": f"價格下跌 {(1 - recent_trend) * 100:.2f}%",
-                }
-            )
+        # 轉換字典為 PriceDataPoint 物件
+        if _price_data and isinstance(_price_data[0], dict):
+            _price_data = [
+                PriceDataPoint(**item) if isinstance(item, dict) else item for item in _price_data
+            ]
 
-    logger.info(f"圖表型態識別完成 | 股票: {ticker} | 發現型態: {len(patterns)}")
+        logger.info(
+            f"開始識別圖表型態 | 股票: {_ticker} | 數據點數: {len(_price_data)} | 回溯: {_lookback_days}天"
+        )
 
-    return {
-        "ticker": ticker,
-        "patterns": patterns,
-        "pattern_count": len(patterns),
-    }
+        if not _price_data or len(_price_data) < 20:
+            logger.warning(f"數據不足 | 股票: {_ticker} | 數據點數: {len(_price_data)}")
+            return {
+                "error": "數據不足",
+                "ticker": _ticker,
+                "patterns": [],
+                "pattern_count": 0,
+            }
+
+        patterns = []
+
+        if len(_price_data) >= 20:
+            recent_trend = _price_data[-1].close / _price_data[-20].close
+
+            if recent_trend > 1.05:
+                patterns.append(
+                    {
+                        "pattern_name": "上升趨勢",
+                        "pattern_type": "bullish",
+                        "confidence": 0.75,
+                        "description": f"價格上漲 {(recent_trend - 1) * 100:.2f}%",
+                    }
+                )
+            elif recent_trend < 0.95:
+                patterns.append(
+                    {
+                        "pattern_name": "下降趨勢",
+                        "pattern_type": "bearish",
+                        "confidence": 0.75,
+                        "description": f"價格下跌 {(1 - recent_trend) * 100:.2f}%",
+                    }
+                )
+
+        logger.info(f"圖表型態識別完成 | 股票: {_ticker} | 發現型態: {len(patterns)}")
+
+        return {
+            "ticker": _ticker,
+            "patterns": patterns,
+            "pattern_count": len(patterns),
+        }
+
+    except Exception as e:
+        logger.error(f"識別圖表型態失敗: {e}", exc_info=True)
+        return {
+            "error": str(e),
+            "ticker": ticker,
+            "patterns": [],
+            "pattern_count": 0,
+        }
 
 
-@function_tool
+@function_tool(strict_mode=False)
 def analyze_trend(
-    ticker: str,
-    price_data: list[PriceDataPoint],
+    ticker: str = None,
+    price_data: list = None,
+    **kwargs,
 ) -> str:
     """分析趨勢方向和強度
 
     Args:
         ticker: 股票代號 (例如: "2330")
         price_data: 歷史價格數據列表,至少需要 20 筆數據
+        **kwargs: 額外參數（用於容錯）
 
     Returns:
         dict: 趨勢分析結果
@@ -297,45 +417,87 @@ def analyze_trend(
                 "mid_term_momentum": float     # 中期動能
             }
     """
-    logger.info(f"開始分析趨勢 | 股票: {ticker} | 數據點數: {len(price_data)}")
+    try:
+        # 參數驗證和容錯
+        params = parse_tool_params(ticker=ticker, price_data=price_data, **kwargs)
 
-    if len(price_data) < 20:
-        logger.warning(f"數據不足 | 股票: {ticker} | 數據點數: {len(price_data)}")
-        return {"error": "數據不足，需至少 20 筆數據", "ticker": ticker}
+        _ticker = params.get("ticker") or ticker
+        _price_data = params.get("price_data") or price_data
 
-    short_term = price_data[-5].close / price_data[-10].close - 1.0
-    mid_term = price_data[-10].close / price_data[-20].close - 1.0
+        # 驗證必要參數
+        if not _ticker:
+            logger.warning("缺少必要參數: ticker")
+            return {"error": "缺少必要參數: ticker"}
 
-    logger.debug(f"動能指標 | 短期: {short_term:.2%} | 中期: {mid_term:.2%}")
+        if not _price_data:
+            logger.warning("缺少必要參數: price_data")
+            return {"error": "缺少必要參數: price_data", "ticker": _ticker}
 
-    if short_term > 0.02 and mid_term > 0.05:
-        direction, strength = "上升", 0.8
-    elif short_term < -0.02 and mid_term < -0.05:
-        direction, strength = "下降", 0.8
-    else:
-        direction, strength = "盤整", 0.4
+        # 轉換字典為 PriceDataPoint 物件
+        if _price_data and isinstance(_price_data[0], dict):
+            _price_data = [
+                PriceDataPoint(**item) if isinstance(item, dict) else item for item in _price_data
+            ]
 
-    logger.info(f"趨勢分析完成 | 股票: {ticker} | 方向: {direction} | 強度: {strength:.2f}")
+        logger.info(f"開始分析趨勢 | 股票: {_ticker} | 數據點數: {len(_price_data)}")
 
-    return {
-        "ticker": ticker,
-        "direction": direction,
-        "strength": strength,
-        "short_term_momentum": short_term,
-        "mid_term_momentum": mid_term,
-    }
+        if len(_price_data) < 20:
+            logger.warning(f"數據不足 | 股票: {_ticker} | 數據點數: {len(_price_data)}")
+            return {
+                "error": "數據不足，需至少 20 筆數據",
+                "ticker": _ticker,
+                "direction": "未知",
+                "strength": 0,
+                "short_term_momentum": 0,
+                "mid_term_momentum": 0,
+            }
+
+        short_term = _price_data[-5].close / _price_data[-10].close - 1.0
+        mid_term = _price_data[-10].close / _price_data[-20].close - 1.0
+
+        logger.debug(f"動能指標 | 短期: {short_term:.2%} | 中期: {mid_term:.2%}")
+
+        if short_term > 0.02 and mid_term > 0.05:
+            direction, strength = "上升", 0.8
+        elif short_term < -0.02 and mid_term < -0.05:
+            direction, strength = "下降", 0.8
+        else:
+            direction, strength = "盤整", 0.4
+
+        logger.info(f"趨勢分析完成 | 股票: {_ticker} | 方向: {direction} | 強度: {strength:.2f}")
+
+        return {
+            "ticker": _ticker,
+            "direction": direction,
+            "strength": strength,
+            "short_term_momentum": short_term,
+            "mid_term_momentum": mid_term,
+        }
+
+    except Exception as e:
+        logger.error(f"分析趨勢失敗: {e}", exc_info=True)
+        return {
+            "error": str(e),
+            "ticker": ticker,
+            "direction": "未知",
+            "strength": 0,
+            "short_term_momentum": 0,
+            "mid_term_momentum": 0,
+        }
 
 
-@function_tool
+@function_tool(strict_mode=False)
 def analyze_support_resistance(
-    ticker: str,
-    price_data: list[PriceDataPoint],
+    ticker: str = None,
+    price_data: list = None,
+    **kwargs,
 ) -> str:
     """分析支撐和壓力位
 
     Args:
         ticker: 股票代號 (例如: "2330")
         price_data: 歷史價格數據列表
+        **kwargs: 額外參數（用於容錯）
 
     Returns:
         dict: 支撐壓力位分析結果
@@ -346,45 +508,84 @@ def analyze_support_resistance(
                 "resistance_levels": [float, ...] # 壓力位列表 (由近到遠)
             }
     """
-    logger.info(f"開始分析支撐壓力 | 股票: {ticker} | 數據點數: {len(price_data)}")
+    try:
+        # 參數驗證和容錯
+        params = parse_tool_params(ticker=ticker, price_data=price_data, **kwargs)
 
-    if not price_data:
-        logger.warning(f"缺少數據 | 股票: {ticker}")
-        return {"error": "缺少價格數據", "ticker": ticker}
+        _ticker = params.get("ticker") or ticker
+        _price_data = params.get("price_data") or price_data
 
-    current_price = price_data[-1].close
+        # 驗證必要參數
+        if not _ticker:
+            logger.warning("缺少必要參數: ticker")
+            return {"error": "缺少必要參數: ticker"}
 
-    support_levels = [
-        current_price * 0.95,
-        current_price * 0.92,
-        current_price * 0.90,
-    ]
+        if not _price_data:
+            logger.warning("缺少必要參數: price_data")
+            return {"error": "缺少必要參數: price_data", "ticker": _ticker}
 
-    resistance_levels = [
-        current_price * 1.05,
-        current_price * 1.08,
-        current_price * 1.10,
-    ]
+        # 轉換字典為 PriceDataPoint 物件
+        if _price_data and isinstance(_price_data[0], dict):
+            _price_data = [
+                PriceDataPoint(**item) if isinstance(item, dict) else item for item in _price_data
+            ]
 
-    logger.info(
-        f"支撐壓力分析完成 | 股票: {ticker} | 當前價: {current_price:.2f} | "
-        f"支撐位: {len(support_levels)} | 壓力位: {len(resistance_levels)}"
-    )
+        logger.info(f"開始分析支撐壓力 | 股票: {_ticker} | 數據點數: {len(_price_data)}")
 
-    return {
-        "ticker": ticker,
-        "current_price": current_price,
-        "support_levels": support_levels,
-        "resistance_levels": resistance_levels,
-    }
+        if not _price_data:
+            logger.warning(f"缺少數據 | 股票: {_ticker}")
+            return {
+                "error": "缺少價格數據",
+                "ticker": _ticker,
+                "current_price": 0,
+                "support_levels": [],
+                "resistance_levels": [],
+            }
+
+        current_price = _price_data[-1].close
+
+        support_levels = [
+            current_price * 0.95,
+            current_price * 0.92,
+            current_price * 0.90,
+        ]
+
+        resistance_levels = [
+            current_price * 1.05,
+            current_price * 1.08,
+            current_price * 1.10,
+        ]
+
+        logger.info(
+            f"支撐壓力分析完成 | 股票: {_ticker} | 當前價: {current_price:.2f} | "
+            f"支撐位: {len(support_levels)} | 壓力位: {len(resistance_levels)}"
+        )
+
+        return {
+            "ticker": _ticker,
+            "current_price": current_price,
+            "support_levels": support_levels,
+            "resistance_levels": resistance_levels,
+        }
+
+    except Exception as e:
+        logger.error(f"分析支撐壓力失敗: {e}", exc_info=True)
+        return {
+            "error": str(e),
+            "ticker": ticker,
+            "current_price": 0,
+            "support_levels": [],
+            "resistance_levels": [],
+        }
 
 
-@function_tool
+@function_tool(strict_mode=False)
 def generate_trading_signals(
-    ticker: str,
-    technical_indicators_json: str,
-    trend_analysis: TrendAnalysis,
-    patterns: ChartPatterns,
+    ticker: str = None,
+    technical_indicators_json: str = None,
+    trend_analysis: dict = None,
+    patterns: dict = None,
+    **kwargs,
 ) -> str:
     """綜合分析產生交易訊號
 
@@ -393,6 +594,7 @@ def generate_trading_signals(
         technical_indicators_json: 技術指標計算結果的 JSON 字串 (來自 calculate_technical_indicators)
         trend_analysis: 趨勢分析結果 (來自 analyze_trend)
         patterns: 圖表型態識別結果 (來自 identify_chart_patterns)
+        **kwargs: 額外參數（用於容錯）
 
     Returns:
         dict: 交易訊號
@@ -406,37 +608,87 @@ def generate_trading_signals(
                 "timestamp": str           # ISO 格式時間戳
             }
     """
-    logger.info(f"開始產生交易訊號 | 股票: {ticker} | 趨勢方向: {trend_analysis.direction}")
+    try:
+        # 參數驗證和容錯
+        params = parse_tool_params(
+            ticker=ticker,
+            technical_indicators_json=technical_indicators_json,
+            trend_analysis=trend_analysis,
+            patterns=patterns,
+            **kwargs,
+        )
 
-    signals = []
-    overall_signal = "觀望"
-    confidence = 0.5
+        _ticker = params.get("ticker") or ticker
+        _technical_indicators_json = (
+            params.get("technical_indicators_json") or technical_indicators_json
+        )
+        _trend_analysis = params.get("trend_analysis") or trend_analysis
+        _patterns = params.get("patterns") or patterns
 
-    if trend_analysis.direction == "上升":
-        signals.append({"type": "trend", "signal": "看多"})
-        confidence += 0.15
+        # 使用預設值以防參數缺失
+        if not _ticker:
+            logger.warning("缺少 ticker 參數")
+            _ticker = "未知"
 
-    bullish_patterns = sum(1 for p in patterns.patterns if p.pattern_type == "bullish")
-    if bullish_patterns > 0:
-        signals.append({"type": "pattern", "signal": "看多"})
-        confidence += 0.1
+        if not _trend_analysis:
+            logger.warning("缺少 trend_analysis 參數，使用預設值")
+            _trend_analysis = {"direction": "盤整", "strength": 0}
+        elif isinstance(_trend_analysis, str):
+            _trend_analysis = json.loads(_trend_analysis)
 
-    if len(signals) >= 2:
-        overall_signal = "買進"
-        confidence = min(0.85, confidence)
+        if not _patterns:
+            logger.warning("缺少 patterns 參數，使用預設值")
+            _patterns = {"patterns": []}
+        elif isinstance(_patterns, str):
+            _patterns = json.loads(_patterns)
 
-    logger.info(
-        f"交易訊號產生完成 | 股票: {ticker} | 訊號: {overall_signal} | "
-        f"信心度: {confidence:.1%} | 訊號數: {len(signals)}"
-    )
+        logger.info(
+            f"開始產生交易訊號 | 股票: {_ticker} | 趨勢方向: {_trend_analysis.get('direction', '未知')}"
+        )
 
-    return {
-        "ticker": ticker,
-        "overall_signal": overall_signal,
-        "confidence": confidence,
-        "signals": signals,
-        "timestamp": datetime.now().isoformat(),
-    }
+        signals = []
+        overall_signal = "觀望"
+        confidence = 0.5
+
+        if _trend_analysis.get("direction") == "上升":
+            signals.append({"type": "trend", "signal": "看多"})
+            confidence += 0.15
+
+        patterns_list = _patterns.get("patterns", [])
+        bullish_patterns = sum(
+            1 for p in patterns_list if isinstance(p, dict) and p.get("pattern_type") == "bullish"
+        )
+        if bullish_patterns > 0:
+            signals.append({"type": "pattern", "signal": "看多"})
+            confidence += 0.1
+
+        if len(signals) >= 2:
+            overall_signal = "買進"
+            confidence = min(0.85, confidence)
+
+        logger.info(
+            f"交易訊號產生完成 | 股票: {_ticker} | 訊號: {overall_signal} | "
+            f"信心度: {confidence:.1%} | 訊號數: {len(signals)}"
+        )
+
+        return {
+            "ticker": _ticker,
+            "overall_signal": overall_signal,
+            "confidence": confidence,
+            "signals": signals,
+            "timestamp": datetime.now().isoformat(),
+        }
+
+    except Exception as e:
+        logger.error(f"產生交易訊號失敗: {e}", exc_info=True)
+        return {
+            "error": str(e),
+            "ticker": ticker,
+            "overall_signal": "觀望",
+            "confidence": 0.3,
+            "signals": [],
+            "timestamp": datetime.now().isoformat(),
+        }
 
 
 async def get_technical_agent(
@@ -476,17 +728,27 @@ async def get_technical_agent(
     logger.info(
         f"Creating Agent with model={llm_model}, mcp_servers={len(mcp_servers)}, tools={len(all_tools)}"
     )
+
+    # GitHub Copilot 不支援 tool_choice 參數
+    model_settings_dict = {
+        "max_completion_tokens": 500,  # 控制回答長度，避免過度冗長
+    }
+
+    # 只有非 GitHub Copilot 模型才支援 tool_choice
+    model_name = llm_model.model if llm_model else ""
+    if "github_copilot" not in model_name.lower():
+        model_settings_dict["tool_choice"] = "required"
+
+    if extra_headers:
+        model_settings_dict["extra_headers"] = extra_headers
+
     analyst = Agent(
         name="technical_analyst",
         instructions=technical_agent_instructions(),
         model=llm_model,
         mcp_servers=mcp_servers,
         tools=all_tools,
-        model_settings=ModelSettings(
-            tool_choice="required",
-            max_completion_tokens=500,  # 控制回答長度，避免過度冗長
-            extra_headers=extra_headers if extra_headers else None,  # 傳遞額外標頭
-        ),
+        model_settings=ModelSettings(**model_settings_dict),
     )
     logger.info("Technical Analyst Agent created successfully")
 

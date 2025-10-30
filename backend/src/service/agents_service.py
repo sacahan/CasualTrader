@@ -487,8 +487,8 @@ class AgentsService:
                 TransactionAction.BUY if action.upper() == "BUY" else TransactionAction.SELL
             )
             status_enum = (
-                TransactionStatus.COMPLETED
-                if status.upper() == "COMPLETED"
+                TransactionStatus.EXECUTED
+                if status.upper() == "EXECUTED"
                 else TransactionStatus.PENDING
             )
 
@@ -504,7 +504,7 @@ class AgentsService:
                 commission=Decimal(str(commission)),
                 status=status_enum,
                 execution_time=(
-                    datetime.now() if status_enum == TransactionStatus.COMPLETED else None
+                    datetime.now() if status_enum == TransactionStatus.EXECUTED else None
                 ),
                 decision_reason=decision_reason,
             )
@@ -704,7 +704,7 @@ class AgentsService:
                     ).label("completed_trades"),
                 )
                 .where(Transaction.agent_id == agent_id)
-                .where(Transaction.status == TransactionStatus.COMPLETED)
+                .where(Transaction.status == TransactionStatus.EXECUTED)
             )
 
             result = await self.session.execute(stmt_transactions)
