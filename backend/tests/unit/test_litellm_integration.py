@@ -100,7 +100,9 @@ class TestTradingAgentWithLiteLLM:
         )
 
         with patch.dict(os.environ, {"OPENAI_API_KEY": "sk-test-key"}):
-            llm_model = await agent._create_llm_model()
+            result = await agent._create_llm_model()
+            # Result is a tuple of (model, extra_headers)
+            llm_model, extra_headers = result
             assert llm_model is not None
             assert llm_model.model == "openai/gpt-4o-mini"
             # Verify DB query was called
@@ -130,7 +132,8 @@ class TestTradingAgentWithLiteLLM:
         )
 
         with patch.dict(os.environ, {"GOOGLE_API_KEY": "AIza-test-key"}):
-            llm_model = await agent._create_llm_model()
+            result = await agent._create_llm_model()
+            llm_model, extra_headers = result
             assert llm_model is not None
             assert llm_model.model == "gemini/gemini-pro"
 
@@ -158,7 +161,8 @@ class TestTradingAgentWithLiteLLM:
         )
 
         with patch.dict(os.environ, {"GITHUB_COPILOT_TOKEN": "ghp-test-token"}):
-            llm_model = await agent._create_llm_model()
+            result = await agent._create_llm_model()
+            llm_model, extra_headers = result
             assert llm_model is not None
             assert llm_model.model == "github_copilot/gpt-5-mini"
 
@@ -228,7 +232,8 @@ class TestLiteLLMProviderSupport:
         )
 
         with patch.dict(os.environ, {env_var: env_value}):
-            llm_model = await agent._create_llm_model()
+            result = await agent._create_llm_model()
+            llm_model, extra_headers = result
             assert llm_model is not None
             assert provider in llm_model.model
 

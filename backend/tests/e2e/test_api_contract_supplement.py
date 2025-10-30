@@ -53,9 +53,10 @@ class TestAPIEndpointContract:
         assert response.status_code in [200, 401, 404]
 
     def test_create_session_endpoint_exists(self, client):
-        """驗證 POST /api/sessions 端點存在"""
+        """驗證 POST /api/sessions 端點處理"""
         response = client.post("/api/sessions", json={})
-        assert response.status_code in [200, 400, 401, 404, 422]
+        # Sessions 端點不支援直接 POST，應該返回 404 或 405
+        assert response.status_code in [404, 405]
 
     def test_health_check_endpoint_exists(self, client):
         """驗證 GET /api/health 端點存在"""

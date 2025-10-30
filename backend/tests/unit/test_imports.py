@@ -28,7 +28,7 @@ def test_module_imports():
         print(f"   - AgentMode.TRADING = {AgentMode.TRADING}")
     except Exception as e:
         print(f"❌ 1. common.enums - 失敗: {e}")
-        raise RuntimeError("Test failed")
+        assert False, "Test failed"
 
     # Test 2: Database Models
     try:
@@ -59,37 +59,29 @@ def test_module_imports():
         )
     except Exception as e:
         print(f"❌ 3. schemas - 失敗: {e}")
-        raise RuntimeError("Test failed")
+        assert False, "Test failed"
 
-    # Test 4: Agents Config (直接從檔案導入，避免 __init__.py 觸發循環導入)
+    # Test 4: Trading module (Trading Agent configuration)
     try:
-        import importlib.util
+        from trading.trading_agent import TradingAgent
 
-        spec = importlib.util.spec_from_file_location("agents.config", "src/agents/config.py")
-        agents_config = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(agents_config)
-
-        AgentConfig = agents_config.AgentConfig
-        _ = agents_config.TradingSettings
-
-        print("✅ 4. agents.config - 配置模型導入成功")
-        config = AgentConfig(name="測試Agent", description="測試用")
-        print(f"   - 創建配置成功: {config.name}")
+        print("✅ 4. trading module - 交易模組導入成功")
+        print(f"   - TradingAgent: {TradingAgent.__name__}")
     except Exception as e:
-        print(f"❌ 4. agents.config - 失敗: {e}")
-        raise RuntimeError("Test failed")
+        print(f"❌ 4. trading module - 失敗: {e}")
+        assert False, "Test failed"
 
-    # Test 5: Agents State (直接從檔案導入)
+    # Test 5: Service layer
     try:
-        spec = importlib.util.spec_from_file_location("agents.state", "src/agents/state.py")
-        agents_state = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(agents_state)
+        from service.agents_service import AgentsService
+        from service.trading_service import TradingService
 
-        _ = agents_state.AgentState
-        print("✅ 5. agents.state - 狀態模型導入成功")
+        print("✅ 5. service layer - 服務層導入成功")
+        print(f"   - AgentsService: {AgentsService.__name__}")
+        print(f"   - TradingService: {TradingService.__name__}")
     except Exception as e:
-        print(f"❌ 5. agents.state - 失敗: {e}")
-        raise RuntimeError("Test failed")
+        print(f"❌ 5. service layer - 失敗: {e}")
+        assert False, "Test failed"
 
     # Test 6: Enum 使用一致性
     try:
@@ -99,7 +91,7 @@ def test_module_imports():
         print("✅ 6. Enum 一致性檢查 - database.models 使用 common.enums")
     except Exception as e:
         print(f"❌ 6. Enum 一致性 - 失敗: {e}")
-        raise RuntimeError("Test failed")
+        assert False, "Test failed"
 
     print("=" * 60)
     print("🎉 所有模組導入測試通過！")

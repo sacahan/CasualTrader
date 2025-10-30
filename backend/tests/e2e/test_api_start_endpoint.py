@@ -127,14 +127,11 @@ class TestResponseFormat:
         """測試：StartModeResponse 模型"""
         from api.routers.agent_execution import StartModeResponse
 
-        response = StartModeResponse(
-            success=True, session_id="session-123", mode="OBSERVATION", execution_time_ms=1000
-        )
+        response = StartModeResponse(success=True, session_id="session-123", mode="OBSERVATION")
 
         assert response.success is True
         assert response.session_id == "session-123"
         assert response.mode == "OBSERVATION"
-        assert response.execution_time_ms == 1000
 
         # 驗證可以序列化為 dict
         response_dict = response.model_dump()

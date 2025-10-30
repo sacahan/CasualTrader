@@ -335,7 +335,7 @@ class TradingAgent:
             )
 
         # 構建完整的 LiteLLM 模型字符串
-        model_str = f"{litellm_prefix}{model_key}"
+        model_str = f"{litellm_prefix}/{model_key}"
 
         logger.info(
             f"Creating LiteLLM model: {model_str} "

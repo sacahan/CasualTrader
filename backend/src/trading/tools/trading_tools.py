@@ -6,6 +6,7 @@ from agents import function_tool, Tool
 from agents.mcp import MCPServerStdio
 
 from common.logger import logger
+from common.enums import TransactionStatus
 
 
 # 頂層交易記錄函數
@@ -56,7 +57,7 @@ async def record_trade(
             total_amount=total_amount,
             commission=commission,
             decision_reason=decision_reason,
-            status="COMPLETED",  # 假設交易立即完成
+            status=TransactionStatus.EXECUTED,  # 假設交易立即完成
         )
 
         # 🔄 自動更新持股明細
@@ -283,7 +284,12 @@ def create_trading_tools(
 
                 if data.get("success"):
                     trading_data = data.get("data", {})
-                    return f"✅ 模擬買入成功：{trading_data.get('symbol')} {trading_data.get('quantity')} 股 @ {trading_data.get('price')} 元，總金額：{trading_data.get('total_amount'):,.2f} 元"
+                    price = trading_data.get("price") or "市價"
+                    total_amount = trading_data.get("total_amount")
+                    total_amount_str = (
+                        f"{total_amount:,.2f}" if total_amount is not None else "0.00"
+                    )
+                    return f"✅ 模擬買入成功：{trading_data.get('symbol')} {trading_data.get('quantity')} 股 @ {price} 元，總金額：{total_amount_str} 元"
                 else:
                     error = data.get("error", "未知錯誤")
                     return f"❌ 模擬買入失敗：{error}"
@@ -339,7 +345,12 @@ def create_trading_tools(
 
                 if data.get("success"):
                     trading_data = data.get("data", {})
-                    return f"✅ 模擬賣出成功：{trading_data.get('symbol')} {trading_data.get('quantity')} 股 @ {trading_data.get('price')} 元，總金額：{trading_data.get('total_amount'):,.2f} 元"
+                    price = trading_data.get("price") or "市價"
+                    total_amount = trading_data.get("total_amount")
+                    total_amount_str = (
+                        f"{total_amount:,.2f}" if total_amount is not None else "0.00"
+                    )
+                    return f"✅ 模擬賣出成功：{trading_data.get('symbol')} {trading_data.get('quantity')} 股 @ {price} 元，總金額：{total_amount_str} 元"
                 else:
                     error = data.get("error", "未知錯誤")
                     return f"❌ 模擬賣出失敗：{error}"

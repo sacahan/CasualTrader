@@ -44,17 +44,19 @@ async def test_market_indices():
 
     try:
         async with create_mcp_market_client() as client:
-            result = await client.get_market_indices(category="major", count=5, format="simple")
+            result = await client.get_market_indices()
 
             if result.get("success"):
                 logger.success("✅ 市場指數獲取成功！")
                 data = result.get("data", [])
-                logger.info(f"獲取到 {len(data)} 個指數")
-
-                for idx in data[:3]:  # 顯示前 3 個
-                    logger.info(
-                        f"  - {idx.get('index_name')}: {idx.get('current_value')} ({idx.get('change_percent')}%)"
-                    )
+                if isinstance(data, list):
+                    logger.info(f"獲取到 {len(data)} 個指數")
+                    for idx in data[:3]:  # 顯示前 3 個
+                        logger.info(
+                            f"  - {idx.get('index_name')}: {idx.get('current_value')} ({idx.get('change_percent')}%)"
+                        )
+                else:
+                    logger.info(f"指數數據: {data}")
             else:
                 logger.error(f"❌ 失敗: {result.get('error')}")
 

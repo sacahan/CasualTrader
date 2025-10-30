@@ -7,11 +7,11 @@ Contract 測試的共用 fixtures
 import pytest
 import sys
 from pathlib import Path
+from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
+from sqlalchemy.orm import sessionmaker
 
 sys.path.insert(0, str(Path(__file__).parent.parent.parent / "src"))
 
-from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
-from sqlalchemy.orm import sessionmaker
 from database.models import Base
 
 

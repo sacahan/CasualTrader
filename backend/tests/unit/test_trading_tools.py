@@ -1,24 +1,15 @@
 #!/usr/bin/env python3
-"""
-測試交易工具功能
-"""
-
 import asyncio
 import sys
-import importlib.util
 from pathlib import Path
 
 # 添加 src 目錄到 Python 路徑
 backend_src = Path(__file__).parent.parent.parent / "src"
 sys.path.insert(0, str(backend_src))
 
-# 直接導入模組文件，避免循環導入
-spec = importlib.util.spec_from_file_location(
-    "trading_agent", str(backend_src / "trading" / "trading_agent.py")
-)
-trading_agent_module = importlib.util.module_from_spec(spec)
-spec.loader.exec_module(trading_agent_module)
-TradingAgent = trading_agent_module.TradingAgent
+from trading.trading_agent import TradingAgent  # noqa: E402
+
+"""測試交易工具功能"""
 
 
 def test_trading_agent_creation():
