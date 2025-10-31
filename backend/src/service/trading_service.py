@@ -84,7 +84,7 @@ class TradingService:
 
         Args:
             agent_id: Agent ID
-            mode: 執行模式 (OBSERVATION/TRADING/REBALANCING)
+            mode: 執行模式 (TRADING/REBALANCING)
             max_turns: 最大輪數（可選）
             session_id: 既存的 session ID（可選）。如果提供，使用該 session 而不創建新的
 

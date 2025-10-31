@@ -53,7 +53,6 @@ class TradingMode(str, Enum):
 
     TRADING = "TRADING"  # 正常交易
     REBALANCING = "REBALANCING"  # 資產再平衡
-    OBSERVATION = "OBSERVATION"  # 觀察中
 
 
 class EnabledTools(BaseModel):

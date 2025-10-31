@@ -29,12 +29,13 @@ class AgentStatus(str, Enum):
 class AgentMode(str, Enum):
     """Agent 交易模式枚舉
 
-    決定 Agent 的行為模式。
+    決定 Agent 的行為模式：
+    - TRADING: 尋找和執行交易機會
+    - REBALANCING: 調整投資組合配置
     """
 
     TRADING = "TRADING"  # 尋找和執行交易機會
     REBALANCING = "REBALANCING"  # 調整投資組合配置
-    OBSERVATION = "OBSERVATION"  # 監控市場但不交易
 
 
 # ==========================================

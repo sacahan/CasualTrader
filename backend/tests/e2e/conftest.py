@@ -57,5 +57,5 @@ def mock_api_response():
     """Common mock responses for API calls"""
     return {
         "success": True,
-        "data": {"agent_id": "test-agent", "mode": "OBSERVATION", "result": {}},
+        "data": {"agent_id": "test-agent", "mode": "TRADING", "result": {}},
     }

@@ -26,7 +26,7 @@ class AgentState(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     name: str
     status: AgentStatus = AgentStatus.INACTIVE
-    current_mode: AgentMode = AgentMode.OBSERVATION
+    current_mode: AgentMode = AgentMode.TRADING
     config: AgentConfig
 
     # 狀態資訊

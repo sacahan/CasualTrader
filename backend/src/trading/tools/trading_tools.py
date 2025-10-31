@@ -218,7 +218,11 @@ async def get_portfolio_status(agent_service, agent_id: str) -> str:
 
 
 def create_trading_tools(
-    agent_service, agent_id: str, casual_market_mcp: MCPServerStdio
+    agent_service,
+    agent_id: str,
+    casual_market_mcp: MCPServerStdio,
+    include_buy_sell: bool = True,
+    include_portfolio: bool = True,
 ) -> list[Tool]:
     """
     創建交易工具的工廠函數
@@ -227,6 +231,8 @@ def create_trading_tools(
         agent_service: Agent 服務實例
         agent_id: Agent ID
         casual_market_mcp: Casual Market MCP 實例（可選，用於模擬交易）
+        include_buy_sell: 是否包含買賣交易工具 (默認: True)
+        include_portfolio: 是否包含投資組合工具 (默認: True)
 
     Returns:
         交易工具列表
@@ -469,10 +475,22 @@ def create_trading_tools(
             logger.error(f"模擬賣出失敗: {e}", exc_info=True)
             raise
 
-    # 將模擬交易工具加入列表
-    return [
-        record_trade_tool,
-        get_portfolio_status_tool,
-        buy_taiwan_stock_tool,
-        sell_taiwan_stock_tool,
-    ]
+    # 根據配置動態構建工具列表
+    tools = []
+
+    # 投資組合工具（兩種模式都需要）
+    if include_portfolio:
+        tools.append(record_trade_tool)
+        tools.append(get_portfolio_status_tool)
+
+    # 買賣交易工具（僅 TRADING 模式）
+    if include_buy_sell:
+        tools.append(buy_taiwan_stock_tool)
+        tools.append(sell_taiwan_stock_tool)
+
+    logger.info(
+        f"Trading tools created: {len(tools)} tool(s) "
+        f"(Portfolio: {include_portfolio}, BuySell: {include_buy_sell})"
+    )
+
+    return tools

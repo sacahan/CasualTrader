@@ -92,7 +92,7 @@ class Agent(Base):
 
     # Agent 狀態 (使用統一的 Enum)
     status: Mapped[AgentStatus] = mapped_column(String(20), default=AgentStatus.INACTIVE)
-    current_mode: Mapped[AgentMode] = mapped_column(String(30), default=AgentMode.OBSERVATION)
+    current_mode: Mapped[AgentMode] = mapped_column(String(30), default=AgentMode.TRADING)
 
     # JSON 配置欄位
     investment_preferences: Mapped[str | None] = mapped_column(Text)
@@ -392,7 +392,5 @@ def validate_agent_mode(mode: str) -> AgentMode | None:
             return AgentMode.TRADING
         case "REBALANCING":
             return AgentMode.REBALANCING
-        case "OBSERVATION":
-            return AgentMode.OBSERVATION
         case _:
             return None

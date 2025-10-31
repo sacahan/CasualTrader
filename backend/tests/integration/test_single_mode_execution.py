@@ -60,9 +60,7 @@ class TestConcurrentExecutionDetection:
         ):
             # 嘗試並發執行應該拋出 AgentBusyError
             with pytest.raises(AgentBusyError):
-                await trading_service.execute_single_mode(
-                    agent_id=agent_id, mode=AgentMode.OBSERVATION
-                )
+                await trading_service.execute_single_mode(agent_id=agent_id, mode=AgentMode.TRADING)
 
     @pytest.mark.asyncio
     async def test_agent_busy_different_modes(self, trading_service):
@@ -82,9 +80,7 @@ class TestConcurrentExecutionDetection:
         ):
             # 嘗試觀察模式 - 應被拒絕
             with pytest.raises(AgentBusyError):
-                await trading_service.execute_single_mode(
-                    agent_id=agent_id, mode=AgentMode.OBSERVATION
-                )
+                await trading_service.execute_single_mode(agent_id=agent_id, mode=AgentMode.TRADING)
 
 
 class TestResourceCleanup:
@@ -94,7 +90,7 @@ class TestResourceCleanup:
     async def test_active_agents_tracking(self, trading_service):
         """測試：執行期間 Agent 添加到 active_agents"""
         agent_id = "agent-test-003"
-        mode = AgentMode.OBSERVATION
+        mode = AgentMode.TRADING
 
         # Mock 必要的服務
         mock_agent_config = MagicMock()
@@ -207,7 +203,7 @@ class TestAgentModes:
 
     def test_all_modes_available(self):
         """測試：所有預期的模式都在 AgentMode 中"""
-        expected_modes = {"OBSERVATION", "TRADING", "REBALANCING"}
+        expected_modes = {"TRADING", "TRADING", "REBALANCING"}
         actual_modes = {mode.value for mode in AgentMode}
 
         assert expected_modes.issubset(
@@ -216,7 +212,7 @@ class TestAgentModes:
 
     def test_mode_enum_values(self):
         """測試：模式的字符串值正確"""
-        assert AgentMode.OBSERVATION.value == "OBSERVATION"
+        assert AgentMode.TRADING.value == "TRADING"
         assert AgentMode.TRADING.value == "TRADING"
         assert AgentMode.REBALANCING.value == "REBALANCING"
 

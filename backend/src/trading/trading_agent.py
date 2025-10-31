@@ -33,6 +33,10 @@ from .tools.sentiment_agent import get_sentiment_agent
 from .tools.fundamental_agent import get_fundamental_agent
 from .tools.risk_agent import get_risk_agent
 from .tools.trading_tools import create_trading_tools, get_portfolio_status
+from .tools.memory_tools import (
+    load_execution_memory,
+    save_execution_memory,
+)
 
 from common.enums import AgentStatus, AgentMode
 from common.logger import logger
@@ -46,6 +50,7 @@ from service.agents_service import (
 from agents.extensions.models.litellm_model import LitellmModel
 
 from database.models import Agent as AgentConfig
+from .tool_config import ToolConfig, ToolRequirements
 
 load_dotenv()
 
@@ -128,9 +133,12 @@ class TradingAgent:
 
         logger.info(f"TradingAgent created: {agent_id}")
 
-    async def initialize(self) -> None:
+    async def initialize(self, mode: AgentMode | None = None) -> None:
         """
         初始化 Agent（載入配置、創建 SDK Agent、載入 Sub-agents）
+
+        Args:
+            mode: Agent 執行模式。若為 None，使用 agent_config.current_mode
 
         Raises:
             AgentNotFoundError: Agent 不存在於資料庫
@@ -148,29 +156,38 @@ class TradingAgent:
                 f"Agent config must be set before initialization for {self.agent_id}"
             )
 
+        # 確定執行模式
+        execution_mode = mode or self.agent_config.current_mode or AgentMode.TRADING
+
         try:
+            # 獲取該模式的工具配置
+            tool_requirements = ToolConfig.get_requirements(execution_mode)
+            logger.info(
+                f"Initializing agent with mode: {execution_mode.value} | {tool_requirements}"
+            )
+
             # 1. 初始化 MCP Servers
-            await self._setup_mcp_servers()
+            await self._setup_mcp_servers(tool_requirements)
 
             # 2. 初始化 OpenAI Tools
-            self.openai_tools = self._setup_openai_tools()
+            self.openai_tools = self._setup_openai_tools(tool_requirements)
 
             # 3. 初始化 Trading Tools
-            self.trading_tools = self._setup_trading_tools()
+            self.trading_tools = self._setup_trading_tools(tool_requirements)
 
             # 4. 創建 LiteLLM 模型
             self.llm_model, self.extra_headers = await self._create_llm_model()
 
-            # 5. 載入 Sub-agents (從 tools/ 目錄，傳入共享配置)
-            self.subagent_tools = await self._load_subagents_as_tools()
+            # 5. 載入 Sub-agents (根據工具配置)
+            self.subagent_tools = await self._load_subagents_as_tools(tool_requirements)
 
-            # 6. 合併所有 tools (不包括 OpenAI 內建工具)
+            # 6. 合併所有 tools
             all_tools = self.trading_tools + self.subagent_tools
 
             # 7. 創建 OpenAI Agent（使用 LiteLLM 模型）
             # GitHub Copilot 不支援 tool_choice 參數
             model_settings_dict = {
-                "include_usage": True,  # 追蹤使用數據
+                "include_usage": True,
             }
 
             # 只有非 GitHub Copilot 模型才支援 tool_choice
@@ -200,7 +217,7 @@ class TradingAgent:
             self.is_initialized = True
             logger.info(
                 f"Agent initialized successfully: {self.agent_id} "
-                f"(model: {self.agent_config.ai_model})"
+                f"(mode: {execution_mode.value}, model: {self.agent_config.ai_model})"
             )
 
         except (AgentNotFoundError, AgentConfigurationError):
@@ -209,72 +226,75 @@ class TradingAgent:
             logger.error(f"Failed to initialize agent {self.agent_id}: {e}", exc_info=True)
             raise AgentInitializationError(f"Agent initialization failed: {str(e)}")
 
-    async def _setup_mcp_servers(self):
+    async def _setup_mcp_servers(self, tool_requirements: ToolRequirements):
         """
-        初始化 MCP 伺服器並註冊到 exit stack
+        初始化 MCP 伺服器並根據工具配置有條件地載入
+
+        Args:
+            tool_requirements: 工具需求配置
 
         Raises:
             Exception: 初始化失敗
         """
         try:
-            # Casual Market MCP Server
-            self.casual_market_mcp = await self._exit_stack.enter_async_context(
-                MCPServerStdio(
-                    name="casual_market_mcp",
-                    params={
-                        "command": "uvx",
-                        "args": [
-                            "--from",
-                            "/Users/sacahan/Documents/workspace/CasualMarket",
-                            "casual-market-mcp",
-                        ],
-                        "env": {"MARKET_MCP_RATE_LIMITING_ENABLED": "false"},
-                    },
-                    client_session_timeout_seconds=DEFAULT_AGENT_TIMEOUT,
+            # Casual Market MCP Server (兩種模式都需要)
+            if tool_requirements.include_casual_market_mcp:
+                self.casual_market_mcp = await self._exit_stack.enter_async_context(
+                    MCPServerStdio(
+                        name="casual_market_mcp",
+                        params={
+                            "command": "uvx",
+                            "args": [
+                                "--from",
+                                "/Users/sacahan/Documents/workspace/CasualMarket",
+                                "casual-market-mcp",
+                            ],
+                            "env": {"MARKET_MCP_RATE_LIMITING_ENABLED": "false"},
+                        },
+                        client_session_timeout_seconds=DEFAULT_AGENT_TIMEOUT,
+                    )
                 )
-            )
-            logger.info("casual_market_mcp server initialized")
+                logger.info("casual_market_mcp server initialized")
 
-            # 構建絕對路徑以確保資料庫文件位置正確
-            memory_db_path = os.path.join(
-                os.path.dirname(os.path.dirname(os.path.dirname(__file__))),
-                "memory",
-                f"{self.agent_id}.db",
-            )
-            # 確保 memory 目錄存在
-            os.makedirs(os.path.dirname(memory_db_path), exist_ok=True)
-
-            # Memory MCP Server
-            self.memory_mcp = await self._exit_stack.enter_async_context(
-                MCPServerStdio(
-                    name="memory_mcp",
-                    params={
-                        "command": "npx",
-                        "args": ["-y", "mcp-memory-libsql"],
-                        "env": {"LIBSQL_URL": f"file:{memory_db_path}"},
-                    },
-                    client_session_timeout_seconds=DEFAULT_AGENT_TIMEOUT,
+            # Memory MCP Server (兩種模式都需要)
+            if tool_requirements.include_memory_mcp:
+                memory_db_path = os.path.join(
+                    os.path.dirname(os.path.dirname(os.path.dirname(__file__))),
+                    "memory",
+                    f"{self.agent_id}.db",
                 )
-            )
-            logger.info(f"memory_mcp server initialized (db: {memory_db_path})")
+                os.makedirs(os.path.dirname(memory_db_path), exist_ok=True)
 
-            # Tavily MCP Server
-            self.tavily_mcp = await self._exit_stack.enter_async_context(
-                MCPServerStdio(
-                    name="tavily_mcp",
-                    params={
-                        "command": "npx",
-                        "args": ["-y", "tavily-mcp@latest"],
-                        "env": {"TAVILY_API_KEY": f"{TAVILY_API_KEY}"},
-                    },
-                    client_session_timeout_seconds=DEFAULT_AGENT_TIMEOUT,
+                self.memory_mcp = await self._exit_stack.enter_async_context(
+                    MCPServerStdio(
+                        name="memory_mcp",
+                        params={
+                            "command": "npx",
+                            "args": ["-y", "mcp-memory-libsql"],
+                            "env": {"LIBSQL_URL": f"file:{memory_db_path}"},
+                        },
+                        client_session_timeout_seconds=DEFAULT_AGENT_TIMEOUT,
+                    )
                 )
-            )
-            logger.info("tavily_mcp server initialized")
+                logger.info(f"memory_mcp server initialized (db: {memory_db_path})")
+
+            # Tavily MCP Server (僅 TRADING 模式)
+            if tool_requirements.include_tavily_mcp:
+                self.tavily_mcp = await self._exit_stack.enter_async_context(
+                    MCPServerStdio(
+                        name="tavily_mcp",
+                        params={
+                            "command": "npx",
+                            "args": ["-y", "tavily-mcp@latest"],
+                            "env": {"TAVILY_API_KEY": f"{TAVILY_API_KEY}"},
+                        },
+                        client_session_timeout_seconds=DEFAULT_AGENT_TIMEOUT,
+                    )
+                )
+                logger.info("tavily_mcp server initialized")
 
         except Exception as e:
             logger.warning(f"Failed to initialize MCP server: {e}")
-            # 如果初始化失敗，清理已創建的資源
             if self._exit_stack:
                 await self._exit_stack.aclose()
                 self._exit_stack = None
@@ -353,53 +373,86 @@ class TradingAgent:
         # return LitellmModel(model=model_str, api_key=api_key), extra_headers
         return LitellmModel(model=model_str), extra_headers
 
-    def _setup_openai_tools(self) -> list[Any]:
-        """設置 OpenAI 內建工具（根據資料庫配置）"""
-        # ✅ 正確配置方式（基於測試驗證）
+    def _setup_openai_tools(self, tool_requirements: ToolRequirements) -> list[Any]:
+        """
+        根據工具配置設置 OpenAI 內建工具
 
-        # WebSearchTool: 提供網路搜尋功能
-        web_search_tool = WebSearchTool(
-            user_location=None,  # 可選：用戶位置，用於本地化搜尋結果
-            filters=None,  # 可選：搜尋過濾器
-            search_context_size="medium",  # 搜尋上下文大小：'low'、'medium'、'high'
-        )
+        Args:
+            tool_requirements: 工具需求配置
 
-        # CodeInterpreterTool: 提供程式碼執行功能
-        # 必須指定 type 和 container 設置，container.type 必須為 "auto"
-        code_interpreter_tool = CodeInterpreterTool(
-            tool_config={
-                "type": "code_interpreter",
-                "container": {
-                    "type": "auto"  # OpenAI 自動選擇最適合的容器
-                },
-            }
-        )
+        Returns:
+            OpenAI 工具列表
+        """
+        tools = []
 
-        tools = [web_search_tool, code_interpreter_tool]
+        # WebSearchTool: 搜尋功能 (TRADING 模式需要)
+        if tool_requirements.include_web_search:
+            web_search_tool = WebSearchTool(
+                user_location=None,
+                filters=None,
+                search_context_size="medium",
+            )
+            tools.append(web_search_tool)
+            logger.debug("WebSearchTool included")
+
+        # CodeInterpreterTool: 程式碼執行功能 (兩種模式都需要)
+        if tool_requirements.include_code_interpreter:
+            code_interpreter_tool = CodeInterpreterTool(
+                tool_config={
+                    "type": "code_interpreter",
+                    "container": {"type": "auto"},
+                }
+            )
+            tools.append(code_interpreter_tool)
+            logger.debug("CodeInterpreterTool included")
+
         logger.debug(
-            "OpenAI tools configured: WebSearchTool(context=medium), CodeInterpreterTool(container=auto)"
+            f"OpenAI tools configured: {len(tools)} tool(s) "
+            f"(WebSearch: {tool_requirements.include_web_search}, "
+            f"CodeInterpreter: {tool_requirements.include_code_interpreter})"
         )
 
         return tools
 
-    def _setup_trading_tools(self) -> list[Tool]:
-        """設置交易相關工具"""
+    def _setup_trading_tools(self, tool_requirements: ToolRequirements) -> list[Tool]:
+        """
+        根據工具配置設置交易相關工具
 
+        Args:
+            tool_requirements: 工具需求配置
+
+        Returns:
+            交易工具列表
+        """
         return create_trading_tools(
-            self.agent_service, self.agent_id, casual_market_mcp=self.casual_market_mcp
+            self.agent_service,
+            self.agent_id,
+            casual_market_mcp=self.casual_market_mcp,
+            include_buy_sell=tool_requirements.include_buy_sell_tools,
+            include_portfolio=tool_requirements.include_portfolio_tools,
         )
 
-    async def _load_subagents_as_tools(self) -> list[Tool]:
-        """載入 Sub-agents (從 tools/ 目錄，根據資料庫配置）"""
+    async def _load_subagents_as_tools(self, tool_requirements: ToolRequirements) -> list[Tool]:
+        """
+        根據工具配置載入 Sub-agents
+
+        Args:
+            tool_requirements: 工具需求配置
+
+        Returns:
+            Sub-agent 工具列表
+        """
         tools = []
 
         try:
-            # 統一的 subagent 配置參數
-            # 注意：不傳遞 openai_tools，因為 WebSearchTool 和 CodeInterpreterTool
-            # 只支援 OpenAI Responses API，不支援 ChatCompletions API
-            # Sub-agents 使用 LitellmModel 呼叫 ChatCompletions API，
-            # 因此只能使用自訂工具，不能使用託管工具
-            mcp_servers = [self.memory_mcp, self.casual_market_mcp, self.tavily_mcp]
+            # 構建 MCP servers 列表，根據配置動態包含
+            mcp_servers = []
+            if tool_requirements.include_memory_mcp and self.memory_mcp:
+                mcp_servers.append(self.memory_mcp)
+            if tool_requirements.include_casual_market_mcp and self.casual_market_mcp:
+                mcp_servers.append(self.casual_market_mcp)
+            if tool_requirements.include_tavily_mcp and self.tavily_mcp:
+                mcp_servers.append(self.tavily_mcp)
 
             subagent_config = {
                 "llm_model": self.llm_model,
@@ -407,114 +460,114 @@ class TradingAgent:
                 "mcp_servers": mcp_servers,  # 共享 MCP servers（動態構建）
             }
 
-            # 生成所有 Sub-agents
-            try:
-                technical_agent = await get_technical_agent(**subagent_config)
-                if technical_agent:
-                    tool = technical_agent.as_tool(
-                        tool_name="technical_analyst",
-                        tool_description="""
+            # 技術分析 Agent (兩種模式都需要)
+            if tool_requirements.include_technical_agent:
+                try:
+                    technical_agent = await get_technical_agent(**subagent_config)
+                    if technical_agent:
+                        tool = technical_agent.as_tool(
+                            tool_name="technical_analyst",
+                            tool_description="""
 • 技術分析專家
     - 進行技術指標分析（MA, RSI, MACD, KD, 布林帶等）
     - 識別圖表型態和趨勢
     - 提供買賣點建議
-                        """,
-                        max_turns=DEFAULT_MAX_TURNS,
-                    )
-                    if tool:
-                        tools.append(tool)
-                        logger.info("技術分析 Sub Agent Tool 載入成功")
+                            """,
+                            max_turns=DEFAULT_MAX_TURNS,
+                        )
+                        if tool:
+                            tools.append(tool)
+                            logger.info("技術分析 Sub Agent Tool 載入成功")
+                        else:
+                            logger.error("技術分析 agent.as_tool() 返回 None")
+                        save_agent_graph(technical_agent, "technical_agent", None)
                     else:
-                        logger.error("技術分析 agent.as_tool() 返回 None")
+                        logger.error("get_technical_agent() 返回 None")
+                except Exception as e:
+                    logger.warning(f"技術分析 agent 載入失敗: {e}", exc_info=True)
 
-                    # 繪製 Sub-Agent 圖形
-                    save_agent_graph(technical_agent, "technical_agent", None)
-                else:
-                    logger.error("get_technical_agent() 返回 None")
-            except Exception as e:
-                logger.warning(f"技術分析 agent 載入失敗: {e}", exc_info=True)
-
-            try:
-                sentiment_agent = await get_sentiment_agent(**subagent_config)
-                if sentiment_agent:
-                    tool = sentiment_agent.as_tool(
-                        tool_name="sentiment_analyst",
-                        tool_description="""
+            # 情緒分析 Agent (僅 TRADING 模式)
+            if tool_requirements.include_sentiment_agent:
+                try:
+                    sentiment_agent = await get_sentiment_agent(**subagent_config)
+                    if sentiment_agent:
+                        tool = sentiment_agent.as_tool(
+                            tool_name="sentiment_analyst",
+                            tool_description="""
 • 情緒分析專家
     - 分析市場情緒和投資人心理
     - 追蹤社交媒體和新聞輿論
     - 評估市場氛圍對股價的影響
-                            """,
-                        max_turns=DEFAULT_MAX_TURNS,
-                    )
-                    if tool:
-                        tools.append(tool)
-                        logger.info("情緒分析 Sub Agent Tool 載入成功")
+                                """,
+                            max_turns=DEFAULT_MAX_TURNS,
+                        )
+                        if tool:
+                            tools.append(tool)
+                            logger.info("情緒分析 Sub Agent Tool 載入成功")
+                        else:
+                            logger.error("情緒分析 agent.as_tool() 返回 None")
+                        save_agent_graph(sentiment_agent, "sentiment_agent", None)
                     else:
-                        logger.error("情緒分析 agent.as_tool() 返回 None")
+                        logger.error("get_sentiment_agent() 返回 None")
+                except Exception as e:
+                    logger.warning(f"情緒分析 agent 載入失敗: {e}", exc_info=True)
 
-                    # 繪製 Sub-Agent 圖形
-                    save_agent_graph(sentiment_agent, "sentiment_agent", None)
-                else:
-                    logger.error("get_sentiment_agent() 返回 None")
-            except Exception as e:
-                logger.warning(f"情緒分析 agent 載入失敗: {e}", exc_info=True)
-
-            try:
-                fundamental_agent = await get_fundamental_agent(**subagent_config)
-                if fundamental_agent:
-                    tool = fundamental_agent.as_tool(
-                        tool_name="fundamental_analyst",
-                        tool_description="""
+            # 基本面分析 Agent (僅 TRADING 模式)
+            if tool_requirements.include_fundamental_agent:
+                try:
+                    fundamental_agent = await get_fundamental_agent(**subagent_config)
+                    if fundamental_agent:
+                        tool = fundamental_agent.as_tool(
+                            tool_name="fundamental_analyst",
+                            tool_description="""
 • 基本面分析專家
     - 研究公司財務報表和營運狀況
     - 評估本益比、股價淨值比等估值指標
     - 分析產業競爭力和成長潛力
-                            """,
-                        max_turns=DEFAULT_MAX_TURNS,
-                    )
-                    if tool:
-                        tools.append(tool)
-                        logger.info("基本面分析 Sub Agent Tool 載入成功")
+                                """,
+                            max_turns=DEFAULT_MAX_TURNS,
+                        )
+                        if tool:
+                            tools.append(tool)
+                            logger.info("基本面分析 Sub Agent Tool 載入成功")
+                        else:
+                            logger.error("基本面分析 agent.as_tool() 返回 None")
+                        save_agent_graph(fundamental_agent, "fundamental_agent", None)
                     else:
-                        logger.error("基本面分析 agent.as_tool() 返回 None")
+                        logger.error("get_fundamental_agent() 返回 None")
+                except Exception as e:
+                    logger.warning(f"基本面分析 agent 載入失敗: {e}", exc_info=True)
 
-                    # 繪製 Sub-Agent 圖形
-                    save_agent_graph(fundamental_agent, "fundamental_agent", None)
-                else:
-                    logger.error("get_fundamental_agent() 返回 None")
-            except Exception as e:
-                logger.warning(f"基本面分析 agent 載入失敗: {e}", exc_info=True)
-
-            try:
-                risk_agent = await get_risk_agent(**subagent_config)
-                if risk_agent:
-                    tool = risk_agent.as_tool(
-                        tool_name="risk_analyst",
-                        tool_description="""
+            # 風險評估 Agent (兩種模式都需要)
+            if tool_requirements.include_risk_agent:
+                try:
+                    risk_agent = await get_risk_agent(**subagent_config)
+                    if risk_agent:
+                        tool = risk_agent.as_tool(
+                            tool_name="risk_analyst",
+                            tool_description="""
 • 風險評估專家
     - 評估投資風險和波動性
     - 計算風險調整後報酬
     - 提供資產配置和避險建議
-                            """,
-                        max_turns=DEFAULT_MAX_TURNS,
-                    )
-                    if tool:
-                        tools.append(tool)
-                        logger.info("風險評估 Sub Agent Tool 載入成功")
+                                """,
+                            max_turns=DEFAULT_MAX_TURNS,
+                        )
+                        if tool:
+                            tools.append(tool)
+                            logger.info("風險評估 Sub Agent Tool 載入成功")
+                        else:
+                            logger.error("風險評估 agent.as_tool() 返回 None")
+                        save_agent_graph(risk_agent, "risk_agent", None)
                     else:
-                        logger.error("風險評估 agent.as_tool() 返回 None")
-
-                    # 繪製 Sub-Agent 圖形
-                    save_agent_graph(risk_agent, "risk_agent", None)
-                else:
-                    logger.error("get_risk_agent() 返回 None")
-            except Exception as e:
-                logger.warning(f"風險評估 agent 載入失敗: {e}", exc_info=True)
+                        logger.error("get_risk_agent() 返回 None")
+                except Exception as e:
+                    logger.warning(f"風險評估 agent 載入失敗: {e}", exc_info=True)
 
         except Exception as e:
             logger.error(f"載入 sub-agents 時發生錯誤: {e}")
 
+        logger.info(f"Sub-agents loaded: {len(tools)} agent(s)")
         return tools
 
     async def run(
@@ -523,7 +576,12 @@ class TradingAgent:
         context: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         """
-        執行 Agent 任務
+        執行 Agent 任務（含記憶體工作流程）
+
+        工作流程：
+        1. 執行前：加載過往記憶體和決策
+        2. 執行中：分析、決策、執行、記錄
+        3. 執行後：保存本次決策並規劃下一步
 
         Args:
             mode: 執行模式
@@ -551,8 +609,8 @@ class TradingAgent:
         if not self.agent_config:
             raise AgentConfigurationError(f"Agent config not set for {self.agent_id}")
 
-        # 使用預設模式或指定模式
-        execution_mode = mode or self.agent_config.current_mode or AgentMode.OBSERVATION
+        # 使用預設模式或指定模式，默認為 TRADING
+        execution_mode = mode or self.agent_config.current_mode or AgentMode.TRADING
 
         logger.info(
             f"Starting agent execution: {self.agent_id} "
@@ -565,24 +623,43 @@ class TradingAgent:
                 self.agent_id, AgentStatus.ACTIVE, execution_mode
             )
 
+            # === Phase 1: 執行前 - 加載記憶體 ===
+            execution_memory = await self._load_execution_memory()
+            logger.info(
+                f"Loaded execution memory: {len(execution_memory.get('past_decisions', []))} past decisions"
+            )
+
             # 生成 trace ID 並執行
             trace_id = gen_trace_id()
             with trace(workflow_name=f"TradingAgent-{self.agent_id}", trace_id=trace_id):
-                # 構建任務提示（可以根據 mode 調整）
-                task_prompt = await self._build_task_prompt(execution_mode, context)
+                # === Phase 2: 構建任務提示（融入記憶體） ===
+                task_prompt = await self._build_task_prompt(
+                    execution_mode, context, execution_memory
+                )
 
-                # 執行 Agent
+                # === Phase 3: 執行 Agent ===
                 result = await Runner.run(self.agent, task_prompt, max_turns=DEFAULT_MAX_TURNS)
 
                 logger.info(
                     f"*** Agent {self.agent_id} execution completed: {result} (trace_id: {trace_id}) ***"
                 )
 
+                # === Phase 4: 執行後 - 保存記憶體 ===
+                await self._save_execution_memory(
+                    execution_result=result.final_output,
+                    execution_memory=execution_memory,
+                )
+
+                # === Phase 5: 規劃下一步 ===
+                next_steps = await self._plan_next_steps(result.final_output)
+                logger.info(f"Planned next steps: {next_steps}")
+
                 return {
                     "success": True,
                     "output": result.final_output,
                     "trace_id": trace_id,
                     "mode": execution_mode.value if execution_mode else "unknown",
+                    "next_steps": next_steps,
                 }
 
         except Exception as e:
@@ -651,13 +728,19 @@ class TradingAgent:
 
         return instructions.strip()
 
-    async def _build_task_prompt(self, mode: AgentMode, context: dict[str, Any] | None) -> str:
+    async def _build_task_prompt(
+        self,
+        mode: AgentMode,
+        context: dict[str, Any] | None,
+        execution_memory: dict[str, Any] | None = None,
+    ) -> str:
         """
-        根據執行模式構建任務提示
+        根據執行模式構建任務提示（融入記憶體上下文）
 
         Args:
             mode: 執行模式
             context: 額外上下文
+            execution_memory: 執行記憶體（含過往決策）
 
         Returns:
             完整的任務提示
@@ -665,6 +748,19 @@ class TradingAgent:
 
         # 獲取投資組合狀態（現在使用 await）
         portfolio_status = await get_portfolio_status(self.agent_service, self.agent_id)
+
+        # 構建記憶體上下文（如果存在）
+        memory_context = ""
+        if execution_memory and execution_memory.get("past_decisions"):
+            past_decisions = execution_memory["past_decisions"][:3]  # 最近 3 個決策
+            memory_context = "\n\n**📚 過往決策參考：**\n"
+            for i, decision in enumerate(past_decisions, 1):
+                memory_context += (
+                    f"\n{i}. {decision.get('date', 'N/A')} - {decision.get('action', 'N/A')}\n"
+                )
+                memory_context += f"   理由：{decision.get('reason', 'N/A')}\n"
+                if decision.get("result"):
+                    memory_context += f"   結果：{decision.get('result', 'N/A')}\n"
 
         # 根據模式添加指導
         task_prompts = {
@@ -676,6 +772,7 @@ class TradingAgent:
 ---
 {portfolio_status}
 ---
+{memory_context}
 
 可用工具：
 • 投資組合管理工具 (record_trade_tool、get_portfolio_status_tool) - 查詢投資組合狀態、記錄交易決策
@@ -697,6 +794,7 @@ class TradingAgent:
 ---
 {portfolio_status}
 ---
+{memory_context}
 
 可用工具：
 • 投資組合管理工具 (record_trade_tool、get_portfolio_status_tool) - 查詢投資組合狀態、記錄交易決策
@@ -710,26 +808,6 @@ class TradingAgent:
 • 考量交易成本和稅務影響
 • 主動將調整理由利用 memory_mcp 存入知識庫以供未來參考
 """,
-            AgentMode.OBSERVATION: f"""
-**🔍 市場觀察與機會發掘模式 (OBSERVATION MODE)**
-
-目的：研究市場機會並識別符合投資策略的潛在標的。
-
----
-{portfolio_status}
----
-
-可用工具：
-• 投資組合管理工具 (record_trade_tool、get_portfolio_status_tool) - 查詢投資組合狀態、記錄交易決策
-• memory_mcp (持久記憶工具) - 儲存和回想分析結論
-• 專業分析 Sub-Agents - technical_analyst、fundamental_analyst、sentiment_analyst、risk_analyst
-
-限制：
-• 本模式不執行交易，僅識別和研究機會
-• 識別新的投資機會必須排除已經買入的標的
-• 評估投資標的應該保持與投資主張的一致性
-• 主動將分析過程和進場條件利用 memory_mcp 存入知識庫以供未來參考
-""",
         }
 
         action_message = (
@@ -738,6 +816,84 @@ class TradingAgent:
         )
         logger.info(f"Action message for {self.agent_id}: {action_message.strip()}")
         return action_message.strip()
+
+    async def _load_execution_memory(self) -> dict[str, Any]:
+        """
+        從 memory_mcp 加載過往 3 天的執行記憶體和決策
+
+        Returns:
+            執行記憶體字典，包含 past_decisions 列表
+        """
+        return await load_execution_memory(self.memory_mcp, self.agent_id)
+
+    async def _save_execution_memory(
+        self,
+        execution_result: str,
+        execution_memory: dict[str, Any] | None = None,
+    ) -> None:
+        """
+        將本次執行結果保存到 memory_mcp
+
+        Args:
+            execution_result: 本次執行的結果
+            execution_memory: 前一個階段加載的記憶體（未直接使用）
+        """
+        mode = self.agent_config.current_mode.value if self.agent_config else None
+        await save_execution_memory(self.memory_mcp, self.agent_id, execution_result, mode=mode)
+
+    async def _plan_next_steps(self, execution_result: str) -> list[str]:
+        """
+        根據執行結果規劃下一步行動
+
+        Args:
+            execution_result: 本次執行的結果
+
+        Returns:
+            計劃的下一步行動列表
+        """
+        try:
+            next_steps = []
+
+            # 提取執行結果摘要
+            summary = self._extract_result_summary(execution_result)
+
+            # 根據結果分析下一步
+            if "成功" in summary.lower() or "success" in summary.lower():
+                next_steps.append("監視持股表現")
+                next_steps.append("準備下次定期評估")
+            elif "失敗" in summary.lower() or "error" in summary.lower():
+                next_steps.append("調查失敗原因")
+                next_steps.append("檢查市場條件")
+            else:
+                next_steps.append("繼續觀察市場")
+
+            next_steps.append("記錄本次執行到記憶體")
+
+            logger.info(f"Planned next steps: {', '.join(next_steps)}")
+            return next_steps
+
+        except Exception as e:
+            logger.error(f"Failed to plan next steps: {e}")
+            return ["重新評估市場狀況"]
+
+    def _extract_result_summary(self, result: str) -> str:
+        """
+        從執行結果中提取摘要（用於記憶體存儲）
+
+        Args:
+            result: 完整執行結果
+
+        Returns:
+            結果摘要
+        """
+        try:
+            # 簡單的摘要提取：取前 200 個字符
+            summary = result.strip()
+            if len(summary) > 200:
+                summary = summary[:200] + "..."
+            return summary
+        except Exception:
+            return "執行結果"
 
     async def stop(self) -> None:
         """

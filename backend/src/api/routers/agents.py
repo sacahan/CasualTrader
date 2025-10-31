@@ -538,7 +538,7 @@ async def switch_agent_mode(
 
     Args:
         agent_id: Agent ID
-        mode: 新模式 (TRADING/OBSERVATION/REBALANCING)
+        mode: 新模式 (TRADING/REBALANCING)
         agents_service: AgentsService 實例
 
     Returns:

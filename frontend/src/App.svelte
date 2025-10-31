@@ -77,15 +77,6 @@
     showDetailModal = true;
   }
 
-  async function handleObserveAgent(agent, mode) {
-    try {
-      await executeAgent(agent.agent_id, mode);
-      notifySuccess(`Agent ${agent.name} 已進入${getModeName(mode)}模式`);
-    } catch (error) {
-      notifyError(`${getModeName(mode)}失敗: ${error.message}`);
-    }
-  }
-
   async function handleTradeAgent(agent, mode) {
     try {
       await executeAgent(agent.agent_id, mode);
@@ -106,7 +97,6 @@
 
   function getModeName(mode) {
     const modes = {
-      OBSERVATION: '觀察',
       TRADING: '交易',
       REBALANCING: '再平衡',
     };
@@ -248,12 +238,10 @@
             onclick={handleAgentSelect}
             onedit={handleEditAgent}
             ondelete={handleDeleteAgent}
-            onobserve={handleObserveAgent}
             ontrade={handleTradeAgent}
             onrebalance={handleRebalanceAgent}
             onstop={handleStopAgent}
           />
-          <!-- 注意: performanceData 和 holdings 在詳細模態中使用 -->
         {/each}
       </div>
     {/if}

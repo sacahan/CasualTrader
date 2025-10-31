@@ -58,20 +58,20 @@ class TestE2EScenario1:
         mock_trading_service.execute_single_mode.return_value = {
             "success": True,
             "session_id": "session-001",
-            "mode": "OBSERVATION",
+            "mode": "TRADING",
             "status": "COMPLETED",
             "execution_time_ms": 1500,
         }
 
         # 執行
         result = await mock_trading_service.execute_single_mode(
-            agent_id=agent_id, mode=AgentMode.OBSERVATION
+            agent_id=agent_id, mode=AgentMode.TRADING
         )
 
         # 驗證
         assert result["success"] is True
         assert result["session_id"] == "session-001"
-        assert result["mode"] == "OBSERVATION"
+        assert result["mode"] == "TRADING"
         assert result["status"] == "COMPLETED"
         assert result["execution_time_ms"] > 0
 
@@ -93,7 +93,7 @@ class TestE2EScenario2:
         """
         agent_id = "test-agent-2"
         modes = [
-            (AgentMode.OBSERVATION, "session-201"),
+            (AgentMode.TRADING, "session-201"),
             (AgentMode.TRADING, "session-202"),
             (AgentMode.REBALANCING, "session-203"),
         ]
@@ -205,7 +205,7 @@ class TestE2EScenario4:
             {
                 "success": True,
                 "session_id": "session-401",
-                "mode": "OBSERVATION",
+                "mode": "TRADING",
                 "status": "COMPLETED",
             },
             # 第二次、第三次被拒絕（409 Agent Busy）
@@ -222,7 +222,7 @@ class TestE2EScenario4:
 
         # 第一次執行成功
         result1 = await mock_trading_service.execute_single_mode(
-            agent_id=agent_id, mode=AgentMode.OBSERVATION
+            agent_id=agent_id, mode=AgentMode.TRADING
         )
         assert result1["success"] is True
         execution_count = 1
@@ -231,7 +231,7 @@ class TestE2EScenario4:
         for _ in range(2):
             with pytest.raises(AgentBusyError):
                 await mock_trading_service.execute_single_mode(
-                    agent_id=agent_id, mode=AgentMode.OBSERVATION
+                    agent_id=agent_id, mode=AgentMode.TRADING
                 )
             execution_count += 1
 
@@ -263,11 +263,11 @@ class TestE2EIntegration:
         mock_trading_service.execute_single_mode.return_value = {
             "success": True,
             "session_id": "session-int-001",
-            "mode": "OBSERVATION",
+            "mode": "TRADING",
             "status": "COMPLETED",
         }
         result = await mock_trading_service.execute_single_mode(
-            agent_id=agent_id, mode=AgentMode.OBSERVATION
+            agent_id=agent_id, mode=AgentMode.TRADING
         )
         assert result["success"]
 
@@ -321,7 +321,7 @@ class TestResourceCleanup:
         mock_trading_service.execute_single_mode.return_value = {
             "success": True,
             "session_id": "session-cleanup",
-            "mode": "OBSERVATION",
+            "mode": "TRADING",
             "status": "COMPLETED",
         }
 
@@ -331,7 +331,7 @@ class TestResourceCleanup:
 
         # 執行
         result = await mock_trading_service.execute_single_mode(
-            agent_id=agent_id, mode=AgentMode.OBSERVATION
+            agent_id=agent_id, mode=AgentMode.TRADING
         )
         assert result["success"]
 

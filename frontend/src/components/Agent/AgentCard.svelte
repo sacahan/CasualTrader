@@ -23,7 +23,6 @@
     holdings = [],
     selected = false,
     onclick = undefined,
-    onobserve = undefined,
     ontrade = undefined,
     onrebalance = undefined,
     onstop = undefined,
@@ -246,13 +245,6 @@
     onclick?.(agent);
   }
 
-  function handleObserve(e) {
-    e.stopPropagation();
-    showRetryButton = false;
-    executionResult = null;
-    onobserve?.(agent, 'OBSERVATION');
-  }
-
   function handleTrade(e) {
     e.stopPropagation();
     showRetryButton = false;
@@ -425,39 +417,7 @@
   <div class="flex gap-2 flex-col">
     <!-- 模式選擇按鈕 -->
     {#if canStart}
-      <div class="grid grid-cols-3 gap-3">
-        <!-- 觀察按鈕 -->
-        <button
-          onclick={handleObserve}
-          disabled={!$isOpen || isExecuting}
-          class="mode-button group"
-          style="--btn-base-color: rgb({agentColor}); --btn-light-color: rgba({agentColor}, 0.8);"
-          title="觀察模式：分析市場無交易"
-        >
-          <div class="button-wrapper">
-            <svg
-              class="h-5 w-5 transition-transform duration-300 group-hover:scale-110"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-            >
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="2"
-                d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
-              />
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="2"
-                d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
-              />
-            </svg>
-            <span class="hidden sm:inline text-sm font-semibold">觀察</span>
-          </div>
-        </button>
-
+      <div class="grid grid-cols-2 gap-3">
         <!-- 交易按鈕 -->
         <button
           onclick={handleTrade}

@@ -359,7 +359,7 @@ class AgentsService:
                 current_funds=Decimal(str(initial_funds)),
                 max_position_size=Decimal(str(max_position_size)),
                 status=AgentStatus.INACTIVE,
-                current_mode=AgentMode.OBSERVATION,
+                current_mode=AgentMode.TRADING,
                 investment_preferences=preferences_json,
                 created_at=datetime.now(),
                 updated_at=datetime.now(),

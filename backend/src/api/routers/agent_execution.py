@@ -41,7 +41,6 @@ router = APIRouter()
 class AgentModeEnum(str, Enum):
     """執行模式枚舉"""
 
-    OBSERVATION = "OBSERVATION"
     TRADING = "TRADING"
     REBALANCING = "REBALANCING"
 
@@ -50,8 +49,8 @@ class StartModeRequest(BaseModel):
     """啟動單一模式執行請求"""
 
     mode: AgentModeEnum = Field(
-        default=AgentModeEnum.OBSERVATION,
-        description="執行模式: OBSERVATION | TRADING | REBALANCING",
+        default=AgentModeEnum.TRADING,
+        description="執行模式: TRADING | REBALANCING",
     )
     max_turns: int | None = Field(None, ge=1, le=50, description="最大輪數")
 
@@ -184,7 +183,7 @@ async def start_agent_mode(
 
     Args:
         agent_id: Agent ID
-        request.mode: 執行模式 (OBSERVATION | TRADING | REBALANCING)
+        request.mode: 執行模式 (TRADING | REBALANCING)
         request.max_turns: 最大輪數（可選）
 
     Returns:

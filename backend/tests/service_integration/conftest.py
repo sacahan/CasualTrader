@@ -22,5 +22,5 @@ def mock_agent_config() -> MagicMock:
     config = MagicMock()
     config.id = "test-agent"
     config.status = "INACTIVE"
-    config.current_mode = "OBSERVATION"
+    config.current_mode = "TRADING"
     return config

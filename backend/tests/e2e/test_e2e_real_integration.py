@@ -6,7 +6,7 @@
 來驗證實現層的正確性。
 
 測試場景：
-1. 執行單一模式 (OBSERVATION/TRADING/REBALANCING) - 驗證實際方法調用
+1. 執行單一模式 (TRADING/REBALANCING) - 驗證實際方法調用
 2. 驗證會話狀態更新
 3. 驗證資源清理
 4. 驗證錯誤處理
@@ -49,7 +49,7 @@ async def trading_service_with_mocks(mock_db_session):
     mock_session = MagicMock()
     mock_session.id = "session-123"
     mock_session.status = SessionStatus.COMPLETED
-    mock_session.mode = AgentMode.OBSERVATION
+    mock_session.mode = AgentMode.TRADING
 
     service.session_service.create_session = AsyncMock(return_value=mock_session)
     service.session_service.update_session_status = AsyncMock()
@@ -101,14 +101,14 @@ async def test_e2e_api_to_trading_service_call_chain():
     # 執行
     result = await service.execute_single_mode(
         agent_id="test-agent",
-        mode=AgentMode.OBSERVATION,
+        mode=AgentMode.TRADING,
     )
 
     # 驗證返回值結構
     assert result["success"] is True
     assert "session_id" in result
     assert result["session_id"] == "session-123"
-    assert result["mode"] == AgentMode.OBSERVATION.value
+    assert result["mode"] == AgentMode.TRADING.value
     assert "execution_time_ms" in result
 
     # 驗證正確的方法被調用
@@ -116,7 +116,7 @@ async def test_e2e_api_to_trading_service_call_chain():
     # 驗證使用的是 agent.run()，而不是 agent.run_mode()
     call_kwargs = mock_agent.run.call_args.kwargs
     assert "mode" in call_kwargs
-    assert call_kwargs["mode"] == AgentMode.OBSERVATION
+    assert call_kwargs["mode"] == AgentMode.TRADING
 
     # 驗證資源清理
     mock_agent.cleanup.assert_called_once()
@@ -175,7 +175,7 @@ async def test_e2e_nonexistent_agent_error():
     with pytest.raises(AgentNotFoundError):
         await service.execute_single_mode(
             agent_id="nonexistent-agent",
-            mode=AgentMode.OBSERVATION,
+            mode=AgentMode.TRADING,
         )
 
 
@@ -212,7 +212,7 @@ async def test_e2e_resource_cleanup_on_exception():
     with pytest.raises(TradingServiceError):
         await service.execute_single_mode(
             agent_id="test-agent",
-            mode=AgentMode.OBSERVATION,
+            mode=AgentMode.TRADING,
         )
 
     # 驗證 cleanup 被調用（即使發生異常）
@@ -258,13 +258,13 @@ async def test_e2e_session_lifecycle():
     # 執行
     await service.execute_single_mode(
         agent_id="test-agent",
-        mode=AgentMode.OBSERVATION,
+        mode=AgentMode.TRADING,
     )
 
     # 驗證會話創建
     service.session_service.create_session.assert_called_once_with(
         agent_id="test-agent",
-        mode=AgentMode.OBSERVATION,
+        mode=AgentMode.TRADING,
         initial_input={},
     )
 
@@ -287,10 +287,9 @@ async def test_e2e_multiple_modes_sequential():
     場景 6: 驗證順序執行多個模式
 
     驗證：
-    1. 執行 OBSERVATION
-    2. 執行 TRADING
-    3. 執行 REBALANCING
-    4. 每個模式都獲得不同的 session_id
+    1. 執行 TRADING
+    2. 執行 REBALANCING
+    3. 每個模式都獲得不同的 session_id
     """
     mock_db_session = AsyncMock()
     service = TradingService(mock_db_session)
@@ -318,7 +317,7 @@ async def test_e2e_multiple_modes_sequential():
     service.session_service.update_session_status = AsyncMock()
 
     # 執行三個模式
-    modes = [AgentMode.OBSERVATION, AgentMode.TRADING, AgentMode.REBALANCING]
+    modes = [AgentMode.TRADING, AgentMode.TRADING, AgentMode.REBALANCING]
     results = []
 
     for mode in modes:
@@ -369,7 +368,7 @@ async def test_e2e_agent_correctly_not_mocked_in_call():
     # 執行 - 如果代碼調用 agent.run_mode()，會在這裡失敗
     result = await service.execute_single_mode(
         agent_id="test-agent",
-        mode=AgentMode.OBSERVATION,
+        mode=AgentMode.TRADING,
     )
 
     # 驗證 run() 被調用
@@ -426,7 +425,7 @@ async def test_e2e_agent_initialize_must_be_called():
     # 執行 - 應該成功，因為 initialize() 被調用了
     result = await service.execute_single_mode(
         agent_id="test-agent",
-        mode=AgentMode.OBSERVATION,
+        mode=AgentMode.TRADING,
     )
 
     # 驗證 initialize() 被調用（這是修復的關鍵）

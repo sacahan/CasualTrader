@@ -38,7 +38,7 @@ class TestAPIEndpoints:
 
         # 驗證可以調用
         result = await mock_service.execute_single_mode(
-            agent_id="test-agent", mode=AgentMode.OBSERVATION
+            agent_id="test-agent", mode=AgentMode.TRADING
         )
 
         assert result["success"] is True
@@ -54,9 +54,7 @@ class TestAPIEndpoints:
 
         # 應該拋出 AgentBusyError
         with pytest.raises(AgentBusyError):
-            await mock_service.execute_single_mode(
-                agent_id="test-agent", mode=AgentMode.OBSERVATION
-            )
+            await mock_service.execute_single_mode(agent_id="test-agent", mode=AgentMode.TRADING)
 
     @pytest.mark.asyncio
     async def test_start_endpoint_agent_not_found(self):
@@ -68,9 +66,7 @@ class TestAPIEndpoints:
 
         # 應該拋出 AgentNotFoundError
         with pytest.raises(AgentNotFoundError):
-            await mock_service.execute_single_mode(
-                agent_id="nonexistent", mode=AgentMode.OBSERVATION
-            )
+            await mock_service.execute_single_mode(agent_id="nonexistent", mode=AgentMode.TRADING)
 
 
 class TestModeValidation:
@@ -78,7 +74,7 @@ class TestModeValidation:
 
     def test_valid_modes(self):
         """測試：所有有效模式"""
-        valid_modes = ["OBSERVATION", "TRADING", "REBALANCING"]
+        valid_modes = ["TRADING", "TRADING", "REBALANCING"]
 
         for mode_str in valid_modes:
             mode = AgentMode[mode_str]
@@ -98,8 +94,8 @@ class TestRequestValidation:
         from api.routers.agent_execution import StartModeRequest, AgentModeEnum
 
         # 有效請求
-        request = StartModeRequest(mode=AgentModeEnum.OBSERVATION)
-        assert request.mode == AgentModeEnum.OBSERVATION
+        request = StartModeRequest(mode=AgentModeEnum.TRADING)
+        assert request.mode == AgentModeEnum.TRADING
         assert request.max_turns is None
 
         # 帶 max_turns
@@ -113,11 +109,11 @@ class TestRequestValidation:
 
         # 無效：max_turns 太大
         with pytest.raises(ValidationError):
-            StartModeRequest(mode=AgentModeEnum.OBSERVATION, max_turns=100)
+            StartModeRequest(mode=AgentModeEnum.TRADING, max_turns=100)
 
         # 無效：max_turns 為 0
         with pytest.raises(ValidationError):
-            StartModeRequest(mode=AgentModeEnum.OBSERVATION, max_turns=0)
+            StartModeRequest(mode=AgentModeEnum.TRADING, max_turns=0)
 
 
 class TestResponseFormat:
@@ -127,11 +123,11 @@ class TestResponseFormat:
         """測試：StartModeResponse 模型"""
         from api.routers.agent_execution import StartModeResponse
 
-        response = StartModeResponse(success=True, session_id="session-123", mode="OBSERVATION")
+        response = StartModeResponse(success=True, session_id="session-123", mode="TRADING")
 
         assert response.success is True
         assert response.session_id == "session-123"
-        assert response.mode == "OBSERVATION"
+        assert response.mode == "TRADING"
 
         # 驗證可以序列化為 dict
         response_dict = response.model_dump()

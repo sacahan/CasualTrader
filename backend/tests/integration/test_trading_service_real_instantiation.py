@@ -39,7 +39,7 @@ async def test_get_or_create_agent_receives_correct_agent_service():
     mock_agent_config = MagicMock(spec=AgentConfig)
     mock_agent_config.id = "test-agent"
     mock_agent_config.status = AgentStatus.INACTIVE
-    mock_agent_config.current_mode = AgentMode.OBSERVATION
+    mock_agent_config.current_mode = AgentMode.TRADING
 
     # 驗證初始狀態
     assert len(service.active_agents) == 0
@@ -105,7 +105,7 @@ async def test_trading_agent_can_call_update_agent_status():
 
     # 驗證可以調用
     await agent.agent_service.update_agent_status(
-        "test-agent", AgentStatus.ACTIVE, AgentMode.OBSERVATION
+        "test-agent", AgentStatus.ACTIVE, AgentMode.TRADING
     )
 
     service.agents_service.update_agent_status.assert_called_once()

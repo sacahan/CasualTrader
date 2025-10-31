@@ -42,28 +42,28 @@ class TestRealAPIEndpoints:
         print(f"✅ Agents 列表: {len(data)} agents found")
 
     @patch("service.trading_service.TradingService.execute_single_mode")
-    async def test_start_agent_observation(self, mock_execute, client):
-        """測試啟動 agent 執行觀察模式"""
+    async def test_start_agent_trading(self, mock_execute, client):
+        """測試啟動 agent 執行交易模式"""
         agent_id = "test-agent"
 
         # 模擬執行返回
         mock_execute.return_value = {
             "session_id": "test-session-1",
             "agent_id": agent_id,
-            "mode": "OBSERVATION",
+            "mode": "TRADING",
             "status": "COMPLETED",
-            "message": "Observation completed",
+            "message": "Trading completed",
         }
 
         # 調用 API
-        response = client.post(f"/api/agents/{agent_id}/start", json={"mode": "OBSERVATION"})
+        response = client.post(f"/api/agents/{agent_id}/start", json={"mode": "TRADING"})
 
         # 即使 mock 沒有被調用（因為是同步測試），我們也驗證 API 的結構
         print(f"✅ API 端點響應狀態: {response.status_code}")
 
     def test_invalid_agent_id(self, client):
         """測試無效的 agent ID"""
-        response = client.post("/api/agents/nonexistent-agent/start", json={"mode": "OBSERVATION"})
+        response = client.post("/api/agents/nonexistent-agent/start", json={"mode": "TRADING"})
         # 應該返回 404 或 400
         print(f"✅ 無效 agent ID 響應: {response.status_code}")
 

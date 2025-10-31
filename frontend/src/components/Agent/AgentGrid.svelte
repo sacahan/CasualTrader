@@ -16,7 +16,6 @@
    * @property {boolean} [loading]
    * @property {Function} [onselect]
    * @property {Function} [onedit]
-   * @property {Function} [onobserve]
    * @property {Function} [ontrade]
    * @property {Function} [onrebalance]
    * @property {Function} [onstop]
@@ -30,7 +29,6 @@
     loading = false,
     onselect = undefined,
     onedit = undefined,
-    onobserve = undefined,
     ontrade = undefined,
     onrebalance = undefined,
     onstop = undefined,
@@ -45,9 +43,6 @@
   }
   function handleEditAgent(agent) {
     onedit?.(agent);
-  }
-  function handleObserveAgent(agent, mode) {
-    onobserve?.(agent, mode);
   }
   function handleTradeAgent(agent, mode) {
     ontrade?.(agent, mode);
@@ -120,7 +115,6 @@
         selected={agent.agent_id === selectedAgentId}
         onclick={handleCardClick}
         onedit={handleEditAgent}
-        onobserve={handleObserveAgent}
         ontrade={handleTradeAgent}
         onrebalance={handleRebalanceAgent}
         onstop={handleStopAgent}

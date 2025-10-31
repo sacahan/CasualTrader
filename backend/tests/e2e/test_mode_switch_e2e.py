@@ -1,8 +1,8 @@
 #!/usr/bin/env python
 """
-測試從 OBSERVATION 模式切換到 TRADING 模式的場景
+測試不同交易模式的執行場景
 
-這個端到端測試驗證 AsyncExitStack 和 MCP servers cancel scope 問題是否已解決。
+這個端到端測試驗證 TRADING 和 REBALANCING 模式的執行。
 """
 
 import asyncio
@@ -22,14 +22,14 @@ async def test_mode_switch():
     async with httpx.AsyncClient(timeout=300.0) as client:
         try:
             print("\n" + "=" * 80)
-            print("測試：OBSERVATION → TRADING 模式切換")
+            print("測試：交易模式執行")
             print("=" * 80)
 
             # 1. 建立 Agent
             print("\n[1] 建立測試 Agent...")
             agent_data = {
                 "name": "Test Agent Mode Switch",
-                "description": "Test switching between OBSERVATION and TRADING modes",
+                "description": "Test trading mode execution",
                 "initial_funds": 1000000,
                 "investment_preferences": ["2330", "2454"],
             }
@@ -48,16 +48,16 @@ async def test_mode_switch():
             agent_id = result.get("agent_id", AGENT_ID)
             print(f"    ✓ Agent 已建立: {agent_id}")
 
-            # 2. 執行 OBSERVATION 模式
-            print("\n[2] 執行 OBSERVATION 模式...")
-            observation_data = {
-                "mode": "OBSERVATION",
+            # 2. 執行 TRADING 模式
+            print("\n[2] 執行 TRADING 模式...")
+            trading_data = {
+                "mode": "TRADING",
                 "context": {"max_turns": 5},
             }
 
             response = await client.post(
                 f"{API_BASE_URL}/api/agent-execution/{agent_id}/start",
-                json=observation_data,
+                json=trading_data,
             )
             print(f"    回應狀態: {response.status_code}")
 
@@ -66,8 +66,8 @@ async def test_mode_switch():
                 return False
 
             result = response.json()
-            observation_session = result.get("session_id")
-            print(f"    ✓ OBSERVATION 模式執行完成: {observation_session}")
+            trading_session = result.get("session_id")
+            print(f"    ✓ TRADING 模式執行完成: {trading_session}")
 
             # 等待一下，讓清理完成
             await asyncio.sleep(2)

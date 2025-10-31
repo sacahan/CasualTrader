@@ -86,7 +86,7 @@ class TestFrontendExecution:
             "type": "execution_started",
             "agent_id": "agent1",
             "session_id": "session-123",
-            "mode": "OBSERVATION",
+            "mode": "TRADING",
         }
         ws_capture.add_message(event)
 
@@ -112,7 +112,7 @@ class TestFrontendExecution:
             "type": "execution_completed",
             "agent_id": "agent1",
             "session_id": "session-123",
-            "mode": "OBSERVATION",
+            "mode": "TRADING",
             "success": True,
             "execution_time_ms": 5000,
             "output": "Agent completed execution successfully",
@@ -140,7 +140,7 @@ class TestFrontendExecution:
         event = {
             "type": "execution_failed",
             "agent_id": "agent1",
-            "mode": "OBSERVATION",
+            "mode": "TRADING",
             "success": False,
             "error": "Insufficient funds for trading",
         }
@@ -186,7 +186,7 @@ class TestFrontendExecution:
                 "type": "execution_started",
                 "agent_id": f"agent{i}",
                 "session_id": f"session-{i}",
-                "mode": "OBSERVATION",
+                "mode": "TRADING",
             }
             ws_capture.add_message(event)
 
@@ -212,7 +212,7 @@ class TestFrontendExecution:
             "type": "execution_started",
             "agent_id": "agent1",
             "session_id": "session-reconnected",
-            "mode": "OBSERVATION",
+            "mode": "TRADING",
         }
         ws_capture.add_message(event)
 
@@ -372,7 +372,7 @@ async def test_full_execution_flow_with_chrome_devtools():
             "type": "execution_started",
             "agent_id": "agent1",
             "session_id": "session-123",
-            "mode": "OBSERVATION",
+            "mode": "TRADING",
         },
         {
             "type": "execution_completed",
