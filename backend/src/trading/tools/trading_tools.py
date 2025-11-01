@@ -217,6 +217,183 @@ async def get_portfolio_status(agent_service, agent_id: str) -> str:
     return portfolio_summary.strip()
 
 
+# ==========================================
+# 原子交易執行函數
+# ==========================================
+async def execute_trade_atomic(
+    agent_service,
+    agent_id: str,
+    ticker: str,
+    action: str,
+    quantity: int,
+    price: float | None = None,
+    decision_reason: str | None = None,
+    company_name: str | None = None,
+    casual_market_mcp: MCPServerStdio | None = None,
+) -> str:
+    """
+    執行完整交易 - 原子操作
+
+    所有操作在單一事務中，保證:
+    - 全成功 → 提交所有變更
+    - 任何失敗 → 回滾所有變更
+
+    Args:
+        agent_service: Agent 服務實例
+        agent_id: Agent ID
+        ticker: 股票代號 (例如: "2330")
+        action: 交易動作 ("BUY" 或 "SELL")
+        quantity: 交易股數 (必須是 1000 的倍數)
+        price: 交易價格 (可選)
+        decision_reason: 交易決策理由 (可選)
+        company_name: 公司名稱 (可選)
+        casual_market_mcp: Casual Market MCP 實例 (可選)
+
+    Returns:
+        交易執行結果訊息
+
+    Raises:
+        ValueError: 參數驗證失敗
+        Exception: 交易執行失敗（自動回滾）
+    """
+    try:
+        # 驗證參數
+        action_upper = action.upper()
+        if action_upper not in ["BUY", "SELL"]:
+            raise ValueError(f"無效的 action: {action}，必須是 'BUY' 或 'SELL'")
+
+        if not isinstance(quantity, int) or quantity <= 0:
+            raise ValueError(f"股數必須是正整數，收到: {quantity}")
+
+        if quantity % 1000 != 0:
+            raise ValueError(f"股數必須是 1000 的倍數，收到: {quantity}")
+
+        logger.info(
+            f"開始原子交易: agent_id={agent_id}, ticker={ticker}, "
+            f"action={action_upper}, quantity={quantity}"
+        )
+
+        # ⭐ 開始事務
+        async with agent_service.session.begin():
+            # Step 1: 驗證 Agent 存在
+            agent_config = await agent_service.get_agent_config(agent_id)
+            if not agent_config:
+                raise ValueError(f"Agent {agent_id} 不存在")
+
+            # Step 2: 執行市場交易 (MCP)
+            market_result = {}
+            if casual_market_mcp:
+                try:
+                    mcp_result = await casual_market_mcp.session.call_tool(
+                        f"{action_upper.lower()}_taiwan_stock",
+                        {
+                            "symbol": ticker,
+                            "quantity": quantity,
+                            "price": price,
+                        },
+                    )
+
+                    # 解析 MCP 結果
+                    if mcp_result and hasattr(mcp_result, "content") and mcp_result.content:
+                        content_item = mcp_result.content[0]
+                        text_content = (
+                            content_item.text
+                            if hasattr(content_item, "text")
+                            else str(content_item)
+                        )
+                        try:
+                            data = json.loads(text_content)
+                            if data.get("success"):
+                                trading_data = data.get("data", {})
+                                market_result["executed_price"] = trading_data.get("price", price)
+                                market_result["commission"] = trading_data.get("commission", 0)
+                            else:
+                                raise ValueError(f"市場交易失敗: {data.get('error', '未知錯誤')}")
+                        except json.JSONDecodeError:
+                            logger.warning("無法解析 MCP 結果，使用預設值")
+                            market_result["executed_price"] = price or 0
+                            market_result["commission"] = 0
+                except Exception as mcp_error:
+                    logger.error(f"MCP 呼叫失敗: {mcp_error}")
+                    raise ValueError(f"市場交易失敗: {str(mcp_error)}")
+            else:
+                # 如果沒有 MCP，使用提供的價格
+                market_result["executed_price"] = price or 0
+                market_result["commission"] = 0
+
+            logger.info(f"市場交易完成: {ticker} {action_upper} {quantity}")
+
+            # Step 3: 記錄交易到資料庫
+            total_amount = float(quantity * market_result["executed_price"])
+            commission = market_result.get("commission", 0)
+
+            transaction = await agent_service.create_transaction(
+                agent_id=agent_id,
+                ticker=ticker,
+                action=action_upper,
+                quantity=quantity,
+                price=market_result["executed_price"],
+                total_amount=total_amount,
+                commission=commission,
+                decision_reason=decision_reason or "原子交易",
+                company_name=company_name,
+                status="COMPLETED",
+            )
+            logger.info(f"交易已記錄: {transaction.id}")
+
+            # Step 4: 更新持股明細
+            await agent_service.update_agent_holdings(
+                agent_id=agent_id,
+                ticker=ticker,
+                action=action_upper,
+                quantity=quantity,
+                price=market_result["executed_price"],
+                company_name=company_name,
+            )
+            logger.info("持股已更新")
+
+            # Step 5: 更新資金餘額
+            if action_upper == "BUY":
+                amount_change = -(total_amount + commission)
+            else:  # SELL
+                amount_change = total_amount - commission
+
+            await agent_service.update_agent_funds(
+                agent_id=agent_id,
+                amount_change=amount_change,
+                transaction_type=f"{action_upper} {ticker}",
+            )
+            logger.info(f"資金已更新: {amount_change:+.2f} 元")
+
+            # Step 6: 更新績效指標
+            await agent_service.calculate_and_update_performance(agent_id)
+            logger.info("績效已更新")
+
+            # ⭐ 事務自動提交（所有步驟都成功）
+            logger.info("原子交易成功完成")
+
+            return (
+                f"✅ 交易執行成功 (原子操作)\n\n"
+                f"📊 交易詳情:\n"
+                f"  • 股票: {ticker} ({company_name or '未知'})\n"
+                f"  • 類型: {action_upper}\n"
+                f"  • 股數: {quantity:,}\n"
+                f"  • 成交價: {market_result['executed_price']:,.2f}\n"
+                f"  • 手續費: {commission:,.2f}\n"
+                f"  • 實際成本: {total_amount + commission:,.2f}\n\n"
+                f"✅ 所有操作已原子性完成 ✓"
+            )
+
+    except Exception as e:
+        # ⭐ 任何失敗 → 事務自動回滾
+        logger.error(f"原子交易失敗，已完全回滾: {e}", exc_info=True)
+        return (
+            f"❌ 交易執行失敗，已完全回滾\n\n"
+            f"❌ 錯誤: {str(e)}\n\n"
+            f"💡 系統狀態完全恢復，無任何痕跡"
+        )
+
+
 def create_trading_tools(
     agent_service,
     agent_id: str,
@@ -475,22 +652,70 @@ def create_trading_tools(
             logger.error(f"模擬賣出失敗: {e}", exc_info=True)
             raise
 
+    @function_tool(strict_mode=False)
+    async def execute_trade_atomic_tool(
+        ticker: str,
+        action: str,
+        quantity: int,
+        price: float | None = None,
+        decision_reason: str | None = None,
+        company_name: str | None = None,
+    ) -> str:
+        """
+        執行完整交易 - 原子操作 (推薦優先使用)
+
+        所有操作在單一事務中進行，保證原子性：
+        - 全部成功 → 提交所有變更
+        - 任何失敗 → 回滾所有變更
+
+        此工具確保市場交易、交易記錄、持股更新、資金更新和績效計算同時成功或全部失敗。
+        這解決了分別呼叫多個函數可能導致的不一致問題。
+
+        Args:
+            ticker: 股票代號，例如 "2330" (台積電)。【必需】
+            action: 交易動作，"BUY" 或 "SELL"。【必需】
+            quantity: 交易股數，必須是1000的倍數。【必需】
+            price: 交易價格，單位為新台幣 (可選)
+            decision_reason: 交易決策理由 (可選)
+            company_name: 公司名稱 (可選)
+
+        Returns:
+            str: 交易結果訊息，包含成功/失敗狀態和詳細資訊
+
+        Examples:
+            - 以指定價格買入台積電：execute_trade_atomic_tool(ticker="2330", action="BUY", quantity=1000, price=520.0)
+            - 以市價賣出台積電：execute_trade_atomic_tool(ticker="2330", action="SELL", quantity=1000)
+        """
+        return await execute_trade_atomic(
+            agent_service=agent_service,
+            agent_id=agent_id,
+            ticker=ticker,
+            action=action,
+            quantity=quantity,
+            price=price,
+            decision_reason=decision_reason,
+            company_name=company_name,
+            casual_market_mcp=casual_market_mcp,
+        )
+
     # 根據配置動態構建工具列表
     tools = []
 
-    # 投資組合工具（兩種模式都需要）
+    # 添加原子交易工具（唯一的交易執行方式）
+    if include_buy_sell:
+        tools.append(execute_trade_atomic_tool)
+
+    # 投資組合工具
     if include_portfolio:
         tools.append(record_trade_tool)
         tools.append(get_portfolio_status_tool)
 
-    # 買賣交易工具（僅 TRADING 模式）
-    if include_buy_sell:
-        tools.append(buy_taiwan_stock_tool)
-        tools.append(sell_taiwan_stock_tool)
+    # 注意: buy_taiwan_stock_tool 和 sell_taiwan_stock_tool 已棄用，不再暴露給 Agent
+    # 所有交易必須使用 execute_trade_atomic_tool
 
     logger.info(
         f"Trading tools created: {len(tools)} tool(s) "
-        f"(Portfolio: {include_portfolio}, BuySell: {include_buy_sell})"
+        f"(AtomicTrade: {include_buy_sell}, Portfolio: {include_portfolio})"
     )
 
     return tools

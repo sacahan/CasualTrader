@@ -678,15 +678,16 @@ class TradingAgent:
 
     def _build_instructions(self, description: str) -> str:
         """
-        根據描述構建 Agent 指令
+        根據描述構建 Agent 指令（系統角色和基本原則）
+
         Args:
             description: Agent 基本描述
 
         Returns:
-            Agent 指令
+            Agent 指令（專注於角色和目標）
         """
 
-        # 基本描述
+        # 基本角色描述
         instructions_parts = [
             f"你是一個專業的股票交易 Agent，你的代號是 {self.agent_id}。",
             "你的投資主張如下：",
@@ -697,7 +698,7 @@ class TradingAgent:
         if self.agent_config.investment_preferences:
             instructions_parts.extend(
                 [
-                    f"你對這些這些公司特別感興趣（股票代號）：{self.agent_config.investment_preferences}。",
+                    f"你對這些公司特別感興趣（股票代號）：{self.agent_config.investment_preferences}。",
                 ]
             )
 
@@ -712,19 +713,17 @@ class TradingAgent:
         instructions = (
             "\n".join(instructions_parts)
             + """
-請根據以上描述作為你的根本指導。
 
-**⚠️ 重要執行原則：**
-1. 你應該使用各種工具來幫助你完成任務：
-    - 主動使用持久記憶工具(memory_mcp)存取先前知識和經驗
-    - 決策前必須先使用投資組合管理工具了解資產狀況
-    - 充分利用專業分析 Sub-Agents 的能力，做出全面評估
-2. 將每次的交易決策使用持久記憶工具(memory_mcp)記錄下來，以便未來參考
-3. 決策理由應包含：分析過程、市場判斷、風險考量、Sub-Agents 建議
-4. 注意交易日檢查，避免在休市日執行操作
-5. 最終目標是最大化投資回報，同時嚴格控制風險
+**🎯 你的核心目標：**
+- 最大化投資回報，同時嚴格控制風險
+- 基於充分的市場分析進行理性、謹慎的決策
+- 遵守所有交易約束和持股限制
+- 記錄每次交易的決策理由供未來參考
 
-請始終保持理性、謹慎，運用所有可用工具做出明智的投資決策。
+**💡 工作原則：**
+- 在任務提示(Task Prompt)中會提供詳細的工具說明和使用流程
+- 根據執行模式的不同，工具和功能會有所不同
+- 遵守系統提供的所有約束和指導
         """
         )
         logger.info(f"Instructions for {self.agent_id}: {instructions.strip()}")
@@ -766,8 +765,8 @@ class TradingAgent:
                     memory_context += f"   結果：{decision.get('result', 'N/A')}\n"
 
         # 根據模式添加指導
-        task_prompts = {
-            AgentMode.TRADING: f"""
+        if mode == AgentMode.TRADING:
+            action_message = f"""
 **🎯 交易執行模式 (TRADING MODE)**
 
 目的：分析市場機會並執行交易。
@@ -778,19 +777,45 @@ class TradingAgent:
 
 {memory_context}
 
-可用工具：
-• 投資組合管理工具 (record_trade_tool、get_portfolio_status_tool) - 查詢投資組合狀態、記錄交易決策
-• 模擬交易工具 (buy_taiwan_stock_tool、sell_taiwan_stock_tool) - 執行台灣股票模擬買賣交易
-• memory_mcp (持久記憶工具) - 儲存和回想分析結論
-• 專業分析 Sub-Agents - technical_analyst、fundamental_analyst、sentiment_analyst、risk_analyst
+**🛠️ 可用工具：**
 
-限制：
-• 必須根據現價進行交易，例如現價為每股1050元，則只能以1050元執行買入或賣出
-• 遵守最大持股比例限制
-• 交易後必須記錄決策理由
-• 主動將決策過程利用 memory_mcp 存入知識庫以供未來參考
-""",
-            AgentMode.REBALANCING: f"""
+1. **原子交易工具（⭐ 優先使用）**
+   - execute_trade_atomic(ticker, action, quantity, price, decision_reason, company_name)
+   - 作用：執行完整交易（市場交易 → 記錄 → 更新資金 → 更新績效）
+   - 特點：原子性保證，全部成功或全部失敗，自動回滾
+   - 例子：execute_trade_atomic("2330", "BUY", 1000, 520.0, "技術突破信號", "台積電")
+
+2. **投資組合工具**
+   - get_portfolio_status_tool：查詢當前投資組合狀態（持股、資金、績效）
+   - record_trade_tool：（備用）記錄交易決策
+
+3. **記憶工具**
+   - memory_mcp：儲存和回想分析結論、過往決策
+
+4. **分析 Sub-Agents**
+   - technical_analyst：技術面分析
+   - fundamental_analyst：基本面分析
+   - sentiment_analyst：情感面分析
+   - risk_analyst：風險評估
+
+**📋 執行流程：**
+
+1️⃣ 使用 get_portfolio_status_tool 查詢當前狀態
+2️⃣ 使用各分析 Sub-Agents 進行全面評估
+3️⃣ 使用 memory_mcp 查詢過往決策參考
+4️⃣ 決策確認無誤後，調用 execute_trade_atomic() 執行交易
+5️⃣ 使用 memory_mcp 記錄本次決策和結果
+
+**⚠️ 重要約束：**
+
+• 必須使用 execute_trade_atomic() 執行交易（原子性保證）
+• 必須根據現價進行交易，例如現價為每股 1050 元，則只能以 1050 元執行買入或賣出
+• 遵守最大持股比例限制：{self.agent_config.max_position_size}%
+• 交易後必須在決策理由中說明：分析過程、市場判斷、風險考量
+"""
+
+        elif mode == AgentMode.REBALANCING:
+            action_message = f"""
 **⚖️ 投資組合重新平衡模式 (REBALANCING MODE)**
 
 目的：檢視投資組合並根據策略進行重新平衡調整。
@@ -801,23 +826,77 @@ class TradingAgent:
 
 {memory_context}
 
-可用工具：
-• 投資組合管理工具 (record_trade_tool、get_portfolio_status_tool) - 查詢投資組合狀態、記錄交易決策
-• 模擬交易工具 (buy_taiwan_stock_tool、sell_taiwan_stock_tool) - 執行台灣股票模擬買賣交易
-• memory_mcp (持久記憶工具) - 儲存和回想分析結論
-• 專業分析 Sub-Agents - technical_analyst、fundamental_analyst、sentiment_analyst、risk_analyst
+**� 重要說明：**
 
-限制：
-• 焦點在現有持股調整，不需要識別新的投資機會
-• 調整應符合投資策略和偏好設定
-• 考量交易成本和稅務影響
-• 主動將調整理由利用 memory_mcp 存入知識庫以供未來參考
-""",
-        }
+本模式專注於調整現有持股，只能查詢投資組合但不執行買賣交易。
+請分析投資組合的當前狀態，判斷是否需要重新平衡，並記錄您的分析結果。
+
+**🛠️ 可用工具：**
+
+1. **投資組合查詢工具（唯一可用）**
+   - get_portfolio_status_tool：查詢當前投資組合狀態（持股明細、資金、績效）
+   - ⚠️ 注意：本模式無法直接執行交易
+
+2. **分析工具**
+   - memory_mcp：儲存重新平衡分析結論
+   - technical_analyst：評估技術面信號
+   - risk_analyst：評估持股風險
+
+3. **不可用工具**
+   - ❌ execute_trade_atomic()：本模式無法直接執行交易
+   - ❌ buy_taiwan_stock_tool、sell_taiwan_stock_tool：不可用
+   - ❌ record_trade_tool：不可用
+
+**📋 分析流程：**
+
+1️⃣ 使用 get_portfolio_status_tool 查詢當前持股和比例
+2️⃣ 分析現有持股是否符合投資策略
+3️⃣ 使用技術和風險分析 Sub-Agents 評估調整建議
+4️⃣ 計畫建議的調整方案（哪些持股應增加/減少，原因）
+5️⃣ 使用 memory_mcp 記錄重新平衡分析和建議
+
+**⚠️ 重要約束：**
+
+• ❌ 本模式 **無法執行交易** - 只能分析和建議
+• 焦點在現有持股評估，不需要識別新的投資機會
+• 分析應符合投資策略和最大持股比例限制（{self.agent_config.max_position_size}%）
+• 考量交易成本和稅務影響（在建議中說明）
+• 分析結論應在 memory_mcp 中清楚記錄，供未來參考
+
+**💡 提示：**
+
+如需實際執行交易調整，請使用 TRADING 模式並使用 execute_trade_atomic() 工具。
+"""
+
+        else:
+            # 預設為 TRADING 模式
+            action_message = f"""
+**🎯 交易執行模式 (TRADING MODE)**
+
+目的：分析市場機會並執行交易。
+
+---
+{portfolio_status}
+---
+
+{memory_context}
+
+**🛠️ 可用工具：**
+
+1. **原子交易工具（⭐ 優先使用）**
+   - execute_trade_atomic(ticker, action, quantity, price, decision_reason, company_name)
+   - 作用：執行完整交易（市場交易 → 記錄 → 更新資金 → 更新績效）
+
+2. **投資組合工具**
+   - get_portfolio_status_tool：查詢當前投資組合狀態
+
+3. **分析 Sub-Agents**
+   - technical_analyst、fundamental_analyst、sentiment_analyst、risk_analyst
+"""
 
         action_message = (
-            task_prompts[mode]
-            + f"\n\n目前的日期時間：{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
+            action_message
+            + f"\n\n**📅 目前的日期時間：** {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
         )
         logger.info(f"Action message for {self.agent_id}: {action_message.strip()}")
         return action_message.strip()
