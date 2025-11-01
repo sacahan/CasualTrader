@@ -90,7 +90,7 @@ class TestTradingAgentWithLiteLLM:
             return_value={
                 "model_key": "gpt-4o-mini",
                 "provider": "openai",
-                "litellm_prefix": "openai",
+                "litellm_prefix": "openai/",
                 "api_key_env_var": "OPENAI_API_KEY",
             }
         )
@@ -122,7 +122,7 @@ class TestTradingAgentWithLiteLLM:
             return_value={
                 "model_key": "gemini-pro",
                 "provider": "gemini",
-                "litellm_prefix": "gemini",
+                "litellm_prefix": "gemini/",
                 "api_key_env_var": "GOOGLE_API_KEY",
             }
         )
@@ -151,7 +151,7 @@ class TestTradingAgentWithLiteLLM:
             return_value={
                 "model_key": "gpt-5-mini",
                 "provider": "github_copilot",
-                "litellm_prefix": "github_copilot",
+                "litellm_prefix": "github_copilot/",
                 "api_key_env_var": "GITHUB_COPILOT_TOKEN",
             }
         )
@@ -180,7 +180,7 @@ class TestTradingAgentWithLiteLLM:
             return_value={
                 "model_key": "gpt-4o-mini",
                 "provider": "openai",
-                "litellm_prefix": "openai",
+                "litellm_prefix": "openai/",
                 "api_key_env_var": "OPENAI_API_KEY",
             }
         )

@@ -38,7 +38,7 @@ from .tools.memory_tools import (
     save_execution_memory,
 )
 
-from common.enums import AgentStatus, AgentMode
+from common.enums import AgentStatus, AgentMode, validate_agent_mode
 from common.logger import logger
 from common.agent_utils import save_agent_graph
 from service.agents_service import (
@@ -156,8 +156,10 @@ class TradingAgent:
                 f"Agent config must be set before initialization for {self.agent_id}"
             )
 
-        # 確定執行模式
-        execution_mode = mode or self.agent_config.current_mode or AgentMode.TRADING
+        # 確定執行模式（容錯：資料庫可能儲存為字串）
+        execution_mode = self._normalize_agent_mode(
+            mode or getattr(self.agent_config, "current_mode", None) or AgentMode.TRADING
+        )
 
         try:
             # 獲取該模式的工具配置
@@ -185,7 +187,6 @@ class TradingAgent:
             all_tools = self.trading_tools + self.subagent_tools
 
             # 7. 創建 OpenAI Agent（使用 LiteLLM 模型）
-            # GitHub Copilot 不支援 tool_choice 參數
             model_settings_dict = {
                 "include_usage": True,
             }
@@ -208,11 +209,11 @@ class TradingAgent:
             )
 
             # 8. 繪製 Agent 結構圖
-            # save_agent_graph(
-            #     agent=self.agent,
-            #     agent_id=self.agent_id,
-            #     output_dir=None,  # 使用預設的 backend/logs 目錄
-            # )
+            save_agent_graph(
+                agent=self.agent,
+                agent_id=self.agent_id,
+                output_dir=None,  # 使用預設的 backend/logs 目錄
+            )
 
             self.is_initialized = True
             logger.info(
@@ -609,8 +610,10 @@ class TradingAgent:
         if not self.agent_config:
             raise AgentConfigurationError(f"Agent config not set for {self.agent_id}")
 
-        # 使用預設模式或指定模式，默認為 TRADING
-        execution_mode = mode or self.agent_config.current_mode or AgentMode.TRADING
+        # 使用預設模式或指定模式，默認為 TRADING（容錯：資料庫可能儲存為字串）
+        execution_mode = self._normalize_agent_mode(
+            mode or getattr(self.agent_config, "current_mode", None) or AgentMode.TRADING
+        )
 
         logger.info(
             f"Starting agent execution: {self.agent_id} "
@@ -713,10 +716,10 @@ class TradingAgent:
 
 **⚠️ 重要執行原則：**
 1. 你應該使用各種工具來幫助你完成任務：
+    - 主動使用持久記憶工具(memory_mcp)存取先前知識和經驗
     - 決策前必須先使用投資組合管理工具了解資產狀況
     - 充分利用專業分析 Sub-Agents 的能力，做出全面評估
-    - 主動使用持久記憶工具(memory_mcp)累積知識和經驗
-2. 每筆交易都要詳細記錄決策理由
+2. 將每次的交易決策使用持久記憶工具(memory_mcp)記錄下來，以便未來參考
 3. 決策理由應包含：分析過程、市場判斷、風險考量、Sub-Agents 建議
 4. 注意交易日檢查，避免在休市日執行操作
 5. 最終目標是最大化投資回報，同時嚴格控制風險
@@ -746,7 +749,7 @@ class TradingAgent:
             完整的任務提示
         """
 
-        # 獲取投資組合狀態（現在使用 await）
+        # 獲取投資組合狀態
         portfolio_status = await get_portfolio_status(self.agent_service, self.agent_id)
 
         # 構建記憶體上下文（如果存在）
@@ -772,6 +775,7 @@ class TradingAgent:
 ---
 {portfolio_status}
 ---
+
 {memory_context}
 
 可用工具：
@@ -794,6 +798,7 @@ class TradingAgent:
 ---
 {portfolio_status}
 ---
+
 {memory_context}
 
 可用工具：
@@ -838,7 +843,10 @@ class TradingAgent:
             execution_result: 本次執行的結果
             execution_memory: 前一個階段加載的記憶體（未直接使用）
         """
-        mode = self.agent_config.current_mode.value if self.agent_config else None
+        # 避免資料庫返回字串導致 .value 取值錯誤
+        mode = None
+        if self.agent_config:
+            mode = self._mode_to_str(getattr(self.agent_config, "current_mode", None))
         await save_execution_memory(self.memory_mcp, self.agent_id, execution_result, mode=mode)
 
     async def _plan_next_steps(self, execution_result: str) -> list[str]:
@@ -957,3 +965,32 @@ class TradingAgent:
         """字串表示"""
         status = "initialized" if self.is_initialized else "not initialized"
         return f"<TradingAgent {self.agent_id} ({status})>"
+
+    # ==========================================
+    # Internal helpers (Enum normalization)
+    # ==========================================
+
+    def _normalize_agent_mode(self, mode: AgentMode | str | None) -> AgentMode:
+        """將輸入的模式安全轉換為 AgentMode Enum。
+
+        容錯處理：資料庫欄位以 String 儲存，讀取後可能是字串。
+        若無法解析則回退至 TRADING。
+        """
+        if isinstance(mode, AgentMode):
+            return mode
+        if isinstance(mode, str):
+            parsed = validate_agent_mode(mode)
+            if parsed is not None:
+                return parsed
+        return AgentMode.TRADING
+
+    def _mode_to_str(self, mode: AgentMode | str | None) -> str | None:
+        """取得模式的字串值，無論輸入為 Enum 或字串。"""
+        if mode is None:
+            return None
+        if isinstance(mode, AgentMode):
+            return mode.value
+        if isinstance(mode, str):
+            parsed = validate_agent_mode(mode)
+            return parsed.value if parsed else mode
+        return None

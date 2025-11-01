@@ -29,75 +29,79 @@ class TestSaveAgentGraph:
         mock_agent = Mock()
 
         with tempfile.TemporaryDirectory() as temp_dir:
+            with patch("common.agent_utils.SKIP_AGENT_GRAPH", False):
+                with patch("common.agent_utils.isinstance") as mock_isinstance:
+                    mock_isinstance.return_value = True
+                    with patch("common.agent_utils.draw_graph") as mock_draw:
+                        success, result = save_agent_graph(
+                            agent=mock_agent,
+                            agent_id="test_agent",
+                            output_dir=temp_dir,
+                        )
+
+                        # 驗證 draw_graph 被呼叫
+                        mock_draw.assert_called_once()
+
+                        # 驗證回傳值
+                        assert success is True
+                        assert "test_agent.svg" in result
+                        assert result.endswith(".svg")
+
+    def test_save_agent_graph_with_default_output_dir(self):
+        """測試使用預設輸出目錄"""
+        mock_agent = Mock()
+
+        with patch("common.agent_utils.SKIP_AGENT_GRAPH", False):
             with patch("common.agent_utils.isinstance") as mock_isinstance:
                 mock_isinstance.return_value = True
                 with patch("common.agent_utils.draw_graph") as mock_draw:
                     success, result = save_agent_graph(
                         agent=mock_agent,
                         agent_id="test_agent",
-                        output_dir=temp_dir,
+                        output_dir=None,  # 使用預設
                     )
 
-                    # 驗證 draw_graph 被呼叫
+                    # 驗證呼叫成功
                     mock_draw.assert_called_once()
-
-                    # 驗證回傳值
                     assert success is True
                     assert "test_agent.svg" in result
-                    assert result.endswith(".svg")
-
-    def test_save_agent_graph_with_default_output_dir(self):
-        """測試使用預設輸出目錄"""
-        mock_agent = Mock()
-
-        with patch("common.agent_utils.isinstance") as mock_isinstance:
-            mock_isinstance.return_value = True
-            with patch("common.agent_utils.draw_graph") as mock_draw:
-                success, result = save_agent_graph(
-                    agent=mock_agent,
-                    agent_id="test_agent",
-                    output_dir=None,  # 使用預設
-                )
-
-                # 驗證呼叫成功
-                mock_draw.assert_called_once()
-                assert success is True
-                assert "test_agent.svg" in result
 
     def test_save_agent_graph_with_relative_path(self):
         """測試使用相對路徑作為輸出目錄"""
         mock_agent = Mock()
 
-        with patch("common.agent_utils.isinstance") as mock_isinstance:
-            mock_isinstance.return_value = True
-            with patch("common.agent_utils.draw_graph") as mock_draw:
-                # 使用相對路徑
-                success, result = save_agent_graph(
-                    agent=mock_agent,
-                    agent_id="test_agent",
-                    output_dir="custom_logs",  # 相對路徑
-                )
+        with patch("common.agent_utils.SKIP_AGENT_GRAPH", False):
+            with patch("common.agent_utils.isinstance") as mock_isinstance:
+                mock_isinstance.return_value = True
+                with patch("common.agent_utils.draw_graph") as mock_draw:
+                    # 使用相對路徑
+                    success, result = save_agent_graph(
+                        agent=mock_agent,
+                        agent_id="test_agent",
+                        output_dir="custom_logs",  # 相對路徑
+                    )
 
-                mock_draw.assert_called_once()
-                assert success is True
-                assert "test_agent.svg" in result
+                    mock_draw.assert_called_once()
+                    assert success is True
+                    assert "test_agent.svg" in result
 
     def test_save_agent_graph_with_absolute_path(self):
         """測試使用絕對路徑作為輸出目錄"""
         mock_agent = Mock()
 
         with tempfile.TemporaryDirectory() as temp_dir:
-            with patch("common.agent_utils.isinstance") as mock_isinstance:
-                mock_isinstance.return_value = True
-                with patch("common.agent_utils.draw_graph") as mock_draw:
-                    success, result = save_agent_graph(
-                        agent=mock_agent,
-                        agent_id="test_agent",
-                        output_dir=temp_dir,
-                    )
+            with patch("common.agent_utils.SKIP_AGENT_GRAPH", False):
+                with patch("common.agent_utils.isinstance") as mock_isinstance:
+                    mock_isinstance.return_value = True
+                    with patch("common.agent_utils.draw_graph") as mock_draw:
+                        success, result = save_agent_graph(
+                            agent=mock_agent,
+                            agent_id="test_agent",
+                            output_dir=temp_dir,
+                        )
 
-                    mock_draw.assert_called_once()
-                    assert success is True
+                        mock_draw.assert_called_once()
+                        assert success is True
                     assert temp_dir in result
 
     def test_save_agent_graph_with_invalid_agent_type(self):
@@ -105,35 +109,37 @@ class TestSaveAgentGraph:
         # 不是 Agent 的對象
         invalid_agent = "not_an_agent"
 
-        success, result = save_agent_graph(
-            agent=invalid_agent,
-            agent_id="test_agent",
-        )
+        with patch("common.agent_utils.SKIP_AGENT_GRAPH", False):
+            success, result = save_agent_graph(
+                agent=invalid_agent,
+                agent_id="test_agent",
+            )
 
-        # 應該失敗
-        assert success is False
-        assert "Invalid agent type" in result or "Expected" in result
+            # 應該失敗
+            assert success is False
+            assert "Invalid agent type" in result or "Expected" in result
 
     def test_save_agent_graph_with_draw_graph_exception(self):
         """測試 draw_graph 拋出異常時的處理"""
         mock_agent = Mock()
 
-        with patch("common.agent_utils.isinstance") as mock_isinstance:
-            mock_isinstance.return_value = True
-            with patch("common.agent_utils.draw_graph") as mock_draw:
-                # 模擬 draw_graph 拋出異常
-                mock_draw.side_effect = RuntimeError("Failed to draw graph")
+        with patch("common.agent_utils.SKIP_AGENT_GRAPH", False):
+            with patch("common.agent_utils.isinstance") as mock_isinstance:
+                mock_isinstance.return_value = True
+                with patch("common.agent_utils.draw_graph") as mock_draw:
+                    # 模擬 draw_graph 拋出異常
+                    mock_draw.side_effect = RuntimeError("Failed to draw graph")
 
-                with tempfile.TemporaryDirectory() as temp_dir:
-                    success, result = save_agent_graph(
-                        agent=mock_agent,
-                        agent_id="test_agent",
-                        output_dir=temp_dir,
-                    )
+                    with tempfile.TemporaryDirectory() as temp_dir:
+                        success, result = save_agent_graph(
+                            agent=mock_agent,
+                            agent_id="test_agent",
+                            output_dir=temp_dir,
+                        )
 
-                    # 應該捕獲異常並返回失敗
-                    assert success is False
-                    assert "Failed to draw graph" in result or "RuntimeError" in result
+                        # 應該捕獲異常並返回失敗
+                        assert success is False
+                        assert "Failed to draw graph" in result or "RuntimeError" in result
 
     def test_save_agent_graph_creates_directory(self):
         """測試自動創建不存在的目錄"""
@@ -143,56 +149,59 @@ class TestSaveAgentGraph:
             # 創建一個不存在的子目錄路徑
             non_existent_dir = Path(temp_dir) / "subdir" / "logs"
 
-            with patch("common.agent_utils.isinstance") as mock_isinstance:
-                mock_isinstance.return_value = True
-                with patch("common.agent_utils.draw_graph") as mock_draw:
-                    success, result = save_agent_graph(
-                        agent=mock_agent,
-                        agent_id="test_agent",
-                        output_dir=str(non_existent_dir),
-                    )
+            with patch("common.agent_utils.SKIP_AGENT_GRAPH", False):
+                with patch("common.agent_utils.isinstance") as mock_isinstance:
+                    mock_isinstance.return_value = True
+                    with patch("common.agent_utils.draw_graph") as mock_draw:
+                        success, result = save_agent_graph(
+                            agent=mock_agent,
+                            agent_id="test_agent",
+                            output_dir=str(non_existent_dir),
+                        )
 
-                    # 應該成功
-                    assert success is True
-                    mock_draw.assert_called_once()
+                        # 應該成功
+                        assert success is True
+                        mock_draw.assert_called_once()
 
     def test_save_agent_graph_returns_correct_filepath(self):
         """測試返回的文件路徑格式正確"""
         mock_agent = Mock()
 
         with tempfile.TemporaryDirectory() as temp_dir:
-            with patch("common.agent_utils.isinstance") as mock_isinstance:
-                mock_isinstance.return_value = True
-                with patch("common.agent_utils.draw_graph"):
-                    agent_id = "my_special_agent"
-                    success, result = save_agent_graph(
-                        agent=mock_agent,
-                        agent_id=agent_id,
-                        output_dir=temp_dir,
-                    )
+            with patch("common.agent_utils.SKIP_AGENT_GRAPH", False):
+                with patch("common.agent_utils.isinstance") as mock_isinstance:
+                    mock_isinstance.return_value = True
+                    with patch("common.agent_utils.draw_graph"):
+                        agent_id = "my_special_agent"
+                        success, result = save_agent_graph(
+                            agent=mock_agent,
+                            agent_id=agent_id,
+                            output_dir=temp_dir,
+                        )
 
-                    # 驗證返回的路徑包含正確的 agent_id 和副檔名
-                    assert success is True
-                    assert agent_id in result
-                    assert result.endswith(".svg")
+                        # 驗證返回的路徑包含正確的 agent_id 和副檔名
+                        assert success is True
+                        assert agent_id in result
+                        assert result.endswith(".svg")
 
     def test_save_agent_graph_with_special_characters_in_agent_id(self):
         """測試處理包含特殊字符的 agent_id"""
         mock_agent = Mock()
 
         with tempfile.TemporaryDirectory() as temp_dir:
-            with patch("common.agent_utils.isinstance") as mock_isinstance:
-                mock_isinstance.return_value = True
-                with patch("common.agent_utils.draw_graph"):
-                    agent_id = "agent-test_001"
-                    success, result = save_agent_graph(
-                        agent=mock_agent,
-                        agent_id=agent_id,
-                        output_dir=temp_dir,
-                    )
+            with patch("common.agent_utils.SKIP_AGENT_GRAPH", False):
+                with patch("common.agent_utils.isinstance") as mock_isinstance:
+                    mock_isinstance.return_value = True
+                    with patch("common.agent_utils.draw_graph"):
+                        agent_id = "agent-test_001"
+                        success, result = save_agent_graph(
+                            agent=mock_agent,
+                            agent_id=agent_id,
+                            output_dir=temp_dir,
+                        )
 
-                    assert success is True
-                    assert agent_id in result
+                        assert success is True
+                        assert agent_id in result
 
 
 class TestSaveAgentGraphIntegration:
@@ -205,32 +214,34 @@ class TestSaveAgentGraphIntegration:
         with tempfile.TemporaryDirectory() as temp_dir:
             temp_path = Path(temp_dir)
 
-            with patch("common.agent_utils.isinstance") as mock_isinstance:
-                mock_isinstance.return_value = True
-                with patch("common.agent_utils.draw_graph"):
-                    success, result = save_agent_graph(
-                        agent=mock_agent,
-                        agent_id="test_agent",
-                        output_dir=temp_path,
-                    )
+            with patch("common.agent_utils.SKIP_AGENT_GRAPH", False):
+                with patch("common.agent_utils.isinstance") as mock_isinstance:
+                    mock_isinstance.return_value = True
+                    with patch("common.agent_utils.draw_graph"):
+                        success, result = save_agent_graph(
+                            agent=mock_agent,
+                            agent_id="test_agent",
+                            output_dir=temp_path,
+                        )
 
-                    assert success is True
+                        assert success is True
 
     def test_save_agent_graph_error_handling_robustness(self):
         """測試錯誤處理的健壯性"""
         mock_agent = Mock()
 
-        with patch("common.agent_utils.isinstance") as mock_isinstance:
-            mock_isinstance.return_value = True
-            with patch("common.agent_utils.draw_graph") as mock_draw:
-                # 模擬各種異常
-                mock_draw.side_effect = Exception("Generic error")
+        with patch("common.agent_utils.SKIP_AGENT_GRAPH", False):
+            with patch("common.agent_utils.isinstance") as mock_isinstance:
+                mock_isinstance.return_value = True
+                with patch("common.agent_utils.draw_graph") as mock_draw:
+                    # 模擬各種異常
+                    mock_draw.side_effect = Exception("Generic error")
 
-                success, result = save_agent_graph(
-                    agent=mock_agent,
-                    agent_id="test_agent",
-                    output_dir=None,
-                )
+                    success, result = save_agent_graph(
+                        agent=mock_agent,
+                        agent_id="test_agent",
+                        output_dir=None,
+                    )
 
-                assert success is False
-                assert len(result) > 0  # 應該有錯誤訊息
+                    assert success is False
+                    assert len(result) > 0  # 應該有錯誤訊息

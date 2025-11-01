@@ -8,6 +8,7 @@ Memory Tools - memory_mcp 操作的統一封裝
 from __future__ import annotations
 
 import json
+from datetime import datetime, timedelta
 from typing import Any
 
 from common.logger import logger
@@ -41,12 +42,11 @@ async def load_execution_memory(
             logger.debug(f"Memory MCP not available for {agent_id}, returning empty memory")
             return {"past_decisions": []}
 
-        # 使用 memory_mcp 工具查詢過往 3 天的記憶體
+        # 使用 search_nodes 工具查詢過往 3 天的記憶體
         result = await memory_mcp.session.call_tool(
-            "recall",
+            "search_nodes",
             {
-                "agent_id": agent_id,
-                "query": "過去3天的交易決策和執行結果",
+                "query": f"agent {agent_id} decision",
                 "limit": 10,
             },
         )
@@ -58,17 +58,23 @@ async def load_execution_memory(
 
             try:
                 data = json.loads(text_content)
-                memories = data.get("memories", [])
+                nodes = data.get("nodes", [])
 
                 # 轉換為記憶體格式
                 past_decisions = [
                     {
-                        "date": memory.get("timestamp", ""),
-                        "action": memory.get("action", ""),
-                        "reason": memory.get("reason", ""),
-                        "result": memory.get("result", ""),
+                        "date": node.get("created_at", ""),
+                        "action": node.get("observations", [{}])[0]
+                        if node.get("observations")
+                        else "",
+                        "reason": node.get("observations", [{}])[1]
+                        if len(node.get("observations", [])) > 1
+                        else "",
+                        "result": node.get("observations", [{}])[2]
+                        if len(node.get("observations", [])) > 2
+                        else "",
                     }
-                    for memory in memories
+                    for node in nodes
                 ]
 
                 logger.info(
@@ -77,8 +83,8 @@ async def load_execution_memory(
 
                 return {"past_decisions": past_decisions}
 
-            except json.JSONDecodeError:
-                logger.warning(f"Failed to parse memory_mcp response for {agent_id}")
+            except (json.JSONDecodeError, IndexError, KeyError) as e:
+                logger.warning(f"Failed to parse memory_mcp response for {agent_id}: {e}")
                 return {"past_decisions": []}
 
         return {"past_decisions": []}
@@ -119,21 +125,24 @@ async def save_execution_memory(
             return False
 
         # 準備執行記錄
-        execution_record = {
-            "agent_id": agent_id,
-            "mode": mode or "unknown",
-            "result_summary": execution_result[:200] + "..."
-            if len(execution_result) > 200
-            else execution_result,
-        }
+        result_summary = (
+            execution_result[:200] + "..." if len(execution_result) > 200 else execution_result
+        )
 
-        # 使用 memory_mcp 工具保存記憶體
+        # 使用 create_entities 工具保存記憶體
         result = await memory_mcp.session.call_tool(
-            "memorize",
+            "create_entities",
             {
-                "agent_id": agent_id,
-                "content": json.dumps(execution_record),
-                "tags": ["execution", mode or "general"],
+                "entities": [
+                    {
+                        "name": f"agent_{agent_id}_execution_{datetime.now().isoformat()}",
+                        "entityType": "trading_execution",
+                        "observations": [
+                            f"Mode: {mode or 'unknown'}",
+                            f"Result: {result_summary}",
+                        ],
+                    }
+                ]
             },
         )
 
@@ -182,12 +191,13 @@ async def recall_recent_decisions(
             logger.debug(f"Memory MCP not available for {agent_id}")
             return []
 
-        # 使用 memory_mcp 工具查詢
+        # 使用 search_nodes 工具查詢
+        search_query = query or f"agent {agent_id} decision"
+
         result = await memory_mcp.session.call_tool(
-            "recall",
+            "search_nodes",
             {
-                "agent_id": agent_id,
-                "query": query or f"過去{days}天的決策",
+                "query": search_query,
                 "limit": limit,
             },
         )
@@ -198,9 +208,9 @@ async def recall_recent_decisions(
 
             try:
                 data = json.loads(text_content)
-                memories = data.get("memories", [])
-                logger.info(f"Recalled {len(memories)} decisions for {agent_id}")
-                return memories
+                nodes = data.get("nodes", [])
+                logger.info(f"Recalled {len(nodes)} decisions for {agent_id}")
+                return nodes
             except json.JSONDecodeError:
                 logger.warning("Failed to parse memory_mcp response")
                 return []
@@ -236,17 +246,49 @@ async def clear_old_memories(
             logger.debug(f"Memory MCP not available for {agent_id}")
             return False
 
+        # Use read_graph to get all entities and filter old ones manually
         result = await memory_mcp.session.call_tool(
-            "forget",
-            {
-                "agent_id": agent_id,
-                "older_than_days": days_old,
-            },
+            "read_graph",
+            {},
         )
 
-        if result and hasattr(result, "content"):
-            logger.info(f"Cleaned up old memories (>{days_old} days) for {agent_id}")
-            return True
+        if result and hasattr(result, "content") and result.content:
+            content_item = result.content[0]
+            text_content = content_item.text if hasattr(content_item, "text") else str(content_item)
+
+            try:
+                data = json.loads(text_content)
+                nodes = data.get("nodes", [])
+                cutoff_time = datetime.now() - timedelta(days=days_old)
+
+                deleted_count = 0
+                for node in nodes:
+                    # Only process nodes belonging to this agent
+                    if f"agent_{agent_id}" not in node.get("name", ""):
+                        continue
+
+                    created_at_str = node.get("created_at", "")
+                    try:
+                        created_at = datetime.fromisoformat(created_at_str)
+                        if created_at < cutoff_time:
+                            # Delete old entity
+                            delete_result = await memory_mcp.session.call_tool(
+                                "delete_entity",
+                                {"name": node.get("name")},
+                            )
+                            if delete_result and hasattr(delete_result, "content"):
+                                deleted_count += 1
+                    except (ValueError, AttributeError):
+                        continue
+
+                logger.info(
+                    f"Cleaned up {deleted_count} old memories (>{days_old} days) for {agent_id}"
+                )
+                return True
+
+            except json.JSONDecodeError:
+                logger.warning(f"Failed to parse read_graph response for {agent_id}")
+                return False
 
         logger.warning(f"Failed to clear old memories for {agent_id}")
         return False

@@ -1,7 +1,7 @@
 # Service 層契約規範 (API-Service Layer Contract)
 
-**版本**: 1.0
-**最後更新**: 2025-10-23
+**版本**: 1.1
+**最後更新**: 2025-10-31
 **狀態**: Active
 
 ## 概述
@@ -222,6 +222,84 @@ async def execute_trade(self, trade_request: TradeRequest) -> TradeResult:
         DatabaseError: 資料庫層錯誤
     """
     pass
+```
+
+---
+
+### 2.4 ToolConfigService
+
+負責動態工具配置管理。根據 Agent 執行模式（TRADING 或 REBALANCING）動態決定所需工具集合。
+
+**關鍵特性**:
+
+- 根據 AgentMode 決定工具配置
+- 支持 2 種執行模式：TRADING 和 REBALANCING
+- TRADING 模式：完整工具集（所有 MCP 伺服器、4 個 Sub-agents）
+- REBALANCING 模式：簡化工具集（核心 MCP 伺服器、2 個 Sub-agents）
+
+#### 2.4.1 get_tool_config (全局函數)
+
+```python
+def get_tool_config(mode: AgentMode | None = None) -> ToolRequirements:
+    """
+    取得指定模式的工具配置需求
+
+    Args:
+        mode: Agent 執行模式 (AgentMode.TRADING 或 AgentMode.REBALANCING)
+        如為 None，預設使用 TRADING 模式
+
+    Returns:
+        ToolRequirements: 工具需求規格
+            - include_memory_mcp: 是否包含記憶體 MCP 伺服器
+            - include_casual_market_mcp: 是否包含市場數據 MCP 伺服器
+            - include_tavily_mcp: 是否包含新聞/投資研究 MCP 伺服器
+            - include_buy_sell_tools: 是否包含買賣交易工具
+            - include_portfolio_tools: 是否包含投資組合查詢工具
+            - include_fundamental_agent: 是否包含基本面分析 Sub-agent
+            - include_technical_agent: 是否包含技術面分析 Sub-agent
+            - include_risk_agent: 是否包含風險評估 Sub-agent
+            - include_sentiment_agent: 是否包含情緒分析 Sub-agent
+
+    Example:
+        ```python
+        # 取得 TRADING 模式的工具配置
+        config = ToolConfig()
+        trading_req = config.get_requirements(AgentMode.TRADING)
+        # trading_req.include_buy_sell_tools → True
+        # trading_req.include_fundamental_agent → True
+
+        # 取得 REBALANCING 模式的工具配置
+        rebal_req = config.get_requirements(AgentMode.REBALANCING)
+        # rebal_req.include_buy_sell_tools → False
+        # rebal_req.include_fundamental_agent → False
+        ```
+    """
+```
+
+#### 2.4.2 ToolConfig.compare_configurations
+
+```python
+def compare_configurations(
+    mode1: AgentMode,
+    mode2: AgentMode
+) -> dict[str, Any]:
+    """
+    比較兩個執行模式的工具配置差異
+
+    Args:
+        mode1: 第一個模式
+        mode2: 第二個模式
+
+    Returns:
+        字典包含差異資訊
+            - differences: 詳細差異清單
+
+    Example:
+        ```python
+        config = ToolConfig()
+        diff = config.compare_configurations(AgentMode.TRADING, AgentMode.REBALANCING)
+        ```
+    """
 ```
 
 ---

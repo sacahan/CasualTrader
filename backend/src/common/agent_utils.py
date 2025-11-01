@@ -6,12 +6,18 @@ Agent 通用工具函數
 
 from __future__ import annotations
 
+import os
 from pathlib import Path
 
 from agents import Agent
 from agents.extensions.visualization import draw_graph
+from dotenv import load_dotenv
 
 from common.logger import logger
+
+load_dotenv()
+
+SKIP_AGENT_GRAPH = os.getenv("SKIP_AGENT_GRAPH", "true").lower() == "true"
 
 
 def save_agent_graph(
@@ -56,6 +62,11 @@ def save_agent_graph(
     Raises:
         TypeError: Agent 不是 OpenAI Agents SDK 的 Agent 實例
     """
+
+    if SKIP_AGENT_GRAPH:
+        logger.info("Skipping agent graph generation as per configuration.")
+        return True, "Agent graph generation skipped."
+
     try:
         # 驗證 agent 是否為正確的類型
         if not isinstance(agent, Agent):

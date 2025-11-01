@@ -1,15 +1,19 @@
 # CasualTrader Frontend
 
-✅ **Status**: Phase 4 實作完成
+✅ **Status**: Phase 4 完成 - OBSERVATION 模式已移除，支援 2 種執行模式
 
-CasualTrader AI 股票交易模擬器的前端應用程式,使用 Vite + Svelte + Tailwind CSS 構建。
+CasualTrader AI 股票交易模擬器的前端應用程式，使用 Vite + Svelte + Tailwind CSS 構建。
 
 ## 功能特性
 
-- **Prompt-Driven Agent 創建**: 使用自然語言描述投資偏好,無需複雜參數配置
+- **2 種 Agent 執行模式** (Phase 4 新增):
+  - **TRADING 模式**: 完整工具集（所有 MCP 伺服器、買賣工具、4 個 Sub-agents）
+  - **REBALANCING 模式**: 簡化工具集（核心 MCP 伺服器、2 個 Sub-agents）
+  - *OBSERVATION 模式已移除*
+- **Prompt-Driven Agent 創建**: 使用自然語言描述投資偏好，無需複雜參數配置
 - **即時狀態監控**: WebSocket 連接提供即時 Agent 狀態更新
 - **策略演進追蹤**: 完整的策略變更歷史與視覺化時間軸
-- **配置鎖定機制**: 執行中的 Agent 無法修改配置,確保策略一致性
+- **配置鎖定機制**: 執行中的 Agent 無法修改配置，確保策略一致性
 - **績效圖表**: 使用 Chart.js 展示投資組合價值與總報酬率走勢
 - **響應式設計**: 支援桌面與移動設備
 
@@ -53,7 +57,7 @@ npm install
 npm run dev
 ```
 
-應用程式將運行在 http://localhost:3000
+應用程式將運行在 <http://localhost:3000>
 
 ### 建置生產版本
 
@@ -95,3 +99,33 @@ VITE_WS_URL=ws://localhost:8000/ws
 - [系統設計](../docs/SYSTEM_DESIGN.md)
 - [前端實作規格](../docs/FRONTEND_IMPLEMENTATION.md)
 - [專案結構](../docs/PROJECT_STRUCTURE.md)
+- [Phase 4 完成摘要](../PHASE4_COMPLETION_SUMMARY.md) - 重構完成說明
+- [遷移和部署指南](../docs/MIGRATION_GUIDE_OBSERVATION_TO_2MODES.md) - Agent 模式遷移指南
+
+---
+
+## 🆕 Phase 4 更新 (2025-10-31)
+
+### ✅ Agent 模式變更
+
+- **移除**: OBSERVATION 模式 (觀察模式已過時)
+- **新增**: 動態模式選擇器
+  - TRADING 模式: 完整功能
+  - REBALANCING 模式: 簡化功能
+
+### ✅ UI 更新
+
+- ✅ 移除 OBSERVATION 按鈕
+- ✅ 更新模式選擇下拉菜單
+- ✅ 新增模式說明文本
+- ✅ API 調用已相應更新
+
+### 📊 測試驗證
+
+- ✅ 18 個新的 E2E 迴歸測試通過
+- ✅ 67 個核心功能測試 100% 通過
+- ✅ 向後兼容性完全保持
+
+---
+
+**最後更新**: 2025年10月31日 (Phase 4 - Agent 模式重構完成)

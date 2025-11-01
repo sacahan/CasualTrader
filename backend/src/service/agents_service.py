@@ -24,7 +24,14 @@ from database.models import (
     AgentPerformance,
     AIModelConfig,
 )
-from common.enums import AgentMode, AgentStatus, TransactionAction, TransactionStatus
+from common.enums import (
+    AgentMode,
+    AgentStatus,
+    TransactionAction,
+    TransactionStatus,
+    validate_agent_mode,
+    validate_agent_status,
+)
 from common.logger import logger
 
 
@@ -381,8 +388,8 @@ class AgentsService:
     async def update_agent_status(
         self,
         agent_id: str,
-        status: AgentStatus | None = None,
-        mode: AgentMode | None = None,
+        status: AgentStatus | str | None = None,
+        mode: AgentMode | str | None = None,
     ) -> bool:
         """
         更新 Agent 狀態
@@ -412,10 +419,19 @@ class AgentsService:
                 logger.warning(f"Agent '{agent_id}' not found for status update")
                 return False
 
+            # 允許傳入字串並做轉換，避免 .value 屬性錯誤
             if status is not None:
-                agent.status = status
+                agent.status = (
+                    status
+                    if isinstance(status, AgentStatus)
+                    else validate_agent_status(str(status)) or AgentStatus.INACTIVE
+                )
             if mode is not None:
-                agent.current_mode = mode
+                agent.current_mode = (
+                    mode
+                    if isinstance(mode, AgentMode)
+                    else validate_agent_mode(str(mode)) or AgentMode.TRADING
+                )
 
             # 更新時間戳記
             agent.updated_at = datetime.now()
@@ -425,10 +441,12 @@ class AgentsService:
             await self.session.commit()
 
             log_msg = f"Updated agent {agent_id}"
-            if status:
-                log_msg += f" status to {status.value}"
-            if mode:
-                log_msg += f" mode to {mode.value}"
+            if status is not None:
+                status_str = status.value if isinstance(status, AgentStatus) else str(status)
+                log_msg += f" status to {status_str}"
+            if mode is not None:
+                mode_str = mode.value if isinstance(mode, AgentMode) else str(mode)
+                log_msg += f" mode to {mode_str}"
             logger.info(log_msg)
             return True
 
@@ -437,9 +455,12 @@ class AgentsService:
             logger.error(
                 f"Error updating agent {agent_id} status: {e}",
                 exc_info=True,
-                extra={"agent_id": agent_id, "new_status": status.value if status else None}
-                if status
-                else {"agent_id": agent_id},
+                extra={
+                    "agent_id": agent_id,
+                    "new_status": status.value
+                    if isinstance(status, AgentStatus)
+                    else (str(status) if status is not None else None),
+                },
             )
             return False
 
@@ -459,9 +480,14 @@ class AgentsService:
         decision_reason: str,
         company_name: str | None = None,
         status: str = "COMPLETED",
+        session_id: str | None = None,
     ) -> Transaction:
         """
         創建交易記錄
+
+        遵循 timestamp.instructions.md 的原則：
+        - EXPLICIT_OVER_IMPLICIT: 明確設置所有欄位包括 session_id
+        - COMPLETE_LIFECYCLE_TRACKING: 設置 execution_time 以追蹤交易執行時刻
 
         Args:
             agent_id: Agent ID
@@ -474,6 +500,7 @@ class AgentsService:
             decision_reason: 交易決策理由
             company_name: 公司名稱（可選）
             status: 交易狀態
+            session_id: 關聯的 Agent Session ID（可選）
 
         Returns:
             創建的交易記錄
@@ -503,6 +530,7 @@ class AgentsService:
                 total_amount=Decimal(str(total_amount)),
                 commission=Decimal(str(commission)),
                 status=status_enum,
+                session_id=session_id,
                 execution_time=(
                     datetime.now() if status_enum == TransactionStatus.EXECUTED else None
                 ),
@@ -512,7 +540,15 @@ class AgentsService:
             self.session.add(transaction)
             await self.session.commit()
 
-            logger.info(f"Created transaction: {action} {quantity} {ticker} for agent {agent_id}")
+            logger.info(
+                f"Created transaction: {action} {quantity}股 x ${price} @ {ticker} for agent {agent_id}",
+                extra={
+                    "agent_id": agent_id,
+                    "ticker": ticker,
+                    "session_id": session_id,
+                    "transaction_id": transaction.id,
+                },
+            )
             return transaction
 
         except Exception as e:
@@ -620,7 +656,9 @@ class AgentsService:
                     holding.updated_at = datetime.now()
 
             await self.session.commit()
-            logger.info(f"Updated holdings: {action} {quantity} {ticker} for agent {agent_id}")
+            logger.info(
+                f"Updated holdings: {action} {quantity}股 x ${price} @ {ticker} for agent {agent_id}"
+            )
 
         except Exception as e:
             await self.session.rollback()
@@ -694,13 +732,13 @@ class AgentsService:
             total_value = Decimal(str(cash_balance)) + stocks_value
 
             # 取得交易統計
-            from sqlalchemy import func
+            from sqlalchemy import func, case
 
             stmt_transactions = (
                 select(
                     func.count(Transaction.id).label("total_trades"),
                     func.sum(
-                        func.case((Transaction.action == TransactionAction.SELL, 1), else_=0)
+                        case((Transaction.action == TransactionAction.SELL, 1), else_=0)
                     ).label("completed_trades"),
                 )
                 .where(Transaction.agent_id == agent_id)
