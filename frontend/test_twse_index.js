@@ -22,6 +22,7 @@ const apiResponse = {
 // 新的 loadMarketIndices 邏輯
 const indicesArray = apiResponse.data ? [apiResponse.data] : [];
 
+// eslint-disable-next-line no-console
 console.log('轉換後的 marketIndices:', indicesArray);
 
 // twseIndex 衍生 store 的邏輯
@@ -44,6 +45,9 @@ const twseIndex = (() => {
   };
 })();
 
+// eslint-disable-next-line no-console
 console.log('最終的 twseIndex:', twseIndex);
+// eslint-disable-next-line no-console
 console.log('可用於顯示: 大盤指數 27752 ▲ 0.23%');
+// eslint-disable-next-line no-console
 console.log('測試通過！');

@@ -13,7 +13,7 @@
   import { AGENT_STATUS, AGENT_RUNTIME_STATUS, WS_EVENT_TYPES } from '../../shared/constants.js';
   import { formatCurrency } from '../../shared/utils.js';
   import { isOpen } from '../../stores/market.js';
-  import { addEventListener, removeEventListener } from '../../stores/websocket.js';
+  import { addEventListener } from '../../stores/websocket.js';
   import { executionRetryManager } from '../../shared/retry.js';
 
   // Props

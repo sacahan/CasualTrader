@@ -16,10 +16,8 @@
     selectedAgent,
     loading as agentsLoading,
     loadAgents,
-    startAgent,
     stopAgent,
     deleteAgent,
-    updateAgent,
     selectAgent,
     executeAgent,
   } from './stores/agents.js';
