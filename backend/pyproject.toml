@@ -61,3 +61,8 @@ strict_optional = true
 warn_no_return = true
 warn_redundant_casts = true
 warn_unused_ignores = true
+
+[dependency-groups]
+dev = [
+    "pytest-asyncio>=1.2.0",
+]

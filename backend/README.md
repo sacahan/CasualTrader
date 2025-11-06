@@ -72,3 +72,7 @@ uv run pytest tests/ -v
 - [Phase 4 完成摘要](../PHASE4_COMPLETION_SUMMARY.md)
 - [遷移和部署指南](../docs/MIGRATION_GUIDE_OBSERVATION_TO_2MODES.md)
 - [服務契約規範](../docs/SERVICE_CONTRACT_SPECIFICATION.md)
+
+---
+
+**最後更新**: 2025-11-06

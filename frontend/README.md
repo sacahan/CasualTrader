@@ -128,4 +128,4 @@ VITE_WS_URL=ws://localhost:8000/ws
 
 ---
 
-**最後更新**: 2025年10月31日 (Phase 4 - Agent 模式重構完成)
+**最後更新**: 2025年11月6日 (Phase 4 - Agent 模式重構完成)

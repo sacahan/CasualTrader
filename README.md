@@ -1,7 +1,7 @@
 # CasualTrader AI 股票交易模擬器
 
 **版本**: 1.0.0
-**日期**: 2025-10-31
+**日期**: 2025-11-06
 **專案類型**: AI Trading Simulator
 **架構**: Monorepo (Backend + Frontend)
 
@@ -435,13 +435,13 @@ chore: 建置或輔助工具變更
   - Agent 管理 API
   - 交易 API
 
-### 開發中功能 (⏳)
-
-- **Phase 4**: 前端介面（準備中，預計 2025-10-31 開始）
+- **Phase 4**: 前端介面 ✅ (已於 2025-10-31 完成)
   - Svelte 元件開發
   - Chart.js 圖表整合
   - WebSocket 客戶端
   - 響應式設計
+  - 2 種 Agent 執行模式 (TRADING / REBALANCING)
+  - Prompt-Driven Agent 創建系統
 
 ### 未來規劃 (📋)
 
@@ -497,6 +497,6 @@ chore: 建置或輔助工具變更
 
 ---
 
-**最後更新**: 2025-10-31
+**最後更新**: 2025-11-06
 **版本**: 1.0.0
 **維護者**: sacahan
