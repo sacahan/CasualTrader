@@ -105,6 +105,7 @@ class TradingAgent:
         agent_id: str,
         agent_config: AgentConfig | None = None,
         agent_service: AgentsService | None = None,
+        trading_service=None,
     ):
         """
         初始化 TradingAgent
@@ -113,6 +114,7 @@ class TradingAgent:
             agent_id: Agent ID
             agent_config: Agent 配置
             agent_service: Agent 服務實例
+            trading_service: Trading 服務實例（用於執行原子交易）
 
         Note:
             初始化後需要呼叫 initialize() 完成 Agent 設定
@@ -120,6 +122,7 @@ class TradingAgent:
         self.agent_id = agent_id
         self.agent_config = agent_config
         self.agent_service = agent_service
+        self.trading_service = trading_service
         self.llm_model = None
         self.extra_headers = None
         self.agent = None
@@ -426,7 +429,7 @@ class TradingAgent:
             交易工具列表
         """
         return create_trading_tools(
-            self.agent_service,
+            self.trading_service,
             self.agent_id,
             casual_market_mcp=self.casual_market_mcp,
             include_buy_sell=tool_requirements.include_buy_sell_tools,

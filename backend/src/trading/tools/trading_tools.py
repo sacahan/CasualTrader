@@ -1,13 +1,16 @@
 from __future__ import annotations
 
 import json
-from typing import Any
+from typing import Any, TYPE_CHECKING
 
 from agents import function_tool, Tool
 from agents.mcp import MCPServerStdio
 
 from common.logger import logger
 from common.enums import TransactionStatus
+
+if TYPE_CHECKING:
+    from service.trading_service import TradingService
 
 
 # ==========================================
@@ -221,7 +224,7 @@ async def get_portfolio_status(agent_service, agent_id: str) -> str:
 # 原子交易執行函數
 # ==========================================
 async def execute_trade_atomic(
-    trading_service,
+    trading_service: "TradingService",
     agent_id: str,
     ticker: str,
     action: str,
@@ -298,7 +301,7 @@ def create_trading_tools(
     創建交易工具的工廠函數
 
     Args:
-        trading_service: Trading 服務實例
+        trading_service: Trading 服務實例 (TradingService)
         agent_id: Agent ID
         casual_market_mcp: Casual Market MCP 實例（可選，用於模擬交易）
         include_buy_sell: 是否包含買賣交易工具 (默認: True)

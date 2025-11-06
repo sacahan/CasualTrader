@@ -33,7 +33,7 @@ async def test_trading_service_execute_trade_atomic_buy_success():
     mock_session_begin = AsyncMock()
     mock_session_begin.__aenter__ = AsyncMock(return_value=None)
     mock_session_begin.__aexit__ = AsyncMock(return_value=None)
-    mock_db_session.begin = MagicMock(return_value=mock_session_begin)
+    mock_db_session.begin_nested = MagicMock(return_value=mock_session_begin)
 
     # Mock agents_service
     mock_agents_service = AsyncMock()
@@ -78,7 +78,7 @@ async def test_trading_service_execute_trade_atomic_buy_success():
     trading_service._calculate_and_update_performance_internal.assert_called_once()
 
     # Verify transaction context was used
-    mock_db_session.begin.assert_called_once()
+    mock_db_session.begin_nested.assert_called_once()
 
 
 @pytest.mark.asyncio
@@ -94,7 +94,7 @@ async def test_trading_service_execute_trade_atomic_sell_success():
     mock_session_begin = AsyncMock()
     mock_session_begin.__aenter__ = AsyncMock(return_value=None)
     mock_session_begin.__aexit__ = AsyncMock(return_value=None)
-    mock_db_session.begin = MagicMock(return_value=mock_session_begin)
+    mock_db_session.begin_nested = MagicMock(return_value=mock_session_begin)
 
     mock_agents_service = AsyncMock()
     mock_agents_service.get_agent_config = AsyncMock(
@@ -190,14 +190,18 @@ async def test_trading_service_execute_trade_atomic_invalid_quantity():
 
 @pytest.mark.asyncio
 async def test_trading_service_execute_trade_atomic_agent_not_found():
-    """Verify agent not found case triggers rollback"""
+    """Verify agent not found case returns error without opening transaction
+
+    Since Agent validation happens BEFORE transaction context,
+    no transaction should be opened if Agent doesn't exist.
+    """
     agent_id = "nonexistent_agent"
 
     mock_db_session = AsyncMock()
     mock_session_begin = AsyncMock()
     mock_session_begin.__aenter__ = AsyncMock(return_value=None)
     mock_session_begin.__aexit__ = AsyncMock(return_value=None)
-    mock_db_session.begin = MagicMock(return_value=mock_session_begin)
+    mock_db_session.begin_nested = MagicMock(return_value=mock_session_begin)
 
     mock_agents_service = AsyncMock()
     mock_agents_service.get_agent_config = AsyncMock(return_value=None)
@@ -219,8 +223,8 @@ async def test_trading_service_execute_trade_atomic_agent_not_found():
     assert "error" in result
     assert "不存在" in result["error"] or "not found" in result["error"].lower()
 
-    # Transaction context should have been used (and exited due to exception)
-    mock_db_session.begin.assert_called_once()
+    # Since Agent validation happens BEFORE transaction, begin_nested should NOT be called
+    mock_db_session.begin_nested.assert_not_called()
 
 
 @pytest.mark.asyncio
@@ -266,7 +270,7 @@ async def test_trading_service_execute_trade_atomic_atomicity():
     mock_session_begin = AsyncMock()
     mock_session_begin.__aenter__ = AsyncMock(return_value=None)
     mock_session_begin.__aexit__ = AsyncMock(return_value=None)
-    mock_db_session.begin = MagicMock(return_value=mock_session_begin)
+    mock_db_session.begin_nested = MagicMock(return_value=mock_session_begin)
 
     mock_agents_service = AsyncMock()
     mock_agents_service.get_agent_config = AsyncMock(
@@ -301,6 +305,6 @@ async def test_trading_service_execute_trade_atomic_atomicity():
     assert "Insufficient funds" in result["error"]
 
     # Verify transaction context was used and exited (for rollback)
-    mock_db_session.begin.assert_called_once()
+    mock_db_session.begin_nested.assert_called_once()
     # The context manager's __aexit__ should have been called
     mock_session_begin.__aexit__.assert_called_once()

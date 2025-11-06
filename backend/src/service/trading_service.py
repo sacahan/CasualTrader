@@ -69,6 +69,8 @@ class TradingService:
 
         # 活躍的 TradingAgent 實例（記憶體中）
         self.active_agents: dict[str, TradingAgent] = {}
+        # 當前執行的 session ID（如果有）
+        self.session_id: str | None = None
 
         logger.info("TradingService initialized")
 
@@ -131,9 +133,11 @@ class TradingService:
                 logger.info(
                     f"🆕 Created session {session_id} for agent {agent_id} ({mode.value}) 🎯"
                 )
+            # 設置當前 session ID
+            self.session_id = session_id
 
             # 4. 更新會Session狀態為 RUNNING
-            await self.session_service.update_session_status(session_id, SessionStatus.RUNNING)
+            await self.session_service.update_session_status(self.session_id, SessionStatus.RUNNING)
 
             # 5. 取得或創建 TradingAgent 實例
             agent = await self._get_or_create_agent(agent_id, agent_config)
@@ -150,7 +154,9 @@ class TradingService:
             result = await agent.run(mode=mode)
 
             # 9. 更新會話狀態為 COMPLETED
-            await self.session_service.update_session_status(session_id, SessionStatus.COMPLETED)
+            await self.session_service.update_session_status(
+                self.session_id, SessionStatus.COMPLETED
+            )
 
             # 10. 更新 Agent 狀態為 INACTIVE（執行完成）
             await self.agents_service.update_agent_status(agent_id, status=AgentStatus.INACTIVE)
@@ -162,7 +168,7 @@ class TradingService:
 
             return {
                 "success": True,
-                "session_id": session_id,
+                "session_id": self.session_id,
                 "mode": mode.value,
                 "execution_time_ms": execution_time_ms,
                 "output": result.get("output") if result else None,
@@ -323,13 +329,16 @@ class TradingService:
                 f"action={action_upper}, quantity={quantity}, price={price}"
             )
 
-            # ⭐ 開始事務 - 所有操作在同一事務內
-            async with self.db_session.begin():
-                # Step 1: 驗證 Agent 存在
-                agent_config = await self.agents_service.get_agent_config(agent_id)
-                if not agent_config:
-                    raise ValueError(f"Agent {agent_id} 不存在")
+            # 🔧 FIX: 在事務外先驗證 Agent 存在
+            # 這避免了「A transaction is already begun on this Session」錯誤
+            agent_config = await self.agents_service.get_agent_config(agent_id)
+            if not agent_config:
+                raise ValueError(f"Agent {agent_id} 不存在")
 
+            # ⭐ 開始事務 - 使用 savepoint() 支援嵌套事務
+            # 如果已有活躍事務，savepoint() 會建立 nested transaction (savepoint)
+            # 如果沒有，它會建立新的事務
+            async with self.db_session.begin_nested():
                 # Step 2: 記錄交易到資料庫
                 total_amount = float(quantity * price)
                 commission = total_amount * 0.001425  # 假設手續費 0.1425%
@@ -345,6 +354,7 @@ class TradingService:
                     decision_reason=decision_reason or "原子交易",
                     company_name=company_name,
                     status="COMPLETED",
+                    session_id=self.session_id if self.session_id else None,
                 )
                 logger.info(f"交易已記錄: {transaction.id}")
 
@@ -382,6 +392,7 @@ class TradingService:
             return {
                 "success": True,
                 "transaction_id": transaction.id,
+                "session_id": self.session_id,
                 "message": f"✅ 交易執行成功\n"
                 f"• 股票: {ticker} ({company_name or '未知'})\n"
                 f"• 類型: {action_upper}\n"
@@ -688,7 +699,7 @@ class TradingService:
             return self.active_agents[agent_id]
 
         logger.debug(f"Creating TradingAgent for {agent_id}")
-        agent = TradingAgent(agent_id, agent_config, self.agents_service)
+        agent = TradingAgent(agent_id, agent_config, self.agents_service, self)
         self.active_agents[agent_id] = agent
         return agent
 
