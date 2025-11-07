@@ -23,6 +23,15 @@ load_dotenv()
 DEFAULT_MODEL = os.getenv("DEFAULT_AI_MODEL", "gpt-5-mini")
 DEFAULT_MAX_TURNS = os.getenv("DEFAULT_MAX_TURNS", 30)
 
+# ==========================================
+# 全局 MCP 伺服器上下文
+# ==========================================
+
+# 用於存儲 async 工具可以訪問的 MCP 伺服器實例
+_sentiment_agent_context = {
+    "tavily_mcp": None,
+}
+
 
 # ==========================================
 # 參數驗證和容錯 Helper 函數
@@ -62,6 +71,173 @@ def parse_tool_params(
             result[k] = v
 
     return result
+
+
+# ==========================================
+# MCP 工具呼叫輔助函數
+# ==========================================
+
+
+async def _call_tavily_search(
+    mcp_server,
+    query: str,
+    max_results: int = 5,
+) -> list[dict[str, Any]]:
+    """
+    透過 tavily_mcp 搜尋新聞。
+
+    Args:
+        mcp_server: tavily_mcp MCPServerStdio 實例
+        query: 搜尋查詢
+        max_results: 最大結果數
+
+    Returns:
+        搜尋結果列表，每筆包含：
+        - title: 新聞標題
+        - url: 連結
+        - content: 新聞內容摘要
+        - source: 來源
+        - timestamp: 發佈時間
+    """
+    try:
+        if not mcp_server:
+            logger.warning("tavily_mcp 不可用，無法執行搜尋")
+            return []
+
+        logger.debug(f"開始 tavily 搜尋: {query}")
+
+        result = await mcp_server.session.call_tool(
+            "tavily_search",
+            {
+                "query": query,
+                "max_results": max_results,
+                "include_images": False,
+                "include_answer": True,
+            },
+        )
+
+        # 解析結果
+        results = result.get("results", [])
+        logger.debug(f"tavily 搜尋完成，取得 {len(results)} 筆結果")
+
+        return results
+
+    except Exception as e:
+        logger.error(f"tavily 搜尋失敗: {e}", exc_info=True)
+        return []
+
+
+def _extract_sentiment_from_text(text: str) -> float:
+    """
+    簡單的文本情緒分析。
+
+    使用關鍵詞匹配進行快速情緒評分。
+
+    Args:
+        text: 文本內容
+
+    Returns:
+        情緒分數 (-1.0 到 1.0)
+    """
+    if not text:
+        return 0.0
+
+    text_lower = text.lower()
+
+    # 正面詞彙
+    positive_words = [
+        "買超",
+        "上升",
+        "利好",
+        "看好",
+        "增長",
+        "強勁",
+        "上漲",
+        "突破",
+        "創新高",
+        "超預期",
+        "成長",
+        "樂觀",
+        "向上",
+        "漲幅",
+    ]
+
+    # 負面詞彙
+    negative_words = [
+        "賣超",
+        "下跌",
+        "利空",
+        "看壞",
+        "下降",
+        "疲弱",
+        "下滑",
+        "破位",
+        "創新低",
+        "不及預期",
+        "衰退",
+        "悲觀",
+        "向下",
+        "跌幅",
+    ]
+
+    positive_count = sum(1 for word in positive_words if word in text_lower)
+    negative_count = sum(1 for word in negative_words if word in text_lower)
+
+    total = positive_count + negative_count
+    if total == 0:
+        return 0.0
+
+    sentiment = (positive_count - negative_count) / total
+    return max(-1.0, min(1.0, sentiment))
+
+
+def _extract_key_topics(articles: list[dict[str, Any]]) -> list[str]:
+    """
+    從文章列表提取關鍵主題。
+
+    簡單實作：從標題和內容中提取常見詞彙。
+
+    Args:
+        articles: 文章列表
+
+    Returns:
+        關鍵主題列表
+    """
+    topics = {}
+
+    keywords_to_watch = [
+        "台積電",
+        "TSMC",
+        "晶片",
+        "AI",
+        "半導體",
+        "電動車",
+        "EV",
+        "蘋果",
+        "鴻海",
+        "聯發科",
+        "聯電",
+        "三星",
+        "英特爾",
+        "房市",
+        "央行",
+        "匯率",
+        "利率",
+        "股市",
+    ]
+
+    for article in articles:
+        title = article.get("title", "").lower()
+        content = article.get("content", "").lower()
+        text = f"{title} {content}"
+
+        for keyword in keywords_to_watch:
+            if keyword.lower() in text:
+                topics[keyword] = topics.get(keyword, 0) + 1
+
+    # 返回出現最頻繁的主題（最多3個）
+    sorted_topics = sorted(topics.items(), key=lambda x: x[1], reverse=True)
+    return [topic for topic, _ in sorted_topics[:3]]
 
 
 # ===== Pydantic Models for Tool Parameters =====
@@ -473,18 +649,21 @@ def analyze_money_flow(
 def analyze_news_sentiment(
     ticker: str = None,
     news_data: list = None,
+    *,
+    auto_fetch: bool = True,
     **kwargs,
-) -> str:
+) -> dict:
     """分析新聞情緒
 
     **可選參數：**
         ticker: 股票代號 (例如: "2330")，None 表示整體市場 [可選]
-        news_data: 新聞列表，缺少時使用空列表 [可選]
+        news_data: 新聞列表，缺少時根據 auto_fetch 決定行為 [可選]
             每筆包含：
             - title: 標題
             - content: 內容
-            - sentiment: 情緒分數 (-1 到 1)
-            - timestamp: 時間
+            - sentiment: 情緒分數 (-1 到 1) [可選]
+            - timestamp: 時間 [可選]
+        auto_fetch: 當 news_data 為空時是否自動透過 tavily_mcp 搜尋 [可選，預設 True]
         **kwargs: 額外參數（用於容錯）
 
     Returns:
@@ -496,23 +675,84 @@ def analyze_news_sentiment(
                 "negative_ratio": float,
                 "sentiment_score": float,   # -100 到 100
                 "key_topics": [str, ...],
-                "interpretation": str
+                "interpretation": str,
+                "data_source": str          # "provided" | "fetched" | "empty"
             }
 
     Note:
-        此函數具有高度的容錯能力，即使缺少參數也能返回有效結果。
+        此函數具有高度的容錯能力，即使無法蒐集數據也能返回有效結果。
+        當 news_data 為空且 auto_fetch=True 時，自動透過 tavily_mcp 搜尋。
+
+        由於 @function_tool 期望同步函數，async 調用已包裝為同步。
     """
     try:
+        import asyncio
+
         # 參數驗證和容錯
         params = parse_tool_params(ticker=ticker, news_data=news_data, **kwargs)
 
         _ticker = params.get("ticker") or ticker
         _news_data = params.get("news_data") or news_data
 
-        # 如果 news_data 為 None，使用空列表
-        if not _news_data:
-            logger.warning("缺少 news_data 參數，使用空列表")
+        target = _ticker or "市場"
+        logger.info(
+            f"開始分析新聞情緒 | 標的: {target} | 傳入新聞數: {len(_news_data) if _news_data else 0}"
+        )
+
+        # 如果沒有數據且允許自動蒐集，則搜尋新聞
+        data_source = "provided"
+        if not _news_data and auto_fetch:
+            logger.info(f"無新聞數據，自動透過 tavily 搜尋 | 標的: {target}")
+
+            tavily_mcp = _sentiment_agent_context.get("tavily_mcp")
+            if tavily_mcp:
+                # 構建搜尋查詢
+                if _ticker:
+                    query = f"{_ticker} news today"
+                else:
+                    query = "Taiwan stock market news today"
+
+                # 以同步方式運行 async 調用
+                try:
+                    loop = asyncio.get_running_loop()
+                    # 已在 async 上下文中，建立任務
+                    search_results = asyncio.run_coroutine_threadsafe(
+                        _call_tavily_search(tavily_mcp, query, max_results=5), loop
+                    ).result(timeout=10)
+                except RuntimeError:
+                    # 沒有運行的 loop，建立新的
+                    search_results = asyncio.run(
+                        _call_tavily_search(tavily_mcp, query, max_results=5)
+                    )
+
+                if search_results:
+                    data_source = "fetched"
+                    logger.info(f"取得 {len(search_results)} 筆新聞")
+
+                    # 轉換為 NewsItem 物件
+                    _news_data = []
+                    for result in search_results:
+                        sentiment = _extract_sentiment_from_text(
+                            f"{result.get('title', '')} {result.get('content', '')}"
+                        )
+                        _news_data.append(
+                            NewsItem(
+                                title=result.get("title", ""),
+                                content=result.get("content", ""),
+                                sentiment=sentiment,
+                                timestamp=result.get("timestamp", datetime.now().isoformat()),
+                            )
+                        )
+                else:
+                    logger.warning(f"tavily 搜尋無結果 | 標的: {target}")
+                    _news_data = []
+            else:
+                logger.warning("tavily_mcp 不可用，無法自動搜尋新聞")
+                _news_data = []
+        elif not _news_data:
+            logger.debug(f"無新聞數據且 auto_fetch=False | 標的: {target}")
             _news_data = []
+            data_source = "empty"
 
         # 轉換字典為 NewsItem 物件
         if _news_data and isinstance(_news_data[0], dict):
@@ -520,13 +760,13 @@ def analyze_news_sentiment(
                 NewsItem(**item) if isinstance(item, dict) else item for item in _news_data
             ]
 
-        target = _ticker or "市場"
-        logger.info(f"開始分析新聞情緒 | 標的: {target} | 新聞數: {len(_news_data)}")
+        logger.info(
+            f"準備分析新聞 | 標的: {target} | 新聞數: {len(_news_data)} | 來源: {data_source}"
+        )
 
         if not _news_data:
-            logger.warning(f"無新聞數據 | 標的: {target}")
+            logger.debug(f"無新聞數據可分析 | 標的: {target}")
             return {
-                "error": "無新聞數據",
                 "ticker": _ticker,
                 "news_count": 0,
                 "positive_ratio": 0,
@@ -534,6 +774,7 @@ def analyze_news_sentiment(
                 "sentiment_score": 0,
                 "key_topics": [],
                 "interpretation": "無可用新聞數據",
+                "data_source": data_source,
             }
 
         news_count = len(_news_data)
@@ -554,6 +795,11 @@ def analyze_news_sentiment(
         avg_sentiment = sum(sentiments) / len(sentiments) if sentiments else 0
         sentiment_score = avg_sentiment * 100
 
+        # 提取關鍵主題
+        key_topics = _extract_key_topics(
+            [{"title": n.title, "content": n.content} for n in _news_data]
+        )
+
         # 解讀
         if sentiment_score > 50:
             interpretation = "新聞情緒極度正面，市場情緒樂觀"
@@ -568,7 +814,7 @@ def analyze_news_sentiment(
 
         logger.info(
             f"新聞情緒分析完成 | 標的: {target} | 分數: {sentiment_score:.1f} | "
-            f"正面: {positive_ratio:.1%} | 負面: {negative_ratio:.1%}"
+            f"正面: {positive_ratio:.1%} | 負面: {negative_ratio:.1%} | 來源: {data_source}"
         )
 
         return {
@@ -577,8 +823,9 @@ def analyze_news_sentiment(
             "positive_ratio": positive_ratio,
             "negative_ratio": negative_ratio,
             "sentiment_score": sentiment_score,
-            "key_topics": [],  # 可以擴展實作關鍵詞提取
+            "key_topics": key_topics,
             "interpretation": interpretation,
+            "data_source": data_source,
         }
 
     except Exception as e:
@@ -592,6 +839,7 @@ def analyze_news_sentiment(
             "sentiment_score": 0,
             "key_topics": [],
             "interpretation": f"分析失敗: {str(e)}",
+            "data_source": "error",
         }
 
 
@@ -599,19 +847,22 @@ def analyze_news_sentiment(
 def analyze_social_sentiment(
     ticker: str,
     social_data: SocialData = None,
+    *,
+    auto_fetch: bool = True,
     **kwargs,
-) -> str:
+) -> dict:
     """分析社群媒體情緒
 
     **必要參數：**
         ticker: 股票代號 (例如: "2330") [必要]
 
     **可選參數：**
-        social_data: 社群數據，缺少時使用預設值 [可選]
+        social_data: 社群數據，缺少時根據 auto_fetch 決定行為 [可選]
             - mention_count: 提及次數
             - positive_mentions: 正面提及
             - negative_mentions: 負面提及
             - trending: 是否熱門
+        auto_fetch: 當 social_data 為空時是否自動透過 tavily_mcp 搜尋 [可選，預設 True]
         **kwargs: 額外參數（用於容錯）
 
     Returns:
@@ -622,13 +873,19 @@ def analyze_social_sentiment(
                 "sentiment_ratio": float,    # 正負面比
                 "trending_status": str,      # 熱度狀態
                 "sentiment_score": float,    # -100 到 100
-                "interpretation": str
+                "interpretation": str,
+                "data_source": str           # "provided" | "fetched" | "empty"
             }
 
-    Raises:
-        返回錯誤字典：缺少必要參數或無社群數據
+    Note:
+        此函數具有高度的容錯能力，即使無法蒐集數據也能返回有效結果。
+        當 social_data 為空且 auto_fetch=True 時，自動透過 tavily_mcp 搜尋社群討論。
+
+        由於 @function_tool 期望同步函數，async 調用已包裝為同步。
     """
     try:
+        import asyncio
+
         # 參數驗證和容錯
         params = parse_tool_params(ticker=ticker, social_data=social_data, **kwargs)
 
@@ -646,19 +903,80 @@ def analyze_social_sentiment(
                 "trending_status": "未知",
                 "sentiment_score": 0,
                 "interpretation": "無法分析，缺少股票代號",
+                "data_source": "error",
             }
 
-        # 如果 social_data 為 None，使用預設值
+        logger.info(f"開始分析社群情緒 | 股票: {_ticker} | 傳入社群數據: {bool(_social_data)}")
+
+        # 如果沒有數據且允許自動蒐集，則搜尋社群討論
+        data_source = "provided"
+        if not _social_data and auto_fetch:
+            logger.info(f"無社群數據，自動透過 tavily 搜尋 | 股票: {_ticker}")
+
+            tavily_mcp = _sentiment_agent_context.get("tavily_mcp")
+            if tavily_mcp:
+                # 構建搜尋查詢（聚焦社群討論和輿情）
+                query = f"{_ticker} PTT Dcard 討論 社群輿情"
+
+                # 以同步方式運行 async 調用
+                try:
+                    loop = asyncio.get_running_loop()
+                    search_results = asyncio.run_coroutine_threadsafe(
+                        _call_tavily_search(tavily_mcp, query, max_results=5), loop
+                    ).result(timeout=10)
+                except RuntimeError:
+                    search_results = asyncio.run(
+                        _call_tavily_search(tavily_mcp, query, max_results=5)
+                    )
+
+                if search_results:
+                    data_source = "fetched"
+                    logger.info(f"取得 {len(search_results)} 筆社群相關結果")
+
+                    # 簡單統計：根據情緒分析結果計算提及和態度
+                    mention_count = len(search_results) * 100  # 估計提及次數
+                    positive_mentions = 0
+                    negative_mentions = 0
+
+                    for result in search_results:
+                        sentiment = _extract_sentiment_from_text(
+                            f"{result.get('title', '')} {result.get('content', '')}"
+                        )
+                        if sentiment > 0.2:
+                            positive_mentions += 1
+                        elif sentiment < -0.2:
+                            negative_mentions += 1
+
+                    _social_data = {
+                        "mention_count": mention_count,
+                        "positive_mentions": positive_mentions,
+                        "negative_mentions": negative_mentions,
+                        "trending": len(search_results) > 3,
+                    }
+                    logger.debug(f"社群數據構建完成: {_social_data}")
+                else:
+                    logger.warning(f"tavily 搜尋無結果 | 股票: {_ticker}")
+                    _social_data = None
+            else:
+                logger.warning("tavily_mcp 不可用，無法自動搜尋社群數據")
+                _social_data = None
+        elif not _social_data:
+            logger.debug(f"無社群數據且 auto_fetch=False | 股票: {_ticker}")
+            _social_data = None
+            data_source = "empty"
+
+        # 如果轉換後仍為 None，使用預設值
         if not _social_data:
-            logger.warning("缺少 social_data 參數，使用預設值")
+            logger.debug(f"無法取得社群數據，使用預設值 | 股票: {_ticker}")
             _social_data = {
                 "mention_count": 0,
                 "positive_mentions": 0,
                 "negative_mentions": 0,
                 "trending": False,
             }
-        elif isinstance(_social_data, dict):
-            # 確保字典有必要的鍵
+
+        # 確保字典類型
+        if isinstance(_social_data, dict):
             pass
         else:
             # 如果是 Pydantic 模型，轉換為字典
@@ -667,7 +985,7 @@ def analyze_social_sentiment(
             elif hasattr(_social_data, "model_dump"):
                 _social_data = _social_data.model_dump()
 
-        logger.info(f"開始分析社群情緒 | 股票: {_ticker}")
+        logger.info(f"準備分析社群 | 股票: {_ticker} | 來源: {data_source}")
 
         mention_count = _social_data.get("mention_count", 0)
         positive = _social_data.get("positive_mentions", 0)
@@ -675,15 +993,15 @@ def analyze_social_sentiment(
         trending = _social_data.get("trending", False)
 
         if mention_count == 0:
-            logger.warning(f"無社群數據 | 股票: {_ticker}")
+            logger.debug(f"無社群數據 | 股票: {_ticker}")
             return {
-                "error": "無社群數據",
                 "ticker": _ticker,
                 "mention_count": 0,
                 "sentiment_ratio": 0,
                 "trending_status": "低關注",
                 "sentiment_score": 0,
                 "interpretation": "無社群提及數據",
+                "data_source": data_source,
             }
 
         logger.debug(
@@ -723,7 +1041,7 @@ def analyze_social_sentiment(
 
         logger.info(
             f"社群情緒分析完成 | 股票: {_ticker} | 分數: {sentiment_score:.1f} | "
-            f"熱度: {trending_status} | 提及: {mention_count}"
+            f"熱度: {trending_status} | 提及: {mention_count} | 來源: {data_source}"
         )
 
         return {
@@ -733,6 +1051,7 @@ def analyze_social_sentiment(
             "trending_status": trending_status,
             "sentiment_score": sentiment_score,
             "interpretation": interpretation,
+            "data_source": data_source,
         }
 
     except Exception as e:
@@ -745,6 +1064,7 @@ def analyze_social_sentiment(
             "trending_status": "未知",
             "sentiment_score": 0,
             "interpretation": f"分析失敗: {str(e)}",
+            "data_source": "error",
         }
 
 
@@ -934,10 +1254,20 @@ async def get_sentiment_agent(
         - 只使用自訂工具進行情緒分析
         - Timeout 由主 TradingAgent 的 execution_timeout 統一控制
         - Sub-agent 作為 Tool 執行時會受到主 Agent 的 timeout 限制
+        - 工具會自動透過全局上下文訪問 tavily_mcp 進行數據蒐集
     """
     logger.info(f"get_sentiment_agent() called with model={llm_model}")
 
     logger.debug("Creating custom tools with function_tool")
+
+    # 提取 tavily_mcp 伺服器並設置到全局上下文（工具可訪問）
+    if mcp_servers:
+        for server in mcp_servers:
+            if hasattr(server, "name") and server.name == "tavily_mcp":
+                _sentiment_agent_context["tavily_mcp"] = server
+                logger.debug("tavily_mcp 已設置到全局上下文")
+                break
+
     all_tools = [
         calculate_fear_greed_index,
         analyze_money_flow,
@@ -945,10 +1275,12 @@ async def get_sentiment_agent(
         analyze_social_sentiment,
         generate_sentiment_signals,
     ]
-    logger.debug(f"Total tools: {len(all_tools)}")
 
+    logger.debug(f"Total tools: {len(all_tools)}")
+    tavily_available = _sentiment_agent_context.get("tavily_mcp") is not None
     logger.info(
-        f"Creating Agent with model={llm_model}, mcp_servers={len(mcp_servers)}, tools={len(all_tools)}"
+        f"Creating Agent with model={llm_model}, mcp_servers={len(mcp_servers) if mcp_servers else 0}, "
+        f"tools={len(all_tools)}, tavily_mcp={'available' if tavily_available else 'not available'}"
     )
 
     # GitHub Copilot 不支援 tool_choice 參數

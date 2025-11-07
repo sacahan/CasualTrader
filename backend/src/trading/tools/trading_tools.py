@@ -364,6 +364,104 @@ def create_trading_tools(
         return await get_portfolio_status(agent_service=agent_service, agent_id=agent_id)
 
     @function_tool(strict_mode=False)
+    async def get_stock_price_tool(symbol: str, **kwargs) -> str:
+        """
+        查詢指定股票的即時價格
+
+        此工具用於取得台灣股票的即時價格資訊。
+
+        **必要參數：**
+            symbol: 股票代號，例如 "2330" (台積電) 或 "0050" (元大台灣50) [必要]
+                   也可使用公司名稱，例如 "台積電"
+
+        **可選參數：**
+            **kwargs: 額外參數（用於容錯）
+
+        Returns:
+            str: 股票價格詳細資訊，包含目前價格、漲跌、成交量等
+
+        Examples:
+            - 查詢台積電價格：get_stock_price_tool(symbol="2330")
+            - 查詢元大台灣50價格：get_stock_price_tool(symbol="0050")
+            - 使用公司名稱查詢：get_stock_price_tool(symbol="台積電")
+
+        Raises:
+            返回錯誤訊息：股票代號不存在或系統異常
+        """
+        try:
+            # 驗證並轉換參數
+            _symbol = str(symbol).strip()
+
+            if not _symbol:
+                return "❌ 股票代號不能為空"
+
+            # 調用 casual_market_mcp 的 get_taiwan_stock_price 工具
+            result = await casual_market_mcp.session.call_tool(
+                "get_taiwan_stock_price",
+                {
+                    "symbol": _symbol,
+                },
+            )
+
+            # 解析結果並格式化回傳
+            if result and hasattr(result, "content") and result.content:
+                # 提取 TextContent 物件的文本內容
+                content_item = result.content[0]
+                text_content = (
+                    content_item.text if hasattr(content_item, "text") else str(content_item)
+                )
+
+                # 解析 JSON
+                try:
+                    data = json.loads(text_content)
+                except json.JSONDecodeError:
+                    # 如果解析失敗，嘗試直接使用內容
+                    return f"✅ 查詢指令已送出：{_symbol}"
+
+                if data.get("success"):
+                    stock_data = data.get("data", {})
+                    symbol_code = stock_data.get("symbol", _symbol)
+                    company_name = stock_data.get("company_name", "未知")
+                    current_price = stock_data.get("current_price")
+                    change = stock_data.get("change")
+                    change_percent = stock_data.get("change_percent")
+                    volume = stock_data.get("volume")
+                    high = stock_data.get("high")
+                    low = stock_data.get("low")
+                    open_price = stock_data.get("open")
+                    previous_close = stock_data.get("previous_close")
+
+                    # 組合詳細資訊
+                    price_info = f"""
+📊 **股票即時價格查詢結果**
+
+🏢 **基本資訊**
+• 股票代號：{symbol_code}
+• 公司名稱：{company_name}
+
+💹 **價格資訊**
+• 目前價格：{current_price} 元
+• 開盤價：{open_price} 元
+• 最高價：{high} 元
+• 最低價：{low} 元
+• 昨收價：{previous_close} 元
+• 漲跌：{change:+.2f} 元 ({change_percent:+.2f}%)
+
+📈 **成交資訊**
+• 成交量：{volume} 股
+"""
+                    return price_info.strip()
+                else:
+                    error = data.get("error", "未知錯誤")
+                    return f"❌ 查詢失敗：{error}"
+
+            return f"✅ 查詢指令已送出：{_symbol}"
+
+        except Exception as e:
+            logger.error(f"查詢股票價格失敗: {e}", exc_info=True)
+            return f"❌ 查詢失敗：{str(e)}"
+
+    # @function_tool(strict_mode=False)
     async def buy_taiwan_stock_tool(
         symbol: str,
         quantity: int,
@@ -465,7 +563,7 @@ def create_trading_tools(
             logger.error(f"模擬買入失敗: {e}", exc_info=True)
             raise
 
-    @function_tool(strict_mode=False)
+    # @function_tool(strict_mode=False)
     async def sell_taiwan_stock_tool(
         symbol: str,
         quantity: int,
@@ -626,10 +724,11 @@ def create_trading_tools(
     if include_buy_sell:
         tools.append(execute_trade_atomic_tool)
 
-    # 投資組合工具
+    # 投資組合和查詢工具
     if include_portfolio:
         tools.append(record_trade_tool)
         tools.append(get_portfolio_status_tool)
+        tools.append(get_stock_price_tool)
 
     # 注意: buy_taiwan_stock_tool 和 sell_taiwan_stock_tool 已棄用，不再暴露給 Agent
     # 所有交易必須使用 execute_trade_atomic_tool
