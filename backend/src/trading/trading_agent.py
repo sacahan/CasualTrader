@@ -192,11 +192,19 @@ class TradingAgent:
             # 7. 創建 OpenAI Agent（使用 LiteLLM 模型）
             model_settings_dict = {
                 "include_usage": True,
+                "reasoning": {"effort": "medium"},
+                "parallel_tool_calls": True,
             }
 
-            # 只有非 GitHub Copilot 模型才支援 tool_choice
+            # 只有特定模型支援 tool_choice，OpenAI 系列模型不支援
             model_name = self.llm_model.model if self.llm_model else ""
-            if "github_copilot" not in model_name.lower():
+            supports_tool_choice = (
+                "gpt-5" not in model_name.lower()
+                and "gpt-5-mini" not in model_name.lower()
+                and "gpt-4.1" not in model_name.lower()
+                and "gpt-4o" not in model_name.lower()
+            )
+            if supports_tool_choice:
                 model_settings_dict["tool_choice"] = "required"
 
             if self.extra_headers:
@@ -698,10 +706,12 @@ class TradingAgent:
         ]
 
         # 投資偏好設定（如果有的話）
+        # 注意：不在 instructions 中提及具體股票代號，避免產生偏見
+        # investment_preferences 應該在任務執行過程中作為參考，而非硬性限制
         if self.agent_config.investment_preferences:
             instructions_parts.extend(
                 [
-                    f"你對這些公司特別感興趣（股票代號）：{self.agent_config.investment_preferences}。",
+                    f"你可以參考 {self.agent_config.investment_preferences} 中的股票清單，但不應限制於這些股票。",
                 ]
             )
 
@@ -718,6 +728,7 @@ class TradingAgent:
             + """
 
 **🎯 你的核心目標：**
+- 你應該基於市場分析和投資策略，廣泛尋找最佳投資機會（不限於特定股票）
 - 最大化投資回報，同時嚴格控制風險
 - 基於充分的市場分析進行理性、謹慎的決策
 - 遵守所有交易約束和持股限制
@@ -772,7 +783,7 @@ class TradingAgent:
             action_message = f"""
 **🎯 交易執行模式 (TRADING MODE)**
 
-目的：分析市場機會並執行交易。
+自主動作：全面評估台股分析市場機會並執行交易。
 
 ---
 {portfolio_status}
@@ -804,15 +815,16 @@ class TradingAgent:
 **📋 執行流程：**
 
 1️⃣ 使用 get_portfolio_status_tool 查詢當前狀態
-2️⃣ 使用各分析 Sub-Agents 進行全面評估
-3️⃣ 使用 memory_mcp 查詢過往決策參考
+2️⃣ 使用 memory_mcp 查詢是否有先前決策後決定下一步動作
+3️⃣ 使用各分析 Sub-Agents 對候選標的進行全面評估
 4️⃣ 決策確認無誤後，調用 execute_trade_atomic() 執行交易
-5️⃣ 使用 memory_mcp 記錄本次決策和結果
+5️⃣ 使用 memory_mcp 記錄本次結果或是下一輪行動方案
 
 **⚠️ 重要約束：**
 
 • 必須使用 execute_trade_atomic() 執行交易（原子性保證）
 • 必須根據現價進行交易，例如現價為每股 1050 元，則只能以 1050 元執行買入或賣出
+• 買入前需確認有足夠資金，賣出前需確認有足夠持股
 • 遵守最大持股比例限制：{self.agent_config.max_position_size}%
 • 交易後必須在決策理由中說明：分析過程、市場判斷、風險考量
 """
@@ -821,7 +833,7 @@ class TradingAgent:
             action_message = f"""
 **⚖️ 投資組合重新平衡模式 (REBALANCING MODE)**
 
-目的：檢視投資組合並根據策略進行重新平衡調整。
+自主動作：檢視投資組合並根據策略進行重新平衡調整。
 
 ---
 {portfolio_status}
@@ -864,7 +876,7 @@ class TradingAgent:
 • 焦點在現有持股評估，不需要識別新的投資機會
 • 分析應符合投資策略和最大持股比例限制（{self.agent_config.max_position_size}%）
 • 考量交易成本和稅務影響（在建議中說明）
-• 分析結論應在 memory_mcp 中清楚記錄，供未來參考
+• 分析結論應在 memory_mcp 中清楚記錄，供下一輪行動參考
 
 **💡 提示：**
 

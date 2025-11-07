@@ -170,18 +170,20 @@ def technical_agent_instructions() -> str:
 
 @function_tool(strict_mode=False)
 def calculate_technical_indicators(
-    ticker: str = None,
-    price_data: list = None,
+    ticker: str,
+    price_data: list,
     indicators: list = None,
     **kwargs,
 ) -> str:
     """計算技術指標
 
-    Args:
-        ticker: 股票代號 (例如: "2330")
-        price_data: 歷史價格數據列表,每筆包含 date, open, high, low, close, volume
-        indicators: 要計算的指標，可以是單個字符串 "macd" 或列表 ["ma", "rsi", "macd", "bollinger", "kd"]，
-                   None 表示計算全部指標
+    **必要參數：**
+        ticker: 股票代號 (例如: "2330") [必要]
+        price_data: 歷史價格數據列表，每筆包含 date, open, high, low, close, volume [必要]
+
+    **可選參數：**
+        indicators: 要計算的指標，可以是單個字符串 "macd" 或列表 ["ma", "rsi", "macd", "bollinger", "kd"]。
+                   預設為 None，表示計算全部指標 [可選]
         **kwargs: 額外參數（用於容錯）
 
     Returns:
@@ -194,6 +196,9 @@ def calculate_technical_indicators(
                     ...
                 }
             }
+
+    Raises:
+        返回錯誤字典：缺少必要參數或數據不足
     """
     try:
         # 參數驗證和容錯
@@ -286,17 +291,19 @@ def calculate_technical_indicators(
 
 @function_tool(strict_mode=False)
 def identify_chart_patterns(
-    ticker: str = None,
-    price_data: list = None,
+    ticker: str,
+    price_data: list,
     lookback_days: int = 60,
     **kwargs,
 ) -> str:
     """識別圖表型態
 
-    Args:
-        ticker: 股票代號 (例如: "2330")
-        price_data: 歷史價格數據列表
-        lookback_days: 回溯分析天數,預設 60 天
+    **必要參數：**
+        ticker: 股票代號 (例如: "2330") [必要]
+        price_data: 歷史價格數據列表 [必要]
+
+    **可選參數：**
+        lookback_days: 回溯分析天數，預設 60 天 [可選]
         **kwargs: 額外參數（用於容錯）
 
     Returns:
@@ -313,6 +320,9 @@ def identify_chart_patterns(
                 ],
                 "pattern_count": int
             }
+
+    Raises:
+        返回錯誤字典：缺少必要參數或數據不足
     """
     try:
         # 參數驗證和容錯
@@ -396,15 +406,17 @@ def identify_chart_patterns(
 
 @function_tool(strict_mode=False)
 def analyze_trend(
-    ticker: str = None,
-    price_data: list = None,
+    ticker: str,
+    price_data: list,
     **kwargs,
 ) -> str:
     """分析趨勢方向和強度
 
-    Args:
-        ticker: 股票代號 (例如: "2330")
-        price_data: 歷史價格數據列表,至少需要 20 筆數據
+    **必要參數：**
+        ticker: 股票代號 (例如: "2330") [必要]
+        price_data: 歷史價格數據列表，至少需要 20 筆數據 [必要]
+
+    **可選參數：**
         **kwargs: 額外參數（用於容錯）
 
     Returns:
@@ -416,6 +428,9 @@ def analyze_trend(
                 "short_term_momentum": float,  # 短期動能
                 "mid_term_momentum": float     # 中期動能
             }
+
+    Raises:
+        返回錯誤字典：缺少必要參數或數據不足（少於 20 筆）
     """
     try:
         # 參數驗證和容錯
@@ -488,15 +503,17 @@ def analyze_trend(
 
 @function_tool(strict_mode=False)
 def analyze_support_resistance(
-    ticker: str = None,
-    price_data: list = None,
+    ticker: str,
+    price_data: list,
     **kwargs,
 ) -> str:
     """分析支撐和壓力位
 
-    Args:
-        ticker: 股票代號 (例如: "2330")
-        price_data: 歷史價格數據列表
+    **必要參數：**
+        ticker: 股票代號 (例如: "2330") [必要]
+        price_data: 歷史價格數據列表 [必要]
+
+    **可選參數：**
         **kwargs: 額外參數（用於容錯）
 
     Returns:
@@ -507,6 +524,9 @@ def analyze_support_resistance(
                 "support_levels": [float, ...],  # 支撐位列表 (由近到遠)
                 "resistance_levels": [float, ...] # 壓力位列表 (由近到遠)
             }
+
+    Raises:
+        返回錯誤字典：缺少必要參數或數據為空
     """
     try:
         # 參數驗證和容錯
@@ -589,11 +609,11 @@ def generate_trading_signals(
 ) -> str:
     """綜合分析產生交易訊號
 
-    Args:
-        ticker: 股票代號 (例如: "2330")
-        technical_indicators_json: 技術指標計算結果的 JSON 字串 (來自 calculate_technical_indicators)
-        trend_analysis: 趨勢分析結果 (來自 analyze_trend)
-        patterns: 圖表型態識別結果 (來自 identify_chart_patterns)
+    **可選參數：**
+        ticker: 股票代號 (例如: "2330") [可選，缺少時預設為 "未知"]
+        technical_indicators_json: 技術指標計算結果的 JSON 字串 (來自 calculate_technical_indicators) [可選]
+        trend_analysis: 趨勢分析結果 (來自 analyze_trend)，缺少時使用預設盤整趨勢 [可選]
+        patterns: 圖表型態識別結果 (來自 identify_chart_patterns)，缺少時預設為空列表 [可選]
         **kwargs: 額外參數（用於容錯）
 
     Returns:
@@ -607,6 +627,9 @@ def generate_trading_signals(
                 ],
                 "timestamp": str           # ISO 格式時間戳
             }
+
+    Note:
+        此函數具有高度的容錯能力，即使缺少部分輸入參數也能返回有效結果。
     """
     try:
         # 參數驗證和容錯

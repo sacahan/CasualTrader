@@ -136,18 +136,26 @@ def fundamental_agent_instructions() -> str:
 
 @function_tool(strict_mode=False)
 def calculate_financial_ratios(
-    ticker: str = None,
-    financial_data: dict = None,
+    ticker: str,
+    financial_data: dict,
 ) -> dict:
     """計算財務比率
 
-    Args:
-        ticker: 股票代號 (例如: "2330")
-        financial_data: 財務數據,包含 revenue, net_income, total_assets 等
-        **kwargs: 額外參數（用於容錯）
+    **必要參數：**
+        ticker: 股票代號 (例如: "2330") [必要]
+        financial_data: 財務數據，包含 revenue, net_income, total_assets 等 [必要]
 
     Returns:
         dict: 財務比率結果 (ROE, ROA, 負債比, 流動比率等)
+            {
+                "ticker": str,
+                "profitability": {"roe": float, "roa": float, "net_margin": float},
+                "solvency": {"debt_ratio": float, "current_ratio": float},
+                "valuation": {"pe_ratio": float, "pb_ratio": float}
+            }
+
+    Raises:
+        返回錯誤字典：缺少必要參數或數據不足
     """
     try:
         # 參數驗證和容錯
@@ -240,18 +248,28 @@ def calculate_financial_ratios(
 
 @function_tool(strict_mode=False)
 def analyze_financial_health(
-    ticker: str = None,
-    financial_ratios: dict = None,
+    ticker: str,
+    financial_ratios: dict,
 ) -> dict:
     """分析財務體質
 
-    Args:
-        ticker: 股票代號 (例如: "2330")
-        financial_ratios: 財務比率 (來自 calculate_financial_ratios)
-        **kwargs: 額外參數（用於容錯）
+    **必要參數：**
+        ticker: 股票代號 (例如: "2330") [必要]
+        financial_ratios: 財務比率 (來自 calculate_financial_ratios) [必要]
 
     Returns:
-        dict: 財務體質分析 (健康度評分、評級、優勢、弱點)
+        dict: 財務體質分析結果
+            {
+                "ticker": str,
+                "health_score": int,        # 0-100
+                "health_grade": str,        # A-F
+                "strengths": list[str],
+                "weaknesses": list[str],
+                "assessment": str
+            }
+
+    Raises:
+        返回錯誤字典：缺少必要參數或數據不足
     """
     try:
         # 參數驗證和容錯
@@ -362,23 +380,37 @@ def analyze_financial_health(
 
 @function_tool(strict_mode=False)
 def evaluate_valuation(
-    ticker: str = None,
-    current_price: float = None,
-    pe_ratio: float = None,
+    ticker: str,
+    current_price: float,
+    pe_ratio: float,
     financial_ratios: dict = None,
     industry_avg: dict = None,
 ) -> dict:
     """評估估值水準
 
-    Args:
-        ticker: 股票代號 (例如: "2330")
-        current_price: 當前股價
-        pe_ratio: 本益比
-        financial_ratios: 財務比率 (來自 calculate_financial_ratios)
-        industry_avg: 產業平均值 (可選)
+    **必要參數：**
+        ticker: 股票代號 (例如: "2330") [必要]
+        current_price: 當前股價 [必要]
+        pe_ratio: 本益比 [必要]
+
+    **可選參數：**
+        financial_ratios: 財務比率 (來自 calculate_financial_ratios)，缺少時使用預設值 [可選]
+        industry_avg: 產業平均值，缺少時使用預設值 [可選]
 
     Returns:
-        dict: 估值分析 (估值水準、合理價、折溢價率)
+        dict: 估值分析結果
+            {
+                "ticker": str,
+                "current_price": float,
+                "valuation_level": str,    # 便宜/合理/昂貴
+                "fair_value": float,
+                "discount_rate": float,
+                "pe_assessment": str,
+                "pb_assessment": str
+            }
+
+    Raises:
+        返回錯誤字典：缺少必要參數
     """
     try:
         # 參數驗證和容錯
@@ -484,19 +516,32 @@ def evaluate_valuation(
 
 @function_tool(strict_mode=False)
 def analyze_growth_potential(
-    ticker: str = None,
-    historical_data: dict = None,
+    ticker: str,
+    historical_data: dict,
     **kwargs,
 ) -> str:
     """分析成長潛力
 
-    Args:
-        ticker: 股票代號 (例如: "2330")
-        historical_data: 歷史財務數據 (營收成長率、EPS 成長率)
+    **必要參數：**
+        ticker: 股票代號 (例如: "2330") [必要]
+        historical_data: 歷史財務數據，包含營收成長率、EPS 成長率 [必要]
+
+    **可選參數：**
         **kwargs: 額外參數（用於容錯）
 
     Returns:
-        dict: 成長潛力分析 (成長評分、成長趨勢)
+        dict: 成長潛力分析結果
+            {
+                "ticker": str,
+                "growth_score": int,       # 0-100
+                "growth_trend": str,       # 加速/穩定/趨緩
+                "revenue_growth": float,
+                "eps_growth": float,
+                "assessment": str
+            }
+
+    Raises:
+        返回錯誤字典：缺少必要參數或數據不足
     """
     try:
         # 參數驗證和容錯
@@ -595,15 +640,27 @@ def generate_investment_rating(
 ) -> str:
     """產生投資評級
 
-    Args:
-        ticker: 股票代號 (例如: "2330")
-        financial_health: 財務體質分析
-        valuation: 估值分析
-        growth: 成長分析
+    **可選參數：**
+        ticker: 股票代號 (例如: "2330")，缺少時預設為 "未知" [可選]
+        financial_health: 財務體質分析，缺少時使用預設值 [可選]
+        valuation: 估值分析，缺少時使用預設值 [可選]
+        growth: 成長分析，缺少時使用預設值 [可選]
         **kwargs: 額外參數（用於容錯）
 
     Returns:
-        dict: 投資評級 (買進/持有/賣出建議)
+        dict: 投資評級結果
+            {
+                "ticker": str,
+                "rating": str,             # 強力買進/買進/持有/賣出
+                "target_price": float,
+                "confidence": float,       # 0-1
+                "recommendation": str,
+                "key_reasons": list[str],
+                "timestamp": str
+            }
+
+    Note:
+        此函數具有高度的容錯能力，即使缺少部分輸入參數也能返回有效結果。
     """
     try:
         # 參數驗證和容錯

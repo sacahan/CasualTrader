@@ -353,7 +353,7 @@ class TradingService:
                     commission=commission,
                     decision_reason=decision_reason or "原子交易",
                     company_name=company_name,
-                    status="COMPLETED",
+                    status="EXECUTED",
                     session_id=self.session_id if self.session_id else None,
                 )
                 logger.info(f"交易已記錄: {transaction.id}")
@@ -422,7 +422,7 @@ class TradingService:
         commission: float,
         decision_reason: str,
         company_name: str | None = None,
-        status: str = "COMPLETED",
+        status: str = "EXECUTED",
         session_id: str | None = None,
     ):
         """
@@ -443,9 +443,7 @@ class TradingService:
 
         action_enum = TransactionAction.BUY if action.upper() == "BUY" else TransactionAction.SELL
         status_enum = (
-            TransactionStatus.EXECUTED
-            if status.upper() == "EXECUTED"
-            else TransactionStatus.PENDING
+            TransactionStatus.EXECUTED if status.upper() == "EXECUTED" else TransactionStatus.FAILED
         )
 
         transaction = Transaction(

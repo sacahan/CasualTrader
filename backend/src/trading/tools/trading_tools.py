@@ -326,16 +326,21 @@ def create_trading_tools(
         """
         記錄交易到資料庫
 
-        Args:
-            ticker: 股票代號 (例如: "2330")
-            action: 交易動作 ("BUY" 或 "SELL")
-            quantity: 交易股數
-            price: 交易價格
-            decision_reason: 交易決策理由
-            company_name: 公司名稱 (可選)
+        **必要參數：**
+            ticker: 股票代號 (例如: "2330") [必要]
+            action: 交易動作 ("BUY" 或 "SELL") [必要]
+            quantity: 交易股數 [必要]
+            price: 交易價格 [必要]
+            decision_reason: 交易決策理由 [必要]
+
+        **可選參數：**
+            company_name: 公司名稱 [可選]
 
         Returns:
             交易記錄結果訊息
+
+        Raises:
+            返回錯誤訊息：缺少必要參數或交易動作無效
         """
         return await record_trade(
             agent_service=agent_service,
@@ -368,15 +373,18 @@ def create_trading_tools(
         """
         模擬買入台灣股票
 
-        此工具用於執行台灣股票的模擬買入交易。您必須提供股票代號和購買股數。
+        此工具用於執行台灣股票的模擬買入交易。
 
-        Args:
-            symbol: 股票代號，例如 "2330" (台積電) 或 "0050" (元大台灣50)。【必需】
-            quantity: 購買股數，必須是1000的倍數 (台股最小交易單位為1張/1000股)。【必需】
+        **必要參數：**
+            symbol: 股票代號，例如 "2330" (台積電) 或 "0050" (元大台灣50) [必要]
+            quantity: 購買股數，必須是1000的倍數 (台股最小交易單位為1張/1000股) [必要]
                      常見數量：1000 (1張)、2000 (2張)、3000 (3張) 等。
                      例如想買5張台積電就傳 quantity=5000
-            price: 指定買入價格，單位為新台幣 (可選，不指定則以市價執行)。
+
+        **可選參數：**
+            price: 指定買入價格，單位為新台幣，缺少時以市價執行 [可選]
                    例如 price=520.0 表示最高願意出價520元
+            **kwargs: 額外參數（用於容錯）
 
         Returns:
             str: 交易結果訊息，包含成功/失敗狀態、股票代號、股數、執行價格和總金額
@@ -384,6 +392,9 @@ def create_trading_tools(
         Examples:
             - 以市價買入台積電1張：buy_taiwan_stock_tool(symbol="2330", quantity=1000)
             - 以指定價格買入5張台積電：buy_taiwan_stock_tool(symbol="2330", quantity=5000, price=520.0)
+
+        Raises:
+            返回錯誤訊息：股票代號不存在、股數不符規定、價格無效或系統異常
         """
         try:
             # 由於 symbol 和 quantity 已經是必需參數（在函數簽名中沒有默認值），
@@ -464,15 +475,18 @@ def create_trading_tools(
         """
         模擬賣出台灣股票
 
-        此工具用於執行台灣股票的模擬賣出交易。您必須提供股票代號和賣出股數。
+        此工具用於執行台灣股票的模擬賣出交易。
 
-        Args:
-            symbol: 股票代號，例如 "2330" (台積電) 或 "0050" (元大台灣50)。【必需】
-            quantity: 賣出股數，必須是1000的倍數 (台股最小交易單位為1張/1000股)。【必需】
+        **必要參數：**
+            symbol: 股票代號，例如 "2330" (台積電) 或 "0050" (元大台灣50) [必要]
+            quantity: 賣出股數，必須是1000的倍數 (台股最小交易單位為1張/1000股) [必要]
                      常見數量：1000 (1張)、2000 (2張)、3000 (3張) 等。
                      例如想賣5張台積電就傳 quantity=5000
-            price: 指定賣出價格，單位為新台幣 (可選，不指定則以市價執行)。
+
+        **可選參數：**
+            price: 指定賣出價格，單位為新台幣，缺少時以市價執行 [可選]
                    例如 price=530.0 表示最低願意出價530元
+            **kwargs: 額外參數（用於容錯）
 
         Returns:
             str: 交易結果訊息，包含成功/失敗狀態、股票代號、股數、執行價格和總金額
@@ -480,6 +494,9 @@ def create_trading_tools(
         Examples:
             - 以市價賣出台積電1張：sell_taiwan_stock_tool(symbol="2330", quantity=1000)
             - 以指定價格賣出5張台積電：sell_taiwan_stock_tool(symbol="2330", quantity=5000, price=530.0)
+
+        Raises:
+            返回錯誤訊息：股票代號不存在、股數不符規定、價格無效或系統異常
         """
         try:
             # 由於 symbol 和 quantity 已經是必需參數（在函數簽名中沒有默認值），
@@ -558,6 +575,7 @@ def create_trading_tools(
         price: float | None = None,
         decision_reason: str | None = None,
         company_name: str | None = None,
+        **kwargs,
     ) -> str:
         """
         執行完整交易 - 原子操作 (推薦優先使用)
@@ -569,13 +587,16 @@ def create_trading_tools(
         此工具確保市場交易、交易記錄、持股更新、資金更新和績效計算同時成功或全部失敗。
         這解決了分別呼叫多個函數可能導致的不一致問題。
 
-        Args:
-            ticker: 股票代號，例如 "2330" (台積電)。【必需】
-            action: 交易動作，"BUY" 或 "SELL"。【必需】
-            quantity: 交易股數，必須是1000的倍數。【必需】
-            price: 交易價格，單位為新台幣 (可選)
-            decision_reason: 交易決策理由 (可選)
-            company_name: 公司名稱 (可選)
+        **必要參數：**
+            ticker: 股票代號，例如 "2330" (台積電) [必要]
+            action: 交易動作，"BUY" (買入) 或 "SELL" (賣出) [必要]
+            quantity: 交易股數，必須是1000的倍數 [必要]
+
+        **可選參數：**
+            price: 交易價格，單位為新台幣，缺少時以市價執行 [可選]
+            decision_reason: 交易決策理由，用於交易記錄和追蹤 [可選]
+            company_name: 公司名稱，用於詳細交易資訊記錄 [可選]
+            **kwargs: 額外參數（用於容錯）
 
         Returns:
             str: 交易結果訊息，包含成功/失敗狀態和詳細資訊
@@ -583,6 +604,9 @@ def create_trading_tools(
         Examples:
             - 以指定價格買入台積電：execute_trade_atomic_tool(ticker="2330", action="BUY", quantity=1000, price=520.0)
             - 以市價賣出台積電：execute_trade_atomic_tool(ticker="2330", action="SELL", quantity=1000)
+
+        Raises:
+            返回錯誤訊息：股票代號不存在、action無效、股數不符規定、價格無效或系統異常
         """
         return await execute_trade_atomic(
             trading_service=trading_service,

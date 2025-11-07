@@ -231,21 +231,25 @@ def calculate_fear_greed_index(
 ) -> str:
     """計算恐懼貪婪指數
 
-    Args:
-        market_data: 市場數據,包含:
-            - price_momentum: 價格動能
-            - market_breadth: 市場寬度
-            - volatility: 波動率
-            - put_call_ratio: 賣權買權比
+    **可選參數：**
+        market_data: 市場數據，缺少時使用預設值 [可選]
+            - price_momentum: 價格動能 (0-100)
+            - market_breadth: 市場寬度 (0-100)
+            - volatility: 波動率 (0-100)
+            - put_call_ratio: 賣權買權比 (0-100)
+        **kwargs: 額外參數（用於容錯）
 
     Returns:
-        dict: 恐懼貪婪指數
+        dict: 恐懼貪婪指數結果
             {
                 "index_value": float,       # 0-100
                 "level": str,               # 恐慌/恐懼/中性/貪婪/極度貪婪
                 "components": dict,         # 各組成分數
                 "interpretation": str       # 解讀說明
             }
+
+    Note:
+        此函數具有高度的容錯能力，缺少參數時使用預設中性值。
     """
     try:
         logger.info("開始計算恐懼貪婪指數")
@@ -330,15 +334,17 @@ def calculate_fear_greed_index(
 
 @function_tool(strict_mode=False)
 def analyze_money_flow(
-    ticker: str = None,
+    ticker: str,
     trading_data: TradingData = None,
     **kwargs,
 ) -> str:
     """分析資金流向
 
-    Args:
-        ticker: 股票代號 (例如: "2330")
-        trading_data: 交易數據,包含:
+    **必要參數：**
+        ticker: 股票代號 (例如: "2330") [必要]
+
+    **可選參數：**
+        trading_data: 交易數據，缺少時使用預設值 [可選]
             - large_buy: 大單買進
             - large_sell: 大單賣出
             - foreign_net: 外資淨買賣
@@ -346,15 +352,18 @@ def analyze_money_flow(
         **kwargs: 額外參數（用於容錯）
 
     Returns:
-        dict: 資金流向分析
+        dict: 資金流向分析結果
             {
-                "ticker": "2330",
+                "ticker": str,
                 "net_flow": float,          # 淨流入金額
                 "flow_direction": str,      # 流入/流出/平衡
                 "large_order_ratio": float, # 大單佔比
                 "foreign_attitude": str,    # 外資態度
                 "interpretation": str
             }
+
+    Raises:
+        返回錯誤字典：缺少必要參數
     """
     try:
         # 參數驗證和容錯
@@ -468,9 +477,10 @@ def analyze_news_sentiment(
 ) -> str:
     """分析新聞情緒
 
-    Args:
-        ticker: 股票代號 (可選,None 表示整體市場)
-        news_data: 新聞列表,每筆包含:
+    **可選參數：**
+        ticker: 股票代號 (例如: "2330")，None 表示整體市場 [可選]
+        news_data: 新聞列表，缺少時使用空列表 [可選]
+            每筆包含：
             - title: 標題
             - content: 內容
             - sentiment: 情緒分數 (-1 到 1)
@@ -478,7 +488,7 @@ def analyze_news_sentiment(
         **kwargs: 額外參數（用於容錯）
 
     Returns:
-        dict: 新聞情緒分析
+        dict: 新聞情緒分析結果
             {
                 "ticker": str,
                 "news_count": int,
@@ -488,6 +498,9 @@ def analyze_news_sentiment(
                 "key_topics": [str, ...],
                 "interpretation": str
             }
+
+    Note:
+        此函數具有高度的容錯能力，即使缺少參數也能返回有效結果。
     """
     try:
         # 參數驗證和容錯
@@ -584,15 +597,17 @@ def analyze_news_sentiment(
 
 @function_tool(strict_mode=False)
 def analyze_social_sentiment(
-    ticker: str = None,
+    ticker: str,
     social_data: SocialData = None,
     **kwargs,
 ) -> str:
     """分析社群媒體情緒
 
-    Args:
-        ticker: 股票代號 (例如: "2330")
-        social_data: 社群數據,包含:
+    **必要參數：**
+        ticker: 股票代號 (例如: "2330") [必要]
+
+    **可選參數：**
+        social_data: 社群數據，缺少時使用預設值 [可選]
             - mention_count: 提及次數
             - positive_mentions: 正面提及
             - negative_mentions: 負面提及
@@ -600,15 +615,18 @@ def analyze_social_sentiment(
         **kwargs: 額外參數（用於容錯）
 
     Returns:
-        dict: 社群情緒分析
+        dict: 社群情緒分析結果
             {
-                "ticker": "2330",
+                "ticker": str,
                 "mention_count": int,
                 "sentiment_ratio": float,    # 正負面比
                 "trending_status": str,      # 熱度狀態
                 "sentiment_score": float,    # -100 到 100
                 "interpretation": str
             }
+
+    Raises:
+        返回錯誤字典：缺少必要參數或無社群數據
     """
     try:
         # 參數驗證和容錯
@@ -740,15 +758,15 @@ def generate_sentiment_signals(
 ) -> str:
     """產生情緒交易訊號
 
-    Args:
-        fear_greed_index: 恐懼貪婪指數 (來自 calculate_fear_greed_index)
-        money_flow: 資金流向分析 (來自 analyze_money_flow)
-        news_sentiment: 新聞情緒 (來自 analyze_news_sentiment)
-        social_sentiment: 社群情緒 (來自 analyze_social_sentiment)
+    **可選參數：**
+        fear_greed_index: 恐懼貪婪指數 (來自 calculate_fear_greed_index)，缺少時使用預設值 [可選]
+        money_flow: 資金流向分析 (來自 analyze_money_flow)，缺少時使用預設值 [可選]
+        news_sentiment: 新聞情緒 (來自 analyze_news_sentiment)，缺少時使用預設值 [可選]
+        social_sentiment: 社群情緒 (來自 analyze_social_sentiment)，缺少時使用預設值 [可選]
         **kwargs: 額外參數（用於容錯）
 
     Returns:
-        dict: 情緒交易訊號
+        dict: 情緒交易訊號結果
             {
                 "overall_signal": str,      # "買進" | "賣出" | "觀望"
                 "confidence": float,        # 信心度 0-1
@@ -757,6 +775,9 @@ def generate_sentiment_signals(
                 "risk_level": str,          # "高" | "中" | "低"
                 "timestamp": str
             }
+
+    Note:
+        此函數具有高度的容錯能力，即使缺少部分輸入參數也能返回有效訊號。
     """
     try:
         # 參數驗證和容錯

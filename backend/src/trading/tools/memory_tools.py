@@ -126,7 +126,7 @@ async def save_execution_memory(
 
         # 準備執行記錄
         result_summary = (
-            execution_result[:200] + "..." if len(execution_result) > 200 else execution_result
+            execution_result[:2000] + "..." if len(execution_result) > 2000 else execution_result
         )
 
         # 使用 create_entities 工具保存記憶體

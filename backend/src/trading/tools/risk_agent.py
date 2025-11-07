@@ -139,21 +139,37 @@ def risk_agent_instructions() -> str:
 
 @function_tool(strict_mode=False)
 def calculate_position_risk(
-    ticker: str = None,
-    position_data: dict = None,
+    ticker: str,
+    position_data: dict,
     market_data: dict = None,
     **kwargs,
 ) -> str:
     """計算個別部位風險
 
-    Args:
-        ticker: 股票代號 (例如: "2330")
-        position_data: 部位數據
-        market_data: 市場數據 (可選)
+    **必要參數：**
+        ticker: 股票代號 (例如: "2330") [必要]
+        position_data: 部位數據，包含 quantity, avg_cost, current_price [必要]
+
+    **可選參數：**
+        market_data: 市場數據，包含 volatility, beta，缺少時使用預設值 [可選]
         **kwargs: 額外參數（用於容錯）
 
     Returns:
-        dict: 部位風險指標
+        dict: 部位風險指標結果
+            {
+                "ticker": str,
+                "position_value": float,
+                "unrealized_pnl": float,
+                "pnl_percent": float,
+                "volatility": float,
+                "beta": float,
+                "var_95": float,
+                "max_drawdown": float,
+                "risk_score": float
+            }
+
+    Raises:
+        返回錯誤字典：缺少必要參數或數據不足
     """
     try:
         # 參數驗證和容錯
@@ -256,19 +272,30 @@ def calculate_position_risk(
 
 @function_tool(strict_mode=False)
 def analyze_portfolio_concentration(
-    positions: list = None,
-    total_value: float = None,
+    positions: list,
+    total_value: float,
     **kwargs,
 ) -> dict:
     """分析投資組合集中度
 
-    Args:
-        positions: 部位列表
-        total_value: 投資組合總價值
+    **必要參數：**
+        positions: 部位列表 [必要]
+        total_value: 投資組合總價值 [必要]
+
+    **可選參數：**
         **kwargs: 額外參數（用於容錯）
 
     Returns:
         dict: 集中度分析結果
+            {
+                "hhi": float,
+                "sector_weights": dict,
+                "top_5_concentration": float,
+                "concentration_level": str
+            }
+
+    Raises:
+        返回錯誤字典：缺少必要參數或數據無效
     """
     try:
         # 參數驗證和容錯
@@ -366,21 +393,34 @@ def analyze_portfolio_concentration(
 
 @function_tool(strict_mode=False)
 def calculate_portfolio_risk(
-    position_risks: list = None,
+    position_risks: list,
     concentration_json: str = None,
     total_value: float = None,
     **kwargs,
 ) -> dict:
     """計算投資組合整體風險
 
-    Args:
-        position_risks: 部位風險列表
-        concentration_json: JSON 格式的集中度數據
-        total_value: 投資組合總價值
+    **必要參數：**
+        position_risks: 部位風險列表 [必要]
+
+    **可選參數：**
+        concentration_json: JSON 格式的集中度數據，缺少時使用預設值 [可選]
+        total_value: 投資組合總價值，缺少時使用預設值 [可選]
         **kwargs: 額外參數（用於容錯）
 
     Returns:
-        dict: 投資組合風險指標
+        dict: 投資組合風險指標結果
+            {
+                "risk_level": str,          # 低/中/中高/高
+                "overall_risk_score": float,
+                "total_var_95": float,
+                "max_portfolio_drawdown": float,
+                "correlation_adjustment": float,
+                "position_count": int
+            }
+
+    Raises:
+        返回錯誤字典：缺少必要參數或數據不足
     """
     try:
         # 參數驗證和容錯
@@ -494,19 +534,34 @@ def calculate_portfolio_risk(
 
 @function_tool(strict_mode=False)
 def perform_stress_test(
-    positions: list = None,
+    positions: list,
     scenarios: list = None,
     **kwargs,
 ) -> dict:
     """執行投資組合壓力測試
 
-    Args:
-        positions: 部位列表
-        scenarios: 壓力測試情景列表
+    **必要參數：**
+        positions: 部位列表 [必要]
+
+    **可選參數：**
+        scenarios: 壓力測試情景列表，缺少時使用預設情景 [可選]
         **kwargs: 額外參數（用於容錯）
 
     Returns:
         dict: 壓力測試結果
+            {
+                "stress_scenarios": [
+                    {
+                        "scenario": str,
+                        "portfolio_loss": float,
+                        "affected_positions": list
+                    }
+                ],
+                "scenario_count": int
+            }
+
+    Raises:
+        返回錯誤字典：缺少必要參數
     """
     try:
         # 參數驗證和容錯
@@ -607,14 +662,24 @@ def generate_risk_recommendations(
 ) -> dict:
     """產生風險管理建議
 
-    Args:
-        portfolio_risk_json: 投資組合風險的 JSON 字串
-        concentration_json: 集中度分析的 JSON 字串
-        position_risks: 部位風險列表
+    **可選參數：**
+        portfolio_risk_json: 投資組合風險的 JSON 字串，缺少時使用預設值 [可選]
+        concentration_json: 集中度分析的 JSON 字串，缺少時使用預設值 [可選]
+        position_risks: 部位風險列表，缺少時使用空列表 [可選]
         **kwargs: 額外參數（用於容錯）
 
     Returns:
-        dict: 風險管理建議
+        dict: 風險管理建議結果
+            {
+                "overall_assessment": str,
+                "key_risks": [str, ...],
+                "recommendations": [str, ...],
+                "urgency_level": str,
+                "timestamp": str
+            }
+
+    Note:
+        此函數具有高度的容錯能力，即使缺少部分輸入參數也能返回有效建議。
     """
     try:
         # 參數驗證和容錯
