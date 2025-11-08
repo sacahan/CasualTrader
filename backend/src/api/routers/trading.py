@@ -452,6 +452,91 @@ async def get_performance(
         ) from e
 
 
+@router.get(
+    "/agents/{agent_id}/performance-history",
+    response_model=list[dict[str, Any]],
+    status_code=status.HTTP_200_OK,
+    summary="取得績效歷史",
+    description="獲取 Agent 的歷史性能數據用於圖表展示",
+)
+async def get_performance_history(
+    agent_id: str,
+    limit: int = 30,
+    order: str = "desc",
+    agents_service: AgentsService = Depends(get_agents_service),
+):
+    """
+    取得績效歷史
+
+    用於前端圖表展示 Agent 的資產淨值變化趨勢。
+
+    Args:
+        agent_id: Agent ID
+        limit: 返回的記錄數量，最多 365（預設 30）
+        order: 排序順序，'asc'（舊到新）或 'desc'（新到舊，預設）
+        agents_service: AgentsService 實例
+
+    Returns:
+        性能歷史記錄列表，時間序列從舊到新，每條包含：
+        - date: 記錄日期 (ISO 8601)
+        - total_value: 投資組合總資產
+        - cash_balance: 現金餘額
+        - unrealized_pnl: 未實現損益
+        - realized_pnl: 已實現損益
+        - daily_return: 日回報率
+        - total_return: 累計回報率
+        - win_rate: 勝率
+        - max_drawdown: 最大回撤
+        - total_trades: 總交易數
+        - winning_trades: 獲勝交易數
+
+    Raises:
+        404: Agent 不存在
+        400: 參數無效
+        500: 查詢失敗
+    """
+    try:
+        # 驗證參數
+        if limit < 1 or limit > 365:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="limit must be between 1 and 365",
+            )
+
+        if order not in ("asc", "desc"):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="order must be 'asc' or 'desc'",
+            )
+
+        logger.info(
+            f"Getting performance history for agent: {agent_id}, limit={limit}, order={order}"
+        )
+
+        # 獲取性能歷史
+        history = await agents_service.get_performance_history(agent_id, limit=limit, order=order)
+
+        logger.debug(f"Retrieved {len(history)} performance records for agent {agent_id}")
+        return history
+
+    except HTTPException:
+        raise
+
+    except AgentNotFoundError as e:
+        logger.warning(f"Agent not found: {agent_id}")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Agent {agent_id} not found",
+        ) from e
+
+    except Exception as e:
+        logger.error(f"Failed to get performance history for agent {agent_id}: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=str(e),
+        ) from e
+
+
 # ==========================================
 # Market Data Endpoints (Placeholder)
 # ==========================================

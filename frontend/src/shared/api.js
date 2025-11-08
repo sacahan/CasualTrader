@@ -202,6 +202,17 @@ class APIClient {
   }
 
   /**
+   * Get agent performance history for chart display
+   * Returns historical performance data in time series format
+   * Note: 後端已實現 GET /api/trading/agents/{agent_id}/performance-history
+   */
+  getPerformanceHistory(agentId, limit = 30, order = 'asc') {
+    return this.request(
+      `/api/trading/agents/${agentId}/performance-history?limit=${limit}&order=${order}`
+    );
+  }
+
+  /**
    * Get agent holdings
    * Note: 後端已實現 GET /api/trading/agents/{agent_id}/holdings
    */

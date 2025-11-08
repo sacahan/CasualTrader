@@ -49,12 +49,22 @@
     await loadMarketIndices();
   });
 
+  // 當 agents 列表變化時，自動載入所有 agent 的詳細資料以顯示圖表
+  $effect(() => {
+    if ($agents && $agents.length > 0) {
+      // 並行加載所有 agent 的詳細資料
+      Promise.all($agents.map((agent) => loadAgentDetails(agent.agent_id))).catch((error) => {
+        console.error('Failed to load agent details:', error);
+      });
+    }
+  });
+
   // 函數定義 - 移到根層級以符合 eslint no-inner-declarations 規則
   async function loadAgentDetails(agentId) {
     try {
-      // 載入績效資料
-      const perfData = await apiClient.getPerformance(agentId);
-      agentPerformanceData[agentId] = perfData.history || [];
+      // 載入績效歷史資料用於圖表展示
+      const perfHistory = await apiClient.getPerformanceHistory(agentId, 30, 'asc');
+      agentPerformanceData[agentId] = perfHistory || [];
 
       // 載入持倉資料
       const holdingsData = await apiClient.getHoldings(agentId);
@@ -233,6 +243,8 @@
         {#each $agents as agent (agent.agent_id)}
           <AgentCard
             {agent}
+            performanceData={agentPerformanceData[agent.agent_id] || []}
+            holdings={agentHoldings[agent.agent_id] || []}
             onclick={handleAgentSelect}
             onedit={handleEditAgent}
             ondelete={handleDeleteAgent}

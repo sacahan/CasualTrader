@@ -922,6 +922,88 @@ class AgentsService:
             "take_profit_percent": 15.0,
         }
 
+    async def get_performance_history(
+        self,
+        agent_id: str,
+        limit: int = 30,
+        order: str = "desc",
+    ) -> list[dict[str, Any]]:
+        """
+        獲取 Agent 的性能歷史記錄
+
+        Args:
+            agent_id: Agent ID
+            limit: 返回的記錄數量（最多 365）
+            order: 排序順序 ('asc' 或 'desc')，預設 'desc' 最近的在前
+
+        Returns:
+            性能歷史記錄列表，每條包含 date, total_value, cash_balance, unrealized_pnl,
+            realized_pnl, daily_return, total_return, win_rate, max_drawdown, total_trades,
+            winning_trades
+
+        Raises:
+            AgentNotFoundError: Agent 不存在
+            AgentDatabaseError: 資料庫操作失敗
+        """
+        try:
+            # 驗證 Agent 存在
+            await self.get_agent_config(agent_id)
+
+            # 限制查詢數量
+            limit = min(limit, 365)
+
+            # 構建查詢
+            stmt = (
+                select(AgentPerformance)
+                .where(AgentPerformance.agent_id == agent_id)
+                .order_by(
+                    AgentPerformance.date.asc()
+                    if order.lower() == "asc"
+                    else AgentPerformance.date.desc()
+                )
+                .limit(limit)
+            )
+
+            result = await self.session.execute(stmt)
+            performance_records = result.scalars().all()
+
+            # 轉換為字典列表
+            history = []
+            for record in performance_records:
+                history.append(
+                    {
+                        "date": record.date.isoformat(),
+                        "total_value": float(record.total_value),
+                        "cash_balance": float(record.cash_balance),
+                        "unrealized_pnl": float(record.unrealized_pnl or 0),
+                        "realized_pnl": float(record.realized_pnl or 0),
+                        "daily_return": float(record.daily_return) if record.daily_return else None,
+                        "total_return": float(record.total_return) if record.total_return else None,
+                        "win_rate": float(record.win_rate) if record.win_rate else None,
+                        "max_drawdown": float(record.max_drawdown) if record.max_drawdown else None,
+                        "total_trades": record.total_trades,
+                        "winning_trades": record.winning_trades,
+                    }
+                )
+
+            # 如果排序是 desc，需要反轉回 asc 以便圖表顯示正確的時間序列
+            if order.lower() == "desc":
+                history.reverse()
+
+            logger.info(
+                f"Retrieved performance history for agent {agent_id}: {len(history)} records"
+            )
+            return history
+
+        except AgentNotFoundError:
+            raise
+
+        except Exception as e:
+            logger.error(
+                f"Failed to get performance history for agent {agent_id}: {e}", exc_info=True
+            )
+            raise AgentDatabaseError(f"Failed to retrieve performance history: {str(e)}")
+
     # ==========================================
     # Context Manager Support
     # ==========================================

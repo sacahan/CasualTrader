@@ -170,7 +170,7 @@
 
   // 監聽數據變化，重新渲染圖表
   $effect(() => {
-    if (chartCanvas && performanceData.length > 0) {
+    if (chartCanvas) {
       renderMiniChart();
     }
   });
@@ -181,12 +181,54 @@
 
     const ctx = chartCanvas.getContext('2d');
 
-    // 準備數據
-    const labels = performanceData.map((d, i) => i);
-    const values = performanceData.map((d) => d.value || d.total_assets || totalAssets);
+    // 如果沒有性能數據，生成示例數據以顯示當前資產
+    // 後端提供歷史數據時，performanceData 會包含 total_value 數組
+    let chartData = performanceData;
+    if (!chartData || chartData.length === 0) {
+      // 生成 10 個示例數據點，逐漸接近當前資產
+      const current = totalAssets;
+      const initial = agent.initial_funds || 1000000;
+      chartData = Array.from({ length: 10 }, (_, i) => ({
+        total_value: initial + (current - initial) * (i / 9),
+        date: new Date(Date.now() - (10 - i) * 24 * 60 * 60 * 1000).toLocaleDateString(),
+      }));
+    }
+
+    // 準備數據 - 優先使用 total_value（來自後端），否則使用 value（舊格式）
+    const labels = chartData.map((d) => {
+      // 如果有日期，提取月日；否則使用索引
+      if (d.date) {
+        try {
+          const date = new Date(d.date);
+          return `${date.getMonth() + 1}/${date.getDate()}`;
+        } catch {
+          return d.date;
+        }
+      }
+      return '';
+    });
+
+    const values = chartData.map((d) => d.total_value || d.value || totalAssets);
 
     if (chartInstance) {
       chartInstance.destroy();
+    }
+
+    // 設置 canvas 的正確尺寸以適應容器
+    // 獲取容器寬度
+    const container = chartCanvas.parentElement;
+    if (container) {
+      const rect = container.getBoundingClientRect();
+      const containerWidth = rect.width;
+
+      // 設置 canvas 的顯示尺寸（CSS）
+      chartCanvas.style.width = '100%';
+      chartCanvas.style.height = '100%';
+
+      // 設置 canvas 的內部尺寸（像素）
+      // 使用 2:1 寬高比（基於 aspectRatio: 2.5，實際應用時會變成約 2:1）
+      chartCanvas.width = containerWidth * (window.devicePixelRatio || 1);
+      chartCanvas.height = 128 * (window.devicePixelRatio || 1);
     }
 
     // @ts-ignore - Chart.js is loaded via CDN in index.html
@@ -208,9 +250,8 @@
         ],
       },
       options: {
-        responsive: true,
-        maintainAspectRatio: true,
-        aspectRatio: 2.5,
+        responsive: false,
+        maintainAspectRatio: false,
         plugins: {
           legend: { display: false },
           tooltip: {
@@ -379,7 +420,7 @@
   </div>
 
   <!-- 迷你績效圖表 -->
-  <div class="mb-6 h-32">
+  <div class="mb-6 h-32 w-full">
     <canvas bind:this={chartCanvas}></canvas>
   </div>
 
@@ -392,12 +433,14 @@
           <div class="flex items-center justify-between text-sm">
             <div class="flex items-center gap-2">
               <span class="font-medium text-gray-300">{holding.ticker || holding.symbol}</span>
-              <span class="text-gray-500">{holding.name || ''}</span>
+              <span class="text-gray-500">{holding.company_name || holding.name || ''}</span>
             </div>
             <div class="text-right">
-              <span class="text-white font-medium">{holding.shares || 0} 股</span>
+              <span class="text-white font-medium"
+                >{holding.quantity || holding.shares || 0} 股</span
+              >
               <span class="text-gray-400 text-xs ml-2"
-                >@ {formatCurrency(holding.avg_price || 0)}</span
+                >@ {formatCurrency(holding.average_cost || holding.avg_price || 0)}</span
               >
             </div>
           </div>
