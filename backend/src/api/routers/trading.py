@@ -117,16 +117,10 @@ async def get_portfolio(
                     "company_name": holding.company_name,
                     "quantity": holding.quantity,
                     "average_cost": float(holding.average_cost),
-                    "current_price": float(holding.current_price)
-                    if holding.current_price
-                    else None,
-                    "market_value": holding.quantity * float(holding.average_cost),
-                    "unrealized_pnl": (
-                        float(holding.unrealized_pnl) if holding.unrealized_pnl else None
-                    ),
-                    "last_updated": (
-                        holding.last_updated.isoformat() if holding.last_updated else None
-                    ),
+                    "total_cost": float(holding.total_cost),
+                    "market_value": float(holding.total_cost),
+                    "unrealized_pnl": 0.0,  # 需要實時價格才能計算
+                    "unrealized_pnl_percent": 0.0,  # 需要實時價格才能計算
                 }
                 for holding in holdings
             ],
@@ -191,25 +185,11 @@ async def get_holdings(
                 "company_name": holding.company_name,
                 "quantity": holding.quantity,
                 "average_cost": float(holding.average_cost),
-                "current_price": float(holding.current_price) if holding.current_price else None,
-                "market_value": holding.quantity * float(holding.average_cost),
-                "cost_basis": holding.quantity * float(holding.average_cost),
-                "unrealized_pnl": float(holding.unrealized_pnl) if holding.unrealized_pnl else None,
-                "unrealized_pnl_percent": (
-                    (
-                        float(holding.unrealized_pnl)
-                        / (holding.quantity * float(holding.average_cost))
-                        * 100
-                    )
-                    if holding.unrealized_pnl and holding.quantity > 0
-                    else None
-                ),
-                "first_purchase_date": (
-                    holding.first_purchase_date.isoformat() if holding.first_purchase_date else None
-                ),
-                "last_updated": (
-                    holding.last_updated.isoformat() if holding.last_updated else None
-                ),
+                "total_cost": float(holding.total_cost),
+                "market_value": float(holding.total_cost),
+                "cost_basis": float(holding.total_cost),
+                "unrealized_pnl": 0.0,  # 需要實時價格才能計算
+                "unrealized_pnl_percent": 0.0,  # 需要實時價格才能計算
             }
             for holding in holdings
         ]
@@ -284,14 +264,14 @@ async def get_transactions(
                 "id": tx.id,
                 "ticker": tx.ticker,
                 "company_name": tx.company_name,
-                "action": tx.action.value if hasattr(tx.action, "value") else tx.action,
+                "action": _get_enum_value(tx.action),
                 "quantity": tx.quantity,
                 "price": float(tx.price),
                 "total_amount": float(tx.total_amount),
                 "commission": float(tx.commission) if tx.commission else 0.0,
                 "net_amount": float(tx.total_amount)
                 + (float(tx.commission) if tx.commission else 0.0),
-                "status": tx.status.value if hasattr(tx.status, "value") else tx.status,
+                "status": _get_enum_value(tx.status),
                 "execution_time": tx.execution_time.isoformat() if tx.execution_time else None,
                 "decision_reason": tx.decision_reason,
                 "created_at": tx.created_at.isoformat() if tx.created_at else None,
@@ -322,43 +302,37 @@ async def get_transactions(
         ) from e
 
 
-@router.get(
-    "/agents/{agent_id}/trades",
-    response_model=dict[str, Any],
-    status_code=status.HTTP_200_OK,
-    summary="取得交易記錄",
-    description="獲取 Agent 的交易記錄（別名，同 transactions）",
-)
-async def get_trades(
-    agent_id: str,
-    limit: int = 50,
-    offset: int = 0,
-    agents_service: AgentsService = Depends(get_agents_service),
-):
-    """
-    取得交易記錄（別名端點）
-
-    這是 get_transactions 的別名，提供相同的功能
-
-    Args:
-        agent_id: Agent ID
-        limit: 返回記錄數量限制
-        offset: 偏移量
-        agents_service: AgentsService 實例
-
-    Returns:
-        交易記錄
-
-    Raises:
-        404: Agent 不存在
-        500: 查詢失敗
-    """
-    return await get_transactions(agent_id, limit, offset, agents_service)
-
-
 # ==========================================
 # Performance Endpoints
 # ==========================================
+
+
+def _get_action_value(action: Any) -> str:
+    """輔助函數：獲取交易動作值
+
+    處理 action 既可能是 Enum 也可能是字符串的情況
+
+    Args:
+        action: 交易動作，可能是 Enum 或字符串
+
+    Returns:
+        交易動作的字符串值
+    """
+    return action.value if hasattr(action, "value") else str(action)
+
+
+def _get_enum_value(enum_obj: Any) -> str:
+    """輔助函數：獲取 Enum 值
+
+    處理物件既可能是 Enum 也可能是字符串的情況
+
+    Args:
+        enum_obj: Enum 物件或字符串
+
+    Returns:
+        Enum 的字符串值
+    """
+    return enum_obj.value if hasattr(enum_obj, "value") else str(enum_obj)
 
 
 @router.get(
@@ -411,19 +385,32 @@ async def get_performance(
 
         # 計算交易統計
         total_trades = len(transactions)
-        buy_trades = sum(1 for tx in transactions if tx.action.value == "BUY")
-        sell_trades = sum(1 for tx in transactions if tx.action.value == "SELL")
+        buy_trades = sum(1 for tx in transactions if _get_action_value(tx.action) == "BUY")
+        sell_trades = sum(1 for tx in transactions if _get_action_value(tx.action) == "SELL")
 
-        # 計算實現損益（簡化版）
-        realized_pnl = sum(
-            float(tx.total_amount) if tx.action.value == "SELL" else -float(tx.total_amount)
-            for tx in transactions
-        )
+        # 計算實現損益（根據已完成交易）
+        # 買入時為負（支出），賣出時為正（收入）
+        realized_pnl = 0.0
+        for tx in transactions:
+            if _get_action_value(tx.action) == "SELL":
+                # 賣出：收入 - 原始成本
+                buy_tx = next(
+                    (
+                        t
+                        for t in transactions
+                        if _get_enum_value(t.status) == "EXECUTED"
+                        and _get_action_value(t.action) == "BUY"
+                        and t.ticker == tx.ticker
+                    ),
+                    None,
+                )
+                if buy_tx:
+                    realized_pnl += float(tx.total_amount) - (float(buy_tx.price) * tx.quantity)
 
         # 計算未實現損益
-        unrealized_pnl = sum(
-            float(holding.unrealized_pnl) if holding.unrealized_pnl else 0 for holding in holdings
-        )
+        # 未實現損益 = 當前持股總市值 - 持股成本基礎
+        # 由於沒有實時價格，設置為 0（應透過 AgentPerformance 表存儲歷史數據）
+        unrealized_pnl = 0.0
 
         # 組裝回應
         performance = {

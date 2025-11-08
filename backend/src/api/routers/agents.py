@@ -211,7 +211,7 @@ async def get_agent(
                 if hasattr(agent.current_mode, "value")
                 else agent.current_mode
             ),
-            "initial_funds": float(agent.initial_funds),
+            "initial_funds": float(agent.initial_funds) if agent.initial_funds else None,
             "current_funds": float(agent.current_funds) if agent.current_funds else None,
             "max_position_size": float(agent.max_position_size)
             if agent.max_position_size

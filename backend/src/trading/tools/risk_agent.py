@@ -836,7 +836,7 @@ async def get_risk_agent(
     logger.debug(f"Total tools: {len(all_tools)}")
 
     logger.info(
-        f"Creating Agent with model={llm_model}, mcp_servers={len(mcp_servers)}, tools={len(all_tools)}"
+        f"Creating Agent with model={llm_model}, mcp_servers={len(mcp_servers) if mcp_servers else 0}, tools={len(all_tools)}"
     )
 
     # GitHub Copilot 不支援 tool_choice 參數
@@ -851,6 +851,10 @@ async def get_risk_agent(
 
     if extra_headers:
         model_settings_dict["extra_headers"] = extra_headers
+
+    # 確保 mcp_servers 是列表
+    if mcp_servers is None:
+        mcp_servers = []
 
     analyst = Agent(
         name="risk_analyst",

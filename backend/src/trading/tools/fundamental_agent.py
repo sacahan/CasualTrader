@@ -790,14 +790,13 @@ async def get_fundamental_agent(
     logger.debug(f"Total tools: {len(all_tools)}")
 
     logger.info(
-        f"Creating Agent with model={llm_model}, mcp_servers={len(mcp_servers)}, tools={len(all_tools)}"
+        f"Creating Agent with model={llm_model}, mcp_servers={len(mcp_servers) if mcp_servers else 0}, tools={len(all_tools)}"
     )
 
     # GitHub Copilot 不支援 tool_choice 參數
     model_settings_dict = {
         "max_completion_tokens": 500,  # 控制回答長度，避免過度冗長
     }
-
     # 只有非 GitHub Copilot 模型才支援 tool_choice
     model_name = llm_model.model if llm_model else ""
     if "github_copilot" not in model_name.lower():
@@ -805,6 +804,10 @@ async def get_fundamental_agent(
 
     if extra_headers:
         model_settings_dict["extra_headers"] = extra_headers
+
+    # 確保 mcp_servers 是列表
+    if mcp_servers is None:
+        mcp_servers = []
 
     analyst = Agent(
         name="fundamental_analyst",

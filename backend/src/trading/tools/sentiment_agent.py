@@ -107,7 +107,7 @@ async def _call_tavily_search(
         logger.debug(f"開始 tavily 搜尋: {query}")
 
         result = await mcp_server.session.call_tool(
-            "tavily_search",
+            "tavily-search",
             {
                 "query": query,
                 "max_results": max_results,
@@ -116,11 +116,26 @@ async def _call_tavily_search(
             },
         )
 
-        # 解析結果
-        results = result.get("results", [])
-        logger.debug(f"tavily 搜尋完成，取得 {len(results)} 筆結果")
+        # 解析 MCP 返回值結構: result.content[0].text (JSON string)
+        if not result or not hasattr(result, "content") or not result.content:
+            logger.warning(f"tavily 搜尋返回空結果 | 查詢: {query}")
+            return []
 
-        return results
+        content_item = result.content[0]
+        text_content = content_item.text if hasattr(content_item, "text") else str(content_item)
+
+        # 解析 JSON
+        try:
+            data = json.loads(text_content)
+        except json.JSONDecodeError as e:
+            logger.warning(f"無法解析 tavily 返回的 JSON | 查詢: {query} | 錯誤: {e}")
+            return []
+
+        # 提取搜尋結果
+        search_results = data.get("results", [])
+        logger.debug(f"tavily 搜尋完成，取得 {len(search_results)} 筆結果")
+
+        return search_results
 
     except Exception as e:
         logger.error(f"tavily 搜尋失敗: {e}", exc_info=True)
@@ -1259,6 +1274,10 @@ async def get_sentiment_agent(
     logger.info(f"get_sentiment_agent() called with model={llm_model}")
 
     logger.debug("Creating custom tools with function_tool")
+
+    # 確保 mcp_servers 為列表
+    if mcp_servers is None:
+        mcp_servers = []
 
     # 提取 tavily_mcp 伺服器並設置到全局上下文（工具可訪問）
     if mcp_servers:

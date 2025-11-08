@@ -224,7 +224,7 @@ class TestBuildTaskPromptWithMemory:
             )
 
         assert "交易執行模式" in prompt
-        assert "目的" in prompt
+        assert "可用工具" in prompt or "執行流程" in prompt
 
     @pytest.mark.asyncio
     async def test_build_task_prompt_rebalancing_mode(self, trading_agent, mock_agent_service):

@@ -6,6 +6,7 @@ TradingService - 交易服務層
 
 from __future__ import annotations
 
+import asyncio
 from datetime import datetime
 from typing import Any
 
@@ -72,7 +73,25 @@ class TradingService:
         # 當前執行的 session ID（如果有）
         self.session_id: str | None = None
 
+        # ⭐ 交易執行鎖 - 防止併發交易導致資金不足
+        # 每個 agent 有獨立的鎖，避免某個 agent 的交易鎖定所有其他 agents
+        self.trade_locks: dict[str, asyncio.Lock] = {}
+
         logger.info("TradingService initialized")
+
+    def _get_or_create_trade_lock(self, agent_id: str) -> asyncio.Lock:
+        """
+        取得或創建特定 Agent 的交易鎖
+
+        Args:
+            agent_id: Agent ID
+
+        Returns:
+            asyncio.Lock 實例
+        """
+        if agent_id not in self.trade_locks:
+            self.trade_locks[agent_id] = asyncio.Lock()
+        return self.trade_locks[agent_id]
 
     async def execute_single_mode(
         self,
@@ -312,104 +331,109 @@ class TradingService:
         Raises:
             TradingServiceError: 交易執行失敗（事務自動回滾）
         """
-        try:
-            # 參數驗證
-            action_upper = action.upper()
-            if action_upper not in ["BUY", "SELL"]:
-                raise ValueError(f"無效的 action: {action}，必須是 'BUY' 或 'SELL'")
+        # ⭐ 取得該 Agent 的交易鎖 - 防止同一 Agent 的併發交易
+        trade_lock = self._get_or_create_trade_lock(agent_id)
 
-            if not isinstance(quantity, int) or quantity <= 0:
-                raise ValueError(f"股數必須是正整數，收到: {quantity}")
+        # 使用鎖保護交易執行，確保單次一筆交易
+        async with trade_lock:
+            try:
+                # 參數驗證
+                action_upper = action.upper()
+                if action_upper not in ["BUY", "SELL"]:
+                    raise ValueError(f"無效的 action: {action}，必須是 'BUY' 或 'SELL'")
 
-            if quantity % 1000 != 0:
-                raise ValueError(f"股數必須是 1000 的倍數，收到: {quantity}")
+                if not isinstance(quantity, int) or quantity <= 0:
+                    raise ValueError(f"股數必須是正整數，收到: {quantity}")
 
-            logger.info(
-                f"開始原子交易: agent_id={agent_id}, ticker={ticker}, "
-                f"action={action_upper}, quantity={quantity}, price={price}"
-            )
+                if quantity % 1000 != 0:
+                    raise ValueError(f"股數必須是 1000 的倍數，收到: {quantity}")
 
-            # 🔧 FIX: 在事務外先驗證 Agent 存在
-            # 這避免了「A transaction is already begun on this Session」錯誤
-            agent_config = await self.agents_service.get_agent_config(agent_id)
-            if not agent_config:
-                raise ValueError(f"Agent {agent_id} 不存在")
-
-            # ⭐ 開始事務 - 使用 savepoint() 支援嵌套事務
-            # 如果已有活躍事務，savepoint() 會建立 nested transaction (savepoint)
-            # 如果沒有，它會建立新的事務
-            async with self.db_session.begin_nested():
-                # Step 2: 記錄交易到資料庫
-                total_amount = float(quantity * price)
-                commission = total_amount * 0.001425  # 假設手續費 0.1425%
-
-                transaction = await self._create_transaction_internal(
-                    agent_id=agent_id,
-                    ticker=ticker,
-                    action=action_upper,
-                    quantity=quantity,
-                    price=price,
-                    total_amount=total_amount,
-                    commission=commission,
-                    decision_reason=decision_reason or "原子交易",
-                    company_name=company_name,
-                    status="EXECUTED",
-                    session_id=self.session_id if self.session_id else None,
+                logger.info(
+                    f"開始原子交易: agent_id={agent_id}, ticker={ticker}, "
+                    f"action={action_upper}, quantity={quantity}, price={price}"
                 )
-                logger.info(f"交易已記錄: {transaction.id}")
 
-                # Step 3: 更新持股明細
-                await self._update_agent_holdings_internal(
-                    agent_id=agent_id,
-                    ticker=ticker,
-                    action=action_upper,
-                    quantity=quantity,
-                    price=price,
-                    company_name=company_name,
-                )
-                logger.info("持股已更新")
+                # 🔧 FIX: 在事務外先驗證 Agent 存在
+                # 這避免了「A transaction is already begun on this Session」錯誤
+                agent_config = await self.agents_service.get_agent_config(agent_id)
+                if not agent_config:
+                    raise ValueError(f"Agent {agent_id} 不存在")
 
-                # Step 4: 更新資金餘額
-                if action_upper == "BUY":
-                    amount_change = -(total_amount + commission)
-                else:  # SELL
-                    amount_change = total_amount - commission
+                # ⭐ 開始事務 - 使用 savepoint() 支援嵌套事務
+                # 如果已有活躍事務，savepoint() 會建立 nested transaction (savepoint)
+                # 如果沒有，它會建立新的事務
+                async with self.db_session.begin_nested():
+                    # Step 2: 記錄交易到資料庫
+                    total_amount = float(quantity * price)
+                    commission = total_amount * 0.001425  # 假設手續費 0.1425%
 
-                await self._update_agent_funds_internal(
-                    agent_id=agent_id,
-                    amount_change=amount_change,
-                    transaction_type=f"{action_upper} {ticker}",
-                )
-                logger.info(f"資金已更新: {amount_change:+.2f} 元")
+                    transaction = await self._create_transaction_internal(
+                        agent_id=agent_id,
+                        ticker=ticker,
+                        action=action_upper,
+                        quantity=quantity,
+                        price=price,
+                        total_amount=total_amount,
+                        commission=commission,
+                        decision_reason=decision_reason or "原子交易",
+                        company_name=company_name,
+                        status="EXECUTED",
+                        session_id=self.session_id if self.session_id else None,
+                    )
+                    logger.info(f"交易已記錄: {transaction.id}")
 
-                # Step 5: 更新績效指標
-                await self._calculate_and_update_performance_internal(agent_id)
-                logger.info("績效已更新")
+                    # Step 3: 更新持股明細
+                    await self._update_agent_holdings_internal(
+                        agent_id=agent_id,
+                        ticker=ticker,
+                        action=action_upper,
+                        quantity=quantity,
+                        price=price,
+                        company_name=company_name,
+                    )
+                    logger.info("持股已更新")
 
-                # ⭐ 事務自動提交（所有步驟都成功）
-                logger.info("原子交易成功完成")
+                    # Step 4: 更新資金餘額
+                    if action_upper == "BUY":
+                        amount_change = -(total_amount + commission)
+                    else:  # SELL
+                        amount_change = total_amount - commission
 
-            return {
-                "success": True,
-                "transaction_id": transaction.id,
-                "session_id": self.session_id,
-                "message": f"✅ 交易執行成功\n"
-                f"• 股票: {ticker} ({company_name or '未知'})\n"
-                f"• 類型: {action_upper}\n"
-                f"• 股數: {quantity:,}\n"
-                f"• 成交價: {price:,.2f}\n"
-                f"• 手續費: {commission:,.2f}\n"
-                f"• 實際成本: {total_amount + commission:,.2f}",
-            }
+                    await self._update_agent_funds_internal(
+                        agent_id=agent_id,
+                        amount_change=amount_change,
+                        transaction_type=f"{action_upper} {ticker}",
+                    )
+                    logger.info(f"資金已更新: {amount_change:+.2f} 元")
 
-        except Exception as e:
-            # ⭐ 任何失敗 → 事務自動回滾
-            logger.error(f"原子交易失敗，已完全回滾: {e}", exc_info=True)
-            return {
-                "success": False,
-                "error": str(e),
-                "message": f"❌ 交易執行失敗，已完全回滾\n❌ 錯誤: {str(e)}",
-            }
+                    # Step 5: 更新績效指標
+                    await self._calculate_and_update_performance_internal(agent_id)
+                    logger.info("績效已更新")
+
+                    # ⭐ 事務自動提交（所有步驟都成功）
+                    logger.info("原子交易成功完成")
+
+                return {
+                    "success": True,
+                    "transaction_id": transaction.id,
+                    "session_id": self.session_id,
+                    "message": f"✅ 交易執行成功\n"
+                    f"• 股票: {ticker} ({company_name or '未知'})\n"
+                    f"• 類型: {action_upper}\n"
+                    f"• 股數: {quantity:,}\n"
+                    f"• 成交價: {price:,.2f}\n"
+                    f"• 手續費: {commission:,.2f}\n"
+                    f"• 實際成本: {total_amount + commission:,.2f}",
+                }
+
+            except Exception as e:
+                # ⭐ 任何失敗 → 事務自動回滾
+                logger.error(f"原子交易失敗，已完全回滾: {e}", exc_info=True)
+                return {
+                    "success": False,
+                    "error": str(e),
+                    "message": f"❌ 交易執行失敗，已完全回滾\n❌ 錯誤: {str(e)}",
+                }
 
     async def _create_transaction_internal(
         self,
