@@ -115,32 +115,10 @@ interface Agent {
 
   // 財務資訊
   current_funds?: number;                  // 目前資金
-  portfolio?: Portfolio;                   // 投資組合
-  performance?: PerformanceMetrics;        // 績效指標
 
   // 時間戳
   created_at: string;                      // 建立時間 (ISO 8601)
   updated_at: string;                      // 更新時間 (ISO 8601)
-}
-```
-
-### Portfolio (投資組合)
-
-```typescript
-interface Portfolio {
-  cash: number;                    // 現金餘額
-  total_value: number;             // 總資產價值
-  positions: {                     // 持股明細
-    [ticker: string]: {
-      quantity: number;            // 持股數量
-      avg_price: number;           // 平均買入價格
-      current_price: number;       // 當前價格
-      total_value: number;         // 持股總價值
-      gain_loss: number;           // 損益
-      gain_loss_percent: number;   // 損益百分比
-    }
-  };
-  timestamp: string;               // 快照時間 (ISO 8601)
 }
 ```
 
@@ -158,22 +136,6 @@ interface Transaction {
   fee: number;                     // 手續費
   timestamp: string;               // 交易時間 (ISO 8601)
   reason?: string;                 // 交易原因
-}
-```
-
-### PerformanceMetrics (績效指標)
-
-```typescript
-interface PerformanceMetrics {
-  total_return: number;            // 總報酬率
-  annual_return: number;           // 年報酬率
-  sharpe_ratio: number;            // 夏普比率
-  max_drawdown: number;            // 最大回撤
-  win_rate: number;                // 勝率
-  total_trades: number;            // 總交易數
-  winning_trades: number;          // 獲利交易數
-  losing_trades: number;           // 虧損交易數
-  updated_at: string;              // 更新時間 (ISO 8601)
 }
 ```
 
@@ -585,44 +547,6 @@ POST /api/agent_execution/agent_123/stop
 
 #### GET /api/trading/agents/{agent_id}/portfolio - 取得投資組合
 
-**描述**: 獲取 Agent 的完整投資組合資訊
-
-**請求**:
-
-```
-GET /api/trading/agents/agent_123/portfolio
-```
-
-**回應** (200):
-
-```json
-{
-  "cash": 50000,
-  "total_value": 1050000,
-  "positions": {
-    "2330": {
-      "quantity": 100,
-      "avg_price": 1000,
-      "current_price": 1050,
-      "total_value": 105000,
-      "gain_loss": 5000,
-      "gain_loss_percent": 5.0
-    },
-    "2454": {
-      "quantity": 50,
-      "avg_price": 500,
-      "current_price": 520,
-      "total_value": 26000,
-      "gain_loss": 1000,
-      "gain_loss_percent": 4.0
-    }
-  },
-  "timestamp": "2025-10-22T15:00:00Z"
-}
-```
-
----
-
 #### GET /api/trading/agents/{agent_id}/holdings - 取得持股明細
 
 **描述**: 獲取 Agent 的所有持股明細
@@ -704,28 +628,6 @@ GET /api/trading/agents/agent_123/portfolio
 #### GET /api/trading/agents/{agent_id}/trades - 取得交易記錄（別名）
 
 **描述**: 同 /transactions，提供別名端點
-
----
-
-#### GET /api/trading/agents/{agent_id}/performance - 取得績效指標
-
-**描述**: 獲取 Agent 的績效分析指標
-
-**回應** (200):
-
-```json
-{
-  "total_return": 0.05,
-  "annual_return": 0.15,
-  "sharpe_ratio": 1.2,
-  "max_drawdown": -0.08,
-  "win_rate": 0.65,
-  "total_trades": 20,
-  "winning_trades": 13,
-  "losing_trades": 7,
-  "updated_at": "2025-10-22T15:00:00Z"
-}
-```
 
 ---
 

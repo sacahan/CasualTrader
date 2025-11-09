@@ -31,34 +31,33 @@
   } = $props();
 
   // 計算資產相關數據
-  // 計算總資產
+  // 計算持股總市值（基於市場價值，如果沒有則使用成本價作為估計）
+  // 由於後端尚未提供實時行情，暫用 market_value = total_cost 作為估計
+  // 當後端集成實時行情後，計算會自動更新
+  let holdingsTotalValue = $derived.by(() => {
+    if (!holdings || holdings.length === 0) return 0;
+    return holdings.reduce((sum, holding) => {
+      // 優先使用 market_value，否則用 total_cost（後端當前估計相同）
+      const value = holding.market_value ?? holding.total_cost ?? 0;
+      return sum + value;
+    }, 0);
+  });
+
+  // 計算總資產 = 現金 + 持股市值
+  // 這才是真實的投資組合淨值
   let totalAssets = $derived.by(() => {
-    const portfolioValue = agent.portfolio?.total_value || 0;
-    const funds = agent.current_funds || agent.initial_funds || 1000000;
-    return portfolioValue > 0 ? portfolioValue : funds;
+    const currentFunds = agent.current_funds ?? agent.initial_funds;
+    return currentFunds + holdingsTotalValue;
   });
 
-  // 計算當前現金
-  let currentCash = $derived.by(() => {
-    const funds = agent.current_funds || agent.initial_funds || 1000000;
-    return agent.portfolio?.cash || funds;
-  });
+  // 計算當前現金（不包含持股）
+  let currentCash = $derived(agent.current_funds ?? agent.initial_funds);
 
-  // 計算損益
-  let pnl = $derived.by(() => {
-    const assets =
-      agent.portfolio?.total_value || agent.current_funds || agent.initial_funds || 1000000;
-    const initial = agent.initial_funds || 1000000;
-    return assets - initial;
-  });
+  // 計算損益 = 總資產 - 初始投入資金
+  let pnl = $derived(totalAssets - agent.initial_funds);
 
   // 判斷是否盈利
-  let isProfit = $derived.by(() => {
-    const assets =
-      agent.portfolio?.total_value || agent.current_funds || agent.initial_funds || 1000000;
-    const initial = agent.initial_funds || 1000000;
-    return assets >= initial;
-  });
+  let isProfit = $derived(totalAssets >= agent.initial_funds);
 
   // Agent 顏色 (從設定中取得，預設為綠色)
   let agentColor = $derived(agent.color_theme || '34, 197, 94');
@@ -187,7 +186,7 @@
     if (!chartData || chartData.length === 0) {
       // 生成 10 個示例數據點，逐漸接近當前資產
       const current = totalAssets;
-      const initial = agent.initial_funds || 1000000;
+      const initial = agent.initial_funds;
       chartData = Array.from({ length: 10 }, (_, i) => ({
         total_value: initial + (current - initial) * (i / 9),
         date: new Date(Date.now() - (10 - i) * 24 * 60 * 60 * 1000).toLocaleDateString(),
@@ -208,7 +207,7 @@
       return '';
     });
 
-    const values = chartData.map((d) => d.total_value || d.value || totalAssets);
+    const values = chartData.map((d) => d.total_value ?? totalAssets);
 
     if (chartInstance) {
       chartInstance.destroy();
@@ -428,20 +427,16 @@
   <div class="mb-6">
     <p class="text-xs text-gray-400 mb-3 font-semibold">持有股數</p>
     {#if holdings && holdings.length > 0}
-      <div class="space-y-2">
+      <div class="space-y-2 max-h-32 overflow-y-auto custom-scrollbar">
         {#each holdings.slice(0, 3) as holding}
-          <div class="flex items-center justify-between text-sm">
-            <div class="flex items-center gap-2">
-              <span class="font-medium text-gray-300">{holding.ticker || holding.symbol}</span>
-              <span class="text-gray-500">{holding.company_name || holding.name || ''}</span>
+          <div class="flex justify-between items-center text-sm bg-gray-700/50 p-2 rounded-md">
+            <div>
+              <div class="font-bold text-white">{holding.ticker}</div>
+              <div class="text-xs text-gray-400">{holding.company_name || holding.name || ''}</div>
             </div>
             <div class="text-right">
-              <span class="text-white font-medium"
-                >{holding.quantity || holding.shares || 0} 股</span
-              >
-              <span class="text-gray-400 text-xs ml-2"
-                >@ {formatCurrency(holding.average_cost || holding.avg_price || 0)}</span
-              >
+              <div class="font-mono text-white">{holding.quantity || 0} 股</div>
+              <div class="text-xs text-gray-400">@ {formatCurrency(holding.average_cost || 0)}</div>
             </div>
           </div>
         {/each}

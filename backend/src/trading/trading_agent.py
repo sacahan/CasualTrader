@@ -585,7 +585,6 @@ class TradingAgent:
     async def run(
         self,
         mode: AgentMode | None = None,
-        context: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         """
         執行 Agent 任務（含記憶體工作流程）
@@ -597,7 +596,6 @@ class TradingAgent:
 
         Args:
             mode: 執行模式
-            context: 額外上下文（可選）
 
         Returns:
             執行結果字典：
@@ -647,9 +645,7 @@ class TradingAgent:
             trace_id = gen_trace_id()
             with trace(workflow_name=f"TradingAgent-{self.agent_id}", trace_id=trace_id):
                 # === Phase 2: 構建任務提示（融入記憶體） ===
-                task_prompt = await self._build_task_prompt(
-                    execution_mode, context, execution_memory
-                )
+                task_prompt = await self._build_task_prompt(execution_mode, execution_memory)
 
                 # === Phase 3: 執行 Agent ===
                 result = await Runner.run(self.agent, task_prompt, max_turns=DEFAULT_MAX_TURNS)
@@ -664,16 +660,11 @@ class TradingAgent:
                     execution_memory=execution_memory,
                 )
 
-                # === Phase 5: 規劃下一步 ===
-                next_steps = await self._plan_next_steps(result.final_output)
-                logger.info(f"Planned next steps: {next_steps}")
-
                 return {
                     "success": True,
                     "output": result.final_output,
                     "trace_id": trace_id,
                     "mode": execution_mode.value if execution_mode else "unknown",
-                    "next_steps": next_steps,
                 }
 
         except Exception as e:
@@ -747,7 +738,6 @@ class TradingAgent:
     async def _build_task_prompt(
         self,
         mode: AgentMode,
-        context: dict[str, Any] | None,
         execution_memory: dict[str, Any] | None = None,
     ) -> str:
         """
@@ -755,7 +745,6 @@ class TradingAgent:
 
         Args:
             mode: 執行模式
-            context: 額外上下文
             execution_memory: 執行記憶體（含過往決策）
 
         Returns:

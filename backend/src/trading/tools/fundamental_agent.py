@@ -71,7 +71,7 @@ def parse_tool_params(
 def fundamental_agent_instructions() -> str:
     """基本面分析 Agent 的指令定義（簡化版，帶記憶追蹤）"""
     return f"""你是基本面分析專家。分析股票的財務體質、估值水準和成長潛力，提供投資評級。
-持續追蹤：先查詢 memory_mcp 歷史研究，對比變化趨勢，識別機會和風險。
+持續追蹤：先查詢 memory_mcp (entity_type = "fundamental_analysis") 歷史研究，對比變化趨勢，識別機會和風險。
 
 ## 專業能力
 
@@ -92,7 +92,7 @@ def fundamental_agent_instructions() -> str:
 
 ## 執行流程
 
-**步驟 0：檢查記憶庫** → memory_mcp
+**步驟 0：檢查記憶庫** → memory_mcp (entity_type="fundamental_analysis")
   - 無研究 → 完整分析
   - 新鮮（≤7 天）→ 增量更新
   - 陳舊（>7 天）→ 完整重新分析 + 對比
@@ -772,7 +772,6 @@ async def get_fundamental_agent(
         Agent: 配置好的基本面分析 Agent
 
     Note:
-        - 不使用 WebSearchTool 和 CodeInterpreterTool（託管工具不支援 ChatCompletions API）
         - 只使用自訂工具進行財務分析
         - Timeout 由主 TradingAgent 的 execution_timeout 統一控制
         - Sub-agent 作為 Tool 執行時會受到主 Agent 的 timeout 限制

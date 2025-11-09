@@ -21,7 +21,7 @@ from service.agents_service import (
     AgentsService,
 )
 from api.config import get_db_session
-from api.models import CreateAgentRequest, UpdateAgentRequest
+from schemas.agent import CreateAgentRequest, UpdateAgentRequest
 
 router = APIRouter(prefix="/api/agents", tags=["agents"])
 
@@ -113,6 +113,9 @@ async def list_agents(
                     "investment_preferences": investment_prefs,
                     "created_at": agent.created_at.isoformat() if agent.created_at else None,
                     "updated_at": agent.updated_at.isoformat() if agent.updated_at else None,
+                    "last_active_at": agent.last_active_at.isoformat()
+                    if agent.last_active_at
+                    else None,
                 }
                 result.append(agent_dict)
             except AttributeError as attr_err:
@@ -220,6 +223,7 @@ async def get_agent(
             "investment_preferences": investment_prefs,
             "created_at": agent.created_at.isoformat() if agent.created_at else None,
             "updated_at": agent.updated_at.isoformat() if agent.updated_at else None,
+            "last_active_at": agent.last_active_at.isoformat() if agent.last_active_at else None,
             "holdings": [
                 {
                     "ticker": holding.ticker,
@@ -295,13 +299,10 @@ async def create_agent(
             name=request.name,
             description=request.description,
             ai_model=request.ai_model,
-            strategy_prompt=request.strategy_prompt,
             initial_funds=request.initial_funds,
             max_position_size=request.max_position_size,
             color_theme=request.color_theme,
             investment_preferences=request.investment_preferences,
-            custom_instructions=request.custom_instructions,
-            enabled_tools=request.enabled_tools.model_dump(),
         )
 
         # 提交資料庫變更

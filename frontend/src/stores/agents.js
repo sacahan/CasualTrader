@@ -201,7 +201,10 @@ export async function startAgent(agentId, config = {}) {
   error.set(null);
 
   try {
-    const result = await apiClient.startAgent(agentId, config);
+    // Extract mode from config or default to TRADING
+    const mode = config.mode || 'TRADING';
+    const maxTurns = config.maxTurns || null;
+    const result = await apiClient.startAgent(agentId, mode, maxTurns);
 
     // 更新 agent 狀態為 running
     agents.update((list) =>
@@ -251,7 +254,7 @@ export async function executeAgent(agentId, mode = 'TRADING') {
   error.set(null);
 
   try {
-    const result = await apiClient.startMode(agentId, mode);
+    const result = await apiClient.startAgent(agentId, mode);
     return result;
   } catch (err) {
     error.set(extractErrorMessage(err));

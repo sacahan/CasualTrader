@@ -75,7 +75,8 @@ class TestDeleteAgentIntegration:
                 total_value=Decimal("100000"),
                 cash_balance=Decimal("100000"),
                 total_trades=0,
-                winning_trades=0,
+                sell_trades_count=0,  # 修正: 賣出交易數
+                winning_trades_correct=0,  # 修正: 真實獲利交易數
             )
             session.add(performance)
 
@@ -159,7 +160,8 @@ class TestDeleteAgentIntegration:
                     total_value=Decimal("100000") - Decimal(i * 5000),
                     cash_balance=Decimal("50000"),
                     total_trades=i * 10,
-                    winning_trades=i * 5,
+                    sell_trades_count=i * 5,  # 修正: 賣出交易數
+                    winning_trades_correct=0,  # 修正: 真實獲利交易數
                 )
                 session.add(performance)
 

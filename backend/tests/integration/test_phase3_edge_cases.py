@@ -45,8 +45,8 @@ class TestAgentsRouterErrorHandling:
     def test_create_agent_missing_required_field(self, client):
         """測試：創建 agent 時缺少必需欄位"""
         payload = {
-            "name": "Test Agent",
-            # 缺少 description
+            # 缺少 name (唯一的必需欄位)
+            "description": "Test description",
         }
         response = client.post("/api/agents", json=payload)
         assert response.status_code == 422

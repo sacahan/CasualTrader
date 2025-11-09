@@ -7,8 +7,6 @@ from .agent import (
     AgentListResponse,
     AgentResponse,
     CreateAgentRequest,
-    EnabledTools,
-    PortfolioSnapshot,
     SessionResponse,
     StartAgentRequest,
     UpdateAgentRequest,
@@ -19,12 +17,10 @@ from .websocket import ErrorResponse, WebSocketMessage
 
 __all__ = [
     # Agent schemas
-    "EnabledTools",
     "CreateAgentRequest",
     "UpdateAgentRequest",
     "StartAgentRequest",
     "UpdateModeRequest",
-    "PortfolioSnapshot",
     "AgentResponse",
     "AgentListResponse",
     "SessionResponse",

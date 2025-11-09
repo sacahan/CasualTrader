@@ -145,8 +145,8 @@ class AgentSession(Base):
     # 執行內容
     initial_input: Mapped[dict[str, Any] | None] = mapped_column(JSON)
     final_output: Mapped[dict[str, Any] | None] = mapped_column(JSON)
-    tools_called: Mapped[list[str] | None] = mapped_column(
-        JSON, doc="呼叫的工具列表，例如: ['get_stock_price', 'analyze_trend']"
+    tools_called: Mapped[str | None] = mapped_column(
+        Text, doc='呼叫的工具列表 (JSON 字串格式)，例如: \'["get_stock_price", "analyze_trend"]\''
     )
     error_message: Mapped[str | None] = mapped_column(Text)
 
@@ -288,7 +288,12 @@ class AgentPerformance(Base):
 
     # 交易統計
     total_trades: Mapped[int] = mapped_column(Integer, default=0)
-    winning_trades: Mapped[int] = mapped_column(Integer, default=0)
+    sell_trades_count: Mapped[int] = mapped_column(
+        Integer, default=0, doc="賣出交易數 (原 winning_trades，語義已修正)"
+    )
+    winning_trades_correct: Mapped[int] = mapped_column(
+        Integer, default=0, doc="真實獲利交易數 (待實現買賣配對邏輯)"
+    )
 
     # 時間戳記
     created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now())

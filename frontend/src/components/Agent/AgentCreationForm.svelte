@@ -136,14 +136,14 @@
   // 初始化表單資料
   function initializeFormData() {
     if (agent) {
-      // 編輯模式 - 填入現有資料
+      // 編輯模式 - 填入現有資料（agent 對象完整，無需防禦性邏輯）
       formData = {
-        name: agent.name || '',
-        description: agent.description || agent.strategy_prompt || '',
-        initial_funds: (agent.initial_funds || DEFAULT_INITIAL_FUNDS).toString(),
-        max_position_size: (agent.max_position_size || DEFAULT_MAX_POSITION_SIZE).toString(),
-        ai_model: agent.ai_model || 'gpt-5-mini',
-        color_theme: agent.color_theme || '34, 197, 94',
+        name: agent.name,
+        description: agent.description || agent.strategy_prompt,
+        initial_funds: agent.initial_funds.toString(),
+        max_position_size: agent.max_position_size.toString(),
+        ai_model: agent.ai_model,
+        color_theme: agent.color_theme,
         investment_preferences: agent.investment_preferences?.join(', ') || '',
       };
 

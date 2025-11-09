@@ -118,17 +118,61 @@ async def _call_tavily_search(
 
         # 解析 MCP 返回值結構: result.content[0].text (JSON string)
         if not result or not hasattr(result, "content") or not result.content:
-            logger.warning(f"tavily 搜尋返回空結果 | 查詢: {query}")
+            logger.warning(
+                f"tavily 搜尋返回空結果 | 查詢: {query} | "
+                f"result: {result} | result type: {type(result).__name__}"
+            )
             return []
 
+        # 添加調試日誌
+        logger.debug(
+            f"tavily 返回結果 | 查詢: {query} | "
+            f"result type: {type(result).__name__} | "
+            f"content length: {len(result.content)} | "
+            f"content[0] type: {type(result.content[0]).__name__}"
+        )
+
         content_item = result.content[0]
-        text_content = content_item.text if hasattr(content_item, "text") else str(content_item)
+
+        # 嘗試多種方式提取文本內容
+        text_content = None
+        if hasattr(content_item, "text"):
+            text_content = content_item.text
+        elif isinstance(content_item, str):
+            text_content = content_item
+        elif hasattr(content_item, "text_content"):
+            text_content = content_item.text_content
+        elif hasattr(content_item, "message"):
+            text_content = content_item.message
+        else:
+            text_content = str(content_item) if content_item else None
+
+        # 檢查返回內容是否為空或非 JSON
+        if not text_content or not text_content.strip():
+            logger.warning(
+                f"tavily 搜尋返回空內容 | 查詢: {query} | "
+                f"content_item type: {type(content_item).__name__} | "
+                f"content_item dir: {[attr for attr in dir(content_item) if not attr.startswith('_')]} | "
+                f"text_content: '{text_content}'"
+            )
+            return []
 
         # 解析 JSON
         try:
             data = json.loads(text_content)
         except json.JSONDecodeError as e:
-            logger.warning(f"無法解析 tavily 返回的 JSON | 查詢: {query} | 錯誤: {e}")
+            # 檢查是否可能是錯誤響應結構
+            if "error" in text_content.lower() or "success" in text_content.lower():
+                logger.error(
+                    f"tavily 返回錯誤 | 查詢: {query} | 返回內容: {text_content} | 錯誤: {e}"
+                )
+            else:
+                logger.warning(
+                    f"無法解析 tavily 返回的 JSON | 查詢: {query} | "
+                    f"返回內容（前200字）: {text_content[:200] if text_content else 'EMPTY'} | "
+                    f"返回內容完整長度: {len(text_content)} | "
+                    f"錯誤: {e}"
+                )
             return []
 
         # 提取搜尋結果

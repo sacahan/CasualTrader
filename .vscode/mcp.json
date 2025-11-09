@@ -15,7 +15,7 @@
                 "mcp-memory-libsql"
             ],
             "env": {
-                "LIBSQL_URL": "file:./memory/knowledge.db"
+                "LIBSQL_URL": "file:./backend/memory/test_memory.db"
             }
         }
     }

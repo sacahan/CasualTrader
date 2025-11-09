@@ -45,7 +45,6 @@ async def setup_test_db():
                 name=f"Test Agent {i}",
                 description=f"Test agent {i} for API testing",
                 ai_model="gpt-4o-mini" if i % 2 == 0 else "gpt-4o",
-                strategy_prompt=f"Test strategy {i}",
                 initial_funds=Decimal(str(100000 * i)),
                 color_theme="34, 197, 94" if i % 2 == 0 else "239, 68, 68",
                 investment_preferences=["2330", "0050"] if i % 2 == 0 else ["2454"],

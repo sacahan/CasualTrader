@@ -22,14 +22,36 @@
   } = $props();
 
   // 計算資產相關數據
-  let totalAssets = $derived(agent?.initial_funds || 1000000);
-  let currentCash = $derived(agent?.initial_funds || 345020.5);
-  let pnl = $derived(totalAssets - (agent?.initial_funds || 1000000));
-  let pnlPercent = $derived((pnl / (agent?.initial_funds || 1000000)) * 100);
+  // 計算持股總市值（市場價值估計 = 後端提供的 market_value）
+  // 注意：當前後端尚未集成實時行情，market_value = total_cost
+  // 實時行情集成後會自動更新計算
+  let holdingsTotalValue = $derived.by(() => {
+    if (!holdings || holdings.length === 0) return 0;
+    return holdings.reduce((sum, holding) => {
+      const value = holding.market_value ?? holding.total_cost ?? 0;
+      return sum + value;
+    }, 0);
+  });
+
+  // 計算總資產 = 現金 + 持股市值（真實投資組合淨值）
+  let totalAssets = $derived.by(() => {
+    const currentFunds = agent.current_funds ?? agent.initial_funds;
+    return currentFunds + holdingsTotalValue;
+  });
+
+  // 計算當前現金（不含持股）
+  let currentCash = $derived(agent.current_funds ?? agent.initial_funds);
+
+  // 計算損益 = 總資產 - 初始投入
+  let pnl = $derived(totalAssets - agent.initial_funds);
+
+  // 計算損益率
+  let pnlPercent = $derived((pnl / agent.initial_funds) * 100);
+
   let isProfit = $derived(pnl >= 0);
 
   // Agent 顏色
-  let agentColor = $derived(agent?.color_theme || '34, 197, 94');
+  let agentColor = $derived(agent.color_theme);
 
   function handleClose() {
     onclose?.();
@@ -40,7 +62,7 @@
   {#snippet header()}
     <div class="flex items-center justify-between w-full">
       <h2 class="text-2xl font-bold" style="color: rgb({agentColor});">
-        {agent?.name || 'Agent 詳情'}
+        {agent.name}
       </h2>
       <div class="flex items-center gap-2">
         <!-- 關閉按鈕 -->
@@ -80,27 +102,27 @@
             <div>
               <p class="text-gray-400">AI 模型</p>
               <p class="font-medium text-white">
-                {agent?.ai_model || '未知模型'}
+                {agent.ai_model}
               </p>
             </div>
             <div>
               <p class="text-gray-400">單一持股上限</p>
               <p class="font-medium text-white">
-                {agent?.max_position_size || 50}%
+                {agent.max_position_size}%
               </p>
             </div>
             <div>
               <p class="text-gray-400">狀態</p>
-              <p class="font-medium text-white">{agent?.status || 'IDLE'}</p>
+              <p class="font-medium text-white">{agent.status}</p>
             </div>
             <div>
               <p class="text-gray-400">創建時間</p>
-              <p class="font-medium text-white">{formatDateTime(agent?.created_at)}</p>
+              <p class="font-medium text-white">{formatDateTime(agent.created_at)}</p>
             </div>
           </div>
 
           <!-- 投資偏好 -->
-          {#if agent?.investment_preferences}
+          {#if agent.investment_preferences}
             <div class="mt-4 border-t border-gray-700 pt-3">
               <p class="mb-2 text-gray-400">投資偏好</p>
               <div class="space-y-2 text-sm">
@@ -170,7 +192,7 @@
       <h3 class="mb-3 text-lg font-semibold text-white" style="color: rgb({agentColor});">
         績效走勢
       </h3>
-      <PerformanceChart agentId={agent?.agent_id} {performanceData} height={300} />
+      <PerformanceChart agentId={agent.agent_id} {performanceData} height={300} />
     </div>
 
     <!-- 持倉詳情 -->

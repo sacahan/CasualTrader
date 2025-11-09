@@ -52,7 +52,6 @@ class StartModeRequest(BaseModel):
         default=AgentModeEnum.TRADING,
         description="執行模式: TRADING | REBALANCING",
     )
-    max_turns: int | None = Field(None, ge=1, le=50, description="最大輪數")
 
 
 # ==========================================
@@ -100,7 +99,6 @@ async def _execute_in_background(
     agent_id: str,
     mode: AgentMode,
     session_id: str,
-    max_turns: int | None = None,
 ) -> None:
     """
     後台執行 Agent 並推送狀態更新
@@ -113,7 +111,6 @@ async def _execute_in_background(
         agent_id: Agent ID
         mode: 執行模式
         session_id: 既存的 session ID（由 API 層創建）
-        max_turns: 最大輪數
     """
     try:
         logger.info(f"[Background] Starting execution for agent {agent_id} ({mode.value})")
@@ -122,7 +119,6 @@ async def _execute_in_background(
         result = await trading_service.execute_single_mode(
             agent_id=agent_id,
             mode=mode,
-            max_turns=max_turns,
             session_id=session_id,
         )
 
@@ -184,7 +180,6 @@ async def start_agent_mode(
     Args:
         agent_id: Agent ID
         request.mode: 執行模式 (TRADING | REBALANCING)
-        request.max_turns: 最大輪數（可選）
 
     Returns:
         成功時返回 202 Accepted 及 session_id
@@ -230,7 +225,6 @@ async def start_agent_mode(
                 agent_id=agent_id,
                 mode=mode,
                 session_id=session_id,
-                max_turns=request.max_turns,
             )
         )
 

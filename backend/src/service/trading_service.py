@@ -97,7 +97,6 @@ class TradingService:
         self,
         agent_id: str,
         mode: AgentMode,
-        max_turns: int | None = None,
         session_id: str | None = None,
     ) -> dict[str, Any]:
         """
@@ -106,7 +105,6 @@ class TradingService:
         Args:
             agent_id: Agent ID
             mode: 執行模式 (TRADING/REBALANCING)
-            max_turns: 最大輪數（可選）
             session_id: 既存的 session ID（可選）。如果提供，使用該 session 而不創建新的
 
         Returns:
@@ -670,9 +668,11 @@ class TradingService:
             performance.total_value = total_value
             performance.cash_balance = Decimal(str(cash_balance))
             performance.total_return = total_return
+            # TODO: win_rate 當前為「交易完成率」非真實勝率
             performance.win_rate = win_rate
             performance.total_trades = total_trades
-            performance.winning_trades = completed_trades
+            performance.sell_trades_count = completed_trades  # 修正: 賣出交易數
+            performance.winning_trades_correct = 0  # TODO: 實現真實獲利交易數計算
             performance.updated_at = datetime.now()
         else:
             # 創建新記錄
@@ -681,12 +681,13 @@ class TradingService:
                 date=today,
                 total_value=total_value,
                 cash_balance=Decimal(str(cash_balance)),
-                unrealized_pnl=Decimal("0"),
-                realized_pnl=Decimal("0"),
+                unrealized_pnl=Decimal("0"),  # TODO: 需要實時股價 API
+                realized_pnl=Decimal("0"),  # TODO: 需要買賣配對邏輯 (FIFO)
                 total_return=total_return,
-                win_rate=win_rate,
+                win_rate=win_rate,  # TODO: 當前為交易完成率
                 total_trades=total_trades,
-                winning_trades=completed_trades,
+                sell_trades_count=completed_trades,  # 修正: 賣出交易數
+                winning_trades_correct=0,  # TODO: 實現真實獲利交易數計算
             )
             self.db_session.add(performance)
 

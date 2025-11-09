@@ -314,13 +314,10 @@ class AgentsService:
         name: str,
         description: str,
         ai_model: str,
-        strategy_prompt: str,
         initial_funds: float,
-        max_position_size: float = 5.0,
+        max_position_size: float = 50.0,
         color_theme: str = "34, 197, 94",
         investment_preferences: list[str] | None = None,
-        custom_instructions: str = "",
-        enabled_tools: dict | None = None,
     ) -> Agent:
         """
         創建新 Agent
@@ -329,13 +326,10 @@ class AgentsService:
             name: Agent 名稱
             description: Agent 描述
             ai_model: AI 模型名稱
-            strategy_prompt: 策略提示
             initial_funds: 初始資金
             max_position_size: 最大持倉比例 (%)
             color_theme: 顏色主題 (RGB 格式)
             investment_preferences: 投資偏好列表
-            custom_instructions: 自訂指令
-            enabled_tools: 啟用的工具
 
         Returns:
             創建的 Agent 實例
@@ -346,7 +340,7 @@ class AgentsService:
         """
         try:
             # 生成 Agent ID
-            agent_id = f"agent_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{str(uuid.uuid4())[:8]}"
+            agent_id = f"agent-{str(uuid.uuid4())[:8]}"
 
             # 轉換投資偏好為 JSON 字串
             preferences_json = None
@@ -778,9 +772,11 @@ class AgentsService:
                 performance.total_value = total_value
                 performance.cash_balance = Decimal(str(cash_balance))
                 performance.total_return = total_return
+                # TODO: win_rate 當前為「交易完成率」非真實勝率，待實現買賣配對邏輯後修正
                 performance.win_rate = win_rate
                 performance.total_trades = total_trades
-                performance.winning_trades = completed_trades
+                performance.sell_trades_count = completed_trades  # 修正: 賣出交易數
+                performance.winning_trades_correct = 0  # TODO: 實現真實獲利交易數計算
                 performance.updated_at = datetime.now()
             else:
                 # 創建新記錄
@@ -789,12 +785,18 @@ class AgentsService:
                     date=today,
                     total_value=total_value,
                     cash_balance=Decimal(str(cash_balance)),
-                    unrealized_pnl=Decimal("0"),  # TODO: 計算未實現損益
-                    realized_pnl=Decimal("0"),  # TODO: 計算已實現損益
+                    # 未實現欄位 - 需要額外實現
+                    unrealized_pnl=Decimal("0"),  # TODO: 需要實時股價 API
+                    realized_pnl=Decimal("0"),  # TODO: 需要買賣配對邏輯 (FIFO)
+                    daily_return=None,  # TODO: 需要歷史績效資料
+                    # 已實現欄位
                     total_return=total_return,
+                    # TODO: win_rate 當前為「交易完成率」非真實勝率
                     win_rate=win_rate,
+                    max_drawdown=None,  # TODO: 需要歷史淨值曲線
                     total_trades=total_trades,
-                    winning_trades=completed_trades,
+                    sell_trades_count=completed_trades,  # 修正: 賣出交易數
+                    winning_trades_correct=0,  # TODO: 實現真實獲利交易數計算
                 )
                 self.session.add(performance)
 
@@ -982,7 +984,8 @@ class AgentsService:
                         "win_rate": float(record.win_rate) if record.win_rate else None,
                         "max_drawdown": float(record.max_drawdown) if record.max_drawdown else None,
                         "total_trades": record.total_trades,
-                        "winning_trades": record.winning_trades,
+                        "sell_trades_count": record.sell_trades_count,  # 修正: 賣出交易數
+                        "winning_trades_correct": record.winning_trades_correct,  # 真實獲利交易數
                     }
                 )
 

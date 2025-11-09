@@ -96,24 +96,6 @@ class TestRequestValidation:
         # 有效請求
         request = StartModeRequest(mode=AgentModeEnum.TRADING)
         assert request.mode == AgentModeEnum.TRADING
-        assert request.max_turns is None
-
-        # 帶 max_turns
-        request = StartModeRequest(mode=AgentModeEnum.TRADING, max_turns=10)
-        assert request.max_turns == 10
-
-    def test_start_mode_request_max_turns_validation(self):
-        """測試：max_turns 的驗證"""
-        from api.routers.agent_execution import StartModeRequest, AgentModeEnum
-        from pydantic import ValidationError
-
-        # 無效：max_turns 太大
-        with pytest.raises(ValidationError):
-            StartModeRequest(mode=AgentModeEnum.TRADING, max_turns=100)
-
-        # 無效：max_turns 為 0
-        with pytest.raises(ValidationError):
-            StartModeRequest(mode=AgentModeEnum.TRADING, max_turns=0)
 
 
 class TestResponseFormat:
