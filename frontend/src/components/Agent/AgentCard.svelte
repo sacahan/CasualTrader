@@ -10,7 +10,7 @@
 
   import { onMount } from 'svelte';
   import { Button } from '../UI/index.js';
-  import { AGENT_STATUS, AGENT_RUNTIME_STATUS, WS_EVENT_TYPES } from '../../shared/constants.js';
+  import { WS_EVENT_TYPES } from '../../shared/constants.js';
   import { formatCurrency } from '../../shared/utils.js';
   import { isOpen } from '../../stores/market.js';
   import { addEventListener } from '../../stores/websocket.js';
@@ -63,18 +63,18 @@
   let agentColor = $derived(agent.color_theme || '34, 197, 94');
 
   // 是否可以編輯 (執行中不可編輯 - 配置鎖定)
-  let isEditable = $derived(agent.runtime_status !== AGENT_RUNTIME_STATUS.RUNNING);
+  let isEditable = $derived(agent.status !== 'running');
 
-  // 是否可以啟動 (persistent status 為 active/inactive 且 runtime 不在執行中)
+  // 是否可以啟動 (status 為 idle, stopped, 或 inactive)
   let canStart = $derived(
-    (agent.status === AGENT_STATUS.ACTIVE || agent.status === AGENT_STATUS.INACTIVE) &&
-      (agent.runtime_status === AGENT_RUNTIME_STATUS.IDLE ||
-        agent.runtime_status === AGENT_RUNTIME_STATUS.STOPPED ||
-        !agent.runtime_status)
+    agent.status === 'idle' ||
+      agent.status === 'stopped' ||
+      agent.status === 'inactive' ||
+      !agent.status
   );
 
   // 是否可以停止
-  let canStop = $derived(agent.runtime_status === AGENT_RUNTIME_STATUS.RUNNING);
+  let canStop = $derived(agent.status === 'running');
 
   // 本地狀態 - 執行加載和錯誤
   let isExecuting = $state(false);
@@ -347,7 +347,7 @@
         {agent.ai_model || '未知模型'}
       </div>
       <div class="flex items-center gap-2 mt-1">
-        {#if agent.runtime_status === AGENT_RUNTIME_STATUS.RUNNING}
+        {#if agent.status === 'running'}
           <span class="status-dot status-running"></span>
           <span class="text-sm text-green-400">運行中</span>
         {:else}

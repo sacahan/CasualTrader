@@ -44,7 +44,6 @@ async def test_create_agent_with_current_funds(db_session):
         name="Test Agent",
         description="Test Description",
         ai_model="gpt-4o-mini",
-        strategy_prompt="Test Strategy",
         initial_funds=1000000.0,
     )
     await db_session.commit()
@@ -64,7 +63,6 @@ async def test_update_agent_funds_increase(db_session):
         name="Test Agent",
         description="Test Description",
         ai_model="gpt-4o-mini",
-        strategy_prompt="Test Strategy",
         initial_funds=1000000.0,
     )
     await db_session.commit()
@@ -94,7 +92,6 @@ async def test_update_agent_funds_decrease(db_session):
         name="Test Agent",
         description="Test Description",
         ai_model="gpt-4o-mini",
-        strategy_prompt="Test Strategy",
         initial_funds=1000000.0,
     )
     await db_session.commit()
@@ -126,7 +123,6 @@ async def test_update_agent_funds_insufficient(db_session):
         name="Test Agent",
         description="Test Description",
         ai_model="gpt-4o-mini",
-        strategy_prompt="Test Strategy",
         initial_funds=1000000.0,
     )
     await db_session.commit()
@@ -150,7 +146,6 @@ async def test_current_funds_fallback_to_initial(db_session):
         name="Test Agent",
         description="Test Description",
         ai_model="gpt-4o-mini",
-        strategy_prompt="Test Strategy",
         initial_funds=1000000.0,
     )
     await db_session.commit()

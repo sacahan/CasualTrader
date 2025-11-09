@@ -92,13 +92,11 @@ class APIClient {
    * 回應包含: { success, session_id, mode, message }
    * @param {string} agentId - Agent ID
    * @param {string} mode - 執行模式 (TRADING | REBALANCING)
-   * @param {number} maxTurns - 最大輪數 (可選)
    * @returns {Promise<{success: boolean, session_id: string, mode: string, message: string}>}
    */
-  startAgent(agentId, mode = 'TRADING', maxTurns = null) {
+  startAgent(agentId, mode = 'TRADING') {
     const body = {
       mode,
-      ...(maxTurns && { max_turns: maxTurns }),
     };
     return this.request(`/api/agent-execution/${agentId}/start`, {
       method: 'POST',

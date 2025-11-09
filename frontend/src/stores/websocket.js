@@ -276,7 +276,7 @@ function handleExecutionStarted(payload) {
   // 更新 agent 狀態為 RUNNING
   agents.update((list) =>
     list.map((agent) =>
-      agent.agent_id === agent_id ? { ...agent, runtime_status: 'running', session_id } : agent
+      agent.agent_id === agent_id ? { ...agent, status: 'running', session_id } : agent
     )
   );
 
@@ -296,9 +296,7 @@ function handleExecutionCompleted(payload) {
 
   // 更新 agent 狀態為 IDLE
   agents.update((list) =>
-    list.map((agent) =>
-      agent.agent_id === agent_id ? { ...agent, runtime_status: 'idle' } : agent
-    )
+    list.map((agent) => (agent.agent_id === agent_id ? { ...agent, status: 'idle' } : agent))
   );
 
   addNotification({
@@ -317,9 +315,7 @@ function handleExecutionFailed(payload) {
 
   // 更新 agent 狀態為 STOPPED
   agents.update((list) =>
-    list.map((agent) =>
-      agent.agent_id === agent_id ? { ...agent, runtime_status: 'stopped' } : agent
-    )
+    list.map((agent) => (agent.agent_id === agent_id ? { ...agent, status: 'stopped' } : agent))
   );
 
   addNotification({
@@ -338,9 +334,7 @@ function handleExecutionStopped(payload) {
 
   // 更新 agent 狀態為 STOPPED
   agents.update((list) =>
-    list.map((agent) =>
-      agent.agent_id === agent_id ? { ...agent, runtime_status: 'stopped' } : agent
-    )
+    list.map((agent) => (agent.agent_id === agent_id ? { ...agent, status: 'stopped' } : agent))
   );
 
   addNotification({

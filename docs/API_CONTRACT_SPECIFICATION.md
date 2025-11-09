@@ -1,8 +1,9 @@
 # API 契約規範 (Frontend-Backend Contract)
 
-**版本**: 1.1
-**最後更新**: 2025-10-26
+**版本**: 2.0
+**最後更新**: 2025-11-09
 **狀態**: Active
+**變更**: 移除已刪除欄位 (strategy_prompt, enabled_tools, max_turns, custom_instructions, runtime_status)
 
 ## 概述
 
@@ -18,8 +19,8 @@ interface Agent {
   id: string;
   name: string;
   investment_preferences: string[];  // ✅ 必須是字串陣列
-  enabled_tools: EnabledTools;       // ✅ 必須是物件
   created_at: string;                // ✅ ISO 8601 格式
+  last_active_at: string | null;    // ✅ ISO 8601 格式 (可為 null)
   // ... 其他欄位
 }
 ```
@@ -30,8 +31,8 @@ class AgentResponse(BaseModel):
     id: str
     name: str
     investment_preferences: list[str]  # ✅ 必須是字串列表
-    enabled_tools: EnabledTools        # ✅ 必須是物件
     created_at: datetime               # ✅ 自動序列化為 ISO 格式
+    last_active_at: datetime | None    # ✅ Agent 最後活動時間
     # ... 其他欄位
 ```
 
@@ -40,8 +41,7 @@ class AgentResponse(BaseModel):
 | 欄位 | 前端格式 | 後端格式 | 轉換規則 |
 |------|----------|----------|----------|
 | `investment_preferences` | `string[]` | `list[str]` | 直接對應，不進行 JSON 字串序列化 |
-| `enabled_tools` | `object` | `dict` | 直接對應 |
-| `created_at` / `updated_at` | `string` (ISO 8601) | `datetime` | 自動序列化為 ISO 8601 格式 |
+| `created_at` / `updated_at` / `last_active_at` | `string` (ISO 8601) | `datetime` | 自動序列化為 ISO 8601 格式 |
 | 數值欄位 | `number` | `float` / `int` | 直接對應 |
 
 ### 3. 通用響應格式
@@ -75,19 +75,6 @@ class AgentResponse(BaseModel):
 
 ## 資料模型定義
 
-### EnabledTools (工具配置)
-
-```typescript
-interface EnabledTools {
-  fundamental_analysis: boolean;   // 基本面分析
-  technical_analysis: boolean;     // 技術面分析
-  risk_assessment: boolean;        // 風險評估
-  sentiment_analysis: boolean;     // 市場情緒分析
-  web_search: boolean;             // 網路搜尋
-  code_interpreter: boolean;       // 程式碼解譯器
-}
-```
-
 ### Agent (完整模型)
 
 ```typescript
@@ -97,20 +84,15 @@ interface Agent {
   name: string;                            // 代理人名稱 (1-100 字)
   description: string;                     // 代理人描述 (0-500 字)
   ai_model: string;                        // 使用的 AI 模型鑰匙
-  strategy_prompt: string;                 // 交易策略提示語
   color_theme: string;                     // UI 顏色 (RGB: "34, 197, 94")
 
   // 配置參數
   initial_funds: number;                   // 初始資金 (> 0)
-  max_position_size: number;               // 最大持倉比例 (1-100%)
-  max_turns: number;                       // 最大回合數 (1-30)
-  enabled_tools: EnabledTools;             // 啟用工具
+  max_position_size: number;               // 最大持倉比例 (百分比)
   investment_preferences: string[];        // 投資偏好代碼 (如 ["2330", "2454"])
-  custom_instructions: string;             // 自訂指令
 
   // 狀態
-  status: "active" | "inactive" | "error" | "suspended";  // 持久化狀態
-  runtime_status?: "idle" | "running" | "stopped";        // 執行時狀態
+  status: "active" | "inactive" | "error" | "suspended" | "idle" | "running" | "stopped";  // Agent 狀態
   current_mode: string;                    // 當前交易模式
 
   // 財務資訊
@@ -118,6 +100,8 @@ interface Agent {
 
   // 時間戳
   created_at: string;                      // 建立時間 (ISO 8601)
+  updated_at: string;                      // 更新時間 (ISO 8601)
+  last_active_at: string | null;          // 最後活動時間 (ISO 8601，可為 null)
   updated_at: string;                      // 更新時間 (ISO 8601)
 }
 ```
@@ -178,27 +162,16 @@ GET /api/agents
     "name": "保守型投資者",
     "description": "低風險策略代理人",
     "ai_model": "gpt-4o-mini",
-    "strategy_prompt": "採用保守投資策略...",
     "color_theme": "34, 197, 94",
     "initial_funds": 1000000,
     "current_funds": 1050000,
     "max_position_size": 50,
-    "status": "active",
-    "runtime_status": "idle",
+    "status": "idle",
     "current_mode": "OBSERVATION",
-    "max_turns": 10,
-    "enabled_tools": {
-      "fundamental_analysis": true,
-      "technical_analysis": true,
-      "risk_assessment": true,
-      "sentiment_analysis": false,
-      "web_search": true,
-      "code_interpreter": false
-    },
     "investment_preferences": ["2330", "2454", "0050"],
-    "custom_instructions": "優先考慮長期持有",
     "created_at": "2025-01-01T00:00:00Z",
-    "updated_at": "2025-10-22T15:00:00Z"
+    "updated_at": "2025-10-22T15:00:00Z",
+    "last_active_at": "2025-10-22T14:30:00Z"
   }
 ]
 ```
@@ -236,18 +209,13 @@ GET /api/agents/agent_123
   "name": "保守型投資者",
   "description": "低風險策略代理人",
   "ai_model": "gpt-4o-mini",
-  "strategy_prompt": "採用保守投資策略...",
   "color_theme": "34, 197, 94",
   "initial_funds": 1000000,
   "current_funds": 1050000,
   "max_position_size": 50,
   "status": "active",
-  "runtime_status": "idle",
   "current_mode": "OBSERVATION",
-  "max_turns": 10,
-  "enabled_tools": { /* ... */ },
   "investment_preferences": ["2330", "2454", "0050"],
-  "custom_instructions": "優先考慮長期持有",
   "created_at": "2025-01-01T00:00:00Z",
   "updated_at": "2025-10-22T15:00:00Z",
   "portfolio": {
@@ -301,12 +269,9 @@ GET /api/agents/agent_123
   "name": "積極型投資者",
   "description": "高風險高報酬策略",
   "ai_model": "gpt-4o",
-  "strategy_prompt": "尋求高報酬的投資機會，接受較高風險...",
   "color_theme": "239, 68, 68",
   "initial_funds": 500000,
   "max_position_size": 75,
-  "max_turns": 20,
-  "enabled_tools": {
     "fundamental_analysis": true,
     "technical_analysis": true,
     "risk_assessment": true,
@@ -315,7 +280,6 @@ GET /api/agents/agent_123
     "code_interpreter": false
   },
   "investment_preferences": ["2330", "2454", "2412"],
-  "custom_instructions": "積極尋找成長型股票"
 }
 ```
 
@@ -344,18 +308,13 @@ GET /api/agents/agent_123
   "name": "積極型投資者",
   "description": "高風險高報酬策略",
   "ai_model": "gpt-4o",
-  "strategy_prompt": "尋求高報酬的投資機會，接受較高風險...",
   "color_theme": "239, 68, 68",
   "initial_funds": 500000,
   "current_funds": 500000,
   "max_position_size": 75,
-  "max_turns": 20,
   "status": "inactive",
-  "runtime_status": "idle",
   "current_mode": "OBSERVATION",
-  "enabled_tools": { /* ... */ },
   "investment_preferences": ["2330", "2454", "2412"],
-  "custom_instructions": "積極尋找成長型股票",
   "created_at": "2025-10-22T16:02:14Z",
   "updated_at": "2025-10-22T16:02:14Z"
 }
@@ -368,7 +327,6 @@ GET /api/agents/agent_123
   "detail": "Validation error",
   "field_errors": {
     "name": ["ensure this value has at least 1 characters"],
-    "strategy_prompt": ["ensure this value has at least 10 characters"],
     "ai_model": ["AI model not found in database"]
   }
 }
@@ -386,9 +344,7 @@ GET /api/agents/agent_123
 {
   "name": "保守型投資者 v2",
   "description": "更新的描述",
-  "strategy_prompt": "新的策略提示語...",
   "max_position_size": 40,
-  "enabled_tools": {
     "fundamental_analysis": true,
     "technical_analysis": false,
     "risk_assessment": true,
@@ -397,7 +353,6 @@ GET /api/agents/agent_123
     "code_interpreter": false
   },
   "investment_preferences": ["2330", "0050"],
-  "custom_instructions": "更新的自訂指令"
 }
 ```
 
@@ -494,7 +449,6 @@ POST /api/agents/agent_123/reset
 ```json
 {
   "mode": "OBSERVATION",
-  "max_turns": 5
 }
 ```
 
@@ -867,7 +821,6 @@ async def test_list_agents_response_schema():
             assert isinstance(agent["name"], str)
             assert isinstance(agent["investment_preferences"], list)
             assert all(isinstance(p, str) for p in agent["investment_preferences"])
-            assert isinstance(agent["enabled_tools"], dict)
             assert "created_at" in agent
             assert "updated_at" in agent
 
@@ -883,7 +836,6 @@ async def test_create_agent_validates_input():
         # strategy_prompt 過短
         response = await client.post("/api/agents", json={
             "name": "test",
-            "strategy_prompt": "short",
             "ai_model": "gpt-4o"
         })
         assert response.status_code == 422
@@ -896,7 +848,6 @@ async def test_agent_crud_lifecycle():
         # Create
         create_resp = await client.post("/api/agents", json={
             "name": "Test Agent",
-            "strategy_prompt": "This is a test strategy",
             "ai_model": "gpt-4o-mini",
             "investment_preferences": ["2330", "2454"]
         })

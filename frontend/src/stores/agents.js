@@ -203,8 +203,7 @@ export async function startAgent(agentId, config = {}) {
   try {
     // Extract mode from config or default to TRADING
     const mode = config.mode || 'TRADING';
-    const maxTurns = config.maxTurns || null;
-    const result = await apiClient.startAgent(agentId, mode, maxTurns);
+    const result = await apiClient.startAgent(agentId, mode);
 
     // 更新 agent 狀態為 running
     agents.update((list) =>

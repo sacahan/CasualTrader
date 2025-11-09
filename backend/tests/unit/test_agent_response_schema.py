@@ -14,24 +14,16 @@ MOCK_AGENT_RESPONSE = {
     "name": "測試代理",
     "description": "用於測試的代理",
     "ai_model": "gpt-4o-mini",
-    "strategy_prompt": "測試策略",
     "color_theme": "34, 197, 94",
     "current_mode": "TRADING",
     "status": "idle",
     "initial_funds": 1000000.0,
     "current_funds": 1000000.0,
-    "max_turns": 50,
+    "max_position_size": 50000.0,
     "investment_preferences": ["2330", "2454", "0050"],  # ✅ 必須是列表
-    "enabled_tools": {
-        "fundamental_analysis": True,
-        "technical_analysis": True,
-        "risk_assessment": True,
-        "sentiment_analysis": False,
-        "web_search": True,
-        "code_interpreter": False,
-    },
     "created_at": "2025-01-01T00:00:00Z",
     "updated_at": "2025-01-01T00:00:00Z",
+    "last_active_at": None,
 }
 
 
@@ -56,31 +48,27 @@ class TestAgentResponseSchema:
             # 模擬前端嘗試使用 .length 屬性（字串沒有 length 屬性）
             _ = agent_with_string["investment_preferences"].length
 
-    def test_enabled_tools_is_dict(self):
-        """測試 enabled_tools 必須是字典格式"""
+    def test_max_position_size_is_numeric(self):
+        """測試 max_position_size 必須是數字格式"""
         agent = MOCK_AGENT_RESPONSE.copy()
 
-        # ✅ 正確格式：字典
-        assert isinstance(agent["enabled_tools"], dict)
-
-        # 驗證所有工具設定都是布林值
-        for tool_name, enabled in agent["enabled_tools"].items():
-            assert isinstance(tool_name, str)
-            assert isinstance(enabled, bool)
+        # ✅ 正確格式：數字
+        assert isinstance(agent["max_position_size"], (int, float))
+        assert agent["max_position_size"] > 0
 
     def test_required_fields_present(self):
         """測試必要欄位都存在且型別正確"""
         agent = MOCK_AGENT_RESPONSE.copy()
 
         # 字串欄位
-        string_fields = ["id", "name", "ai_model", "strategy_prompt", "current_mode", "status"]
+        string_fields = ["id", "name", "ai_model", "current_mode", "status"]
         for field in string_fields:
             assert field in agent
             assert isinstance(agent[field], str)
             assert len(agent[field]) > 0  # 不能是空字串
 
         # 數字欄位
-        numeric_fields = ["initial_funds", "current_funds", "max_turns"]
+        numeric_fields = ["initial_funds", "current_funds", "max_position_size"]
         for field in numeric_fields:
             assert field in agent
             assert isinstance(agent[field], (int, float))
@@ -135,7 +123,6 @@ class TestAgentResponseSchema:
         # 驗證每個 agent 的格式
         for agent in agents_list:
             assert isinstance(agent["investment_preferences"], list)
-            assert isinstance(agent["enabled_tools"], dict)
             assert isinstance(agent["id"], str)
 
     def test_empty_investment_preferences(self):
@@ -168,11 +155,9 @@ class TestAgentResponseSchema:
 
         # 確保反序列化後型別仍然正確
         assert isinstance(deserialized_agent["investment_preferences"], list)
-        assert isinstance(deserialized_agent["enabled_tools"], dict)
 
         # 確保內容沒有改變
         assert deserialized_agent["investment_preferences"] == agent["investment_preferences"]
-        assert deserialized_agent["enabled_tools"] == agent["enabled_tools"]
 
 
 class TestSchemaValidationHelpers:
@@ -191,14 +176,6 @@ class TestSchemaValidationHelpers:
         elif not isinstance(agent_data["investment_preferences"], list):
             errors.append(
                 "investment_preferences must be a list, got {type(agent_data['investment_preferences']).__name__}"
-            )
-
-        # 檢查 enabled_tools
-        if "enabled_tools" not in agent_data:
-            errors.append("Missing field: enabled_tools")
-        elif not isinstance(agent_data["enabled_tools"], dict):
-            errors.append(
-                "enabled_tools must be a dict, got {type(agent_data['enabled_tools']).__name__}"
             )
 
         return errors
@@ -220,7 +197,7 @@ class TestSchemaValidationHelpers:
         # ❌ 缺失欄位
         incomplete_agent = {"name": "Test"}
         errors = self.validate_agent_schema(incomplete_agent)
-        assert len(errors) >= 2  # 至少缺失 investment_preferences 和 enabled_tools
+        assert len(errors) >= 1  # 至少缺失 investment_preferences
 
 
 if __name__ == "__main__":

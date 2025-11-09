@@ -252,7 +252,6 @@ async def test_create_agent_success(mock_db_session, agents_service, sample_agen
         name="Test Agent",
         description="A test agent",
         ai_model="gpt-4",
-        strategy_prompt="Test strategy that is longer than 10 chars",
         initial_funds=100000,
     )
 
@@ -272,7 +271,6 @@ async def test_create_agent_database_error(mock_db_session, agents_service):
             name="Test",
             description="Test",
             ai_model="gpt-4",
-            strategy_prompt="A valid strategy prompt that is longer than 10 characters",
             initial_funds=100000,
         )
 

@@ -1,8 +1,9 @@
 # Service 層契約規範 (API-Service Layer Contract)
 
-**版本**: 1.1
-**最後更新**: 2025-10-31
+**版本**: 2.0
+**最後更新**: 2025-11-09
 **狀態**: Active
+**變更**: 移除已刪除欄位，更新績效計算欄位
 
 ## 概述
 
@@ -43,10 +44,10 @@ async def get_agent_config(self, agent_id: str) -> AgentResponse:
             - name: Agent 名稱
             - description: 描述
             - ai_model: 使用的 AI 模型鑰匙
-            - strategy_prompt: 交易策略提示語
+            - description: Agent 描述
             - investment_preferences: 投資偏好列表
-            - enabled_tools: 啟用的工具配置
             - created_at: 建立時間 (ISO 8601 格式)
+            - last_active_at: 最後活動時間 (ISO 8601 格式，可為 null)
             - updated_at: 更新時間 (ISO 8601 格式)
 
     Raises:

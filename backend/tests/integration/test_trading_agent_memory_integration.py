@@ -196,7 +196,6 @@ class TestBuildTaskPromptWithMemory:
         ):
             prompt = await trading_agent._build_task_prompt(
                 mode=AgentMode.TRADING,
-                context=None,
                 execution_memory=memory,
             )
 
@@ -219,7 +218,6 @@ class TestBuildTaskPromptWithMemory:
         ):
             prompt = await trading_agent._build_task_prompt(
                 mode=AgentMode.TRADING,
-                context=None,
                 execution_memory=None,
             )
 
@@ -238,7 +236,6 @@ class TestBuildTaskPromptWithMemory:
         ):
             prompt = await trading_agent._build_task_prompt(
                 mode=AgentMode.REBALANCING,
-                context=None,
                 execution_memory=None,
             )
 
@@ -257,7 +254,6 @@ class TestBuildTaskPromptWithMemory:
         ):
             prompt = await trading_agent._build_task_prompt(
                 mode=AgentMode.TRADING,
-                context=None,
                 execution_memory=None,
             )
 

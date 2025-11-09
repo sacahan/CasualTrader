@@ -139,7 +139,7 @@
       // 編輯模式 - 填入現有資料（agent 對象完整，無需防禦性邏輯）
       formData = {
         name: agent.name,
-        description: agent.description || agent.strategy_prompt,
+        description: agent.description || '',
         initial_funds: agent.initial_funds.toString(),
         max_position_size: agent.max_position_size.toString(),
         ai_model: agent.ai_model,
@@ -232,7 +232,6 @@
       const agentData = {
         name: formData.name.trim(),
         description: formData.description.trim(), // 簡短描述，用於卡片顯示
-        strategy_prompt: formData.description.trim(), // 完整策略指令，用於 Agent 執行
         initial_funds: parseFloat(formData.initial_funds),
         ai_model: formData.ai_model,
         color_theme: formData.color_theme, // 卡片顏色

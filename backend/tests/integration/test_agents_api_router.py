@@ -299,7 +299,6 @@ def test_create_agent_success(test_client, mock_agents_service, sample_agent_mod
             "name": "Test Agent",
             "description": "Test Agent Description",
             "ai_model": "gpt-4",
-            "strategy_prompt": "Buy low, sell high",
             "initial_funds": 100000.0,
             "max_position_size": 50,
             "investment_preferences": ["tech", "healthcare"],
@@ -325,7 +324,6 @@ def test_create_agent_invalid_model(test_client, mock_agents_service):
             "name": "Test Agent",
             "description": "Test",
             "ai_model": "invalid-model",
-            "strategy_prompt": "A valid strategy prompt that is longer than 10 characters",
             "initial_funds": 100000.0,
         }
 
@@ -349,7 +347,6 @@ def test_create_agent_configuration_error(test_client, mock_agents_service):
             "name": "Test Agent",
             "description": "Test",
             "ai_model": "gpt-4",
-            "strategy_prompt": "A valid strategy prompt that is longer than 10 characters",
             "initial_funds": 100000.0,
         }
 
@@ -508,7 +505,6 @@ def test_create_agent_with_special_characters(test_client, mock_agents_service, 
             "name": "Test Agent 🤖 中文",
             "description": "Description with 特殊字符 & symbols",
             "ai_model": "gpt-4",
-            "strategy_prompt": "Buy 低 sell 高 trading",
             "initial_funds": 100000.0,
         }
 
