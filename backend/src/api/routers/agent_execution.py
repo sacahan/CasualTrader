@@ -216,6 +216,11 @@ async def start_agent_mode(
 
         logger.info(f"API: Created session {session_id}, starting background execution")
 
+        # ⚡ 關鍵：立即標記 agent 為活躍，防止競態條件
+        # 使用特殊字串作為佔位符，表示執行即將開始
+        trading_service.active_agents[agent_id] = "STARTING"  # type: ignore
+        logger.debug(f"Marked agent {agent_id} as active (placeholder)")
+
         # 💡 核心改變：在後台啟動執行，立即返回 session_id
         # 使用 asyncio.create_task 在後台執行，不阻塞 HTTP 回應
         # 傳遞 session_id 給後台任務，避免重複創建

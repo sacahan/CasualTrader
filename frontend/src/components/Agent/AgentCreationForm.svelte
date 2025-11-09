@@ -11,7 +11,11 @@
   import { notifySuccess, notifyError } from '../../stores/notifications.js';
   import { modelOptionsForSelect, modelsLoading, loadModels } from '../../stores/models.js';
   import { Button, Input, Select, Textarea } from '../UI/index.js';
-  import { DEFAULT_INITIAL_FUNDS, DEFAULT_MAX_POSITION_SIZE } from '../../shared/constants.js';
+  import {
+    DEFAULT_INITIAL_FUNDS,
+    MIN_INITIAL_FUNDS,
+    DEFAULT_MAX_POSITION_SIZE,
+  } from '../../shared/constants.js';
   import { onMount } from 'svelte';
 
   /**
@@ -190,9 +194,14 @@
     }
 
     const initialFunds = parseFloat(formData.initial_funds);
-    if (!isEditMode && (isNaN(initialFunds) || initialFunds <= 0)) {
-      errors.initial_funds = '初始資金必須大於 0';
-      isValid = false;
+    if (!isEditMode) {
+      if (isNaN(initialFunds) || initialFunds <= 0) {
+        errors.initial_funds = '初始資金必須大於 0';
+        isValid = false;
+      } else if (initialFunds < MIN_INITIAL_FUNDS) {
+        errors.initial_funds = `初始資金至少需要 ${MIN_INITIAL_FUNDS.toLocaleString()} 元才能進行台股交易`;
+        isValid = false;
+      }
     }
 
     const maxPositionSize = parseFloat(formData.max_position_size);

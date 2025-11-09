@@ -131,7 +131,10 @@ class TradingService:
             agent_config = await self.agents_service.get_agent_config(agent_id)
 
             # 2. 檢查 Agent 是否已在執行
-            if agent_id in self.active_agents:
+            # 如果 active_agents[agent_id] 是 "STARTING"，表示是 API 層的佔位符，可以繼續
+            # 如果是實際的 TradingAgent 實例，表示真的在執行，應該拒絕
+            existing = self.active_agents.get(agent_id)
+            if existing is not None and existing != "STARTING":
                 raise AgentBusyError(f"Agent {agent_id} is already running")
 
             # 3. 取得或創建執行會話
@@ -159,24 +162,29 @@ class TradingService:
             # 5. 取得或創建 TradingAgent 實例
             agent = await self._get_or_create_agent(agent_id, agent_config)
 
-            # 6. 標記為活躍
+            # 6. 標記為活躍（記憶體）
             self.active_agents[agent_id] = agent
 
-            # 7. 初始化 Agent（載入工具、Sub-agents 等）
+            # 7. 更新 Agent 狀態為 ACTIVE（資料庫）
+            await self.agents_service.update_agent_status(agent_id, status=AgentStatus.ACTIVE)
+            logger.info(f"Agent {agent_id} status updated to ACTIVE")
+
+            # 8. 初始化 Agent（載入工具、Sub-agents 等）
             logger.info(f"Initializing agent {agent_id}")
             await agent.initialize()
 
-            # 8. 執行指定模式
+            # 9. 執行指定模式
             logger.info(f"Executing {mode.value} for agent {agent_id}")
             result = await agent.run(mode=mode)
 
-            # 9. 更新會話狀態為 COMPLETED
+            # 10. 更新會話狀態為 COMPLETED
             await self.session_service.update_session_status(
                 self.session_id, SessionStatus.COMPLETED
             )
 
-            # 10. 更新 Agent 狀態為 INACTIVE（執行完成）
+            # 11. 更新 Agent 狀態為 INACTIVE（執行完成）
             await self.agents_service.update_agent_status(agent_id, status=AgentStatus.INACTIVE)
+            logger.info(f"Agent {agent_id} status updated to INACTIVE")
 
             execution_time_ms = int((datetime.now() - start_time).total_seconds() * 1000)
             logger.info(
@@ -209,6 +217,7 @@ class TradingService:
 
             # 更新 Agent 狀態為 INACTIVE（即使執行失敗）
             await self.agents_service.update_agent_status(agent_id, status=AgentStatus.INACTIVE)
+            logger.info(f"Agent {agent_id} status updated to INACTIVE (after error)")
 
             execution_time_ms = int((datetime.now() - start_time).total_seconds() * 1000)
             raise TradingServiceError(f"Failed to execute {mode.value}: {str(e)}") from e
@@ -249,6 +258,11 @@ class TradingService:
 
             # 檢查是否有正在執行的 agent
             if agent_id not in self.active_agents:
+                # Agent 不在記憶體中，但仍需確保資料庫狀態正確
+                logger.info(
+                    f"Agent {agent_id} not in active_agents, ensuring DB status is inactive"
+                )
+                await self.agents_service.update_agent_status(agent_id, status=AgentStatus.INACTIVE)
                 return {
                     "success": True,
                     "status": "not_running",

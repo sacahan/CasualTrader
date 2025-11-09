@@ -230,12 +230,9 @@ async def get_agent(
                     "company_name": holding.company_name,
                     "quantity": holding.quantity,
                     "average_cost": float(holding.average_cost),
-                    "current_price": float(holding.current_price)
-                    if holding.current_price
-                    else None,
-                    "unrealized_pnl": (
-                        float(holding.unrealized_pnl) if holding.unrealized_pnl else None
-                    ),
+                    "total_cost": float(holding.total_cost),
+                    # Note: current_price and unrealized_pnl are not stored in DB
+                    # They should be calculated by frontend or enriched separately
                 }
                 for holding in holdings
             ],

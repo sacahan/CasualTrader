@@ -74,7 +74,10 @@ export const MARKET_HOURS = {
 };
 
 // Default Values
-export const DEFAULT_INITIAL_FUNDS = 1000000;
+export const DEFAULT_INITIAL_FUNDS = parseInt(
+  import.meta.env.VITE_DEFAULT_INITIAL_FUNDS || '1000000'
+);
+export const MIN_INITIAL_FUNDS = parseInt(import.meta.env.VITE_MIN_INITIAL_FUNDS || '100000');
 export const DEFAULT_MAX_POSITION_SIZE = 50;
 export const MAX_RECONNECT_ATTEMPTS = 5;
 export const RECONNECT_DELAY_MS = 1000;

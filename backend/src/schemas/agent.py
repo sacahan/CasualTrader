@@ -34,7 +34,9 @@ class CreateAgentRequest(BaseModel):
         pattern=r"^\d{1,3},\s*\d{1,3},\s*\d{1,3}$",
         description="UI 卡片顏色 (RGB 格式，例如: 34, 197, 94)",
     )  # UI 卡片顏色
-    initial_funds: float = Field(default=1000000.0, gt=0)  # 初始資金
+    initial_funds: float = Field(
+        default=1000000.0, ge=100000, description="初始資金，最少需要 100,000 元才能進行台股交易"
+    )  # 初始資金
     max_position_size: float = Field(default=50.0, ge=1, le=100)  # 最大持倉比例 (%)
     investment_preferences: list[str] = Field(default_factory=list)
 
