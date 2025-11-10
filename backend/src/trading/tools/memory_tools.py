@@ -22,7 +22,7 @@ from common.logger import logger
 async def load_execution_memory(
     memory_mcp,
     agent_id: str,
-) -> dict[str, Any]:
+) -> str | None:
     """
     從 memory_mcp 加載過往 3 天的執行記憶體和決策
 
@@ -31,23 +31,54 @@ async def load_execution_memory(
         agent_id: Agent ID
 
     Returns:
-        執行記憶體字典，包含 past_decisions 列表
+        記憶體內容字串，若無記憶體則返回 None
 
     Example:
-        memory = await load_execution_memory(memory_mcp, "agent_123")
-        # 返回: {"past_decisions": [...]}
+        {
+            "entities": [
+                {
+                    "name": "trading_decision_buy_tsmc",
+                    "entityType": "trading_decision",
+                    "observations": [
+                        "買入 TSMC 2330",
+                        "數量 1000 股"
+                    ]
+                },
+                {
+                    "name": "trading_decision_sell_amd",
+                    "entityType": "trading_decision",
+                    "observations": [
+                        "賣出 AMD",
+                        "獲利了結"
+                    ]
+                },
+                {
+                    "name": "trading_decision_2025_01_15",
+                    "entityType": "trading_decision",
+                    "observations": [
+                        "時間: 2025-01-15 10:30",
+                        "決策: 買入 TSMC 2330",
+                        "數量: 1000 股",
+                        "目標價: 620 元",
+                        "技術指標: RSI 35(超賣), MACD 正向交叉",
+                        "理由: 基於市場分析和技術信號"
+                    ]
+                }
+            ],
+            "relations": []
+        }
     """
     try:
         if not memory_mcp:
             logger.debug(f"Memory MCP not available for {agent_id}, returning empty memory")
-            return {"past_decisions": []}
+            return None
 
-        # 使用 search_nodes 工具查詢過往 3 天的記憶體
+        # 使用 search_nodes 工具查詢過往交易決定
         result = await memory_mcp.session.call_tool(
             "search_nodes",
             {
-                "query": f"agent {agent_id} decision",
-                "limit": 10,
+                "query": "trading_decision",
+                "limit": 3,
             },
         )
 
@@ -58,40 +89,29 @@ async def load_execution_memory(
 
             try:
                 data = json.loads(text_content)
-                nodes = data.get("nodes", [])
+                entities = data.get("entities", [])
 
-                # 轉換為記憶體格式
-                past_decisions = [
-                    {
-                        "date": node.get("created_at", ""),
-                        "action": node.get("observations", [{}])[0]
-                        if node.get("observations")
-                        else "",
-                        "reason": node.get("observations", [{}])[1]
-                        if len(node.get("observations", [])) > 1
-                        else "",
-                        "result": node.get("observations", [{}])[2]
-                        if len(node.get("observations", [])) > 2
-                        else "",
-                    }
-                    for node in nodes
-                ]
+                # 轉換為記憶體格式 - 只取最近一筆決策
+                past_decisions = [entity.get("observations", []) for entity in entities[:1]]
 
-                logger.info(
+                logger.debug(
                     f"Loaded {len(past_decisions)} decisions from memory_mcp for {agent_id}"
                 )
 
-                return {"past_decisions": past_decisions}
+                memory_context = "\n**📚 過往決策參考：**\n"
+                for i, decision in enumerate(past_decisions, 1):
+                    memory_context += f"\n{i}. {decision}\n"
+                    return memory_context
 
             except (json.JSONDecodeError, IndexError, KeyError) as e:
                 logger.warning(f"Failed to parse memory_mcp response for {agent_id}: {e}")
-                return {"past_decisions": []}
+                return
 
-        return {"past_decisions": []}
+        return None
 
     except Exception as e:
         logger.warning(f"Failed to load execution memory from memory_mcp: {e}")
-        return {"past_decisions": []}
+        return None
 
 
 async def save_execution_memory(
@@ -124,23 +144,15 @@ async def save_execution_memory(
             logger.debug(f"Memory MCP not available for {agent_id}, skipping memory save")
             return False
 
-        # 準備執行記錄
-        result_summary = (
-            execution_result[:2000] + "..." if len(execution_result) > 2000 else execution_result
-        )
-
         # 使用 create_entities 工具保存記憶體
         result = await memory_mcp.session.call_tool(
             "create_entities",
             {
                 "entities": [
                     {
-                        "name": f"agent_{agent_id}_execution_{datetime.now().isoformat()}",
-                        "entityType": "trading_execution",
-                        "observations": [
-                            f"Mode: {mode or 'unknown'}",
-                            f"Result: {result_summary}",
-                        ],
+                        "name": f"{agent_id}@{datetime.now().isoformat()}",
+                        "entityType": "trading_decision",
+                        "observations": [execution_result],
                     }
                 ]
             },

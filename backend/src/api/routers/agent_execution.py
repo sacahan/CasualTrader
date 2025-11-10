@@ -80,6 +80,7 @@ class StopResponse(BaseModel):
     success: bool
     agent_id: str
     status: str  # "stopped" or "not_running"
+    sessions_aborted: int = 0  # 中斷的會話數量
 
 
 # ==========================================
@@ -288,11 +289,16 @@ async def stop_agent(
     與 start 端點不同，此端點會等待 Agent 實際停止完成後才返回。
     這簡化了前端的操作流程。
 
+    此端點會：
+    1. 取消 Agent 正在執行的任務
+    2. 清理所有關聯的資源
+    3. 中斷所有 RUNNING 狀態的會話，確保下一輪執行不受阻
+
     Args:
         agent_id: Agent ID
 
     Returns:
-        停止結果
+        停止結果，包含中斷的會話數量
 
     Raises:
         404: Agent 不存在
@@ -310,15 +316,20 @@ async def stop_agent(
                 "type": "execution_stopped",
                 "agent_id": agent_id,
                 "status": result["status"],
+                "sessions_aborted": result.get("sessions_aborted", 0),
             }
         )
 
-        logger.info(f"API: Agent {agent_id} stopped with status: {result['status']}")
+        logger.info(
+            f"API: Agent {agent_id} stopped with status: {result['status']}, "
+            f"sessions aborted: {result.get('sessions_aborted', 0)}"
+        )
 
         return StopResponse(
             success=result["success"],
             agent_id=agent_id,
             status=result["status"],
+            sessions_aborted=result.get("sessions_aborted", 0),
         )
 
     except AgentNotFoundError as e:

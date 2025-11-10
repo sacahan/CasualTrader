@@ -637,8 +637,8 @@ class TradingAgent:
 
             # === Phase 1: 執行前 - 加載記憶體 ===
             execution_memory = await self._load_execution_memory()
-            logger.info(
-                f"Loaded execution memory: {len(execution_memory.get('past_decisions', []))} past decisions"
+            logger.debug(
+                f"Loaded execution memory: {execution_memory if execution_memory else 'No past decisions'}"
             )
 
             # 生成 trace ID 並執行
@@ -651,7 +651,7 @@ class TradingAgent:
                 result = await Runner.run(self.agent, task_prompt, max_turns=DEFAULT_MAX_TURNS)
 
                 logger.info(
-                    f"*** Agent {self.agent_id} execution completed: {result} (trace_id: {trace_id}) ***"
+                    f"✅ Agent {self.agent_id} execution completed: {result} (trace_id: {trace_id})"
                 )
 
                 # === Phase 4: 執行後 - 保存記憶體 ===
@@ -738,7 +738,7 @@ class TradingAgent:
     async def _build_task_prompt(
         self,
         mode: AgentMode,
-        execution_memory: dict[str, Any] | None = None,
+        execution_memory: str | None = None,
     ) -> str:
         """
         根據執行模式構建任務提示（融入記憶體上下文）
@@ -754,19 +754,6 @@ class TradingAgent:
         # 獲取投資組合狀態
         portfolio_status = await get_portfolio_status(self.agent_service, self.agent_id)
 
-        # 構建記憶體上下文（如果存在）
-        memory_context = ""
-        if execution_memory and execution_memory.get("past_decisions"):
-            past_decisions = execution_memory["past_decisions"][:3]  # 最近 3 個決策
-            memory_context = "\n\n**📚 過往決策參考：**\n"
-            for i, decision in enumerate(past_decisions, 1):
-                memory_context += (
-                    f"\n{i}. {decision.get('date', 'N/A')} - {decision.get('action', 'N/A')}\n"
-                )
-                memory_context += f"   理由：{decision.get('reason', 'N/A')}\n"
-                if decision.get("result"):
-                    memory_context += f"   結果：{decision.get('result', 'N/A')}\n"
-
         # 根據模式添加指導
         if mode == AgentMode.TRADING:
             action_message = f"""
@@ -774,11 +761,10 @@ class TradingAgent:
 
 主要行動：對台股進行全面評估市場機會，然後自主執行交易。
 
----
 {portfolio_status}
 ---
-
-{memory_context}
+{execution_memory if execution_memory else ""}
+---
 
 **🛠️ 可用工具：**
 
@@ -805,10 +791,9 @@ class TradingAgent:
 **📋 執行流程：**
 
 1️⃣ 使用 get_portfolio_status_tool 查詢當前狀態
-2️⃣ 使用 memory_mcp 查詢是否有先前決策後決定下一步動作
-3️⃣ 使用各分析 Sub-Agents 對候選標的進行全面評估
-4️⃣ 決策確認無誤後，調用 execute_trade_atomic() 執行交易
-5️⃣ 使用 memory_mcp 記錄本次結果或是下一輪行動方案
+2️⃣ 使用各分析 Sub-Agents 對候選標的進行全面評估
+3️⃣ 決策確認無誤後，調用 execute_trade_atomic() 執行交易
+4️⃣ 將交易決策和理由摘要為500字以內的結論回覆
 
 **⚠️ 重要約束：**
 
@@ -825,13 +810,11 @@ class TradingAgent:
 
 主要行動：檢視投資組合並根據策略進行重新平衡調整。
 
----
 {portfolio_status}
 ---
+{execution_memory if execution_memory else ""}
 
-{memory_context}
-
-**� 重要說明：**
+**📚 重要說明：**
 
 本模式專注於調整現有持股，只能查詢投資組合但不執行買賣交易。
 請分析投資組合的當前狀態，判斷是否需要重新平衡，並記錄您的分析結果。
@@ -855,10 +838,9 @@ class TradingAgent:
 **📋 分析流程：**
 
 1️⃣ 使用 get_portfolio_status_tool 查詢當前持股和比例
-2️⃣ 分析現有持股是否符合投資策略
-3️⃣ 使用技術和風險分析 Sub-Agents 評估調整建議
+2️⃣ 使用 Sub-Agents 分析現有持股是否符合投資策略
 4️⃣ 計畫建議的調整方案（哪些持股應增加/減少，原因）
-5️⃣ 使用 memory_mcp 記錄重新平衡分析和建議
+5️⃣ 將分析結論和建議摘要為500字以內的報告回覆
 
 **⚠️ 重要約束：**
 
@@ -866,7 +848,7 @@ class TradingAgent:
 • 焦點在現有持股評估，不需要識別新的投資機會
 • 分析應符合投資策略和最大持股比例限制（{self.agent_config.max_position_size}%）
 • 考量交易成本和稅務影響（在建議中說明）
-• 分析結論應在 memory_mcp 中清楚記錄，供下一輪行動參考
+• 分析結論應詳盡且有理有據
 
 **💡 提示：**
 
@@ -880,11 +862,9 @@ class TradingAgent:
 
 目的：分析市場機會並執行交易。
 
----
 {portfolio_status}
 ---
-
-{memory_context}
+{execution_memory if execution_memory else ""}
 
 **🛠️ 可用工具：**
 
@@ -907,12 +887,12 @@ class TradingAgent:
         logger.info(f"Action message for {self.agent_id}: {action_message.strip()}")
         return action_message.strip()
 
-    async def _load_execution_memory(self) -> dict[str, Any]:
+    async def _load_execution_memory(self) -> str | None:
         """
-        從 memory_mcp 加載過往 3 天的執行記憶體和決策
+        從 memory_mcp 加載過往的執行記憶體和決策
 
         Returns:
-            執行記憶體字典，包含 past_decisions 列表
+            執行記憶體字串，若無記憶體則返回 None
         """
         return await load_execution_memory(self.memory_mcp, self.agent_id)
 

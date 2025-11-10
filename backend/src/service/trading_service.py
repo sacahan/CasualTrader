@@ -238,6 +238,18 @@ class TradingService:
         """
         停止 Agent 正在執行的任務
 
+        此方法會：
+        1. 取消 Agent 正在執行的任務
+        2. 清理 Agent 資源
+        3. 中斷所有 RUNNING 狀態的會話
+        4. 更新 Agent 狀態為 INACTIVE
+
+        Timestamps Updated:
+            - Agent.updated_at: 設置為當前時間
+            - AgentSession.updated_at: 所有中斷會話都會更新
+            - AgentSession.end_time: 設置為停止時間
+            - AgentSession.execution_time_ms: 自動計算
+
         Args:
             agent_id: Agent ID
 
@@ -245,7 +257,8 @@ class TradingService:
             停止結果：
             {
                 "success": bool,
-                "status": "stopped" | "not_running"
+                "status": "stopped" | "not_running",
+                "sessions_aborted": int（中斷的會話數量）
             }
 
         Raises:
@@ -256,16 +269,34 @@ class TradingService:
             # 檢查 Agent 是否存在
             await self.agents_service.get_agent_config(agent_id)
 
+            sessions_aborted_count = 0
+
             # 檢查是否有正在執行的 agent
             if agent_id not in self.active_agents:
                 # Agent 不在記憶體中，但仍需確保資料庫狀態正確
                 logger.info(
                     f"Agent {agent_id} not in active_agents, ensuring DB status is inactive"
                 )
+
+                # 即使 Agent 不在記憶體中，也要清理所有 RUNNING 會話
+                try:
+                    sessions_aborted_count = len(
+                        await self.session_service.abort_running_sessions(
+                            agent_id, reason="Agent stopped (was not in active_agents)"
+                        )
+                    )
+                    if sessions_aborted_count > 0:
+                        logger.info(
+                            f"Aborted {sessions_aborted_count} sessions for agent {agent_id}"
+                        )
+                except Exception as e:
+                    logger.error(f"Error aborting sessions for agent {agent_id}: {e}")
+
                 await self.agents_service.update_agent_status(agent_id, status=AgentStatus.INACTIVE)
                 return {
                     "success": True,
                     "status": "not_running",
+                    "sessions_aborted": sessions_aborted_count,
                 }
 
             # 取得 agent 並停止
@@ -285,12 +316,30 @@ class TradingService:
             finally:
                 del self.active_agents[agent_id]
 
+            # ⭐ 關鍵：中斷所有 RUNNING 會話，確保會話狀態一致
+            # 遵循 timestamp.instructions.md 中的 Pattern 2：中斷所有相關會話
+            try:
+                sessions_aborted_count = len(
+                    await self.session_service.abort_running_sessions(
+                        agent_id, reason="Agent stopped by user"
+                    )
+                )
+                if sessions_aborted_count > 0:
+                    logger.info(
+                        f"Aborted {sessions_aborted_count} running sessions for agent {agent_id}"
+                    )
+            except Exception as e:
+                logger.error(f"Error aborting sessions for agent {agent_id}: {e}")
+                # 即使會話中斷失敗，也要繼續更新 Agent 狀態
+
             # 更新 Agent 狀態為 INACTIVE（停止）
+            # 遵循 timestamp.instructions.md - 明確設置 updated_at
             await self.agents_service.update_agent_status(agent_id, status=AgentStatus.INACTIVE)
 
             return {
                 "success": True,
                 "status": "stopped",
+                "sessions_aborted": sessions_aborted_count,
             }
 
         except AgentNotFoundError:
@@ -732,8 +781,14 @@ class TradingService:
                 f"got {type(self.agents_service).__name__}"
             )
 
+        # 如果已存在且是有效的 TradingAgent 實例，則返回
+        # 注意：跳過 "STARTING" 佔位符（這是 API 層的臨時標記）
         if agent_id in self.active_agents:
-            return self.active_agents[agent_id]
+            existing_agent = self.active_agents[agent_id]
+            # 只有當是 TradingAgent 實例時才返回
+            if isinstance(existing_agent, TradingAgent):
+                return existing_agent
+            # 如果是字串佔位符 "STARTING"，繼續創建真實的 Agent 實例
 
         logger.debug(f"Creating TradingAgent for {agent_id}")
         agent = TradingAgent(agent_id, agent_config, self.agents_service, self)

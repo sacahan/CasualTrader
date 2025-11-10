@@ -78,6 +78,87 @@ def parse_tool_params(
 # ==========================================
 
 
+def _parse_detailed_results(text_content: str) -> list[dict[str, Any]]:
+    """
+    解析 Tavily 返回的 'Detailed Results' 純文本格式。
+
+    格式示例：
+    Detailed Results:
+
+    Title: [標的] 2881富邦金說好的教訓呢QQ? - 看板Stock - PTT網頁版
+    URL: https://www.pttweb.cc/bbs/Stock/M.1652840005.A.CB4
+    Content: 標的：2881.TW 富邦金2. 分類：討論3. 分析/正文： 這幾天大家一直保單問題...
+
+    Args:
+        text_content: Tavily 返回的純文本內容
+
+    Returns:
+        搜尋結果列表，每筆包含 title, url, content, source, timestamp
+    """
+    results = []
+
+    try:
+        # 移除 "Detailed Results:" 頭部
+        content = text_content
+        if "Detailed Results:" in content:
+            content = content.split("Detailed Results:", 1)[1]
+
+        # 按 "Title:" 分割結果
+        result_blocks = content.split("\nTitle:")
+
+        for block in result_blocks:
+            title = None
+            url = None
+            content_text = None
+
+            # 清理 block，移除開始的空白
+            block = block.strip()
+            if not block:
+                continue
+
+            # 解析第一行（可能是 title 或以 Title: 開頭的內容）
+            if block.startswith("Title:"):
+                block = block[6:]  # 移除 "Title:" 前綴
+
+            lines = block.split("\n")
+
+            # 第一行是 title
+            if len(lines) > 0:
+                title = lines[0].strip()
+
+            # 查找 URL 和 Content
+            for line in lines[1:]:
+                line = line.strip()
+                if line.startswith("URL:"):
+                    url = line[4:].strip()
+                elif line.startswith("Content:"):
+                    content_text = line[8:].strip()
+                elif url is None and line.startswith("http"):
+                    # 如果沒有 "URL:" 標籤但看起來是 URL
+                    url = line
+                elif content_text is None and url is not None:
+                    # 如果已有 URL 但沒有 Content，則後續行視為 content
+                    content_text = line
+
+            # 只有在有 title 和 url 時才添加結果
+            if title and url:
+                results.append(
+                    {
+                        "title": title,
+                        "url": url,
+                        "content": content_text or "",
+                        "source": "tavily-search",
+                        "timestamp": datetime.now().isoformat(),
+                    }
+                )
+
+        return results
+
+    except Exception as e:
+        logger.warning(f"解析 'Detailed Results' 格式時發生錯誤: {e}")
+        return []
+
+
 async def _call_tavily_search(
     mcp_server,
     query: str,
@@ -157,26 +238,29 @@ async def _call_tavily_search(
             )
             return []
 
-        # 解析 JSON
+        # 嘗試解析 JSON 或 "Detailed Results" 格式
+        search_results = []
+
+        # 首先嘗試解析 JSON 格式
         try:
             data = json.loads(text_content)
-        except json.JSONDecodeError as e:
-            # 檢查是否可能是錯誤響應結構
-            if "error" in text_content.lower() or "success" in text_content.lower():
-                logger.error(
-                    f"tavily 返回錯誤 | 查詢: {query} | 返回內容: {text_content} | 錯誤: {e}"
-                )
+            search_results = data.get("results", [])
+            logger.debug(f"成功解析 JSON 格式，取得 {len(search_results)} 筆結果")
+        except json.JSONDecodeError:
+            # 嘗試解析 "Detailed Results" 純文本格式
+            if "Detailed Results:" in text_content or "Title:" in text_content:
+                logger.debug("偵測到 'Detailed Results' 純文本格式，開始解析")
+                search_results = _parse_detailed_results(text_content)
+                logger.debug(f"成功解析 'Detailed Results' 格式，取得 {len(search_results)} 筆結果")
             else:
+                # 既非 JSON 也非 Detailed Results 格式
                 logger.warning(
-                    f"無法解析 tavily 返回的 JSON | 查詢: {query} | "
+                    f"無法解析 tavily 返回的內容 | 查詢: {query} | "
                     f"返回內容（前200字）: {text_content[:200] if text_content else 'EMPTY'} | "
-                    f"返回內容完整長度: {len(text_content)} | "
-                    f"錯誤: {e}"
+                    f"返回內容完整長度: {len(text_content)}"
                 )
-            return []
+                return []
 
-        # 提取搜尋結果
-        search_results = data.get("results", [])
         logger.debug(f"tavily 搜尋完成，取得 {len(search_results)} 筆結果")
 
         return search_results
