@@ -29,6 +29,11 @@
   "github.copilot.chat.search.semanticTextResults": true,
   "github.copilot.nextEditSuggestions.enabled": true,
   "editor.inlineSuggest.edits.showCollapsed": true,
+  "editor.tabSize": 2,
+  "editor.insertSpaces": true,
+  "[javascript]": {
+    "editor.defaultFormatter": "esbenp.prettier-vscode"
+  },
   // GitHub Copilot Chat
   "github.copilot.chat.followUps": "always",
   "github.copilot.chat.localeOverride": "zh-TW",

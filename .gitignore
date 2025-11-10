@@ -118,3 +118,7 @@ Thumbs.db
 logs/
 *.log
 backend/src/logs/
+
+# playwright videos and screenshots
+frontend/test-results/
+frontend/playwright-report/

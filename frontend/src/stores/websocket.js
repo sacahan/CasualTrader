@@ -210,7 +210,7 @@ export function removeEventListener(eventType, callback) {
 /**
  * 分發事件給監聽器
  */
-function handleEvent(data) {
+export function handleEvent(data) {
   // 相容後端的 "type" 字段和舊版 "event_type" 字段
   const eventType = data.type || data.event_type;
   const payload = data.payload || data;
