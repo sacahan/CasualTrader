@@ -21,10 +21,14 @@
     selectAgent,
     executeAgent,
   } from './stores/agents.js';
+  import {
+    agentDetails,
+    loadAgentDetails,
+    getAgentHoldingsDerived,
+  } from './stores/agentDetails.js';
   import { connectWebSocket, disconnectWebSocket } from './stores/websocket.js';
   import { loadMarketStatus, loadMarketIndices } from './stores/market.js';
   import { notifySuccess, notifyError } from './stores/notifications.js';
-  import { apiClient } from './shared/api.js';
 
   // 模態視窗狀態
   let showCreateModal = $state(false);
@@ -33,11 +37,6 @@
 
   // 編輯模式的 Agent
   let editingAgent = $state(null);
-
-  // 每個 Agent 的詳細資料
-  let agentPerformanceData = $state({});
-  let agentHoldings = $state({});
-  let agentTransactions = $state({});
 
   onMount(async () => {
     // 連接 WebSocket
@@ -52,31 +51,12 @@
   // 當 agents 列表變化時，自動載入所有 agent 的詳細資料以顯示圖表
   $effect(() => {
     if ($agents && $agents.length > 0) {
-      // 並行加載所有 agent 的詳細資料
+      // 並行加載所有 agent 的詳細資料（使用新的 agentDetails store）
       Promise.all($agents.map((agent) => loadAgentDetails(agent.agent_id))).catch((error) => {
         console.error('Failed to load agent details:', error);
       });
     }
   });
-
-  // 函數定義 - 移到根層級以符合 eslint no-inner-declarations 規則
-  async function loadAgentDetails(agentId) {
-    try {
-      // 載入績效歷史資料用於圖表展示
-      const perfHistory = await apiClient.getPerformanceHistory(agentId, 30, 'asc');
-      agentPerformanceData[agentId] = perfHistory || [];
-
-      // 載入持倉資料
-      const holdingsData = await apiClient.getHoldings(agentId);
-      agentHoldings[agentId] = holdingsData || [];
-
-      // 載入交易歷史
-      const txData = await apiClient.getTransactions(agentId);
-      agentTransactions[agentId] = txData || [];
-    } catch (error) {
-      console.error('Failed to load agent details:', error);
-    }
-  }
 
   // Agent 事件處理 - updated for Svelte 5 callback props
   async function handleAgentSelect(agent) {
@@ -241,10 +221,11 @@
     {:else}
       <div class="grid grid-cols-1 gap-8 md:grid-cols-2 xl:grid-cols-2">
         {#each $agents as agent (agent.agent_id)}
+          {@const detail = $agentDetails[agent.agent_id] || {}}
           <AgentCard
             {agent}
-            performanceData={agentPerformanceData[agent.agent_id] || []}
-            holdings={agentHoldings[agent.agent_id] || []}
+            performanceData={detail.performance || []}
+            holdings={detail.holdings || []}
             onclick={handleAgentSelect}
             onedit={handleEditAgent}
             ondelete={handleDeleteAgent}
@@ -273,12 +254,13 @@
 
   <!-- Agent Detail Modal -->
   {#if $selectedAgent}
+    {@const detail = $agentDetails[$selectedAgent.agent_id] || {}}
     <AgentDetailModal
       agent={$selectedAgent}
       bind:open={showDetailModal}
-      performanceData={agentPerformanceData[$selectedAgent.agent_id] || []}
-      holdings={agentHoldings[$selectedAgent.agent_id] || []}
-      transactions={agentTransactions[$selectedAgent.agent_id] || []}
+      performanceData={detail.performance || []}
+      holdings={detail.holdings || []}
+      transactions={detail.transactions || []}
       onclose={handleDetailModalClose}
     />
   {/if}

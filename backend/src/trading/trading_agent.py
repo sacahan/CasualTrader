@@ -637,9 +637,9 @@ class TradingAgent:
 
             # === Phase 1: 執行前 - 加載記憶體 ===
             execution_memory = await self._load_execution_memory()
-            logger.debug(
-                f"Loaded execution memory: {execution_memory if execution_memory else 'No past decisions'}"
-            )
+            # logger.debug(
+            #     f"Loaded execution memory: {execution_memory if execution_memory else 'No past decisions'}"
+            # )
 
             # 生成 trace ID 並執行
             trace_id = gen_trace_id()

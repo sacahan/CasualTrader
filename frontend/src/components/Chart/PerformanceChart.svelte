@@ -14,11 +14,12 @@
    * @typedef {Object} Props
    * @property {any} agentId
    * @property {any} [performanceData] - { date, portfolio_value, total_return }
+   * @property {string} [agentColor]
    * @property {number} [height]
    */
 
   /** @type {Props} */
-  let { performanceData = [], height = 300 } = $props();
+  let { agentId, performanceData = [], agentColor = '34, 197, 94', height = 300 } = $props();
 
   let canvas = $state();
   let chart = $state(null);
@@ -29,6 +30,11 @@
 
     const ctx = canvas.getContext('2d');
 
+    // 創建梯度漸層 - 對齊 createCardChart 風格
+    const gradient = ctx.createLinearGradient(0, 0, 0, 200);
+    gradient.addColorStop(0, `rgba(${agentColor}, 0.5)`);
+    gradient.addColorStop(1, `rgba(${agentColor}, 0)`);
+
     chart = new Chart(ctx, {
       type: 'line',
       data: {
@@ -37,8 +43,8 @@
           {
             label: '投資組合價值 (TWD)',
             data: [],
-            borderColor: 'rgb(59, 130, 246)',
-            backgroundColor: 'rgba(59, 130, 246, 0.1)',
+            borderColor: `rgb(${agentColor})`,
+            backgroundColor: gradient,
             borderWidth: 2,
             fill: true,
             tension: 0.4,
@@ -131,7 +137,7 @@
             },
             ticks: {
               callback: function (value) {
-                return value.toFixed(2) + '%';
+                return Number(value).toFixed(2) + '%';
               },
             },
           },

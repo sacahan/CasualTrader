@@ -6,6 +6,7 @@ import {
   RECONNECT_DELAY_MS,
 } from '../shared/constants.js';
 import { agents } from './agents.js';
+import { refreshAgentDetails } from './agentDetails.js';
 import { addNotification } from './notifications.js';
 
 /**
@@ -280,10 +281,10 @@ function handleExecutionStarted(payload) {
     )
   );
 
-  addNotification({
-    type: 'info',
-    message: `Agent ${agent_id} 開始執行 ${mode} 模式...`,
-  });
+  // addNotification({
+  //   type: 'info',
+  //   message: `Agent ${agent_id} 開始執行 ${mode} 模式...`,
+  // });
 
   console.warn(`[WS] Execution started for agent ${agent_id}`);
 }
@@ -305,6 +306,11 @@ function handleExecutionCompleted(payload) {
   });
 
   console.warn(`[WS] Execution completed for agent ${agent_id}`);
+
+  // 非同步刷新詳細數據：性能、持股、交易紀錄
+  refreshAgentDetails(agent_id).catch((error) => {
+    console.error(`Failed to refresh details for agent ${agent_id}:`, error);
+  });
 }
 
 /**
@@ -324,6 +330,11 @@ function handleExecutionFailed(payload) {
   });
 
   console.error(`[WS] Execution failed for agent ${agent_id}:`, error);
+
+  // 非同步刷新詳細數據以反映最新狀態
+  refreshAgentDetails(agent_id).catch((err) => {
+    console.error(`Failed to refresh details for agent ${agent_id} after failure:`, err);
+  });
 }
 
 /**
@@ -343,6 +354,11 @@ function handleExecutionStopped(payload) {
   });
 
   console.warn(`[WS] Execution stopped for agent ${agent_id}`);
+
+  // 非同步刷新詳細數據以反映最新狀態
+  refreshAgentDetails(agent_id).catch((error) => {
+    console.error(`Failed to refresh details for agent ${agent_id} after stop:`, error);
+  });
 }
 
 /**

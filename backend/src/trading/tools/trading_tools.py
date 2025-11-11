@@ -229,7 +229,7 @@ async def execute_trade_atomic(
     ticker: str,
     action: str,
     quantity: int,
-    price: float | None = None,
+    price: float,
     decision_reason: str | None = None,
     company_name: str | None = None,
 ) -> str:
@@ -248,7 +248,7 @@ async def execute_trade_atomic(
         ticker: 股票代號 (例如: "2330")
         action: 交易動作 ("BUY" 或 "SELL")
         quantity: 交易股數 (必須是 1000 的倍數)
-        price: 交易價格
+        price: 交易價格 (必須提供，不可為 None)
         decision_reason: 交易決策理由 (可選)
         company_name: 公司名稱 (可選)
 
@@ -256,7 +256,7 @@ async def execute_trade_atomic(
         交易執行結果訊息
 
     Raises:
-        ValueError: 參數驗證失敗
+        ValueError: 參數驗證失敗，包括 price 為 None 的情況
     """
     try:
         result = await trading_service.execute_trade_atomic(
@@ -670,7 +670,7 @@ def create_trading_tools(
         ticker: str,
         action: str,
         quantity: int,
-        price: float | None = None,
+        price: float,
         decision_reason: str | None = None,
         company_name: str | None = None,
         **kwargs,
@@ -689,9 +689,9 @@ def create_trading_tools(
             ticker: 股票代號，例如 "2330" (台積電) [必要]
             action: 交易動作，"BUY" (買入) 或 "SELL" (賣出) [必要]
             quantity: 交易股數，必須是1000的倍數 [必要]
+            price: 交易價格，單位為新台幣 [必要]
 
         **可選參數：**
-            price: 交易價格，單位為新台幣，缺少時以市價執行 [可選]
             decision_reason: 交易決策理由，用於交易記錄和追蹤 [可選]
             company_name: 公司名稱，用於詳細交易資訊記錄 [可選]
             **kwargs: 額外參數（用於容錯）
@@ -700,11 +700,11 @@ def create_trading_tools(
             str: 交易結果訊息，包含成功/失敗狀態和詳細資訊
 
         Examples:
-            - 以指定價格買入台積電：execute_trade_atomic_tool(ticker="2330", action="BUY", quantity=1000, price=520.0)
-            - 以市價賣出台積電：execute_trade_atomic_tool(ticker="2330", action="SELL", quantity=1000)
+            - 買入台積電：execute_trade_atomic_tool(ticker="2330", action="BUY", quantity=1000, price=520.0)
+            - 賣出台積電：execute_trade_atomic_tool(ticker="2330", action="SELL", quantity=1000, price=520.0)
 
         Raises:
-            返回錯誤訊息：股票代號不存在、action無效、股數不符規定、價格無效或系統異常
+            返回錯誤訊息：股票代號不存在、action無效、股數不符規定、price 為空或系統異常
         """
         return await execute_trade_atomic(
             trading_service=trading_service,

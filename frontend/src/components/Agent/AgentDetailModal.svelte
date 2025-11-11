@@ -9,7 +9,7 @@
 
   import { Modal } from '../UI/index.js';
   import { PerformanceChart } from '../Chart/index.js';
-  import { formatCurrency, formatDateTime } from '../../shared/utils.js';
+  import { formatCurrency, formatDateTime, formatNumber } from '../../shared/utils.js';
 
   // Props
   let {
@@ -50,8 +50,8 @@
 
   let isProfit = $derived(pnl >= 0);
 
-  // Agent 顏色
-  let agentColor = $derived(agent.color_theme);
+  // Agent 顏色 (從設定中取得，預設為綠色)
+  let agentColor = $derived(agent.color_theme || '34, 197, 94');
 
   function handleClose() {
     onclose?.();
@@ -64,52 +64,147 @@
       <h2 class="text-2xl font-bold" style="color: rgb({agentColor});">
         {agent.name}
       </h2>
-      <div class="flex items-center gap-2">
-        <!-- 關閉按鈕 -->
-        <button
-          type="button"
-          class="ml-2 rounded-md text-gray-400 hover:text-white focus:outline-none focus:ring-2 focus:ring-primary-500"
-          onclick={handleClose}
-        >
-          <span class="sr-only">關閉</span>
-          <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              stroke-width="2"
-              d="M6 18L18 6M6 6l12 12"
-            />
-          </svg>
-        </button>
-      </div>
+      <button
+        type="button"
+        class="rounded-md text-gray-400 hover:text-white focus:outline-none focus:ring-2 focus:ring-primary-500"
+        onclick={handleClose}
+      >
+        <span class="sr-only">關閉</span>
+        <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            stroke-width="2"
+            d="M6 18L18 6M6 6l12 12"
+          />
+        </svg>
+      </button>
     </div>
   {/snippet}
 
-  <div class="custom-scrollbar max-h-[75vh] space-y-6 overflow-y-auto">
-    <!-- 基本資訊與資產概覽 -->
-    <div class="grid grid-cols-1 gap-6 lg:grid-cols-2">
-      <!-- 基本資訊 -->
-      <div class="rounded-lg border border-gray-700 bg-gray-800 p-4">
-        <h3 class="mb-3 text-lg font-semibold text-white" style="color: rgb({agentColor});">
-          基本資訊
-        </h3>
-        <div class="space-y-3 text-sm">
-          <div class="border-b border-gray-700 pb-3">
+  <!-- 主容器：左圖表 + 右面板 -->
+  <div class="grid h-full grid-cols-1 gap-6 lg:grid-cols-[1.5fr_1fr]">
+    <!-- 左側：績效圖表 -->
+    <div class="rounded-lg border border-gray-700 bg-gray-800 p-6">
+      <h3 class="mb-4 text-lg font-semibold text-gray-400">績效走勢</h3>
+      <div class="h-full min-h-[400px]">
+        <PerformanceChart agentId={agent.agent_id} {performanceData} {agentColor} height={400} />
+      </div>
+    </div>
+
+    <!-- 右側：信息面板（可滾動） -->
+    <div class="custom-scrollbar flex max-h-[calc(100vh-180px)] flex-col gap-6 overflow-y-auto">
+      <!-- KPI 指標區 -->
+      <div class="space-y-3 rounded-lg border border-gray-700 bg-gray-800 p-6">
+        <div class="grid grid-cols-2 gap-4">
+          <div>
+            <p class="text-xs text-gray-400">總資產</p>
+            <p class="mt-1 text-lg font-bold text-white" style="color: rgb({agentColor});">
+              {formatCurrency(totalAssets)}
+            </p>
+          </div>
+          <div>
+            <p class="text-xs text-gray-400">總損益</p>
+            <p
+              class="mt-1 text-lg font-bold"
+              class:text-gain={isProfit}
+              class:text-loss={!isProfit}
+            >
+              {isProfit ? '+' : ''}{formatCurrency(pnl)}
+            </p>
+          </div>
+          <div>
+            <p class="text-xs text-gray-400">持有現金</p>
+            <p class="mt-1 text-lg font-bold text-white">
+              {formatCurrency(currentCash)}
+            </p>
+          </div>
+          <div>
+            <p class="text-xs text-gray-400">損益率</p>
+            <p
+              class="mt-1 text-lg font-bold"
+              class:text-gain={isProfit}
+              class:text-loss={!isProfit}
+            >
+              {isProfit ? '+' : ''}{pnlPercent.toFixed(2)}%
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <!-- 持倉詳情 -->
+      <div class="rounded-lg border border-gray-700 bg-gray-800 p-6">
+        <h4 class="mb-3 font-semibold text-gray-400">持有股數</h4>
+        {#if holdings && holdings.length > 0}
+          <div class="space-y-2">
+            {#each holdings as holding}
+              <div
+                class="flex items-center justify-between rounded-md bg-gray-900 px-3 py-2 text-sm"
+              >
+                <div>
+                  <p class="font-medium text-white">{holding.ticker}</p>
+                  <p class="text-xs text-gray-400">{holding.name || ''}</p>
+                </div>
+                <div class="text-right">
+                  <p class="text-white">{formatNumber(holding.shares || 0)} 股</p>
+                  <p class="text-xs text-gray-400">
+                    每股均價 {formatCurrency(holding.avg_price || 0)}
+                  </p>
+                </div>
+              </div>
+            {/each}
+          </div>
+        {:else}
+          <p class="text-center text-sm text-gray-500">無持股</p>
+        {/if}
+      </div>
+
+      <!-- 交易歷史 -->
+      <div class="rounded-lg border border-gray-700 bg-gray-800 p-6">
+        <h4 class="mb-3 font-semibold text-gray-400">交易歷史</h4>
+        {#if transactions && transactions.length > 0}
+          <div class="custom-scrollbar max-h-48 space-y-2 overflow-y-auto">
+            {#each transactions as tx}
+              <div
+                class="flex items-center justify-between rounded-md bg-gray-900 px-3 py-2 text-sm"
+              >
+                <div>
+                  <div class={tx.type === 'BUY' ? 'text-green-400' : 'text-red-400'}>
+                    {tx.type === 'BUY' ? '買入' : '賣出'}
+                    {tx.ticker}
+                  </div>
+                  <p class="text-xs text-gray-400">{tx.company_name || ''}</p>
+                </div>
+                <div class="text-right">
+                  <p class="text-white">
+                    {formatNumber(tx.shares || 0)} 股 / {formatCurrency(tx.price)}
+                  </p>
+                  <p class="text-xs text-gray-400">{formatDateTime(tx.timestamp)}</p>
+                </div>
+              </div>
+            {/each}
+          </div>
+        {:else}
+          <p class="text-center text-sm text-gray-500">無交易記錄</p>
+        {/if}
+      </div>
+
+      <!-- 基本資訊（可摺疊區塊） -->
+      <details class="rounded-lg border border-gray-700 bg-gray-800 p-6">
+        <summary class="cursor-pointer font-semibold text-gray-400"> 基本資訊 </summary>
+        <div class="mt-4 space-y-3 border-t border-gray-700 pt-4 text-sm">
+          <div>
             <p class="text-gray-400">描述</p>
             <p class="mt-1 text-white">{agent.description}</p>
           </div>
-          <div class="grid grid-cols-2 gap-4">
+          <div class="grid grid-cols-2 gap-3">
             <div>
               <p class="text-gray-400">AI 模型</p>
-              <p class="font-medium text-white">
-                {agent.ai_model}
-              </p>
+              <p class="font-medium text-white">{agent.ai_model}</p>
             </div>
             <div>
               <p class="text-gray-400">單一持股上限</p>
-              <p class="font-medium text-white">
-                {agent.max_position_size}%
-              </p>
+              <p class="font-medium text-white">{agent.max_position_size}%</p>
             </div>
             <div>
               <p class="text-gray-400">狀態</p>
@@ -121,136 +216,33 @@
             </div>
           </div>
 
-          <!-- 投資偏好 -->
-          {#if agent.investment_preferences}
-            <div class="mt-4 border-t border-gray-700 pt-3">
+          {#if agent.investment_preferences && (agent.investment_preferences.length > 0 || agent.investment_preferences.preferred_sectors || agent.investment_preferences.excluded_tickers)}
+            <div class="border-t border-gray-700 pt-3">
               <p class="mb-2 text-gray-400">投資偏好</p>
-              <div class="space-y-2 text-sm">
+              <div class="space-y-1 text-sm">
                 {#if agent.investment_preferences && agent.investment_preferences.length > 0}
-                  <div>
+                  <p class="text-white">
                     <span class="text-gray-400">偏好公司：</span>
-                    <span class="ml-2 font-medium text-white">
-                      {agent.investment_preferences.join(', ')}
-                    </span>
-                  </div>
+                    {agent.investment_preferences.join(', ')}
+                  </p>
                 {/if}
                 {#if agent.investment_preferences.preferred_sectors && agent.investment_preferences.preferred_sectors.length > 0}
-                  <div>
+                  <p class="text-white">
                     <span class="text-gray-400">偏好產業：</span>
-                    <span class="ml-2 font-medium text-white">
-                      {agent.investment_preferences.preferred_sectors.join(', ')}
-                    </span>
-                  </div>
+                    {agent.investment_preferences.preferred_sectors.join(', ')}
+                  </p>
                 {/if}
                 {#if agent.investment_preferences.excluded_tickers && agent.investment_preferences.excluded_tickers.length > 0}
-                  <div>
+                  <p class="text-white">
                     <span class="text-gray-400">排除股票：</span>
-                    <span class="ml-2 font-medium text-white">
-                      {agent.investment_preferences.excluded_tickers.join(', ')}
-                    </span>
-                  </div>
+                    {agent.investment_preferences.excluded_tickers.join(', ')}
+                  </p>
                 {/if}
-                <div>
-                  <span class="text-gray-400">再平衡頻率：</span>
-                  <span class="ml-2 font-medium text-white">
-                    {agent.investment_preferences.rebalance_frequency || '每週'}
-                  </span>
-                </div>
               </div>
             </div>
           {/if}
         </div>
-      </div>
-
-      <!-- 資產概覽 -->
-      <div class="rounded-lg border border-gray-700 bg-gray-800 p-4">
-        <h3 class="mb-3 text-lg font-semibold text-white" style="color: rgb({agentColor});">
-          資產概覽
-        </h3>
-        <div class="space-y-4">
-          <div>
-            <p class="text-sm text-gray-400">總資產</p>
-            <p class="text-xl font-bold text-white">{formatCurrency(totalAssets)}</p>
-          </div>
-          <div>
-            <p class="text-sm text-gray-400">現金餘額</p>
-            <p class="text-xl font-bold text-white">{formatCurrency(currentCash)}</p>
-          </div>
-          <div>
-            <p class="text-sm text-gray-400">總損益</p>
-            <p class="text-xl font-bold" class:text-gain={isProfit} class:text-loss={!isProfit}>
-              {isProfit ? '+' : ''}{formatCurrency(pnl)}
-              <span class="text-sm">({pnlPercent.toFixed(2)}%)</span>
-            </p>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- 績效圖表 -->
-    <div class="rounded-lg border border-gray-700 bg-gray-800 p-4">
-      <h3 class="mb-3 text-lg font-semibold text-white" style="color: rgb({agentColor});">
-        績效走勢
-      </h3>
-      <PerformanceChart agentId={agent.agent_id} {performanceData} height={300} />
-    </div>
-
-    <!-- 持倉詳情 -->
-    <div class="rounded-lg border border-gray-700 bg-gray-800 p-4">
-      <h3 class="mb-3 text-lg font-semibold text-white" style="color: rgb({agentColor});">
-        持倉詳情
-      </h3>
-      {#if holdings && holdings.length > 0}
-        <div class="space-y-2">
-          {#each holdings as holding}
-            <div
-              class="flex items-center justify-between rounded-lg border border-gray-700 bg-gray-900 p-3"
-            >
-              <div>
-                <p class="font-medium text-white">{holding.ticker}</p>
-                <p class="text-sm text-gray-400">{holding.name || ''}</p>
-              </div>
-              <div class="text-right">
-                <p class="font-medium text-white">{holding.shares || 0} 股</p>
-                <p class="text-sm text-gray-400">
-                  成本 @ {formatCurrency(holding.avg_price || 0)}
-                </p>
-              </div>
-            </div>
-          {/each}
-        </div>
-      {:else}
-        <p class="py-8 text-center text-gray-500">尚無持股</p>
-      {/if}
-    </div>
-
-    <!-- 交易歷史 -->
-    <div class="rounded-lg border border-gray-700 bg-gray-800 p-4">
-      <h3 class="mb-3 text-lg font-semibold text-white" style="color: rgb({agentColor});">
-        交易歷史
-      </h3>
-      {#if transactions && transactions.length > 0}
-        <div class="custom-scrollbar max-h-64 space-y-2 overflow-y-auto">
-          {#each transactions as tx}
-            <div
-              class="flex items-center justify-between rounded-lg border border-gray-700 bg-gray-900 p-3 text-sm"
-            >
-              <div>
-                <span class={tx.type === 'BUY' ? 'text-green-400' : 'text-red-400'}>
-                  {tx.type === 'BUY' ? '買入' : '賣出'}
-                </span>
-                <span class="ml-2 text-white">{tx.ticker}</span>
-              </div>
-              <div class="text-right">
-                <p class="text-white">{tx.shares} 股 @ {formatCurrency(tx.price)}</p>
-                <p class="text-xs text-gray-400">{formatDateTime(tx.timestamp)}</p>
-              </div>
-            </div>
-          {/each}
-        </div>
-      {:else}
-        <p class="py-8 text-center text-gray-500">尚無交易記錄</p>
-      {/if}
+      </details>
     </div>
   </div>
 

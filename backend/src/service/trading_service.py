@@ -409,6 +409,16 @@ class TradingService:
                 if quantity % 1000 != 0:
                     raise ValueError(f"股數必須是 1000 的倍數，收到: {quantity}")
 
+                if price is None:
+                    raise ValueError("交易價格 (price) 不能為 None，必須提供具體的交易價格")
+
+                if not isinstance(price, (int, float)):
+                    try:
+                        # 嘗試將 price 轉換為浮點數（支持 Decimal 等其他數值類型）
+                        price = float(price)
+                    except (TypeError, ValueError) as e:
+                        raise ValueError(f"交易價格無效: {price}，無法轉換為浮點數") from e
+
                 logger.info(
                     f"開始原子交易: agent_id={agent_id}, ticker={ticker}, "
                     f"action={action_upper}, quantity={quantity}, price={price}"

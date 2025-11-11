@@ -148,7 +148,7 @@
     });
 
     // 初始化圖表
-    if (chartCanvas && performanceData.length > 0) {
+    if (chartCanvas && Array.isArray(performanceData) && performanceData.length > 0) {
       renderMiniChart();
     }
 
@@ -178,78 +178,56 @@
     // @ts-ignore - Chart.js is loaded via CDN in index.html
     if (!window.Chart || !chartCanvas) return;
 
-    const ctx = chartCanvas.getContext('2d');
+    // 確保 performanceData 是陣列
+    const data = Array.isArray(performanceData) ? performanceData : [];
 
-    // 如果沒有性能數據，生成示例數據以顯示當前資產
-    // 後端提供歷史數據時，performanceData 會包含 total_value 數組
-    let chartData = performanceData;
-    if (!chartData || chartData.length === 0) {
-      // 生成 10 個示例數據點，逐漸接近當前資產
-      const current = totalAssets;
-      const initial = agent.initial_funds;
-      chartData = Array.from({ length: 10 }, (_, i) => ({
-        total_value: initial + (current - initial) * (i / 9),
-        date: new Date(Date.now() - (10 - i) * 24 * 60 * 60 * 1000).toLocaleDateString(),
-      }));
+    // 如果沒有性能數據，停止繪製
+    if (data.length === 0) {
+      return;
     }
 
-    // 準備數據 - 優先使用 total_value（來自後端），否則使用 value（舊格式）
-    const labels = chartData.map((d) => {
-      // 如果有日期，提取月日；否則使用索引
-      if (d.date) {
-        try {
-          const date = new Date(d.date);
-          return `${date.getMonth() + 1}/${date.getDate()}`;
-        } catch {
-          return d.date;
-        }
-      }
-      return '';
-    });
-
-    const values = chartData.map((d) => d.total_value ?? totalAssets);
-
+    // 銷毀舊圖表實例
     if (chartInstance) {
       chartInstance.destroy();
+      chartInstance = null;
     }
 
-    // 設置 canvas 的正確尺寸以適應容器
-    // 獲取容器寬度
-    const container = chartCanvas.parentElement;
-    if (container) {
-      const rect = container.getBoundingClientRect();
-      const containerWidth = rect.width;
+    const ctx = chartCanvas.getContext('2d');
+    const initial = agent.initial_funds;
 
-      // 設置 canvas 的顯示尺寸（CSS）
-      chartCanvas.style.width = '100%';
-      chartCanvas.style.height = '100%';
+    // 提取資產價值（直接使用 total_value）
+    const values = data.map((d) => d.total_value ?? 0);
 
-      // 設置 canvas 的內部尺寸（像素）
-      // 使用 2:1 寬高比（基於 aspectRatio: 2.5，實際應用時會變成約 2:1）
-      chartCanvas.width = containerWidth * (window.devicePixelRatio || 1);
-      chartCanvas.height = 128 * (window.devicePixelRatio || 1);
-    }
+    // 創建梯度漸層 - 對齊 createCardChart 風格
+    const gradient = ctx.createLinearGradient(0, 0, 0, 200);
+    gradient.addColorStop(0, `rgba(${agentColor}, 0.5)`);
+    gradient.addColorStop(1, `rgba(${agentColor}, 0)`);
 
     // @ts-ignore - Chart.js is loaded via CDN in index.html
     chartInstance = new window.Chart(ctx, {
       type: 'line',
       data: {
-        labels,
+        labels: data.map((_, idx) => idx.toString()),
         datasets: [
           {
+            label: '資產價值',
             data: values,
             borderColor: `rgb(${agentColor})`,
-            backgroundColor: `rgba(${agentColor}, 0.1)`,
+            backgroundColor: gradient,
             borderWidth: 2,
-            fill: true,
+            pointRadius: 3,
+            pointBackgroundColor: `rgb(${agentColor})`,
+            pointBorderColor: '#fff',
+            pointBorderWidth: 1,
+            pointHoverRadius: 6,
+            pointHoverBackgroundColor: `rgb(${agentColor})`,
             tension: 0.4,
-            pointRadius: 0,
-            pointHoverRadius: 4,
+            fill: true,
           },
         ],
       },
       options: {
-        responsive: false,
+        responsive: true,
         maintainAspectRatio: false,
         plugins: {
           legend: { display: false },
@@ -257,24 +235,33 @@
             enabled: true,
             mode: 'index',
             intersect: false,
-            backgroundColor: 'rgba(0, 0, 0, 0.8)',
-            titleColor: '#fff',
-            bodyColor: '#fff',
-            borderColor: `rgb(${agentColor})`,
-            borderWidth: 1,
             callbacks: {
-              label: (context) => `資產: ${formatCurrency(context.parsed.y)}`,
+              title: (tooltipItems) => {
+                const idx = tooltipItems[0].dataIndex;
+                const d = data[idx];
+                if (d?.date) {
+                  try {
+                    const date = new Date(d.date);
+                    return `📅 ${date.getMonth() + 1}/${date.getDate()}`;
+                  } catch {
+                    return `資料點 ${idx}`;
+                  }
+                }
+                return `資料點 ${idx}`;
+              },
+              label: (context) => {
+                const totalAssetValue = context.parsed.y;
+                const pnl = totalAssetValue - initial;
+                const sign = pnl >= 0 ? '+' : '';
+                const pnlPercent = ((pnl / initial) * 100).toFixed(2);
+                return `${formatCurrency(totalAssetValue)} (${sign}${pnlPercent}%)`;
+              },
             },
           },
         },
         scales: {
           x: { display: false },
           y: { display: false },
-        },
-        interaction: {
-          mode: 'nearest',
-          axis: 'x',
-          intersect: false,
         },
       },
     });
@@ -400,7 +387,9 @@
   <div class="mb-6 grid grid-cols-2 gap-4">
     <div>
       <p class="text-xs text-gray-400 mb-1">總資產</p>
-      <p class="text-2xl font-bold text-white">{formatCurrency(totalAssets)}</p>
+      <p class="text-2xl font-bold" style="color: rgb({agentColor});">
+        {formatCurrency(totalAssets)}
+      </p>
     </div>
     <div>
       <p class="text-xs text-gray-400 mb-1">總損益</p>
@@ -411,15 +400,23 @@
   </div>
 
   <!-- 現金餘額 -->
-  <div class="mb-4">
-    <p class="text-xs text-gray-400 mb-1">持有現金</p>
-    <p class="text-lg font-semibold text-white">
-      {formatCurrency(currentCash)}
-    </p>
+  <div class="mb-6 grid grid-cols-2 gap-4">
+    <div>
+      <p class="text-xs text-gray-400 mb-1">持有現金</p>
+      <p class="text-lg font-semibold" style="color: rgb({agentColor});">
+        {formatCurrency(currentCash)}
+      </p>
+    </div>
+    <div>
+      <p class="text-xs text-gray-400 mb-1">股票現值</p>
+      <p class="text-lg font-semibold" style="color: rgb({agentColor});">
+        {formatCurrency(holdingsTotalValue)}
+      </p>
+    </div>
   </div>
 
   <!-- 迷你績效圖表 -->
-  <div class="mb-6 h-32 w-full">
+  <div class="mb-6 h-48 w-full">
     <canvas bind:this={chartCanvas}></canvas>
   </div>
 
