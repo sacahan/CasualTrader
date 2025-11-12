@@ -1678,6 +1678,11 @@ class AgentsService:
                         "total_return": float(record.total_return) if record.total_return else None,
                         "win_rate": float(record.win_rate) if record.win_rate else None,
                         "max_drawdown": float(record.max_drawdown) if record.max_drawdown else None,
+                        "sharpe_ratio": float(record.sharpe_ratio) if record.sharpe_ratio else None,
+                        "sortino_ratio": float(record.sortino_ratio)
+                        if record.sortino_ratio
+                        else None,
+                        "calmar_ratio": float(record.calmar_ratio) if record.calmar_ratio else None,
                         "total_trades": record.total_trades,
                         "sell_trades_count": record.sell_trades_count,  # 修正: 賣出交易數
                         "winning_trades_correct": record.winning_trades_correct,  # 真實獲利交易數

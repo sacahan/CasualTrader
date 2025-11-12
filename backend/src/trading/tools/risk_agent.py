@@ -140,7 +140,7 @@ def risk_agent_instructions() -> str:
 @function_tool(strict_mode=False)
 def calculate_position_risk(
     ticker: str,
-    position_data: dict,
+    position_data: dict = None,
     market_data: dict = None,
     **kwargs,
 ) -> str:
@@ -148,9 +148,9 @@ def calculate_position_risk(
 
     **必要參數：**
         ticker: 股票代號 (例如: "2330") [必要]
-        position_data: 部位數據，包含 quantity, avg_cost, current_price [必要]
 
     **可選參數：**
+        position_data: 部位數據，包含 quantity, avg_cost, current_price [可選]
         market_data: 市場數據，包含 volatility, beta，缺少時使用預設值 [可選]
         **kwargs: 額外參數（用於容錯）
 

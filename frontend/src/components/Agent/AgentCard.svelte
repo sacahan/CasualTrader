@@ -11,7 +11,7 @@
   import { onMount } from 'svelte';
   import { Button } from '../UI/index.js';
   import { WS_EVENT_TYPES } from '../../shared/constants.js';
-  import { formatCurrency } from '../../shared/utils.js';
+  import { formatCurrency, formatNumber } from '../../shared/utils.js';
   import { isOpen } from '../../stores/market.js';
   import { addEventListener } from '../../stores/websocket.js';
   import { executionRetryManager } from '../../shared/retry.js';
@@ -195,8 +195,8 @@
     const ctx = chartCanvas.getContext('2d');
     const initial = agent.initial_funds;
 
-    // 提取資產價值（直接使用 total_value）
-    const values = data.map((d) => d.total_value ?? 0);
+    // 提取資產價值（使用 portfolio_value）
+    const values = data.map((d) => d.portfolio_value ?? 0);
 
     // 創建梯度漸層 - 對齊 createCardChart 風格
     const gradient = ctx.createLinearGradient(0, 0, 0, 200);
@@ -425,19 +425,19 @@
     <p class="text-xs text-gray-400 mb-3 font-semibold">持有股數</p>
     {#if holdings && holdings.length > 0}
       <div class="space-y-2 max-h-32 overflow-y-auto custom-scrollbar">
-        {#each holdings.slice(0, 3) as holding}
+        {#each holdings.slice(0, 10) as holding}
           <div class="flex justify-between items-center text-sm bg-gray-700/50 p-2 rounded-md">
             <div>
               <div class="font-bold text-white">{holding.ticker}</div>
               <div class="text-xs text-gray-400">{holding.company_name || holding.name || ''}</div>
             </div>
             <div class="text-right">
-              <div class="font-mono text-white">{holding.quantity || 0} 股</div>
-              <div class="text-xs text-gray-400">@ {formatCurrency(holding.average_cost || 0)}</div>
+              <div class="font-mono text-white">{formatNumber(holding.shares || 0)} 股</div>
+              <div class="text-xs text-gray-400">@ {formatCurrency(holding.avg_price || 0)}</div>
             </div>
           </div>
         {/each}
-        {#if holdings.length > 3}
+        {#if holdings.length > 10}
           <p class="text-xs text-gray-500 text-center">
             還有 {holdings.length - 3} 檔股票...
           </p>
