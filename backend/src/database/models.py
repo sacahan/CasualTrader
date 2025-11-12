@@ -285,6 +285,15 @@ class AgentPerformance(Base):
     total_return: Mapped[Decimal | None] = mapped_column(Numeric(8, 4))
     win_rate: Mapped[Decimal | None] = mapped_column(Numeric(5, 2))
     max_drawdown: Mapped[Decimal | None] = mapped_column(Numeric(8, 4))
+    sharpe_ratio: Mapped[Decimal | None] = mapped_column(
+        Numeric(8, 4), doc="風險調整後的報酬 (Sharpe Ratio)"
+    )
+    sortino_ratio: Mapped[Decimal | None] = mapped_column(
+        Numeric(8, 4), doc="只考慮下行風險的比率 (Sortino Ratio)"
+    )
+    calmar_ratio: Mapped[Decimal | None] = mapped_column(
+        Numeric(8, 4), doc="年化報酬與最大回撤的比值 (Calmar Ratio)"
+    )
 
     # 交易統計
     total_trades: Mapped[int] = mapped_column(Integer, default=0)

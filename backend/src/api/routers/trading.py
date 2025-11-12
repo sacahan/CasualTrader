@@ -466,9 +466,10 @@ async def get_performance_history(
     agents_service: AgentsService = Depends(get_agents_service),
 ):
     """
-    取得績效歷史
+    取得績效歷史 - 圖表展示用（已轉換格式）
 
     用於前端圖表展示 Agent 的資產淨值變化趨勢。
+    ⚠️ 重要: 所有數據已在後端完成格式轉換，前端可直接使用。
 
     Args:
         agent_id: Agent ID
@@ -477,18 +478,21 @@ async def get_performance_history(
         agents_service: AgentsService 實例
 
     Returns:
-        性能歷史記錄列表，時間序列從舊到新，每條包含：
+        性能歷史記錄列表（已格式化），每條包含：
         - date: 記錄日期 (ISO 8601)
-        - total_value: 投資組合總資產
-        - cash_balance: 現金餘額
-        - unrealized_pnl: 未實現損益
-        - realized_pnl: 已實現損益
-        - daily_return: 日回報率
-        - total_return: 累計回報率
-        - win_rate: 勝率
-        - max_drawdown: 最大回撤
+        - portfolio_value: 投資組合總資產 (TWD) [欄位已重命名]
+        - total_return: 累計回報率 (%) [已轉為百分比]
+        - win_rate: 勝率 (%) [已轉為百分比]
+        - daily_return: 日回報率 (%) [已轉為百分比]
+        - max_drawdown: 最大回撤 (%) [已轉為百分比]
+        - sharpe_ratio: 風險調整後的報酬 [進階指標]
+        - sortino_ratio: 下行風險調整比率 [進階指標]
+        - calmar_ratio: 報酬/最大回撤比值 [進階指標]
+        - cash_balance: 現金餘額 (TWD)
+        - realized_pnl: 已實現損益 (TWD)
+        - unrealized_pnl: 未實現損益 (TWD)
         - total_trades: 總交易數
-        - winning_trades: 獲勝交易數
+        - winning_trades: 真實獲利交易數 [使用 FIFO 配對邏輯]
 
     Raises:
         404: Agent 不存在
@@ -517,7 +521,62 @@ async def get_performance_history(
         history = await agents_service.get_performance_history(agent_id, limit=limit, order=order)
 
         logger.debug(f"Retrieved {len(history)} performance records for agent {agent_id}")
-        return history
+
+        # 轉換為圖表格式（後端集中處理原則）
+        # 1. 欄位重新命名: total_value -> portfolio_value
+        # 2. 數值轉換: 小數 -> 百分比 (0.05 -> 5.0)
+        # 3. 進階風險指標包含
+        formatted_history = []
+        for record in history:
+            formatted_record = {
+                "date": record["date"],
+                "portfolio_value": float(record["total_value"]),  # 欄位重新命名
+                "total_return": (
+                    float(record["total_return"]) * 100  # 轉為百分比
+                    if record["total_return"] is not None
+                    else None
+                ),
+                "win_rate": (
+                    float(record["win_rate"])  # 已經是百分比格式
+                    if record["win_rate"] is not None
+                    else None
+                ),
+                "daily_return": (
+                    float(record["daily_return"]) * 100  # 轉為百分比
+                    if record["daily_return"] is not None
+                    else None
+                ),
+                "max_drawdown": (
+                    float(record["max_drawdown"]) * 100  # 轉為百分比
+                    if record["max_drawdown"] is not None
+                    else None
+                ),
+                # 進階風險指標
+                "sharpe_ratio": (
+                    float(record["sharpe_ratio"])  # 已是小數格式
+                    if record.get("sharpe_ratio") is not None
+                    else None
+                ),
+                "sortino_ratio": (
+                    float(record["sortino_ratio"])  # 已是小數格式
+                    if record.get("sortino_ratio") is not None
+                    else None
+                ),
+                "calmar_ratio": (
+                    float(record["calmar_ratio"])  # 已是小數格式
+                    if record.get("calmar_ratio") is not None
+                    else None
+                ),
+                # 保留原始欄位用於其他用途
+                "cash_balance": float(record["cash_balance"]),
+                "realized_pnl": float(record["realized_pnl"]),
+                "unrealized_pnl": float(record["unrealized_pnl"]),
+                "total_trades": record["total_trades"],
+                "winning_trades": record["winning_trades_correct"],  # 使用真實獲利交易數
+            }
+            formatted_history.append(formatted_record)
+
+        return formatted_history
 
     except HTTPException:
         raise

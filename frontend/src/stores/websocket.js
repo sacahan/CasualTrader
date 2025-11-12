@@ -272,7 +272,7 @@ export function handleEvent(data) {
  * 處理執行開始事件
  */
 function handleExecutionStarted(payload) {
-  const { agent_id, session_id, mode } = payload;
+  const { agent_id, session_id } = payload;
 
   // 更新 agent 狀態為 RUNNING
   agents.update((list) =>

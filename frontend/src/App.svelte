@@ -21,11 +21,7 @@
     selectAgent,
     executeAgent,
   } from './stores/agents.js';
-  import {
-    agentDetails,
-    loadAgentDetails,
-    getAgentHoldingsDerived,
-  } from './stores/agentDetails.js';
+  import { agentDetails, loadAgentDetails } from './stores/agentDetails.js';
   import { connectWebSocket, disconnectWebSocket } from './stores/websocket.js';
   import { loadMarketStatus, loadMarketIndices } from './stores/market.js';
   import { notifySuccess, notifyError } from './stores/notifications.js';

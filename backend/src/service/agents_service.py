@@ -10,7 +10,7 @@ from __future__ import annotations
 import json
 from typing import Any
 from decimal import Decimal
-from datetime import datetime
+from datetime import datetime, date
 import uuid
 
 from sqlalchemy import select
@@ -697,6 +697,663 @@ class AgentsService:
             logger.error(f"Database error getting transactions: {e}", exc_info=True)
             raise AgentDatabaseError(f"Failed to get transactions: {str(e)}")
 
+    async def calculate_trade_pairs_and_win_rate(self, agent_id: str) -> dict[str, Any]:
+        """
+        計算交易對數和勝率 (使用 FIFO 買賣配對邏輯)
+
+        此方法實現完整的買賣配對邏輯，追蹤每個股票的買入成本和賣出收益，
+        計算真實的獲利交易數和勝率。
+
+        Args:
+            agent_id: Agent ID
+
+        Returns:
+            包含以下鍵值的字典:
+            - total_pairs (int): 已完成的買賣對數
+            - winning_pairs (int): 獲利的買賣對數
+            - losing_pairs (int): 虧損的買賣對數
+            - win_rate (Decimal): 勝率 (%)
+
+        Raises:
+            AgentDatabaseError: 資料庫操作失敗
+        """
+        try:
+            # 取得所有已執行的交易記錄（按時間排序）
+            stmt = (
+                select(Transaction)
+                .where(Transaction.agent_id == agent_id)
+                .where(Transaction.status == TransactionStatus.EXECUTED)
+                .order_by(Transaction.created_at)
+            )
+            result = await self.session.execute(stmt)
+            transactions = list(result.scalars().all())
+
+            # 按股票分組交易
+            trades_by_ticker: dict[str, dict[str, list[Transaction]]] = {}
+            for tx in transactions:
+                if tx.ticker not in trades_by_ticker:
+                    trades_by_ticker[tx.ticker] = {"buys": [], "sells": []}
+
+                if tx.action == TransactionAction.BUY:
+                    trades_by_ticker[tx.ticker]["buys"].append(tx)
+                else:
+                    trades_by_ticker[tx.ticker]["sells"].append(tx)
+
+            # 計算買賣對和損益
+            total_pairs = 0
+            winning_pairs = 0
+
+            for ticker, trades in trades_by_ticker.items():
+                buys = trades["buys"].copy()
+                sells = trades["sells"].copy()
+
+                buy_idx = 0
+
+                for sell in sells:
+                    remaining_qty = sell.quantity
+
+                    while remaining_qty > 0 and buy_idx < len(buys):
+                        buy = buys[buy_idx]
+
+                        # 計算此次配對的數量（取較小值）
+                        matched_qty = min(remaining_qty, buy.quantity)
+
+                        # 計算此對交易的損益（含手續費）
+                        # 損益 = (賣出價 - 買入價) × 數量 - 雙邊手續費
+                        gross_pnl = (sell.price - buy.price) * matched_qty
+                        buy_commission_portion = buy.commission * (
+                            matched_qty / buy.quantity
+                        )  # 按比例分攤手續費
+                        sell_commission_portion = sell.commission * (matched_qty / sell.quantity)
+                        net_pnl = gross_pnl - buy_commission_portion - sell_commission_portion
+
+                        # 判斷是否獲利
+                        if net_pnl > 0:
+                            winning_pairs += 1
+
+                        total_pairs += 1
+
+                        # 更新剩餘數量
+                        remaining_qty -= matched_qty
+                        buy.quantity -= matched_qty
+
+                        # 如果買入交易完全配對，移到下一個買入交易
+                        if buy.quantity == 0:
+                            buy_idx += 1
+
+            # 計算勝率
+            win_rate = (
+                Decimal(str(winning_pairs / total_pairs * 100)) if total_pairs > 0 else Decimal("0")
+            )
+
+            logger.info(
+                f"Trade pairs calculated for agent {agent_id}: "
+                f"total={total_pairs}, winning={winning_pairs}, win_rate={win_rate}%"
+            )
+
+            return {
+                "total_pairs": total_pairs,
+                "winning_pairs": winning_pairs,
+                "losing_pairs": total_pairs - winning_pairs,
+                "win_rate": win_rate,
+            }
+
+        except Exception as e:
+            logger.error(
+                f"Failed to calculate trade pairs for agent {agent_id}: {e}", exc_info=True
+            )
+            raise AgentDatabaseError(f"Failed to calculate trade pairs: {str(e)}")
+
+    async def calculate_realized_pnl(self, agent_id: str) -> Decimal:
+        """
+        計算已實現損益 (使用 FIFO 方法)
+
+        此方法追蹤每個股票的買入成本，並在賣出時計算實際損益。
+        使用 FIFO (First In, First Out) 方法來匹配買賣交易。
+
+        Args:
+            agent_id: Agent ID
+
+        Returns:
+            已實現損益總額 (Decimal)
+
+        Raises:
+            AgentDatabaseError: 資料庫操作失敗
+        """
+        try:
+            # 取得所有已執行的交易記錄（按時間排序）
+            stmt = (
+                select(Transaction)
+                .where(Transaction.agent_id == agent_id)
+                .where(Transaction.status == TransactionStatus.EXECUTED)
+                .order_by(Transaction.created_at)
+            )
+            result = await self.session.execute(stmt)
+            transactions = list(result.scalars().all())
+
+            # 追蹤成本基礎 (cost basis)
+            # 格式: {ticker: [(quantity, price, commission), ...]}
+            cost_basis: dict[str, list[tuple[int, Decimal, Decimal]]] = {}
+            realized_pnl = Decimal("0")
+
+            for tx in transactions:
+                ticker = tx.ticker
+
+                if tx.action == TransactionAction.BUY:
+                    # 買入: 記錄成本基礎
+                    if ticker not in cost_basis:
+                        cost_basis[ticker] = []
+
+                    cost_basis[ticker].append((tx.quantity, tx.price, tx.commission))
+
+                elif tx.action == TransactionAction.SELL:
+                    # 賣出: 使用 FIFO 配對並計算損益
+                    remaining_qty = tx.quantity
+                    sell_price = tx.price
+                    sell_commission_per_share = tx.commission / tx.quantity
+
+                    while remaining_qty > 0 and ticker in cost_basis and cost_basis[ticker]:
+                        # 取得最早的買入記錄 (FIFO)
+                        buy_qty, buy_price, buy_commission = cost_basis[ticker][0]
+
+                        # 計算此次配對的數量
+                        matched_qty = min(remaining_qty, buy_qty)
+
+                        # 計算毛損益
+                        gross_pnl = (sell_price - buy_price) * matched_qty
+
+                        # 扣除手續費（按比例分攤）
+                        buy_commission_portion = buy_commission * (matched_qty / buy_qty)
+                        sell_commission_portion = sell_commission_per_share * matched_qty
+
+                        # 計算淨損益
+                        net_pnl = gross_pnl - buy_commission_portion - sell_commission_portion
+
+                        # 累加到總已實現損益
+                        realized_pnl += net_pnl
+
+                        # 更新剩餘數量
+                        remaining_qty -= matched_qty
+                        buy_qty -= matched_qty
+
+                        # 更新或移除成本基礎記錄
+                        if buy_qty == 0:
+                            cost_basis[ticker].pop(0)
+                        else:
+                            cost_basis[ticker][0] = (buy_qty, buy_price, buy_commission)
+
+            logger.info(f"Calculated realized P&L for agent {agent_id}: {realized_pnl}")
+            return realized_pnl
+
+        except Exception as e:
+            logger.error(
+                f"Failed to calculate realized P&L for agent {agent_id}: {e}", exc_info=True
+            )
+            raise AgentDatabaseError(f"Failed to calculate realized P&L: {str(e)}")
+
+    async def calculate_max_drawdown(self, agent_id: str) -> Decimal | None:
+        """
+        計算最大回撤
+
+        最大回撤 = (歷史最高淨值 - 當前最低淨值) / 歷史最高淨值 × 100%
+
+        演算法:
+        1. 取得所有歷史績效記錄（按日期排序）
+        2. 追蹤滾動最高淨值 (peak)
+        3. 計算每日回撤 = (peak - current_value) / peak × 100%
+        4. 追蹤最大回撤
+
+        Args:
+            agent_id: Agent ID
+
+        Returns:
+            最大回撤百分比 (%) 或 None (資料不足)
+
+        Raises:
+            AgentDatabaseError: 資料庫操作失敗
+        """
+        try:
+            # 取得所有歷史績效記錄（按日期升序排序）
+            stmt = (
+                select(AgentPerformance.total_value)
+                .where(AgentPerformance.agent_id == agent_id)
+                .order_by(AgentPerformance.date.asc())
+            )
+
+            result = await self.session.execute(stmt)
+            values = [row[0] for row in result.all()]
+
+            # 需要至少 2 個資料點才能計算回撤
+            if len(values) < 2:
+                logger.debug(
+                    f"Insufficient data to calculate max drawdown for agent {agent_id}: "
+                    f"only {len(values)} records"
+                )
+                return None
+
+            # 初始化追蹤變數
+            peak = Decimal("0")  # 歷史最高淨值
+            max_drawdown = Decimal("0")  # 最大回撤
+
+            # 遍歷每個淨值
+            for value in values:
+                # 更新歷史最高淨值
+                if value > peak:
+                    peak = value
+
+                # 計算當前回撤
+                if peak > 0:
+                    drawdown = (peak - value) / peak * 100
+                    # 更新最大回撤
+                    if drawdown > max_drawdown:
+                        max_drawdown = drawdown
+
+            logger.info(
+                f"Calculated max drawdown for agent {agent_id}: {max_drawdown:.2f}% "
+                f"(peak={peak}, data_points={len(values)})"
+            )
+            return max_drawdown
+
+        except Exception as e:
+            logger.error(
+                f"Failed to calculate max drawdown for agent {agent_id}: {e}", exc_info=True
+            )
+            raise AgentDatabaseError(f"Failed to calculate max drawdown: {str(e)}")
+
+    async def calculate_sharpe_ratio(self, agent_id: str) -> Decimal | None:
+        """
+        計算夏普比率
+
+        衡量投資風險調整後的報酬。
+        公式: (年化報酬率 - 無風險利率) / 年化波動率
+
+        無風險利率設定為 2%（台灣公債平均利率）
+        波動率計算：日報酬率的標準差 × √252（交易日數）
+
+        Args:
+            agent_id: Agent ID
+
+        Returns:
+            夏普比率 或 None (資料不足)
+
+        Raises:
+            AgentDatabaseError: 資料庫操作失敗
+        """
+        try:
+            # 無風險利率（年化 2%）
+            RISK_FREE_RATE = Decimal("2")
+
+            # 取得所有歷史績效記錄（按日期排序）
+            stmt = (
+                select(AgentPerformance.daily_return)
+                .where(AgentPerformance.agent_id == agent_id)
+                .where(AgentPerformance.daily_return.isnot(None))
+                .order_by(AgentPerformance.date.asc())
+            )
+
+            result = await self.session.execute(stmt)
+            daily_returns = [row[0] for row in result.all()]
+
+            # 需要至少 20 個交易日資料
+            if len(daily_returns) < 20:
+                logger.debug(
+                    f"Insufficient data to calculate Sharpe ratio for agent {agent_id}: "
+                    f"only {len(daily_returns)} records (need >= 20)"
+                )
+                return None
+
+            # 計算日報酬率平均值
+            avg_return = sum(daily_returns) / len(daily_returns)
+
+            # 計算日報酬率標準差（波動率）
+            variance = sum((r - avg_return) ** 2 for r in daily_returns) / len(daily_returns)
+            daily_volatility = variance.sqrt()
+
+            # 年化波動率（252 個交易日）
+            annual_volatility = daily_volatility * Decimal("15.8745")  # √252
+
+            # 計算年化報酬率
+            # 假設日平均報酬複利計算：(1 + 日平均報酬)^252 - 1
+            if avg_return > -1:
+                annual_return = ((1 + avg_return / 100) ** 252 - 1) * 100
+            else:
+                annual_return = Decimal("0")
+
+            # 計算夏普比率
+            if annual_volatility > 0:
+                sharpe_ratio = (annual_return - RISK_FREE_RATE) / annual_volatility
+            else:
+                sharpe_ratio = Decimal("0")
+
+            logger.info(
+                f"Calculated Sharpe ratio for agent {agent_id}: {sharpe_ratio:.4f} "
+                f"(annual_return={annual_return:.2f}%, annual_volatility={annual_volatility:.2f}%, "
+                f"data_points={len(daily_returns)})"
+            )
+            return sharpe_ratio
+
+        except Exception as e:
+            logger.error(
+                f"Failed to calculate Sharpe ratio for agent {agent_id}: {e}", exc_info=True
+            )
+            raise AgentDatabaseError(f"Failed to calculate Sharpe ratio: {str(e)}")
+
+    async def calculate_sortino_ratio(self, agent_id: str) -> Decimal | None:
+        """
+        計算索提諾比率
+
+        改良版的夏普比率，只考慮下行風險（負報酬）。
+        公式: (年化報酬率 - 無風險利率) / 年化下行波動率
+
+        下行波動率只計算低於目標報酬（通常為 0%）的報酬標準差。
+        無風險利率設定為 2%。
+
+        Args:
+            agent_id: Agent ID
+
+        Returns:
+            索提諾比率 或 None (資料不足)
+
+        Raises:
+            AgentDatabaseError: 資料庫操作失敗
+        """
+        try:
+            # 無風險利率（年化 2%）
+            RISK_FREE_RATE = Decimal("2")
+            TARGET_RETURN = Decimal("0")  # 目標報酬為 0%
+
+            # 取得所有歷史績效記錄（按日期排序）
+            stmt = (
+                select(AgentPerformance.daily_return)
+                .where(AgentPerformance.agent_id == agent_id)
+                .where(AgentPerformance.daily_return.isnot(None))
+                .order_by(AgentPerformance.date.asc())
+            )
+
+            result = await self.session.execute(stmt)
+            daily_returns = [row[0] for row in result.all()]
+
+            # 需要至少 20 個交易日資料
+            if len(daily_returns) < 20:
+                logger.debug(
+                    f"Insufficient data to calculate Sortino ratio for agent {agent_id}: "
+                    f"only {len(daily_returns)} records (need >= 20)"
+                )
+                return None
+
+            # 計算日報酬率平均值
+            avg_return = sum(daily_returns) / len(daily_returns)
+
+            # 計算下行波動率（只考慮負報酬）
+            downside_returns = [r for r in daily_returns if r < TARGET_RETURN]
+
+            if downside_returns:
+                downside_variance = sum((r - TARGET_RETURN) ** 2 for r in downside_returns) / len(
+                    daily_returns
+                )  # 分母用總數，不是負報酬數
+                downside_volatility = downside_variance.sqrt()
+            else:
+                # 無下行波動，直接返回
+                downside_volatility = Decimal("0")
+
+            # 年化下行波動率
+            annual_downside_volatility = downside_volatility * Decimal("15.8745")  # √252
+
+            # 計算年化報酬率
+            if avg_return > -1:
+                annual_return = ((1 + avg_return / 100) ** 252 - 1) * 100
+            else:
+                annual_return = Decimal("0")
+
+            # 計算索提諾比率
+            if annual_downside_volatility > 0:
+                sortino_ratio = (annual_return - RISK_FREE_RATE) / annual_downside_volatility
+            else:
+                # 無下行風險，索提諾比率為無窮大（用很大的數表示）
+                sortino_ratio = Decimal("999") if annual_return > RISK_FREE_RATE else Decimal("0")
+
+            logger.info(
+                f"Calculated Sortino ratio for agent {agent_id}: {sortino_ratio:.4f} "
+                f"(annual_return={annual_return:.2f}%, annual_downside_volatility={annual_downside_volatility:.2f}%, "
+                f"data_points={len(daily_returns)}, downside_returns={len(downside_returns)})"
+            )
+            return sortino_ratio
+
+        except Exception as e:
+            logger.error(
+                f"Failed to calculate Sortino ratio for agent {agent_id}: {e}", exc_info=True
+            )
+            raise AgentDatabaseError(f"Failed to calculate Sortino ratio: {str(e)}")
+
+    async def calculate_calmar_ratio(self, agent_id: str) -> Decimal | None:
+        """
+        計算卡瑪比率
+
+        衡量報酬率與最大回撤的比值。
+        公式: 年化報酬率 / 最大回撤
+
+        Args:
+            agent_id: Agent ID
+
+        Returns:
+            卡瑪比率 或 None (資料不足)
+
+        Raises:
+            AgentDatabaseError: 資料庫操作失敗
+        """
+        try:
+            # 取得最大回撤
+            max_drawdown = await self.calculate_max_drawdown(agent_id)
+            if max_drawdown is None or max_drawdown == 0:
+                logger.debug(
+                    f"Cannot calculate Calmar ratio for agent {agent_id}: "
+                    f"max_drawdown is {max_drawdown}"
+                )
+                return None
+
+            # 取得所有日報酬率計算年化報酬率
+            stmt = (
+                select(AgentPerformance.daily_return)
+                .where(AgentPerformance.agent_id == agent_id)
+                .where(AgentPerformance.daily_return.isnot(None))
+                .order_by(AgentPerformance.date.asc())
+            )
+
+            result = await self.session.execute(stmt)
+            daily_returns = [row[0] for row in result.all()]
+
+            if not daily_returns:
+                return None
+
+            # 計算平均日報酬率
+            avg_return = sum(daily_returns) / len(daily_returns)
+
+            # 計算年化報酬率
+            if avg_return > -1:
+                annual_return = ((1 + avg_return / 100) ** 252 - 1) * 100
+            else:
+                annual_return = Decimal("0")
+
+            # 計算卡瑪比率
+            calmar_ratio = annual_return / max_drawdown
+
+            logger.info(
+                f"Calculated Calmar ratio for agent {agent_id}: {calmar_ratio:.4f} "
+                f"(annual_return={annual_return:.2f}%, max_drawdown={max_drawdown:.2f}%)"
+            )
+            return calmar_ratio
+
+        except Exception as e:
+            logger.error(
+                f"Failed to calculate Calmar ratio for agent {agent_id}: {e}", exc_info=True
+            )
+            raise AgentDatabaseError(f"Failed to calculate Calmar ratio: {str(e)}")
+
+    async def calculate_daily_return(self, agent_id: str, current_date: date) -> Decimal | None:
+        """
+        計算當日報酬率
+
+        比較當日與前一個交易日的投資組合總價值，計算日報酬率。
+        公式: (今日總價值 - 前日總價值) / 前日總價值 × 100%
+
+        Args:
+            agent_id: Agent ID
+            current_date: 計算日期
+
+        Returns:
+            當日報酬率 (%) 或 None (無前一日資料)
+
+        Raises:
+            AgentDatabaseError: 資料庫操作失敗
+        """
+        try:
+            from datetime import timedelta
+
+            # 取得當日績效
+            stmt_today = (
+                select(AgentPerformance)
+                .where(AgentPerformance.agent_id == agent_id)
+                .where(AgentPerformance.date == current_date)
+            )
+            result_today = await self.session.execute(stmt_today)
+            today_perf = result_today.scalar_one_or_none()
+
+            if not today_perf:
+                logger.debug(f"No performance record for agent {agent_id} on {current_date}")
+                return None
+
+            # 尋找前一個交易日的績效記錄
+            # 向前查找最多 7 天（處理週末和假日）
+            prev_perf = None
+            for days_back in range(1, 8):
+                prev_date = current_date - timedelta(days=days_back)
+                stmt_prev = (
+                    select(AgentPerformance)
+                    .where(AgentPerformance.agent_id == agent_id)
+                    .where(AgentPerformance.date == prev_date)
+                )
+                result_prev = await self.session.execute(stmt_prev)
+                prev_perf = result_prev.scalar_one_or_none()
+
+                if prev_perf:
+                    break
+
+            if not prev_perf or prev_perf.total_value <= 0:
+                logger.debug(f"No previous performance record found for agent {agent_id}")
+                return None
+
+            # 計算日報酬率
+            daily_return = (
+                (today_perf.total_value - prev_perf.total_value) / prev_perf.total_value * 100
+            )
+
+            logger.info(
+                f"Calculated daily return for agent {agent_id} on {current_date}: "
+                f"{daily_return}% (from {prev_perf.total_value} to {today_perf.total_value})"
+            )
+
+            return Decimal(str(daily_return))
+
+        except Exception as e:
+            logger.error(
+                f"Failed to calculate daily return for agent {agent_id} on {current_date}: {e}",
+                exc_info=True,
+            )
+            raise AgentDatabaseError(f"Failed to calculate daily return: {str(e)}")
+
+    async def calculate_unrealized_pnl(self, agent_id: str) -> Decimal:
+        """
+        計算未實現損益
+
+        使用 MCP casual-market 服務獲取實時股價，計算當前持股的未實現損益。
+        公式: Σ (當前價格 - 平均成本) × 持有數量
+
+        Args:
+            agent_id: Agent ID
+
+        Returns:
+            未實現損益總額 (Decimal)
+
+        Raises:
+            AgentDatabaseError: 資料庫操作失敗
+        """
+        try:
+            # 取得當前持股
+            holdings = await self.get_agent_holdings(agent_id)
+
+            if not holdings:
+                logger.debug(f"No holdings found for agent {agent_id}")
+                return Decimal("0")
+
+            # 導入 MCP Client
+            from api.mcp_client import MCPMarketClient
+
+            unrealized_pnl = Decimal("0")
+            successful_prices = 0
+            failed_prices = 0
+
+            # 初始化 MCP Client
+            async with MCPMarketClient() as mcp_client:
+                for holding in holdings:
+                    try:
+                        # 調用 MCP 服務獲取實時價格
+                        price_data = await mcp_client.get_stock_price(holding.ticker)
+
+                        # 檢查回應格式
+                        if not price_data or not price_data.get("success"):
+                            logger.warning(
+                                f"Failed to get price for {holding.ticker}: "
+                                f"{price_data.get('error', 'Unknown error')}"
+                            )
+                            failed_prices += 1
+                            continue
+
+                        # 從回應中提取當前價格
+                        stock_data = price_data.get("data", {})
+                        current_price = stock_data.get("current_price")
+
+                        if current_price is None:
+                            logger.warning(
+                                f"No current_price in response for {holding.ticker}: {stock_data}"
+                            )
+                            failed_prices += 1
+                            continue
+
+                        # 轉換為 Decimal 並計算此持股的未實現損益
+                        current_price_decimal = Decimal(str(current_price))
+                        position_pnl = (
+                            current_price_decimal - holding.average_cost
+                        ) * holding.quantity
+
+                        unrealized_pnl += position_pnl
+                        successful_prices += 1
+
+                        logger.debug(
+                            f"Holding {holding.ticker}: qty={holding.quantity}, "
+                            f"cost={holding.average_cost}, current={current_price_decimal}, "
+                            f"pnl={position_pnl}"
+                        )
+
+                    except Exception as e:
+                        logger.warning(
+                            f"Error getting price for {holding.ticker}: {e}", exc_info=True
+                        )
+                        failed_prices += 1
+                        continue
+
+            logger.info(
+                f"Calculated unrealized P&L for agent {agent_id}: {unrealized_pnl} "
+                f"(successful: {successful_prices}, failed: {failed_prices})"
+            )
+
+            return unrealized_pnl
+
+        except Exception as e:
+            logger.error(
+                f"Failed to calculate unrealized P&L for agent {agent_id}: {e}", exc_info=True
+            )
+            raise AgentDatabaseError(f"Failed to calculate unrealized P&L: {str(e)}")
+
     async def calculate_and_update_performance(self, agent_id: str) -> None:
         """
         計算並更新 Agent 績效指標
@@ -752,12 +1409,16 @@ class AgentsService:
                 else Decimal("0")
             )
 
-            # 計算勝率（簡化：基於交易完成率）
-            win_rate = (
-                Decimal(str(completed_trades / total_trades * 100))
-                if total_trades > 0
-                else Decimal("0")
-            )
+            # 計算真實買賣配對和勝率（使用 FIFO 邏輯）
+            trade_pairs_result = await self.calculate_trade_pairs_and_win_rate(agent_id)
+            winning_pairs = trade_pairs_result["winning_pairs"]
+            win_rate = trade_pairs_result["win_rate"]
+
+            # 計算已實現損益（使用 FIFO 邏輯）
+            realized_pnl = await self.calculate_realized_pnl(agent_id)
+
+            # 計算未實現損益（使用 MCP 服務獲取實時股價）
+            unrealized_pnl = await self.calculate_unrealized_pnl(agent_id)
 
             # 查找今日績效記錄
             today = date.today()
@@ -772,11 +1433,13 @@ class AgentsService:
                 performance.total_value = total_value
                 performance.cash_balance = Decimal(str(cash_balance))
                 performance.total_return = total_return
-                # TODO: win_rate 當前為「交易完成率」非真實勝率，待實現買賣配對邏輯後修正
+                performance.realized_pnl = realized_pnl  # 已實現損益
+                performance.unrealized_pnl = unrealized_pnl  # 未實現損益（實時計算）
+                # 使用真實買賣配對邏輯計算的勝率
                 performance.win_rate = win_rate
                 performance.total_trades = total_trades
-                performance.sell_trades_count = completed_trades  # 修正: 賣出交易數
-                performance.winning_trades_correct = 0  # TODO: 實現真實獲利交易數計算
+                performance.sell_trades_count = completed_trades  # 賣出交易數
+                performance.winning_trades_correct = winning_pairs  # 真實獲利交易數
                 performance.updated_at = datetime.now()
             else:
                 # 創建新記錄
@@ -785,21 +1448,53 @@ class AgentsService:
                     date=today,
                     total_value=total_value,
                     cash_balance=Decimal(str(cash_balance)),
-                    # 未實現欄位 - 需要額外實現
-                    unrealized_pnl=Decimal("0"),  # TODO: 需要實時股價 API
-                    realized_pnl=Decimal("0"),  # TODO: 需要買賣配對邏輯 (FIFO)
-                    daily_return=None,  # TODO: 需要歷史績效資料
-                    # 已實現欄位
+                    # 損益欄位
+                    unrealized_pnl=unrealized_pnl,  # 未實現損益（使用 MCP 服務獲取實時股價）
+                    realized_pnl=realized_pnl,  # 已實現損益（使用 FIFO 邏輯）
+                    daily_return=None,  # 首次創建時無法計算，需要前一日資料
+                    # 績效指標
                     total_return=total_return,
-                    # TODO: win_rate 當前為「交易完成率」非真實勝率
+                    # 使用真實買賣配對邏輯計算的勝率
                     win_rate=win_rate,
-                    max_drawdown=None,  # TODO: 需要歷史淨值曲線
+                    max_drawdown=None,  # 待計算：需要歷史淨值曲線
                     total_trades=total_trades,
-                    sell_trades_count=completed_trades,  # 修正: 賣出交易數
-                    winning_trades_correct=0,  # TODO: 實現真實獲利交易數計算
+                    sell_trades_count=completed_trades,  # 賣出交易數
+                    winning_trades_correct=winning_pairs,  # 真實獲利交易數
                 )
                 self.session.add(performance)
 
+            # 先提交當前績效記錄，然後計算日報酬率和最大回撤
+            await self.session.commit()
+
+            # 計算並更新當日報酬率（需要前一日資料）
+            daily_return = await self.calculate_daily_return(agent_id, today)
+            if daily_return is not None:
+                performance.daily_return = daily_return
+                logger.info(f"Updated daily return for agent {agent_id}: {daily_return}%")
+
+            # 計算並更新最大回撤（需要歷史淨值曲線）
+            max_drawdown = await self.calculate_max_drawdown(agent_id)
+            if max_drawdown is not None:
+                performance.max_drawdown = max_drawdown
+                logger.info(f"Updated max drawdown for agent {agent_id}: {max_drawdown:.2f}%")
+
+            # 計算並更新進階風險指標
+            sharpe_ratio = await self.calculate_sharpe_ratio(agent_id)
+            if sharpe_ratio is not None:
+                performance.sharpe_ratio = sharpe_ratio
+                logger.info(f"Updated Sharpe ratio for agent {agent_id}: {sharpe_ratio:.4f}")
+
+            sortino_ratio = await self.calculate_sortino_ratio(agent_id)
+            if sortino_ratio is not None:
+                performance.sortino_ratio = sortino_ratio
+                logger.info(f"Updated Sortino ratio for agent {agent_id}: {sortino_ratio:.4f}")
+
+            calmar_ratio = await self.calculate_calmar_ratio(agent_id)
+            if calmar_ratio is not None:
+                performance.calmar_ratio = calmar_ratio
+                logger.info(f"Updated Calmar ratio for agent {agent_id}: {calmar_ratio:.4f}")
+
+            # 提交所有更新
             await self.session.commit()
             logger.info(f"Updated performance for agent {agent_id}: total_value={total_value}")
 

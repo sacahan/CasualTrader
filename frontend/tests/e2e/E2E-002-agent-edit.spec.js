@@ -129,9 +129,6 @@ test.describe('✏️ E2E-002: Agent 編輯功能', () => {
         .locator('input')
         .first();
 
-      // 記錄原始值
-      const originalName = await nameInput.inputValue();
-
       // 修改為不同的值（這個值將被丟棄）
       await nameInput.selectText();
       await nameInput.fill('This will be cancelled');

@@ -228,6 +228,16 @@ def create_app() -> FastAPI:
     )
     app.include_router(ai_models.router, prefix="/api")
     app.include_router(websocket_router.router, tags=["websocket"])
+
+    # Import and register dashboard router (避免循環導入)
+    try:
+        from api.routers.dashboard import router as dashboard_router
+
+        app.include_router(dashboard_router)
+        logger.success("   ✓ Dashboard router registered")
+    except Exception as e:
+        logger.warning(f"   ⚠ Failed to register dashboard router: {e}")
+
     logger.success("   ✓ All API routes registered")
 
     # Health check endpoint (must be before static files mounting)

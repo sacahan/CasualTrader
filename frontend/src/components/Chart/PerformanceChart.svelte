@@ -12,14 +12,13 @@
 
   /**
    * @typedef {Object} Props
-   * @property {any} agentId
    * @property {any} [performanceData] - { date, portfolio_value, total_return }
    * @property {string} [agentColor]
    * @property {number} [height]
    */
 
   /** @type {Props} */
-  let { agentId, performanceData = [], agentColor = '34, 197, 94', height = 300 } = $props();
+  let { performanceData = [], agentColor = '34, 197, 94', height = 300 } = $props();
 
   let canvas = $state();
   let chart = $state(null);

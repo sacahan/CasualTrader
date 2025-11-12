@@ -5,3 +5,4 @@
  */
 
 export { default as PerformanceChart } from './PerformanceChart.svelte';
+export { default as RiskMetricsCard } from './RiskMetricsCard.svelte';
