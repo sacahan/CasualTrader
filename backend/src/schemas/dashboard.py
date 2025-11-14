@@ -6,7 +6,7 @@ Dashboard API Schemas
 
 from __future__ import annotations
 
-from datetime import date
+import datetime
 from typing import Optional
 
 from pydantic import BaseModel, Field
@@ -76,7 +76,7 @@ class RiskMetrics(BaseModel):
 class PerformanceDataPoint(BaseModel):
     """績效數據點"""
 
-    date: date = Field(..., description="日期", example="2025-10-12")
+    date: datetime.date = Field(..., description="日期", example="2025-10-12")
     value: float = Field(..., description="投資組合價值", example=1000000.0)
     daily_return: float = Field(..., description="每日報酬率 (%)", example=0.52)
 
@@ -128,44 +128,13 @@ class DashboardData(BaseModel):
         ..., description="Agent ID", example="550e8400-e29b-41d4-a716-446655440000"
     )
     time_period: str = Field(..., description="時間段 (1D|1W|1M|3M|1Y|all)", example="1M")
-    period_start: date = Field(..., description="時間段開始日期", example="2025-10-12")
-    period_end: date = Field(..., description="時間段結束日期", example="2025-11-12")
+    period_start: datetime.date = Field(..., description="時間段開始日期", example="2025-10-12")
+    period_end: datetime.date = Field(..., description="時間段結束日期", example="2025-11-12")
 
-    # 各個指標
-    kpi_metrics: KPIMetrics = Field(..., description="KPI 快速指標")
+    # 各個指標 (使用別名以支援前端命名規約)
+    kpi: KPIMetrics = Field(..., description="KPI 快速指標", alias="kpi_metrics")
     risk_metrics: RiskMetrics = Field(..., description="風險指標詳情")
     performance_data: list[PerformanceDataPoint] = Field(..., description="績效趨勢數據")
     trade_stats: TradeStats = Field(..., description="交易統計")
 
-    class Config:
-        json_schema_extra = {
-            "example": {
-                "agent_id": "550e8400-e29b-41d4-a716-446655440000",
-                "time_period": "1M",
-                "period_start": "2025-10-12",
-                "period_end": "2025-11-12",
-                "kpi_metrics": {
-                    "net_value_growth": 5.2,
-                    "total_return": 12.5,
-                    "win_rate": 70.5,
-                    "max_drawdown": -8.5,
-                },
-                "risk_metrics": {
-                    "sharpe_ratio": 1.25,
-                    "sortino_ratio": 1.50,
-                    "calmar_ratio": 0.75,
-                    "information_ratio": 2.30,
-                },
-                "performance_data": [
-                    {"date": "2025-10-12", "value": 1000000.0, "daily_return": 0.0},
-                    {"date": "2025-10-13", "value": 1005200.0, "daily_return": 0.52},
-                ],
-                "trade_stats": {
-                    "total_trades": 42,
-                    "winning_trades": 28,
-                    "losing_trades": 14,
-                    "win_rate": 66.7,
-                    "avg_return": 2.5,
-                },
-            }
-        }
+    model_config = {"populate_by_name": True}

@@ -761,10 +761,12 @@ class AgentsService:
                         # 計算此對交易的損益（含手續費）
                         # 損益 = (賣出價 - 買入價) × 數量 - 雙邊手續費
                         gross_pnl = (sell.price - buy.price) * matched_qty
-                        buy_commission_portion = buy.commission * (
-                            matched_qty / buy.quantity
+                        buy_commission_portion = buy.commission * Decimal(
+                            str(matched_qty / buy.quantity)
                         )  # 按比例分攤手續費
-                        sell_commission_portion = sell.commission * (matched_qty / sell.quantity)
+                        sell_commission_portion = sell.commission * Decimal(
+                            str(matched_qty / sell.quantity)
+                        )
                         net_pnl = gross_pnl - buy_commission_portion - sell_commission_portion
 
                         # 判斷是否獲利
@@ -1706,6 +1708,86 @@ class AgentsService:
                 f"Failed to get performance history for agent {agent_id}: {e}", exc_info=True
             )
             raise AgentDatabaseError(f"Failed to retrieve performance history: {str(e)}")
+
+    async def get_agent_financial_summary(self, agent_id: str) -> dict[str, Any]:
+        """
+        獲取 Agent 的財務摘要數據
+
+        用於 WebSocket 廣播，提供完整的財務狀態資訊。
+
+        Args:
+            agent_id: Agent ID
+
+        Returns:
+            包含以下財務數據的字典：
+            - current_funds: 當前資金
+            - initial_funds: 初始資金
+            - total_portfolio_value: 總投資組合價值（現金 + 持倉市值）
+            - holdings_value: 持倉總市值
+            - cash_percentage: 現金比例
+            - stocks_percentage: 股票比例
+            - total_return: 總回報金額
+            - total_return_percent: 總回報率
+
+        Raises:
+            AgentNotFoundError: Agent 不存在
+            AgentDatabaseError: 資料庫操作失敗
+        """
+        try:
+            # 獲取 Agent 配置
+            agent = await self.get_agent_config(agent_id)
+
+            # 獲取持倉資料
+            holdings = await self.get_agent_holdings(agent_id)
+
+            # 計算財務數據
+            current_funds = float(agent.current_funds)
+            initial_funds = float(agent.initial_funds)
+
+            # 計算持倉總市值（使用平均成本作為估計）
+            holdings_value = sum(
+                float(holding.quantity) * float(holding.average_cost) for holding in holdings
+            )
+
+            # 計算總投資組合價值
+            total_portfolio_value = current_funds + holdings_value
+
+            # 計算比例
+            cash_percentage = (
+                (current_funds / total_portfolio_value * 100) if total_portfolio_value > 0 else 0.0
+            )
+            stocks_percentage = (
+                (holdings_value / total_portfolio_value * 100) if total_portfolio_value > 0 else 0.0
+            )
+
+            # 計算總回報
+            total_return = total_portfolio_value - initial_funds
+            total_return_percent = (
+                (total_return / initial_funds * 100) if initial_funds > 0 else 0.0
+            )
+
+            return {
+                "current_funds": current_funds,
+                "initial_funds": initial_funds,
+                "total_portfolio_value": total_portfolio_value,
+                "holdings_value": holdings_value,
+                "cash_percentage": round(cash_percentage, 2),
+                "stocks_percentage": round(stocks_percentage, 2),
+                "total_return": total_return,
+                "total_return_percent": round(total_return_percent, 2),
+                "holdings_count": len(holdings),
+            }
+
+        except AgentNotFoundError:
+            raise
+        except Exception as e:
+            logger.error(
+                f"Error getting financial summary for agent '{agent_id}': {e}",
+                exc_info=True,
+            )
+            raise AgentDatabaseError(
+                f"Failed to get financial summary for agent '{agent_id}'"
+            ) from e
 
     # ==========================================
     # Context Manager Support

@@ -127,16 +127,18 @@ class WebSocketManager:
         status: str,
         runtime_status: str | None = None,
         details: dict[str, Any] | None = None,
+        financial_data: dict[str, Any] | None = None,
     ):
         """
         廣播代理人狀態變更事件。
-        會將持久化狀態、執行時狀態與細節資料廣播給所有客戶端。
+        會將持久化狀態、執行時狀態、財務數據與細節資料廣播給所有客戶端。
 
         Args:
             agent_id: Agent ID
             status: 持久化狀態 (active/inactive/error/suspended)
             runtime_status: 執行時狀態 (idle/running/stopped)
             details: 其他詳細資訊
+            financial_data: 財務數據 (current_funds, total_portfolio_value, holdings_value 等)
         """
         message = {
             "type": "agent_status",
@@ -145,6 +147,11 @@ class WebSocketManager:
             "runtime_status": runtime_status,
             "data": details or {},
         }
+
+        # 如果提供了財務數據，將其合併到消息中
+        if financial_data:
+            message["financial_data"] = financial_data
+
         await self.broadcast(message)
 
     async def broadcast_trade_execution(self, agent_id: str, trade_data: dict[str, Any]):
@@ -200,9 +207,112 @@ class WebSocketManager:
         message = {
             "type": "error",
             "agent_id": agent_id,
-            "error": error_message,
-            "data": error_details or {},
+            "message": error_message,
+            "details": error_details or {},
         }
+        await self.broadcast(message)
+
+    async def broadcast_execution_completed(
+        self,
+        agent_id: str,
+        execution_time_ms: int,
+        financial_data: dict[str, Any] | None = None,
+    ):
+        """
+        廣播執行完成事件，包含完整的財務狀態。
+
+        Args:
+            agent_id: Agent ID
+            execution_time_ms: 執行時間（毫秒）
+            financial_data: 財務數據，包含：
+                - current_funds: 當前資金
+                - initial_funds: 初始資金
+                - total_portfolio_value: 總投資組合價值
+                - holdings_value: 持倉總市值
+                - cash_percentage: 現金比例
+                - stocks_percentage: 股票比例
+        """
+        message = {
+            "type": "execution_completed",
+            "agent_id": agent_id,
+            "execution_time_ms": execution_time_ms,
+        }
+
+        if financial_data:
+            message["financial_data"] = financial_data
+
+        await self.broadcast(message)
+
+    async def broadcast_execution_started(
+        self,
+        agent_id: str,
+        session_id: str,
+        mode: str,
+    ):
+        """
+        廣播執行開始事件。
+
+        Args:
+            agent_id: Agent ID
+            session_id: 會話 ID
+            mode: 執行模式 (TRADING/REBALANCING)
+        """
+        message = {
+            "type": "execution_started",
+            "agent_id": agent_id,
+            "session_id": session_id,
+            "mode": mode,
+        }
+        await self.broadcast(message)
+
+    async def broadcast_execution_failed(
+        self,
+        agent_id: str,
+        error: str,
+        financial_data: dict[str, Any] | None = None,
+    ):
+        """
+        廣播執行失敗事件，包含財務狀態。
+
+        Args:
+            agent_id: Agent ID
+            error: 錯誤訊息
+            financial_data: 財務數據
+        """
+        message = {
+            "type": "execution_failed",
+            "agent_id": agent_id,
+            "error": error,
+        }
+
+        if financial_data:
+            message["financial_data"] = financial_data
+
+        await self.broadcast(message)
+
+    async def broadcast_execution_stopped(
+        self,
+        agent_id: str,
+        status: str,
+        financial_data: dict[str, Any] | None = None,
+    ):
+        """
+        廣播執行停止事件，包含財務狀態。
+
+        Args:
+            agent_id: Agent ID
+            status: 停止狀態
+            financial_data: 財務數據
+        """
+        message = {
+            "type": "execution_stopped",
+            "agent_id": agent_id,
+            "status": status,
+        }
+
+        if financial_data:
+            message["financial_data"] = financial_data
+
         await self.broadcast(message)
 
 
