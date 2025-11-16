@@ -12,7 +12,7 @@
   import { formatNumber } from '../../shared/utils.js';
 
   // Props
-  let { metrics = {} } = $props();
+  let { metrics = {}, agentColor = '34, 197, 94' } = $props();
 
   // 定義風險指標配置
   const riskMetricsConfig = [

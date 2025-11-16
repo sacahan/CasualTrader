@@ -805,6 +805,38 @@ class TradingService:
         self.active_agents[agent_id] = agent
         return agent
 
+    async def get_transactions_by_session(self, session_id: str) -> list[Any]:
+        """
+        取得指定 session 的所有交易記錄
+
+        Args:
+            session_id: Session ID
+
+        Returns:
+            交易記錄列表
+
+        Raises:
+            Exception: 查詢失敗
+        """
+        from database.models import Transaction
+        from sqlalchemy import select
+
+        try:
+            stmt = (
+                select(Transaction)
+                .where(Transaction.session_id == session_id)
+                .order_by(Transaction.created_at.asc())
+            )
+            result = await self.db_session.execute(stmt)
+            transactions = list(result.scalars().all())
+
+            logger.debug(f"Retrieved {len(transactions)} transactions for session {session_id}")
+            return transactions
+
+        except Exception as e:
+            logger.error(f"Failed to get transactions for session {session_id}: {e}")
+            raise
+
     async def cleanup(self) -> None:
         """清理所有活躍 agent"""
         logger.info(f"Cleaning up {len(self.active_agents)} active agents")

@@ -124,7 +124,30 @@ class APIClient {
 
   /**
    * Get execution history
-   * Note: 後端路徑為 /api/agent-execution/{agent_id}/history
+   *
+   * 獲取 Agent 的執行歷史記錄列表，按時間倒序排列。
+   *
+   * @param {string} agentId - Agent ID
+   * @param {number} limit - 返回的最大記錄數，預設 20
+   * @param {string|null} statusFilter - 狀態過濾器 (pending|running|completed|failed|stopped)
+   * @returns {Promise<Array>} 執行歷史記錄陣列
+   *
+   * 回應格式：
+   * [{
+   *   id: string,
+   *   agent_id: string,
+   *   mode: string,
+   *   status: string,
+   *   start_time: string (ISO 8601),
+   *   end_time: string (ISO 8601),
+   *   execution_time_ms: number,
+   *   final_output: object,
+   *   completed_at: string (ISO 8601),
+   *   error_message: string | null,
+   *   created_at: string (ISO 8601)
+   * }]
+   *
+   * Note: 後端路徑為 GET /api/agent-execution/{agent_id}/history
    */
   getExecutionHistory(agentId, limit = 20, statusFilter = null) {
     let endpoint = `/api/agent-execution/${agentId}/history?limit=${limit}`;

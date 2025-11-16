@@ -7,15 +7,16 @@
    */
 
   /**
-   * @typedef {Object} RiskMetrics
-   * @property {number} [sharpe_ratio]
-   * @property {number} [sortino_ratio]
-   * @property {number} [calmar_ratio]
-   * @property {string} date
+   * @typedef {Object} RiskMetricsProps
+   * @property {any} [metrics]
+   * @property {string} [agentColor]
    */
 
-  /** @type {RiskMetrics} */
-  let { metrics = {} } = $props();
+  /** @type {RiskMetricsProps} */
+  let {
+    metrics = { sharpe_ratio: 0, sortino_ratio: 0, calmar_ratio: 0 },
+    agentColor = '34, 197, 94',
+  } = $props();
 
   // 格式化函數
   function formatRatio(value) {

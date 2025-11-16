@@ -63,7 +63,7 @@ export async function fetchModelByKey(modelKey) {
  */
 export async function fetchAllModels(includeDisabled = false) {
   const url = new URL(`${API_BASE_URL}/api/models/`);
-  url.searchParams.append('include_disabled', includeDisabled);
+  url.searchParams.append('include_disabled', includeDisabled ? 'true' : 'false');
 
   const response = await fetch(url);
 

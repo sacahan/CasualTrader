@@ -124,12 +124,7 @@
           <div class="rounded-lg border border-gray-700 bg-gray-800 p-6">
             <h3 class="mb-4 text-lg font-semibold text-gray-400">績效走勢</h3>
             <div class="h-full min-h-[400px]">
-              <PerformanceChart
-                agentId={agent?.agent_id}
-                {performanceData}
-                {agentColor}
-                height={400}
-              />
+              <PerformanceChart {performanceData} {agentColor} height={400} />
             </div>
 
             <!-- 進階風險指標 -->

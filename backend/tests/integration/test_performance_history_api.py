@@ -13,7 +13,7 @@ from datetime import date, timedelta
 from unittest.mock import AsyncMock
 from fastapi.testclient import TestClient
 
-from api.app import app
+from api.app import create_app
 from api.dependencies import get_agents_service
 
 
@@ -24,7 +24,8 @@ class TestPerformanceHistoryAPI:
     @pytest.fixture
     def client(self):
         """創建測試客戶端"""
-        return TestClient(app)
+        app = create_app()
+        return TestClient(app), app
 
     def create_mock_performance_record(self, days_ago=0):
         """創建 mock 績效記錄"""
@@ -57,6 +58,7 @@ class TestPerformanceHistoryAPI:
         - sortino_ratio (新增進階指標)
         - calmar_ratio (新增進階指標)
         """
+        test_client, app = client
         agent_id = "test-agent-001"
 
         # Mock AgentsService
@@ -74,7 +76,7 @@ class TestPerformanceHistoryAPI:
 
         try:
             # 調用 API
-            response = client.get(
+            response = test_client.get(
                 f"/api/trading/agents/{agent_id}/performance-history?limit=30&order=desc"
             )
 
@@ -117,6 +119,7 @@ class TestPerformanceHistoryAPI:
 
         場景: 數據不足時，某些指標可能為 NULL
         """
+        test_client, app = client
         agent_id = "test-agent-002"
 
         # 創建有 NULL 進階指標的記錄
@@ -137,7 +140,7 @@ class TestPerformanceHistoryAPI:
 
         try:
             # 調用 API
-            response = client.get(
+            response = test_client.get(
                 f"/api/trading/agents/{agent_id}/performance-history?limit=30&order=desc"
             )
 
@@ -163,6 +166,7 @@ class TestPerformanceHistoryAPI:
         - 小數指標 : sharpe_ratio, sortino_ratio, calmar_ratio
         - 金額指標 (TWD) : portfolio_value, cash_balance, realized_pnl, unrealized_pnl
         """
+        test_client, app = client
         agent_id = "test-agent-003"
 
         # Mock AgentsService
@@ -177,7 +181,7 @@ class TestPerformanceHistoryAPI:
 
         try:
             # 調用 API
-            response = client.get(
+            response = test_client.get(
                 f"/api/trading/agents/{agent_id}/performance-history?limit=1&order=desc"
             )
 
@@ -207,25 +211,27 @@ class TestPerformanceHistoryAPI:
 
     async def test_performance_history_invalid_limit(self, client):
         """測試無效的 limit 參數"""
+        test_client, app = client
         agent_id = "test-agent-004"
 
         # 測試 limit 超過最大值
-        response = client.get(
+        response = test_client.get(
             f"/api/trading/agents/{agent_id}/performance-history?limit=400&order=desc"
         )
         assert response.status_code == 400
 
         # 測試 limit 為 0
-        response = client.get(
+        response = test_client.get(
             f"/api/trading/agents/{agent_id}/performance-history?limit=0&order=desc"
         )
         assert response.status_code == 400
 
     async def test_performance_history_invalid_order(self, client):
         """測試無效的 order 參數"""
+        test_client, app = client
         agent_id = "test-agent-005"
 
-        response = client.get(
+        response = test_client.get(
             f"/api/trading/agents/{agent_id}/performance-history?limit=30&order=invalid"
         )
         assert response.status_code == 400

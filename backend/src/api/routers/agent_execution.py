@@ -348,11 +348,108 @@ async def stop_agent(
 
 
 @router.get(
+    "/{agent_id}/history",
+    response_model=list[dict],
+    status_code=status.HTTP_200_OK,
+    summary="取得 Agent 執行歷史",
+    description="取得 Agent 的執行歷史記錄列表，按時間倒序排列",
+)
+async def get_execution_history(
+    agent_id: str,
+    limit: int = 20,
+    status_filter: str | None = None,
+    session_service: AgentSessionService = Depends(
+        lambda db_session=Depends(get_db_session): AgentSessionService(db_session)
+    ),
+    trading_service: TradingService = Depends(get_trading_service),
+):
+    """
+    取得 Agent 執行歷史
+
+    Args:
+        agent_id: Agent ID
+        limit: 返回的最大記錄數（預設 20）
+        status_filter: 狀態過濾器（可選）：pending, running, completed, failed, stopped
+
+    Returns:
+        執行歷史記錄列表（按時間倒序）
+
+    Raises:
+        500: 查詢失敗
+    """
+    try:
+        # 轉換 status_filter 字串為 SessionStatus enum（如果提供）
+        status_enum = None
+        if status_filter:
+            try:
+                from common.enums import SessionStatus
+
+                status_enum = SessionStatus[status_filter.upper()]
+            except KeyError:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Invalid status filter: {status_filter}",
+                )
+
+        sessions = await session_service.list_agent_sessions(
+            agent_id=agent_id,
+            limit=limit,
+            status=status_enum,
+        )
+
+        # 為歷史列表構建回應（包含基本交易統計，但不含詳細交易記錄）
+        result = []
+        for session in sessions:
+            # 獲取該 session 的交易統計
+            transactions = await trading_service.get_transactions_by_session(session.id)
+            # 安全地獲取狀態值（處理 Enum 或字符串）
+            filled_count = len(
+                [
+                    tx
+                    for tx in transactions
+                    if (tx.status.value if hasattr(tx.status, "value") else tx.status) == "executed"
+                ]
+            )
+            total_notional = sum(float(tx.total_amount) for tx in transactions)
+
+            result.append(
+                {
+                    "id": session.id,
+                    "agent_id": session.agent_id,
+                    "mode": session.mode,
+                    "status": session.status,
+                    "start_time": session.start_time,
+                    "end_time": session.end_time,
+                    "execution_time_ms": session.execution_time_ms,
+                    "final_output": session.final_output,
+                    "completed_at": session.end_time,  # 別名，前端可能使用
+                    "error_message": session.error_message,
+                    "created_at": session.created_at,
+                    # 新增：基本統計資料（不含完整交易列表）
+                    "trade_count": len(transactions),
+                    "filled_count": filled_count,
+                    "total_notional": total_notional,
+                }
+            )
+
+        return result
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to get execution history for agent {agent_id}: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=str(e),
+        ) from e
+
+
+@router.get(
     "/{agent_id}/sessions/{session_id}",
     response_model=dict,
     status_code=status.HTTP_200_OK,
     summary="取得會話詳細資訊",
-    description="取得單個會話的執行結果，包含呼叫的工具列表",
+    description="取得單個會話的執行結果，包含呼叫的工具列表和交易記錄",
 )
 async def get_session_detail(
     agent_id: str,
@@ -360,6 +457,7 @@ async def get_session_detail(
     session_service: AgentSessionService = Depends(
         lambda db_session=Depends(get_db_session): AgentSessionService(db_session)
     ),
+    trading_service: TradingService = Depends(get_trading_service),
 ):
     """
     取得會話詳細資訊
@@ -369,7 +467,7 @@ async def get_session_detail(
         session_id: Session ID
 
     Returns:
-        會話詳細資訊，包含執行結果、呼叫的工具列表等
+        會話詳細資訊，包含執行結果、呼叫的工具列表、交易記錄等
 
     Raises:
         404: Session 不存在
@@ -383,6 +481,43 @@ async def get_session_detail(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail=f"Session {session_id} not found for agent {agent_id}",
             )
+
+        # 獲取該 session 的所有交易記錄
+        transactions = await trading_service.get_transactions_by_session(session_id)
+
+        # 構建交易記錄列表
+        trades = [
+            {
+                "id": tx.id,
+                "ticker": tx.ticker,
+                "symbol": tx.ticker,  # 別名，前端可能使用
+                "company_name": tx.company_name,
+                "action": tx.action.value if hasattr(tx.action, "value") else tx.action,
+                "type": tx.action.value if hasattr(tx.action, "value") else tx.action,  # 別名
+                "quantity": tx.quantity,
+                "shares": tx.quantity,  # 別名
+                "price": float(tx.price),
+                "amount": float(tx.total_amount),
+                "total_amount": float(tx.total_amount),  # 別名
+                "commission": float(tx.commission),
+                "status": tx.status.value if hasattr(tx.status, "value") else tx.status,
+                "execution_time": tx.execution_time.isoformat() if tx.execution_time else None,
+                "decision_reason": tx.decision_reason,
+                "created_at": tx.created_at.isoformat() if tx.created_at else None,
+            }
+            for tx in transactions
+        ]
+
+        # 計算統計資料
+        # 安全地獲取狀態值（處理 Enum 或字符串）
+        filled_count = len(
+            [
+                tx
+                for tx in transactions
+                if (tx.status.value if hasattr(tx.status, "value") else tx.status) == "executed"
+            ]
+        )
+        total_notional = sum(float(tx.total_amount) for tx in transactions)
 
         return {
             "id": session.id,
@@ -398,6 +533,14 @@ async def get_session_detail(
             "error_message": session.error_message,
             "created_at": session.created_at,
             "updated_at": session.updated_at,
+            # 新增：交易記錄列表
+            "trades": trades,
+            # 新增：統計資料
+            "stats": {
+                "filled": filled_count,
+                "notional": total_notional,
+                "total_trades": len(transactions),
+            },
         }
 
     except HTTPException:

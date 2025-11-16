@@ -1,9 +1,9 @@
 # API 契約規範 (Frontend-Backend Contract)
 
-**版本**: 2.0
-**最後更新**: 2025-11-09
+**版本**: 2.1
+**最後更新**: 2025-11-16
 **狀態**: Active
-**變更**: 移除已刪除欄位 (strategy_prompt, enabled_tools, max_turns, custom_instructions, runtime_status)
+**變更**: 新增 Agent 執行歷史查詢端點 (GET /api/agent-execution/{agent_id}/history)
 
 ## 概述
 
@@ -491,7 +491,208 @@ POST /api/agent_execution/agent_123/stop
   "success": true,
   "agent_id": "agent_123",
   "status": "stopped",
+  "sessions_aborted": 1,
   "message": "Agent execution stopped"
+}
+```
+
+---
+
+#### GET /api/agent-execution/{agent_id}/history - 取得執行歷史
+
+**描述**: 獲取 Agent 的執行歷史記錄列表，按時間倒序排列。
+
+**路徑參數**:
+
+- `agent_id` (string, required): Agent ID
+
+**查詢參數**:
+
+- `limit` (number, optional): 返回的最大記錄數，預設 20
+- `status_filter` (string, optional): 狀態過濾器 (pending | running | completed | failed | stopped)
+
+**請求**:
+
+```http
+GET /api/agent-execution/agent_123/history?limit=10&status_filter=completed
+```
+
+**回應** (200):
+
+```json
+[
+  {
+    "id": "session_abc123",
+    "agent_id": "agent_123",
+    "mode": "TRADING",
+    "status": "completed",
+    "start_time": "2025-11-16T10:00:00Z",
+    "end_time": "2025-11-16T10:05:30Z",
+    "execution_time_ms": 330000,
+    "trade_count": 5,
+    "filled_count": 3,
+    "total_notional": 1500000.0,
+    "final_output": {
+      "summary": "Successfully executed 3 trades",
+      "trades": [...]
+    },
+    "completed_at": "2025-11-16T10:05:30Z",
+    "error_message": null,
+    "created_at": "2025-11-16T10:00:00Z"
+  },
+  {
+    "id": "session_def456",
+    "agent_id": "agent_123",
+    "mode": "REBALANCING",
+    "status": "failed",
+    "start_time": "2025-11-16T09:00:00Z",
+    "end_time": "2025-11-16T09:02:15Z",
+    "execution_time_ms": 135000,
+    "trade_count": 0,
+    "filled_count": 0,
+    "total_notional": 0,
+    "final_output": null,
+    "completed_at": "2025-11-16T09:02:15Z",
+    "error_message": "Execution timeout",
+    "created_at": "2025-11-16T09:00:00Z"
+  }
+]
+```
+
+**新增欄位說明**:
+
+- `trade_count` (number): 交易總數
+- `filled_count` (number): 成交筆數
+- `total_notional` (number): 交易總金額
+
+**錯誤** (400):
+
+```json
+{
+  "detail": "Invalid status filter: invalid_status",
+  "error_code": "BAD_REQUEST"
+}
+```
+
+**錯誤** (500):
+
+```json
+{
+  "detail": "Failed to retrieve execution history",
+  "error_code": "INTERNAL_ERROR"
+}
+```
+
+---
+
+#### GET /api/agent-execution/{agent_id}/sessions/{session_id} - 取得會話詳細資訊
+
+**描述**: 獲取單個會話的完整執行結果，包含呼叫的工具列表、完整輸出等詳細資訊。
+
+**路徑參數**:
+
+- `agent_id` (string, required): Agent ID
+- `session_id` (string, required): Session ID
+
+**請求**:
+
+```http
+GET /api/agent-execution/agent_123/sessions/session_abc123
+```
+
+**回應** (200):
+
+```json
+{
+  "id": "session_abc123",
+  "agent_id": "agent_123",
+  "mode": "TRADING",
+  "status": "completed",
+  "start_time": "2025-11-16T10:00:00Z",
+  "end_time": "2025-11-16T10:05:30Z",
+  "execution_time_ms": 330000,
+  "initial_input": {},
+  "final_output": {
+    "summary": "Successfully executed 3 trades",
+    "trades": [
+      {
+        "ticker": "2330",
+        "action": "buy",
+        "quantity": 1000,
+        "price": 585.0
+      }
+    ],
+    "stats": {
+      "filled": 3,
+      "notional": 1755000,
+      "pnl": 0
+    }
+  },
+  "trades": [
+    {
+      "id": "tx-001",
+      "ticker": "2330",
+      "symbol": "2330",
+      "company_name": "台積電",
+      "action": "BUY",
+      "quantity": 1000,
+      "price": 580.0,
+      "amount": 580000.0,
+      "total_amount": 580000.0,
+      "commission": 817.0,
+      "status": "executed",
+      "execution_time": "2025-11-16T13:48:50",
+      "decision_reason": "買入理由...",
+      "created_at": "2025-11-16T13:48:50"
+    }
+  ],
+  "stats": {
+    "filled": 3,
+    "notional": 1755000.0,
+    "total_trades": 3
+  },
+  "tools_called": [
+    "get_taiwan_stock_price",
+    "buy_taiwan_stock",
+    "get_company_profile"
+  ],
+  "error_message": null,
+  "created_at": "2025-11-16T10:00:00Z",
+  "updated_at": "2025-11-16T10:05:30Z"
+}
+```
+
+**欄位說明**:
+
+**新增資料庫欄位**:
+
+- `trades` (array): 完整的交易記錄列表，從資料庫直接查詢，包含各交易的詳細資訊
+- `stats` (object): 交易統計資訊
+  - `filled` (number): 成交筆數
+  - `notional` (number): 交易總金額
+  - `total_trades` (number): 交易總數
+
+**資料優先級**:
+
+前端應該按以下優先級使用資料：
+
+1. **交易記錄**
+   - 優先：`final_output.trades`（LLM 生成的交易計畫）
+   - 其次：`trades`（資料庫實際執行記錄）
+
+2. **統計資料**
+   - 優先：`final_output.stats`（LLM 提供的摘要）
+   - 其次：`stats`（後端計算的實際數據）
+
+3. **工具調用**
+   - 來源：`tools_called`（LLM 在執行過程中調用的工具列表）
+
+**錯誤** (404):
+
+```json
+{
+  "detail": "Session session_abc123 not found for agent agent_123",
+  "error_code": "NOT_FOUND"
 }
 ```
 
@@ -985,5 +1186,7 @@ describe('API Contract Validation', () => {
 
 | 版本 | 日期 | 變更 |
 |------|------|------|
+| 2.1 | 2025-11-16 | 增強 GET /api/agent-execution/{agent_id}/history：新增 `trade_count`、`filled_count`、`total_notional` 欄位。增強 GET /api/agent-execution/{agent_id}/sessions/{session_id}：新增 `trades` 陣列和 `stats` 物件，包含資料庫實際交易記錄和統計資訊 |
+| 2.0 | 2025-11-09 | 移除已刪除欄位 (strategy_prompt, enabled_tools, max_turns, custom_instructions, runtime_status) |
 | 1.1 | 2025-10-26 | 移除 AIModel 中的 max_tokens、cost_per_1k_tokens、description 欄位 |
 | 1.0 | 2025-10-22 | 初始版本，包含所有實現的端點 |

@@ -10,10 +10,17 @@
 
   import { onMount } from 'svelte';
   import { WS_EVENT_TYPES } from '../../shared/constants.js';
-  import { formatCurrency, formatNumber } from '../../shared/utils.js';
+  import {
+    formatCurrency,
+    formatNumber,
+    formatDateTime,
+    extractErrorMessage,
+  } from '../../shared/utils.js';
   import { isOpen } from '../../stores/market.js';
   import { addEventListener } from '../../stores/websocket.js';
   import { executionRetryManager } from '../../shared/retry.js';
+  import { apiClient } from '../../shared/api.js';
+  import ExecutionResultModal from './ExecutionResultModal.svelte';
 
   // Props
   let {
@@ -94,16 +101,48 @@
   });
 
   // 本地狀態 - 執行加載和錯誤
-  let isExecuting = $state(false);
-  let executionError = $state(null);
-  let executionResult = $state(null);
-  let showRetryButton = $state(false);
-  let retryCount = $state(0);
-  let showExecutionDetail = $state(false); // 控制執行結果詳細區的展開/收起
+  let isExecuting = $state(false); // 標記 Agent 是否正在執行交易
+  let executionError = $state(null); // 儲存執行錯誤訊息
+  let executionResult = $state(null); // 儲存執行結果摘要（包含 success, time_ms, mode, sessionId 等）
+  let showRetryButton = $state(false); // 控制是否顯示重試按鈕
+  let retryCount = $state(0); // 記錄當前重試次數
+  let executionDetail = $state(null); // 儲存執行詳細資訊（從 API 載入的完整 session 資料）
+  let executionDetailError = $state(null); // 儲存載入執行詳情時的錯誤
+  let isExecutionDetailLoading = $state(false); // 標記是否正在載入執行詳情
+  let showExecutionModal = $state(false); // 控制執行結果 Modal 的顯示狀態
+  let latestSessionId = $state(null); // 儲存最新的 session ID（用於重新開啟時載入歷史紀錄）
+  let hasHistoricalSessions = $state(false); // 標記是否有歷史執行紀錄（completed 或 failed）
+
+  let executionOutputData = $derived.by(() =>
+    normalizeExecutionOutput(executionDetail?.final_output ?? executionResult?.output)
+  );
+  let executionSummaryText = $derived(executionOutputData.summary);
+
+  // 優先使用 API 直接提供的交易記錄（從資料庫 JOIN），如果沒有則使用從 final_output 解析的
+  let executionTrades = $derived(
+    executionDetail?.trades &&
+      Array.isArray(executionDetail.trades) &&
+      executionDetail.trades.length > 0
+      ? executionDetail.trades
+      : executionOutputData.trades
+  );
+
+  let executionRebalancePlan = $derived(executionOutputData.rebalance);
+
+  // 優先使用 API 直接提供的統計資料（從資料庫計算），如果沒有則使用從 final_output 解析的
+  let executionStatsData = $derived(
+    executionDetail?.stats && Object.keys(executionDetail.stats).length > 0
+      ? executionDetail.stats
+      : executionOutputData.stats
+  );
+
+  let executionDetailText = $derived(executionOutputData.detailText);
+  let executionToolsUsed = $derived.by(() => normalizeToolsCalled(executionDetail?.tools_called));
 
   // Canvas for mini chart
   let chartCanvas;
   let chartInstance;
+  let detailRequestId = 0;
 
   // WebSocket 事件監聽取消函數
   let unsubscribeExecStarted;
@@ -119,40 +158,79 @@
         isExecuting = true;
         executionError = null;
         executionResult = null;
+        clearExecutionDetailState();
+        showExecutionModal = false;
       }
     });
 
-    unsubscribeExecCompleted = addEventListener(WS_EVENT_TYPES.EXECUTION_COMPLETED, (payload) => {
-      if (payload.agent_id === agent.agent_id) {
-        isExecuting = false;
-        executionResult = {
-          success: true,
-          time_ms: payload.execution_time_ms,
-          mode: payload.mode,
-        };
+    // 監聽執行完成事件：當 Agent 成功完成交易執行時觸發
+    unsubscribeExecCompleted = addEventListener(
+      WS_EVENT_TYPES.EXECUTION_COMPLETED,
+      async (payload) => {
+        // 只處理本 Agent 的事件（過濾其他 Agent 的廣播訊息）
+        if (payload.agent_id === agent.agent_id) {
+          // 重置執行狀態，清除舊的詳細資料
+          isExecuting = false;
+          clearExecutionDetailState();
+          showExecutionModal = false;
 
-        // 成功時重置重試計數和狀態
-        executionRetryManager.reset(agent.agent_id);
-        showRetryButton = false;
-        retryCount = 0;
+          // 構建執行結果摘要物件，供 UI 顯示使用
+          executionResult = {
+            success: true,
+            time_ms: payload.execution_time_ms,
+            mode: payload.mode,
+            sessionId: payload.session_id,
+            output: payload.output,
+            completedAt: payload.completed_at ?? new Date().toISOString(),
+          };
+
+          // 更新最新 session ID，標記有歷史紀錄可查看
+          // 這讓用戶在刷新頁面後仍能查看最近的執行結果
+          latestSessionId = payload.session_id;
+          hasHistoricalSessions = true;
+
+          // 自動載入執行詳細資訊（包含交易明細、工具使用等）
+          if (payload.session_id) {
+            await loadExecutionDetail(payload.session_id);
+          }
+
+          // 成功時重置重試計數和狀態（清除之前的錯誤記錄）
+          executionRetryManager.reset(agent.agent_id);
+          showRetryButton = false;
+          retryCount = 0;
+        }
       }
-    });
+    );
 
-    unsubscribeExecFailed = addEventListener(WS_EVENT_TYPES.EXECUTION_FAILED, (payload) => {
+    // 監聽執行失敗事件：當 Agent 執行過程中發生錯誤時觸發
+    unsubscribeExecFailed = addEventListener(WS_EVENT_TYPES.EXECUTION_FAILED, async (payload) => {
+      // 只處理本 Agent 的事件
       if (payload.agent_id === agent.agent_id) {
+        // 標記執行結束，儲存錯誤訊息
         isExecuting = false;
         executionError = payload.error;
+        clearExecutionDetailState();
+        showExecutionModal = false;
 
-        // 更新重試計數
+        // 更新重試計數（用於顯示「已重試 X 次」）
         const failureCount = executionRetryManager.getRetryCount(agent.agent_id) + 1;
         retryCount = failureCount;
 
-        // 檢查是否可以重試
+        // 即使失敗也嘗試載入最新 session 資料
+        // 失敗的 session 可能包含部分執行資訊，對除錯有幫助
+        if (payload.session_id) {
+          latestSessionId = payload.session_id;
+          hasHistoricalSessions = true;
+          await loadExecutionDetail(payload.session_id);
+        }
+
+        // 檢查是否可以重試（是否已達最大重試次數）
         if (executionRetryManager.canRetry(agent.agent_id)) {
+          // 記錄本次重試，顯示重試按鈕
           executionRetryManager.recordRetry(agent.agent_id, payload.error);
           showRetryButton = true;
         } else {
-          // 已達最大重試次數
+          // 已達最大重試次數，隱藏重試按鈕並更新錯誤訊息
           showRetryButton = false;
           executionError = `執行失敗 (已重試 ${failureCount} 次): ${payload.error}`;
         }
@@ -162,10 +240,16 @@
     unsubscribeExecStopped = addEventListener(WS_EVENT_TYPES.EXECUTION_STOPPED, (payload) => {
       if (payload.agent_id === agent.agent_id) {
         isExecuting = false;
+        clearExecutionDetailState();
+        showExecutionModal = false;
       }
     });
 
-    // 初始化圖表
+    // 載入最新的 session 紀錄（非同步執行，不阻塞 onMount）
+    // 這讓組件掛載時自動顯示上次執行結果，即使頁面刷新也能查看歷史紀錄
+    loadLatestSession();
+
+    // 初始化圖表：如果有性能資料則渲染迷你圖表
     if (chartCanvas && Array.isArray(performanceData) && performanceData.length > 0) {
       renderMiniChart();
     }
@@ -294,6 +378,8 @@
     e.stopPropagation();
     showRetryButton = false;
     executionResult = null;
+    clearExecutionDetailState();
+    showExecutionModal = false;
     ontrade?.(agent, 'TRADING');
   }
 
@@ -301,6 +387,8 @@
     e.stopPropagation();
     showRetryButton = false;
     executionResult = null;
+    clearExecutionDetailState();
+    showExecutionModal = false;
     onrebalance?.(agent, 'REBALANCING');
   }
 
@@ -311,11 +399,15 @@
     const lastMode = agent.current_mode || 'TRADING';
     showRetryButton = false;
     executionError = null;
+    executionResult = null;
+    clearExecutionDetailState();
+    showExecutionModal = false;
     ontrade?.(agent, lastMode);
   }
 
   function handleStop(e) {
     e.stopPropagation();
+    showExecutionModal = false;
     onstop?.(agent);
   }
 
@@ -330,7 +422,307 @@
       ondelete?.(agent);
     }
   }
+
+  /**
+   * 載入最新的 session 紀錄
+   *
+   * 功能說明：
+   * - 在組件掛載時自動呼叫，檢查是否有最近的執行紀錄
+   * - 只載入已完成（completed）或失敗（failed）的 session
+   * - 自動載入詳細資訊並構建執行結果摘要供 UI 顯示
+   *
+   * 使用時機：
+   * - 組件初始化時（onMount）
+   * - 確保用戶刷新頁面後仍能查看最近的執行結果
+   *
+   * @async
+   * @returns {Promise<void>}
+   */
+  async function loadLatestSession() {
+    try {
+      // 從後端獲取最新的 1 筆執行歷史紀錄
+      const history = await apiClient.getExecutionHistory(agent.agent_id, 1);
+
+      if (history && history.length > 0) {
+        const latest = history[0];
+
+        // 只使用已完成或失敗的 session（過濾掉正在執行中或其他中間狀態）
+        if (latest.status === 'completed' || latest.status === 'failed') {
+          // 儲存最新 session ID，用於後續查看詳情
+          latestSessionId = latest.id;
+          hasHistoricalSessions = true;
+
+          // 自動載入完整的執行詳細資訊（包含交易明細、工具使用等）
+          await loadExecutionDetail(latest.id);
+
+          // 構建 executionResult 摘要物件，用於在卡片上顯示執行結果預覽
+          executionResult = {
+            success: latest.status === 'completed', // 判斷執行是否成功
+            time_ms: latest.execution_time_ms, // 執行耗時（毫秒）
+            mode: latest.mode, // 執行模式（TRADING 或 REBALANCING）
+            sessionId: latest.id, // Session 唯一識別碼
+            output: latest.final_output, // 執行輸出（可能是 JSON 或純文字）
+            completedAt: latest.completed_at || latest.end_time, // 完成時間戳記
+          };
+        }
+      }
+    } catch (error) {
+      // 載入失敗時記錄錯誤，但不阻斷組件正常運作
+      console.error(`Failed to load latest session for agent ${agent.agent_id}:`, error);
+    }
+  }
+
+  /**
+   * 載入指定 session 的詳細執行資訊
+   *
+   * 功能說明：
+   * - 從後端 API 獲取完整的 session 詳細資料
+   * - 包含交易明細、工具使用、再平衡計劃等完整資訊
+   * - 使用請求 ID 機制防止競態條件（race condition）
+   *
+   * 競態條件處理：
+   * - 每次呼叫都會產生新的 requestId
+   * - 只有最新的請求結果會被採用，避免舊請求覆蓋新資料
+   *
+   * @async
+   * @param {string} sessionId - Session 的唯一識別碼
+   * @returns {Promise<void>}
+   */
+  async function loadExecutionDetail(sessionId) {
+    // 如果沒有提供 sessionId，直接返回
+    if (!sessionId) {
+      return;
+    }
+
+    // 產生新的請求 ID，用於識別本次請求（防止舊請求覆蓋新資料）
+    const requestId = ++detailRequestId;
+    isExecutionDetailLoading = true;
+    executionDetailError = null;
+
+    try {
+      // 從後端 API 獲取 session 的完整詳細資訊
+      const detail = await apiClient.getSessionDetails(agent.agent_id, sessionId);
+
+      // 只有當本次請求仍是最新的請求時，才更新資料
+      // 這避免了「先發後至」的問題（舊請求比新請求晚回應）
+      if (requestId === detailRequestId) {
+        executionDetail = detail;
+      }
+    } catch (error) {
+      // 只有當本次請求仍是最新的請求時，才更新錯誤狀態
+      if (requestId === detailRequestId) {
+        executionDetailError = extractErrorMessage(error);
+        console.error(`Failed to load session detail for ${sessionId}:`, error);
+      }
+    } finally {
+      // 只有當本次請求仍是最新的請求時，才標記載入完成
+      if (requestId === detailRequestId) {
+        isExecutionDetailLoading = false;
+      }
+    }
+  }
+
+  /**
+   * 開啟執行結果 Modal 彈窗
+   *
+   * 功能說明：
+   * - 顯示執行結果的詳細 Modal
+   * - 優先使用最新的 session ID（支援查看歷史紀錄）
+   * - 如果該 session 詳情尚未載入，則自動載入
+   *
+   * 優先順序：
+   * 1. latestSessionId - 最新的歷史紀錄（即使頁面刷新也能保留）
+   * 2. executionResult.sessionId - 當前執行的 session
+   *
+   * @param {Event} event - DOM 事件物件
+   */
+  function openExecutionModal(event) {
+    // 阻止事件冒泡，避免觸發父元素的 click 事件
+    event?.stopPropagation?.();
+
+    // 顯示 Modal
+    showExecutionModal = true;
+
+    // 優先使用最新的 session ID（確保用戶總是看到最新的執行結果）
+    const sessionId = latestSessionId || executionResult?.sessionId;
+
+    // 如果有 sessionId 且該 session 的詳情尚未載入或不是當前 session，則載入詳情
+    // 避免重複載入相同的資料
+    if (sessionId && executionDetail?.id !== sessionId && !isExecutionDetailLoading) {
+      loadExecutionDetail(sessionId);
+    }
+  }
+
+  function closeExecutionModal() {
+    showExecutionModal = false;
+  }
+
+  function handleWindowKeydown(event) {
+    if (event.key === 'Escape' && showExecutionModal) {
+      closeExecutionModal();
+    }
+  }
+
+  function clearExecutionDetailState() {
+    executionDetail = null;
+    executionDetailError = null;
+    isExecutionDetailLoading = false;
+  }
+
+  function buildExecutionStatCards() {
+    const stats = executionStatsData || {};
+    const filledValue =
+      stats.filled ?? (Array.isArray(executionTrades) ? executionTrades.length : null);
+    const notionalValue = stats.notional != null ? formatCurrency(stats.notional) : '--';
+    const pnlValue = stats.pnl != null ? formatCurrency(stats.pnl) : '--';
+    const startTime = executionDetail?.start_time
+      ? formatDateTime(executionDetail.start_time)
+      : '--';
+    const endTime = executionDetail?.end_time ? formatDateTime(executionDetail.end_time) : '--';
+    const toolsValue = executionToolsUsed.length ? executionToolsUsed.join('、') : '--';
+
+    return [
+      { label: '模式', value: executionResult?.mode || agent.current_mode || '--' },
+      {
+        label: '耗時',
+        value: executionResult?.time_ms ? `${executionResult.time_ms} ms` : '--',
+      },
+      { label: '成交筆數', value: filledValue ?? '--' },
+      { label: '名目金額', value: notionalValue },
+      { label: '預估損益', value: pnlValue },
+      { label: '使用工具', value: toolsValue },
+      { label: '開始時間', value: startTime },
+      { label: '結束時間', value: endTime },
+    ];
+  }
+
+  function normalizeExecutionOutput(rawOutput) {
+    const base = {
+      summary: '',
+      detailText: '',
+      trades: [],
+      rebalance: null,
+      stats: {},
+    };
+
+    if (!rawOutput) {
+      return base;
+    }
+
+    if (typeof rawOutput === 'string') {
+      const trimmed = rawOutput.trim();
+      if (!trimmed) {
+        return base;
+      }
+      const parsed = tryParseJson(trimmed);
+      if (parsed) {
+        return normalizeExecutionOutput(parsed);
+      }
+      return {
+        ...base,
+        summary: trimmed,
+        detailText: trimmed,
+      };
+    }
+
+    if (Array.isArray(rawOutput)) {
+      const detailText = JSON.stringify(rawOutput, null, 2);
+      return {
+        ...base,
+        summary: detailText,
+        detailText,
+        trades: rawOutput,
+      };
+    }
+
+    const summaryCandidates = [
+      rawOutput.summary?.description,
+      rawOutput.summary?.text,
+      typeof rawOutput.summary === 'string' ? rawOutput.summary : null,
+      rawOutput.description,
+      rawOutput.notes,
+      rawOutput.message,
+      rawOutput.result,
+    ].filter((text) => typeof text === 'string' && text.trim().length > 0);
+
+    const trades =
+      (Array.isArray(rawOutput.trades) && rawOutput.trades) ||
+      (Array.isArray(rawOutput.executed_trades) && rawOutput.executed_trades) ||
+      (Array.isArray(rawOutput.detail?.trades) && rawOutput.detail.trades) ||
+      [];
+
+    const detailText = JSON.stringify(rawOutput, null, 2);
+
+    const rebalancePlan =
+      rawOutput.rebalance || rawOutput.rebalance_plan || rawOutput.detail?.rebalance || null;
+
+    const stats = {
+      filled:
+        rawOutput.summary?.filled ??
+        rawOutput.trade_count ??
+        (Array.isArray(trades) ? trades.length : undefined),
+      notional: rawOutput.summary?.notional ?? rawOutput.notional,
+      pnl: rawOutput.summary?.pnl ?? rawOutput.pnl,
+    };
+
+    return {
+      summary: summaryCandidates[0] ?? detailText,
+      detailText,
+      trades: Array.isArray(trades) ? trades : [],
+      rebalance: rebalancePlan,
+      stats,
+    };
+  }
+
+  function normalizeToolsCalled(tools) {
+    if (!tools) {
+      return [];
+    }
+    if (Array.isArray(tools)) {
+      return tools.filter(Boolean);
+    }
+    if (typeof tools === 'string') {
+      const parsed = tryParseJson(tools);
+      if (Array.isArray(parsed)) {
+        return parsed.filter(Boolean);
+      }
+      return tools
+        .split(',')
+        .map((item) => item.trim())
+        .filter(Boolean);
+    }
+    return [];
+  }
+
+  function tryParseJson(value) {
+    try {
+      return JSON.parse(value);
+    } catch {
+      return null;
+    }
+  }
+
+  function getExecutionStatusMeta() {
+    const status = executionDetail?.status?.toLowerCase();
+    if (status === 'completed') {
+      return { label: '執行成功', className: 'status-badge-success' };
+    }
+    if (status === 'failed') {
+      return { label: '執行失敗', className: 'status-badge-failed' };
+    }
+    if (status === 'running' || status === 'pending') {
+      return { label: '執行中', className: 'status-badge-running' };
+    }
+    if (status === 'stopped' || status === 'timeout') {
+      return { label: '已停止', className: 'status-badge-stopped' };
+    }
+    return executionResult?.success
+      ? { label: '執行成功', className: 'status-badge-success' }
+      : { label: '執行狀態', className: 'status-badge-stopped' };
+  }
 </script>
+
+<svelte:window on:keydown={handleWindowKeydown} />
 
 <div
   class="agent-card rounded-3xl border border-gray-800 bg-gray-900/80 p-6 shadow-2xl transition-all duration-300 cursor-pointer hover:-translate-y-1 hover:shadow-[0_40px_55px_rgba(0,0,0,0.55)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 focus-visible:ring-offset-gray-900"
@@ -365,8 +757,6 @@
         </div>
         <span class="hidden text-gray-600 sm:inline">•</span>
         <span>模式 {agent.current_mode || '—'}</span>
-        <span class="hidden text-gray-600 sm:inline">•</span>
-        <span>最新現金 {formatCurrency(currentCash)}</span>
       </div>
     </div>
     <div class="flex items-center gap-1 self-start opacity-80 transition-opacity hover:opacity-100">
@@ -616,37 +1006,57 @@
 
     {#if executionResult && executionResult.success}
       <div class="result-summary animation-fade-in mt-3">
-        <div>
-          <h4 class="font-semibold text-white text-lg">執行完成</h4>
+        <div class="result-summary-content">
+          <div class="result-summary-header">
+            <h4 class="font-semibold text-white text-lg">執行完成</h4>
+            <span class="result-pill">{executionResult.mode || '—'}</span>
+          </div>
           <p class="text-sm text-gray-300 mt-1">
             {executionResult.mode || '未知模式'} 模式 • 耗時 {executionResult.time_ms ?? '--'}ms
           </p>
           {#if executionResult.sessionId}
-            <p class="text-xs text-gray-400 mt-1">Session: {executionResult.sessionId}</p>
+            <p class="text-xs text-gray-500 mt-1">Session: {executionResult.sessionId}</p>
+          {/if}
+          {#if executionSummaryText}
+            <p class="result-summary-text mt-3">{executionSummaryText}</p>
           {/if}
         </div>
-        <button
-          type="button"
-          class="expand-button"
-          onclick={() => (showExecutionDetail = !showExecutionDetail)}
-        >
-          {showExecutionDetail ? '隱藏詳細結果 ▲' : '查看詳細結果 ▼'}
+        <div class="result-actions">
+          <button type="button" class="expand-button" onclick={openExecutionModal}>
+            查看執行結果
+          </button>
+        </div>
+      </div>
+    {/if}
+
+    <!-- 新增：即使沒有當前執行結果，只要有歷史紀錄就顯示按鈕 -->
+    {#if hasHistoricalSessions && !executionResult && !isExecuting && !executionError}
+      <div class="mt-3">
+        <button type="button" class="expand-button w-full" onclick={openExecutionModal}>
+          查看最近執行結果
         </button>
       </div>
-
-      {#if showExecutionDetail}
-        <div class="result-detail-container animation-slide-in">
-          <h5 class="font-semibold text-white mb-3">執行詳細結果</h5>
-          {#if executionResult.detail}
-            <pre class="detail-json">{JSON.stringify(executionResult.detail, null, 2)}</pre>
-          {:else}
-            <p class="text-sm text-gray-400">目前沒有可顯示的詳細資料。</p>
-          {/if}
-        </div>
-      {/if}
     {/if}
   </div>
 </div>
+
+<ExecutionResultModal
+  isOpen={showExecutionModal}
+  {agent}
+  {executionResult}
+  {executionDetail}
+  {executionSummaryText}
+  {executionTrades}
+  {executionToolsUsed}
+  {executionRebalancePlan}
+  {executionStatsData}
+  {executionDetailText}
+  isLoading={isExecutionDetailLoading}
+  error={executionDetailError}
+  onClose={closeExecutionModal}
+  onRetryLoadDetail={loadExecutionDetail}
+  buildStatCards={buildExecutionStatCards}
+/>
 
 <style>
   .agent-card {
@@ -1007,6 +1417,9 @@
     border-radius: 0.85rem;
     padding: 1rem;
     transition: all 0.3s ease;
+    display: flex;
+    gap: 1rem;
+    align-items: stretch;
   }
 
   .result-summary.failed {
@@ -1019,6 +1432,46 @@
     background: linear-gradient(135deg, rgba(234, 179, 8, 0.1), rgba(234, 179, 8, 0.05));
   }
 
+  .result-summary-content {
+    flex: 1;
+  }
+
+  .result-summary-header {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  .result-pill {
+    padding: 0.1rem 0.65rem;
+    border-radius: 9999px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    background: rgba(59, 130, 246, 0.15);
+    color: #bfdbfe;
+  }
+
+  .result-summary-text {
+    color: #d1d5db;
+    font-size: 0.9rem;
+    line-height: 1.5;
+    display: -webkit-box;
+    line-clamp: 3;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  .result-actions {
+    width: 160px;
+    display: flex;
+    align-items: flex-end;
+  }
+
+  .result-actions .expand-button {
+    margin-top: 0;
+  }
+
   .trade-item,
   .rebalance-item {
     background: rgba(30, 41, 59, 0.9);
@@ -1026,6 +1479,36 @@
     border-radius: 0.75rem;
     padding: 0.75rem;
     margin-bottom: 0.75rem;
+  }
+
+  .trade-item-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 0.5rem;
+  }
+
+  .trade-item-title {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  .trade-status-badge {
+    font-size: 0.7rem;
+    padding: 0.2rem 0.6rem;
+    border-radius: 9999px;
+    background: rgba(59, 130, 246, 0.2);
+    color: #bfdbfe;
+    font-weight: 600;
+  }
+
+  .trade-item-body {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+    gap: 0.35rem;
+    font-size: 0.85rem;
+    color: #e5e7eb;
   }
 
   .trade-action-buy {
@@ -1074,6 +1557,12 @@
     border-radius: 0.5rem;
     padding: 1rem;
     text-align: center;
+  }
+
+  .stat-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 1rem;
   }
 
   .animation-fade-in {
@@ -1178,5 +1667,119 @@
     font-size: 0.8rem;
     overflow-x: auto;
     color: #e5e7eb;
+  }
+
+  .detail-section {
+    background: rgba(15, 23, 42, 0.6);
+    border: 1px solid rgba(75, 85, 99, 0.35);
+    border-radius: 0.85rem;
+    padding: 1rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
+  .detail-section-title {
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: #94a3b8;
+    margin: 0;
+  }
+
+  .detail-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+
+  .tool-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+
+  .tool-chip {
+    padding: 0.35rem 0.75rem;
+    border-radius: 9999px;
+    background: rgba(59, 130, 246, 0.2);
+    color: #bfdbfe;
+    font-size: 0.75rem;
+    font-weight: 600;
+  }
+
+  .modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(15, 23, 42, 0.85);
+    backdrop-filter: blur(8px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1.5rem;
+    z-index: 50;
+  }
+
+  .modal-panel {
+    width: min(900px, 100%);
+    max-height: 90vh;
+    border-radius: 1.25rem;
+    border: 1px solid rgba(148, 163, 184, 0.3);
+    background: rgba(15, 23, 42, 0.95);
+    box-shadow: 0 30px 60px rgba(0, 0, 0, 0.5);
+    display: flex;
+    flex-direction: column;
+  }
+
+  .modal-header {
+    padding: 1.25rem 1.5rem;
+    border-bottom: 1px solid rgba(75, 85, 99, 0.5);
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 1rem;
+  }
+
+  .modal-title-row {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  .modal-title {
+    font-weight: 600;
+    color: #fff;
+    margin: 0;
+  }
+
+  .modal-subtitle {
+    margin-top: 0.35rem;
+    color: #94a3b8;
+    font-size: 0.85rem;
+  }
+
+  .modal-body {
+    padding: 1.5rem;
+    overflow-y: auto;
+    gap: 1rem;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .modal-close-button {
+    color: #9ca3af;
+  }
+
+  .modal-close-button:hover {
+    color: #fff;
+  }
+
+  .modal-loading {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 2rem 0;
+    color: #d1d5db;
   }
 </style>

@@ -11,7 +11,7 @@
   import { formatNumber } from '../../shared/utils.js';
 
   // Props
-  let { metrics = {} } = $props();
+  let { metrics = {}, agentColor = '34, 197, 94' } = $props();
 
   // 定義 KPI 卡片配置
   const kpiConfig = [

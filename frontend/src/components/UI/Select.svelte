@@ -4,23 +4,9 @@
    *
    * 可重用的下拉選擇組件
    * Svelte 5 compatible - removes legacy createBubbler
-   *
-   * @typedef {Object} Props
-   * @property {string} [value]
-   * @property {any} [options] - [{ value, label }]
-   * @property {any} [optionGroups] - { groupName: [options] }
-   * @property {string} [placeholder]
-   * @property {boolean} [disabled]
-   * @property {string} [error]
-   * @property {string} [label]
-   * @property {boolean} [required]
-   * @property {string} [id]
-   * @property {Function} [onchange]
-   * @property {Function} [onblur]
-   * @property {Function} [onfocus]
    */
 
-  /** @type {Props & { [key: string]: any }} */
+  /** @type {any} */
   let {
     value = $bindable(''),
     options = [],

@@ -1,23 +1,5 @@
 <script>
-  /**
-   * Button Component
-   *
-   * 可重用的按鈕組件,支援多種樣式和狀態
-   * 符合 FRONTEND_IMPLEMENTATION.md 規格
-   * Svelte 5 compatible - removes legacy createBubbler
-   *
-   * @typedef {Object} Props
-   * @property {string} [variant] - primary | secondary | danger | ghost
-   * @property {string} [size] - sm | md | lg
-   * @property {boolean} [disabled]
-   * @property {boolean} [loading]
-   * @property {boolean} [fullWidth]
-   * @property {string} [type]
-   * @property {Function} [onclick]
-   * @property {import('svelte').Snippet} [children]
-   */
-
-  /** @type {Props & { [key: string]: any }} */
+  /** @type {any} */
   let {
     variant = 'primary',
     size = 'md',
@@ -64,7 +46,7 @@
   {@render children?.()}
 </button>
 
-<style>
+<style lang="postcss">
   .btn {
     @apply inline-flex items-center justify-center rounded-lg font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2;
   }

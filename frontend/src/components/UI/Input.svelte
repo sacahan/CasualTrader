@@ -4,24 +4,9 @@
    *
    * 可重用的輸入框組件
    * Svelte 5 compatible - removes legacy createBubbler
-   *
-   * @typedef {Object} Props
-   * @property {string} [type]
-   * @property {string} [value]
-   * @property {string} [placeholder]
-   * @property {boolean} [disabled]
-   * @property {string} [error]
-   * @property {string} [label]
-   * @property {string} [help]
-   * @property {boolean} [required]
-   * @property {string} [id]
-   * @property {Function} [oninput]
-   * @property {Function} [onchange]
-   * @property {Function} [onblur]
-   * @property {Function} [onfocus]
    */
 
-  /** @type {Props & { [key: string]: any }} */
+  /** @type {any} */
   let {
     type = 'text',
     value = $bindable(''),
@@ -63,10 +48,12 @@
       class="form-input block w-full rounded-lg border border-gray-600 bg-gray-700 px-4 py-2 text-white placeholder-gray-400 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500 disabled:bg-gray-800 disabled:cursor-not-allowed {error
         ? 'border-red-500'
         : ''}"
-      {oninput}
       {onchange}
       {onblur}
       {onfocus}
+      oninput={(e) => {
+        oninput?.(e);
+      }}
       {...rest}
     />
   {:else}
@@ -82,6 +69,7 @@
         ? 'border-red-500'
         : ''}"
       oninput={(e) => {
+        // @ts-ignore
         value = e.target.value;
         oninput?.(e);
       }}

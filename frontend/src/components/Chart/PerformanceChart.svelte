@@ -115,11 +115,12 @@
             },
             ticks: {
               callback: function (value) {
+                const numValue = Number(value);
                 return new Intl.NumberFormat('zh-TW', {
                   style: 'currency',
                   currency: 'TWD',
                   minimumFractionDigits: 0,
-                }).format(value);
+                }).format(numValue);
               },
             },
           },

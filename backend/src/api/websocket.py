@@ -207,8 +207,8 @@ class WebSocketManager:
         message = {
             "type": "error",
             "agent_id": agent_id,
-            "message": error_message,
-            "details": error_details or {},
+            "error": error_message,
+            "data": error_details or {},
         }
         await self.broadcast(message)
 

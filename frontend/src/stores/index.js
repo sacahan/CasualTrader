@@ -47,7 +47,6 @@ export {
   marketIndices,
   stockQuotes,
   isOpen,
-  nextOpenTime,
   loading as marketLoading,
   error as marketError,
   loadMarketStatus,
