@@ -293,19 +293,46 @@ function handleExecutionStarted(payload) {
  * 處理執行完成事件
  */
 function handleExecutionCompleted(payload) {
-  const { agent_id, execution_time_ms } = payload;
+  const { agent_id, execution_time_ms, financial_data } = payload;
 
-  // 更新 agent 狀態為 IDLE
-  agents.update((list) =>
-    list.map((agent) => (agent.agent_id === agent_id ? { ...agent, status: 'idle' } : agent))
-  );
+  // 如果有財務數據，立即更新 agent 的財務狀態
+  if (financial_data) {
+    agents.update((list) =>
+      list.map((agent) =>
+        agent.agent_id === agent_id
+          ? {
+              ...agent,
+              status: 'idle',
+              current_funds: financial_data.current_funds,
+              // 可選：也可以儲存其他財務數據供顯示
+              total_portfolio_value: financial_data.total_portfolio_value,
+              holdings_value: financial_data.holdings_value,
+            }
+          : agent
+      )
+    );
+  } else {
+    // 如果沒有財務數據，只更新狀態
+    agents.update((list) =>
+      list.map((agent) => (agent.agent_id === agent_id ? { ...agent, status: 'idle' } : agent))
+    );
+  }
 
   addNotification({
     type: 'success',
     message: `Agent ${agent_id} 執行完成 (耗時 ${execution_time_ms}ms)`,
   });
 
-  console.warn(`[WS] Execution completed for agent ${agent_id}`);
+  console.warn(`[WS] Execution completed for agent ${agent_id}`, financial_data);
+
+  // 如果沒有財務數據，則需要重新載入完整的 agent 數據
+  if (!financial_data) {
+    import('./agents.js').then(({ loadAgent }) => {
+      loadAgent(agent_id).catch((error) => {
+        console.error(`Failed to reload agent ${agent_id}:`, error);
+      });
+    });
+  }
 
   // 非同步刷新詳細數據：性能、持股、交易紀錄
   refreshAgentDetails(agent_id).catch((error) => {
@@ -317,19 +344,45 @@ function handleExecutionCompleted(payload) {
  * 處理執行失敗事件
  */
 function handleExecutionFailed(payload) {
-  const { agent_id, error } = payload;
+  const { agent_id, error, financial_data } = payload;
 
-  // 更新 agent 狀態為 STOPPED
-  agents.update((list) =>
-    list.map((agent) => (agent.agent_id === agent_id ? { ...agent, status: 'stopped' } : agent))
-  );
+  // 如果有財務數據，更新財務狀態和執行狀態
+  if (financial_data) {
+    agents.update((list) =>
+      list.map((agent) =>
+        agent.agent_id === agent_id
+          ? {
+              ...agent,
+              status: 'stopped',
+              current_funds: financial_data.current_funds,
+              total_portfolio_value: financial_data.total_portfolio_value,
+              holdings_value: financial_data.holdings_value,
+            }
+          : agent
+      )
+    );
+  } else {
+    // 如果沒有財務數據，只更新狀態
+    agents.update((list) =>
+      list.map((agent) => (agent.agent_id === agent_id ? { ...agent, status: 'stopped' } : agent))
+    );
+  }
 
   addNotification({
     type: 'error',
     message: `Agent ${agent_id} 執行失敗: ${error}`,
   });
 
-  console.error(`[WS] Execution failed for agent ${agent_id}:`, error);
+  console.error(`[WS] Execution failed for agent ${agent_id}:`, error, financial_data);
+
+  // 如果沒有財務數據，則需要重新載入
+  if (!financial_data) {
+    import('./agents.js').then(({ loadAgent }) => {
+      loadAgent(agent_id).catch((err) => {
+        console.error(`Failed to reload agent ${agent_id}:`, err);
+      });
+    });
+  }
 
   // 非同步刷新詳細數據以反映最新狀態
   refreshAgentDetails(agent_id).catch((err) => {
@@ -341,19 +394,45 @@ function handleExecutionFailed(payload) {
  * 處理執行停止事件
  */
 function handleExecutionStopped(payload) {
-  const { agent_id, status } = payload;
+  const { agent_id, status, financial_data } = payload;
 
-  // 更新 agent 狀態為 STOPPED
-  agents.update((list) =>
-    list.map((agent) => (agent.agent_id === agent_id ? { ...agent, status: 'stopped' } : agent))
-  );
+  // 如果有財務數據，更新財務狀態和執行狀態
+  if (financial_data) {
+    agents.update((list) =>
+      list.map((agent) =>
+        agent.agent_id === agent_id
+          ? {
+              ...agent,
+              status: 'stopped',
+              current_funds: financial_data.current_funds,
+              total_portfolio_value: financial_data.total_portfolio_value,
+              holdings_value: financial_data.holdings_value,
+            }
+          : agent
+      )
+    );
+  } else {
+    // 如果沒有財務數據，只更新狀態
+    agents.update((list) =>
+      list.map((agent) => (agent.agent_id === agent_id ? { ...agent, status: 'stopped' } : agent))
+    );
+  }
 
   addNotification({
     type: 'warning',
     message: `Agent ${agent_id} 已停止 (狀態: ${status})`,
   });
 
-  console.warn(`[WS] Execution stopped for agent ${agent_id}`);
+  console.warn(`[WS] Execution stopped for agent ${agent_id}`, financial_data);
+
+  // 如果沒有財務數據，則需要重新載入
+  if (!financial_data) {
+    import('./agents.js').then(({ loadAgent }) => {
+      loadAgent(agent_id).catch((err) => {
+        console.error(`Failed to reload agent ${agent_id}:`, err);
+      });
+    });
+  }
 
   // 非同步刷新詳細數據以反映最新狀態
   refreshAgentDetails(agent_id).catch((error) => {

@@ -1,0 +1,1143 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Casual Trader Dashboard Mock</title>
+  <link
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Sans+TC:wght@400;500;700&display=swap"
+    rel="stylesheet" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    :root {
+      color-scheme: dark;
+    }
+
+    body {
+      font-family: "Inter", "Noto Sans TC", system-ui, sans-serif;
+      background-color: #0f172a;
+      color: #e5e7eb;
+    }
+
+    .primary-btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem;
+      padding: 0.75rem 1.25rem;
+      border-radius: 0.75rem;
+      border: none;
+      font-weight: 600;
+      color: white;
+      background: linear-gradient(135deg, #3b82f6, #2563eb);
+      box-shadow: 0 10px 30px rgba(37, 99, 235, 0.35);
+      transition: all 0.3s ease;
+    }
+
+    .primary-btn:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 18px 35px rgba(37, 99, 235, 0.45);
+    }
+
+    .primary-btn:active {
+      transform: translateY(0);
+    }
+
+    .agent-card {
+      position: relative;
+      overflow: hidden;
+      background: linear-gradient(180deg, #0f172a, rgba(15, 23, 42, 0.8));
+      border-radius: 1.5rem;
+      padding: 1.75rem;
+      border: 1px solid rgba(148, 163, 184, 0.2);
+      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.45);
+      transition: transform 0.3s ease, box-shadow 0.3s ease;
+      cursor: pointer;
+    }
+
+    .agent-card:hover {
+      transform: translateY(-4px);
+      box-shadow: 0 40px 55px rgba(0, 0, 0, 0.55);
+    }
+
+    .agent-card.selected {
+      box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.55), 0 40px 55px rgba(0, 0, 0, 0.55);
+    }
+
+    .agent-card-header {
+      position: relative;
+      z-index: 1;
+    }
+
+    .metric-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 1rem;
+    }
+
+    .metric-card {
+      position: relative;
+      background: rgba(15, 23, 42, 0.85);
+      border-radius: 1rem;
+      border: 1px solid rgba(148, 163, 184, 0.25);
+      padding: 1rem 1.25rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.35rem;
+      min-height: 120px;
+      z-index: 1;
+    }
+
+    .metric-card::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      border-radius: inherit;
+      pointer-events: none;
+      box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.04);
+    }
+
+    .metric-value {
+      font-size: 1.9rem;
+      font-weight: 700;
+    }
+
+    .metric-caption {
+      font-size: 0.75rem;
+      color: #94a3b8;
+      letter-spacing: 0.02em;
+      text-transform: uppercase;
+    }
+
+    .info-card {
+      background: rgba(15, 23, 42, 0.75);
+      border: 1px solid rgba(148, 163, 184, 0.2);
+      border-radius: 1rem;
+      padding: 1rem;
+      min-height: 110px;
+    }
+
+    .modal-panel {
+      width: min(900px, 100%);
+      max-height: 90vh;
+      border-radius: 1.25rem;
+      border: 1px solid rgba(148, 163, 184, 0.3);
+      background: rgba(15, 23, 42, 0.95);
+      box-shadow: 0 30px 60px rgba(0, 0, 0, 0.5);
+      display: flex;
+      flex-direction: column;
+    }
+
+    .modal-body {
+      padding: 1.5rem;
+      overflow-y: auto;
+      gap: 1rem;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .modal-summary-block {
+      background: rgba(15, 23, 42, 0.85);
+      border: 1px solid rgba(59, 130, 246, 0.4);
+      border-radius: 1rem;
+      padding: 1rem 1.25rem;
+    }
+
+    .modal-summary-block h4 {
+      color: #94a3b8;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      font-size: 0.75rem;
+    }
+
+    .modal-summary-block p {
+      margin-top: 0.25rem;
+      color: #e5e7eb;
+      font-size: 0.95rem;
+      line-height: 1.5;
+    }
+
+    .stat-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+      gap: 1rem;
+    }
+
+    .stat-card {
+      padding: 1rem;
+      border-radius: 0.9rem;
+      border: 1px solid rgba(148, 163, 184, 0.35);
+      background: rgba(17, 24, 39, 0.85);
+      min-height: 110px;
+    }
+
+    .status-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 9999px;
+      display: inline-block;
+    }
+
+    .status-running {
+      background-color: #22c55e;
+      box-shadow: 0 0 10px rgba(34, 197, 94, 0.8);
+      animation: pulse 2s infinite;
+    }
+
+    .status-stopped {
+      background-color: #6b7280;
+    }
+
+    @keyframes pulse {
+
+      0%,
+      100% {
+        opacity: 1;
+      }
+
+      50% {
+        opacity: 0.5;
+      }
+    }
+
+    .icon-button {
+      border: none;
+      background: transparent;
+      border-radius: 0.5rem;
+      padding: 0.4rem;
+      color: #9ca3af;
+      transition: all 0.2s ease;
+    }
+
+    .icon-button:hover:not(:disabled) {
+      background-color: rgba(107, 114, 128, 0.3);
+      color: white;
+    }
+
+    .icon-button:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+    }
+
+    .custom-scrollbar::-webkit-scrollbar {
+      width: 6px;
+    }
+
+    .custom-scrollbar::-webkit-scrollbar-track {
+      background: #1f2937;
+    }
+
+    .custom-scrollbar::-webkit-scrollbar-thumb {
+      background-color: #4b5563;
+      border-radius: 9999px;
+    }
+
+    .mode-button {
+      position: relative;
+      padding: 0.75rem 1rem;
+      border-radius: 0.85rem;
+      font-weight: 600;
+      color: white;
+      border: none;
+      cursor: pointer;
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      background: linear-gradient(135deg, var(--btn-light-color), var(--btn-base-color));
+      box-shadow: 0 10px 20px rgba(0, 0, 0, 0.35);
+      overflow: hidden;
+      font-size: 0.9rem;
+    }
+
+    .mode-button:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+    }
+
+    .mode-button::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(110deg, transparent, rgba(255, 255, 255, 0.35), transparent);
+      transform: translateX(-100%);
+      transition: transform 0.6s ease;
+    }
+
+    .mode-button:not(:disabled):hover::before {
+      transform: translateX(100%);
+    }
+
+    .mode-button .button-wrapper {
+      position: relative;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.4rem;
+      z-index: 1;
+    }
+
+    .stop-button {
+      position: relative;
+      width: 100%;
+      padding: 0.85rem 1rem;
+      border-radius: 0.85rem;
+      font-weight: 600;
+      color: white;
+      border: none;
+      cursor: pointer;
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      background: linear-gradient(135deg, rgba(239, 68, 68, 0.9), rgba(185, 28, 28, 0.85));
+      box-shadow: 0 12px 24px rgba(239, 68, 68, 0.35);
+      overflow: hidden;
+    }
+
+    .stop-button:disabled {
+      opacity: 0.35;
+      cursor: not-allowed;
+    }
+
+    .stop-button::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(110deg, transparent, rgba(255, 255, 255, 0.3), transparent);
+      transform: translateX(-100%);
+      transition: transform 0.6s ease;
+    }
+
+    .stop-button:not(:disabled):hover::before {
+      transform: translateX(100%);
+    }
+
+    .result-summary {
+      background: linear-gradient(135deg, rgba(34, 197, 94, 0.1), rgba(34, 197, 94, 0.05));
+      border-left: 4px solid #22c55e;
+      border-radius: 0.85rem;
+      padding: 1rem;
+      margin-top: 1rem;
+    }
+
+    .result-summary.failed {
+      border-left-color: #ef4444;
+      background: linear-gradient(135deg, rgba(239, 68, 68, 0.1), rgba(239, 68, 68, 0.05));
+    }
+
+    .result-detail-container {
+      background: rgba(15, 23, 42, 0.9);
+      border: 1px solid rgba(148, 163, 184, 0.2);
+      border-radius: 0.85rem;
+      padding: 1rem;
+      margin-top: 0.75rem;
+      backdrop-filter: blur(12px);
+    }
+
+    .trade-item,
+    .rebalance-item {
+      background: rgba(30, 41, 59, 0.9);
+      border: 1px solid rgba(75, 85, 99, 0.35);
+      border-radius: 0.75rem;
+      padding: 0.75rem;
+    }
+
+    .trade-action-buy {
+      background: rgba(34, 197, 94, 0.2);
+      color: #4ade80;
+      padding: 0.15rem 0.75rem;
+      border-radius: 9999px;
+      font-size: 0.75rem;
+      font-weight: 600;
+    }
+
+    .trade-action-sell {
+      background: rgba(239, 68, 68, 0.2);
+      color: #f87171;
+      padding: 0.15rem 0.75rem;
+      border-radius: 9999px;
+      font-size: 0.75rem;
+      font-weight: 600;
+    }
+
+    .expand-button {
+      width: 100%;
+      padding: 0.5rem 0.75rem;
+      background: rgba(75, 85, 99, 0.3);
+      border: 1px solid rgba(75, 85, 99, 0.4);
+      border-radius: 0.65rem;
+      color: #d1d5db;
+      font-weight: 600;
+      margin-top: 0.75rem;
+      transition: all 0.2s ease;
+    }
+
+    .expand-button:hover {
+      background: rgba(75, 85, 99, 0.5);
+    }
+
+    .text-gain {
+      color: #4ade80;
+    }
+
+    .text-loss {
+      color: #f87171;
+    }
+
+    .hidden {
+      display: none;
+    }
+
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(15, 23, 42, 0.85);
+      backdrop-filter: blur(8px);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 1.5rem;
+      z-index: 100;
+    }
+
+    .modal-header {
+      padding: 1.25rem 1.5rem;
+      border-bottom: 1px solid rgba(75, 85, 99, 0.5);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+    }
+
+    .status-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+      padding: 0.25rem 0.75rem;
+      border-radius: 9999px;
+      font-size: 0.75rem;
+      font-weight: 600;
+    }
+
+    .status-badge-success {
+      background: rgba(34, 197, 94, 0.2);
+      color: #4ade80;
+    }
+
+    .status-badge-failed {
+      background: rgba(239, 68, 68, 0.2);
+      color: #f87171;
+    }
+
+    .status-badge-running {
+      background: rgba(59, 130, 246, 0.2);
+      color: #93c5fd;
+    }
+  </style>
+</head>
+
+<body class="bg-gray-900">
+  <div class="min-h-screen bg-gray-900">
+    <nav class="border-b border-gray-800 bg-gray-800 shadow-lg">
+      <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+        <div class="flex h-16 items-center justify-between">
+          <div class="flex items-center gap-3">
+            <div class="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-600">
+              <svg class="h-6 w-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                  d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+              </svg>
+            </div>
+            <h1 class="text-xl font-bold text-white">Casual Trader</h1>
+          </div>
+          <div class="flex items-center gap-5">
+            <div class="flex items-center gap-2 border-r border-gray-700 pr-4">
+              <svg class="h-4 w-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                  d="M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4h16v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4z" />
+              </svg>
+              <div class="flex flex-col">
+                <span class="text-xs text-gray-400">大盤指數</span>
+                <div class="flex items-center gap-2">
+                  <span id="twse-value" class="text-sm font-semibold text-white">--</span>
+                  <span id="twse-change" class="text-xs text-gray-400">--</span>
+                </div>
+              </div>
+            </div>
+            <div class="flex items-center gap-2">
+              <div id="market-dot" class="status-dot"></div>
+              <span id="market-status" class="text-sm text-gray-300">市場狀態載入中...</span>
+            </div>
+            <div class="flex items-center gap-2">
+              <div id="ws-dot" class="status-dot"></div>
+              <span id="ws-status" class="text-sm text-gray-300">連線狀態載入中...</span>
+            </div>
+            <button id="theme-toggle"
+              class="rounded-lg p-2 text-gray-300 transition-colors hover:bg-gray-700 hover:text-white"
+              aria-label="切換主題">
+              <svg id="theme-icon" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                  d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
+              </svg>
+            </button>
+          </div>
+        </div>
+      </div>
+    </nav>
+
+    <main class="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+      <header class="mb-8 text-center">
+        <h2 class="text-3xl font-bold text-white sm:text-4xl">AI 代理人股票交易模擬</h2>
+        <p class="mt-2 text-gray-400">觀察不同 AI 交易策略的績效表現</p>
+      </header>
+
+      <section
+        class="mb-8 flex flex-col gap-4 rounded-2xl border border-gray-800 bg-gray-800 p-6 shadow-xl sm:flex-row sm:items-center sm:justify-between">
+        <p class="text-gray-300">點擊卡片查看詳細資訊，或透過設定按鈕管理 Agents。</p>
+        <button class="primary-btn" id="open-agent-modal">
+          <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+          </svg>
+          創建新 Agent
+        </button>
+      </section>
+
+      <section class="grid grid-cols-1 gap-8 md:grid-cols-2" id="agent-grid"></section>
+    </main>
+
+    <div id="execution-modal" class="modal-overlay hidden">
+      <div class="modal-panel">
+        <div class="modal-header">
+          <div>
+            <p class="text-sm text-gray-400">執行結果</p>
+            <h3 id="execution-modal-title" class="text-xl font-semibold text-white"></h3>
+          </div>
+          <button id="execution-modal-close"
+            class="rounded-lg p-2 text-gray-400 transition-colors hover:bg-gray-700 hover:text-white"
+            aria-label="關閉執行結果">
+            <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+        <div id="execution-modal-content" class="modal-body custom-scrollbar"></div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const marketSnapshot = {
+      isOpen: true,
+      index: {
+        value: 20342.58,
+        changePercent: 0.82,
+      },
+      connection: {
+        live: true,
+      },
+    };
+
+    const agents = [
+      {
+        id: "agt-001",
+        name: "Alpha Momentum",
+        aiModel: "gpt-4.1-trader",
+        status: "running",
+        color: "34, 197, 94",
+        initialFunds: 1200000,
+        currentFunds: 465200,
+        currentMode: "TRADING",
+        holdings: [
+          { ticker: "2330.TW", name: "台積電", shares: 300, avgPrice: 945.5, marketValue: 315600 },
+          { ticker: "2317.TW", name: "鴻海", shares: 1800, avgPrice: 186.2, marketValue: 342000 },
+          { ticker: "2881.TW", name: "富邦金", shares: 1200, avgPrice: 74.3, marketValue: 89160 },
+        ],
+        performance: Array.from({ length: 30 }, (_, i) => ({
+          label: `Day ${i + 1}`,
+          portfolio_value: 1000000 + (Math.sin(i / 3) + i * 0.2) * 12000 + Math.random() * 4000,
+        })),
+        execution: {
+          state: "success",
+          mode: "TRADING",
+          timeMs: 1485,
+          timestamp: "2025-11-16 09:34",
+          summary: {
+            orders: 4,
+            filled: 3,
+            notional: 420000,
+            estPnL: 12800,
+            description: "AI 評估台積電與鴻海的動能訊號後，調整持股比重以鎖定短期收益，並保留現金等待下一次突破。",
+          },
+          detail: {
+            trades: [
+              { action: "BUY", ticker: "2330.TW", shares: 120, price: 980.5, impact: "+2.1%" },
+              { action: "SELL", ticker: "2317.TW", shares: 600, price: 205.4, impact: "+1.2%" },
+              { action: "BUY", ticker: "2881.TW", shares: 800, price: 77.3, impact: "+0.4%" },
+            ],
+          },
+        },
+      },
+      {
+        id: "agt-002",
+        name: "Beta Guardian",
+        aiModel: "claude-3.5-sonnet",
+        status: "stopped",
+        color: "249, 115, 22",
+        initialFunds: 800000,
+        currentFunds: 312400,
+        currentMode: "REBALANCING",
+        holdings: [
+          { ticker: "2454.TW", name: "聯發科", shares: 220, avgPrice: 1245, marketValue: 273900 },
+          { ticker: "2603.TW", name: "長榮", shares: 1600, avgPrice: 203.3, marketValue: 325280 },
+          { ticker: "1210.TW", name: "大成", shares: 500, avgPrice: 70.8, marketValue: 34150 },
+          { ticker: "1301.TW", name: "台塑", shares: 900, avgPrice: 88.6, marketValue: 79740 },
+        ],
+        performance: Array.from({ length: 30 }, (_, i) => ({
+          label: `Day ${i + 1}`,
+          portfolio_value: 850000 - (Math.cos(i / 2) + i * 0.25) * 9000 + Math.random() * 3000,
+        })),
+        execution: {
+          state: "failed",
+          mode: "REBALANCING",
+          error: "市場收盤期間無法執行再平衡",
+          retryCount: 1,
+          canRetry: true,
+          summary: {
+            description: "AI 嘗試在收盤後執行再平衡以降低航運部位，但因市場未開放導致指令退回，建議等開盤後再試。",
+          },
+        },
+      },
+    ];
+
+    const executionModal = document.getElementById("execution-modal");
+    const executionModalTitle = document.getElementById("execution-modal-title");
+    const executionModalContent = document.getElementById("execution-modal-content");
+    const executionModalClose = document.getElementById("execution-modal-close");
+
+    let selectedAgentId = agents[0]?.id ?? null;
+
+    executionModalClose.addEventListener("click", closeExecutionModal);
+    executionModal.addEventListener("click", (event) => {
+      if (event.target === executionModal) {
+        closeExecutionModal();
+      }
+    });
+
+    window.addEventListener("keydown", (event) => {
+      if (event.key === "Escape" && !executionModal.classList.contains("hidden")) {
+        closeExecutionModal();
+      }
+    });
+
+    function formatCurrency(value) {
+      return new Intl.NumberFormat("zh-TW", {
+        style: "currency",
+        currency: "TWD",
+        maximumFractionDigits: 0,
+      }).format(value ?? 0);
+    }
+
+    function formatNumber(value) {
+      return new Intl.NumberFormat("zh-TW", {
+        maximumFractionDigits: 0,
+      }).format(value ?? 0);
+    }
+
+    function renderNav() {
+      const valueEl = document.getElementById("twse-value");
+      const changeEl = document.getElementById("twse-change");
+      const marketDot = document.getElementById("market-dot");
+      const marketStatus = document.getElementById("market-status");
+      const wsDot = document.getElementById("ws-dot");
+      const wsStatus = document.getElementById("ws-status");
+
+      valueEl.textContent = marketSnapshot.index.value.toLocaleString("zh-TW", {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      });
+
+      const changeText = `${marketSnapshot.index.changePercent >= 0 ? "▲" : "▼"}${Math.abs(
+        marketSnapshot.index.changePercent
+      ).toFixed(2)}%`;
+      changeEl.textContent = changeText;
+      changeEl.className = `text-xs ${marketSnapshot.index.changePercent >= 0 ? "text-red-400" : "text-green-400"
+        }`;
+
+      marketDot.classList.toggle("status-running", marketSnapshot.isOpen);
+      marketDot.classList.toggle("status-stopped", !marketSnapshot.isOpen);
+      marketStatus.textContent = marketSnapshot.isOpen ? "市場開盤中" : "市場已收盤";
+
+      wsDot.classList.toggle("status-running", marketSnapshot.connection.live);
+      wsDot.classList.toggle("status-stopped", !marketSnapshot.connection.live);
+      wsStatus.textContent = marketSnapshot.connection.live ? "即時連線" : "離線";
+    }
+
+    function renderCards() {
+      const container = document.getElementById("agent-grid");
+      container.innerHTML = "";
+
+      agents.forEach((agent) => {
+        const card = createAgentCard(agent);
+        container.appendChild(card);
+      });
+    }
+
+    function createAgentCard(agent) {
+      const holdingsTotalValue = agent.holdings?.reduce((sum, holding) => {
+        const value = holding.marketValue ?? holding.totalCost ?? 0;
+        return sum + value;
+      }, 0) ?? 0;
+
+      const currentFunds = agent.currentFunds ?? agent.initialFunds;
+      const totalAssets = currentFunds + holdingsTotalValue;
+      const pnl = totalAssets - agent.initialFunds;
+      const isProfit = pnl >= 0;
+
+      const card = document.createElement("div");
+      card.className = "agent-card";
+      card.dataset.agentId = agent.id;
+      card.style.borderColor = `rgba(${agent.color}, 0.35)`;
+
+      if (agent.id === selectedAgentId) {
+        card.classList.add("selected");
+      }
+
+      card.innerHTML = `
+          <div class="mb-4 flex items-center justify-between agent-card-header">
+            <div class="flex-1">
+              <h3 class="text-xl font-bold" style="color: rgb(${agent.color});">${agent.name}</h3>
+              <div class="my-3 text-base" style="color: rgba(${agent.color}, 0.85);">${agent.aiModel}</div>
+              <div class="flex items-center gap-2 mt-1">
+                <span class="status-dot ${agent.status === "running" ? "status-running" : "status-stopped"}"></span>
+                <span class="text-sm ${agent.status === "running" ? "text-green-400" : "text-gray-400"}">${agent.status === "running" ? "運行中" : "已停止"}</span>
+              </div>
+            </div>
+            <div class="flex items-center justify-end">
+              <div class="flex items-center gap-1 opacity-70 hover:opacity-100 transition-opacity">
+                <button class="icon-button" data-action="edit" title="編輯 Agent">
+                  <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                  </svg>
+                </button>
+                <button class="icon-button" data-action="delete" title="刪除 Agent" ${agent.status === "running" ? "disabled" : ""}>
+                  <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                  </svg>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div class="mb-6 metric-grid">
+            <div class="metric-card">
+              <p class="text-xs text-gray-400">總資產</p>
+              <p class="metric-value" style="color: rgb(${agent.color});">${formatCurrency(totalAssets)}</p>
+              <p class="metric-caption">初始資金 ${formatCurrency(agent.initialFunds)}</p>
+            </div>
+            <div class="metric-card">
+              <p class="text-xs text-gray-400">總損益</p>
+              <p class="metric-value ${isProfit ? "text-gain" : "text-loss"}">${isProfit ? "+" : ""}${formatCurrency(pnl)}</p>
+              <p class="metric-caption">${isProfit ? "策略持續發揮" : "需觀察回撤"}</p>
+            </div>
+          </div>
+          <div class="mb-6 grid grid-cols-2 gap-4">
+            <div class="info-card">
+              <p class="text-xs text-gray-400 mb-1">持有現金</p>
+              <p class="text-lg font-semibold" style="color: rgb(${agent.color});">${formatCurrency(
+        currentFunds
+      )}</p>
+            </div>
+            <div class="info-card">
+              <p class="text-xs text-gray-400 mb-1">股票現值</p>
+              <p class="text-lg font-semibold" style="color: rgb(${agent.color});">${formatCurrency(
+        holdingsTotalValue
+      )}</p>
+            </div>
+          </div>
+
+          <div class="mb-6 h-48 w-full">
+            <canvas></canvas>
+          </div>
+
+          <div class="mb-6">
+            <p class="text-xs text-gray-400 mb-3 font-semibold">持有股數</p>
+            ${renderHoldings(agent.holdings)}
+          </div>
+
+          <div class="flex flex-col gap-3" data-role="actions">
+            ${renderActionButtons(agent)}
+            ${renderExecutionBlocks(agent)}
+          </div>
+        `;
+
+      attachCardEvents(card, agent);
+      renderMiniChart(card.querySelector("canvas"), agent);
+
+      card.addEventListener("click", (event) => {
+        if (event.target.closest("button")) {
+          return;
+        }
+        selectedAgentId = agent.id;
+        document.querySelectorAll(".agent-card").forEach((cardEl) => cardEl.classList.remove("selected"));
+        card.classList.add("selected");
+      });
+
+      return card;
+    }
+
+    function renderHoldings(holdings = []) {
+      if (!holdings.length) {
+        return '<p class="text-sm text-gray-500 text-center py-4">尚無持股</p>';
+      }
+
+      const rows = holdings.slice(0, 10).map((holding) => {
+        return `
+            <div class="flex justify-between items-center text-sm bg-gray-800/80 p-2 rounded-md">
+              <div>
+                <p class="font-semibold text-white">${holding.ticker}</p>
+                <p class="text-xs text-gray-400">${holding.name ?? ""}</p>
+              </div>
+              <div class="text-right">
+                <p class="text-white">${formatNumber(holding.shares)} 股</p>
+                <p class="text-xs text-gray-400">均價 ${formatCurrency(holding.avgPrice)}</p>
+              </div>
+            </div>
+          `;
+      });
+
+      if (holdings.length > 10) {
+        rows.push(
+          `<p class="text-xs text-gray-500 text-center">還有 ${holdings.length - 10} 檔股票...</p>`
+        );
+      }
+
+      return `<div class="space-y-2 max-h-32 overflow-y-auto custom-scrollbar">${rows.join("")}</div>`;
+    }
+
+    function renderActionButtons(agent) {
+      const canStart = ["idle", "stopped", "inactive", undefined, null].includes(agent.status);
+      const canStop = agent.status === "running";
+      const isExecuting = agent.execution?.state === "running";
+
+      let html = "";
+
+      if (canStart) {
+        html += `
+            <div class="grid grid-cols-2 gap-3">
+              <button
+                class="mode-button"
+                style="--btn-base-color: rgb(${agent.color}); --btn-light-color: rgba(${agent.color}, 0.75);"
+                data-action="trade"
+                ${!marketSnapshot.isOpen || isExecuting ? "disabled" : ""}
+              >
+                <div class="button-wrapper">
+                  <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3v18h18" />
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 14l4-4 3 3 6-6" />
+                  </svg>
+                  <span>交易</span>
+                </div>
+              </button>
+
+              <button
+                class="mode-button"
+                style="--btn-base-color: rgb(${agent.color}); --btn-light-color: rgba(${agent.color}, 0.75);"
+                data-action="rebalance"
+                ${!marketSnapshot.isOpen || isExecuting ? "disabled" : ""}
+              >
+                <div class="button-wrapper">
+                  <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4h16v7H4zM4 13h16v7H4z" />
+                  </svg>
+                  <span>再平衡</span>
+                </div>
+              </button>
+            </div>
+          `;
+      }
+
+      if (canStop) {
+        html += `
+            <button class="stop-button" data-action="stop" ${!marketSnapshot.isOpen || isExecuting ? "disabled" : ""}>
+              <div class="button-wrapper">
+                <span>停止</span>
+              </div>
+            </button>
+          `;
+      }
+
+      if (isExecuting) {
+        html += `
+            <div class="mt-2 p-2 bg-blue-50/10 border border-blue-400/30 rounded text-sm text-blue-200 flex items-center gap-2">
+              <div class="h-4 w-4 border-2 border-blue-400 border-t-transparent rounded-full animate-spin"></div>
+              <span>執行中...</span>
+            </div>
+          `;
+      }
+
+      return html;
+    }
+
+    function renderExecutionBlocks(agent) {
+      const execution = agent.execution || {};
+      let html = "";
+
+      if (execution.error) {
+        html += `
+            <button class="expand-button mt-3" data-action="execution-detail">查看失敗詳情</button>
+          `;
+      }
+
+      if (execution.state === "success") {
+        html += `
+        <button class="expand-button" data-action="execution-detail">查看執行結果</button>
+          `;
+      }
+
+      return html;
+    }
+
+    function renderExecutionDetail(execution) {
+      if (!execution.detail) {
+        return '<p class="text-sm text-gray-400">無詳細資料</p>';
+      }
+
+      if (execution.mode === "TRADING") {
+        const trades = execution.detail.trades
+          .map(
+            (trade) => `
+                <div class="trade-item">
+                  <div class="flex items-center justify-between mb-2">
+                    <span class="${trade.action === "BUY" ? "trade-action-buy" : "trade-action-sell"}">
+                      ${trade.action === "BUY" ? "買入" : "賣出"}
+                    </span>
+                    <span class="text-sm text-gray-400">${trade.ticker}</span>
+                  </div>
+                  <div class="flex items-center justify-between text-sm text-gray-200">
+                    <span>${formatNumber(trade.shares)} 股 @ ${formatCurrency(trade.price)}</span>
+                    <span class="text-xs text-gray-400">影響 ${trade.impact}</span>
+                  </div>
+                </div>
+              `
+          )
+          .join("");
+        return trades;
+      }
+
+      if (execution.mode === "REBALANCING") {
+        return `
+            <div class="rebalance-item">
+              <p class="text-sm text-gray-300">完成權重調整，投資組合達到目標配置。</p>
+            </div>
+          `;
+      }
+
+      return '<p class="text-sm text-gray-400">無對應模式的詳細資訊</p>';
+    }
+
+    function attachCardEvents(card, agent) {
+      const buttons = card.querySelectorAll("button[data-action]");
+      buttons.forEach((btn) => {
+        btn.addEventListener("click", (event) => {
+          event.stopPropagation();
+          const action = btn.dataset.action;
+          switch (action) {
+            case "trade":
+            case "rebalance":
+              alert(`${agent.name} 執行 ${action === "trade" ? "交易" : "再平衡"} 模式 (demo)`);
+              break;
+            case "stop":
+              alert(`${agent.name} 已送出停止指令 (demo)`);
+              break;
+            case "edit":
+              alert(`開啟 ${agent.name} 編輯表單 (demo)`);
+              break;
+            case "delete":
+              alert(`刪除 ${agent.name} 的確認框 (demo)`);
+              break;
+            case "retry":
+              alert(`${agent.name} 進行重試 (demo)`);
+              break;
+            case "execution-detail":
+              openExecutionModal(agent, agent.execution);
+              break;
+            default:
+              break;
+          }
+        });
+      });
+    }
+
+    function openExecutionModal(agent, execution = {}) {
+      executionModalTitle.textContent = `${agent.name} · ${execution?.mode || "執行結果"}`;
+      executionModalContent.innerHTML = buildExecutionModalContent(agent, execution);
+      executionModal.classList.remove("hidden");
+    }
+
+    function closeExecutionModal() {
+      executionModal.classList.add("hidden");
+    }
+
+    function buildExecutionModalContent(agent, execution = {}) {
+      if (!execution || Object.keys(execution).length === 0) {
+        return '<p class="text-sm text-gray-400">目前沒有可顯示的執行資料。</p>';
+      }
+
+      const summary = execution.summary || {};
+      const state = execution.state || "unknown";
+      const badgeClass =
+        state === "success"
+          ? "status-badge-success"
+          : state === "failed"
+            ? "status-badge-failed"
+            : "status-badge-running";
+      const stateLabel =
+        state === "success" ? "執行成功" : state === "failed" ? "執行失敗" : "執行狀態";
+
+      const stats = [
+        { label: "模式", value: execution.mode || "--" },
+        { label: "耗時", value: execution.timeMs ? `${execution.timeMs} ms` : "--" },
+        { label: "成交筆數", value: summary.filled ?? "--" },
+        {
+          label: "成交總額",
+          value: summary.notional ? formatCurrency(summary.notional) : "--",
+        },
+        {
+          label: "預估損益",
+          value: typeof summary.estPnL === "number" ? formatCurrency(summary.estPnL) : "--",
+          className:
+            typeof summary.estPnL === "number"
+              ? summary.estPnL >= 0
+                ? "text-gain"
+                : "text-loss"
+              : "",
+        },
+      ];
+
+      const statHtml = stats
+        .map(
+          (stat) => `
+              <div class="stat-card">
+                <p class="text-xs text-gray-400">${stat.label}</p>
+                <p class="mt-2 text-lg font-semibold ${stat.className || ""}">${stat.value}</p>
+              </div>
+            `
+        )
+        .join("");
+
+      const summaryDescription =
+        summary.description ||
+        summary.note ||
+        summary.notes ||
+        (state === "success"
+          ? "AI 已完成此輪操作，策略調整結果如下。"
+          : state === "failed"
+            ? "AI 執行時遭遇問題，請檢視錯誤原因並視情況重試。"
+            : "");
+
+      const summarySection = summaryDescription
+        ? `
+        <div class="modal-summary-block mb-6">
+          <h4>AI 交易總結</h4>
+          <p>${summaryDescription}</p>
+        </div>
+      `
+        : "";
+
+      const detailBlock = execution.detail
+        ? `<div class="space-y-3">${renderExecutionDetail(execution)}</div>`
+        : '<p class="text-sm text-gray-400">尚無詳細資料。</p>';
+
+      const errorBlock = execution.error
+        ? `<div class="mb-6 rounded-lg border border-red-400/40 bg-red-500/10 p-3 text-sm text-red-100">${execution.error}</div>`
+        : "";
+
+      const timestamp = execution.timestamp
+        ? `<span class="text-sm text-gray-400">執行時間 ${execution.timestamp}</span>`
+        : "";
+
+      return `
+        <div class="flex flex-wrap items-center gap-3 mb-4">
+          <span class="status-badge ${badgeClass}">${stateLabel}</span>
+          ${timestamp}
+          <span class="text-sm text-gray-500">Agent：${agent.name}</span>
+        </div>
+        <div class="stat-grid mb-6">
+          ${statHtml}
+        </div>
+        ${summarySection}
+        ${errorBlock}
+        <div>
+          <h4 class="mb-3 text-base font-semibold text-gray-200">詳細內容</h4>
+          ${detailBlock}
+        </div>
+      `;
+    }
+
+    function renderMiniChart(canvas, agent) {
+      if (!window.Chart || !canvas) return;
+      const ctx = canvas.getContext("2d");
+      const values = agent.performance?.map((p) => Math.round(p.portfolio_value)) ?? [];
+      if (!values.length) return;
+
+      const gradient = ctx.createLinearGradient(0, 0, 0, 200);
+      gradient.addColorStop(0, `rgba(${agent.color}, 0.45)`);
+      gradient.addColorStop(1, `rgba(${agent.color}, 0.05)`);
+
+      new Chart(ctx, {
+        type: "line",
+        data: {
+          labels: agent.performance.map((p) => p.label),
+          datasets: [
+            {
+              label: "資產價值",
+              data: values,
+              borderColor: `rgb(${agent.color})`,
+              backgroundColor: gradient,
+              borderWidth: 2,
+              pointRadius: 0,
+              fill: true,
+              tension: 0.35,
+            },
+          ],
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { display: false },
+            tooltip: {
+              callbacks: {
+                label: (ctx) => ` ${formatCurrency(ctx.parsed.y)}`,
+              },
+            },
+          },
+          scales: {
+            x: { display: false },
+            y: { display: false },
+          },
+        },
+      });
+    }
+
+    function setupThemeToggle() {
+      const body = document.body;
+      const toggleBtn = document.getElementById("theme-toggle");
+      const icon = document.getElementById("theme-icon");
+      let theme = "dark";
+
+      toggleBtn.addEventListener("click", () => {
+        theme = theme === "dark" ? "light" : "dark";
+        body.classList.toggle("bg-gray-100", theme === "light");
+        body.classList.toggle("text-gray-900", theme === "light");
+        body.classList.toggle("bg-gray-900", theme === "dark");
+        icon.innerHTML = theme === "dark"
+          ? '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />'
+          : '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />';
+      });
+    }
+
+    renderNav();
+    renderCards();
+    setupThemeToggle();
+  </script>
+</body>
+
+</html>

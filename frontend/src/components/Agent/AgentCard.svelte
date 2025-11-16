@@ -9,7 +9,6 @@
    */
 
   import { onMount } from 'svelte';
-  import { Button } from '../UI/index.js';
   import { WS_EVENT_TYPES } from '../../shared/constants.js';
   import { formatCurrency, formatNumber } from '../../shared/utils.js';
   import { isOpen } from '../../stores/market.js';
@@ -76,12 +75,31 @@
   // 是否可以停止
   let canStop = $derived(agent.status === 'running');
 
+  const statusLabelMap = {
+    running: '運行中',
+    idle: '待命',
+    stopped: '已停止',
+    inactive: '未啟動',
+  };
+
+  let statusLabel = $derived(statusLabelMap[agent.status] ?? '未知狀態');
+  let statusBadgeClass = $derived(
+    agent.status === 'running' ? 'status-badge-running' : 'status-badge-stopped'
+  );
+  let pnlPercent = $derived.by(() => {
+    if (!agent.initial_funds) {
+      return 0;
+    }
+    return (pnl / agent.initial_funds) * 100;
+  });
+
   // 本地狀態 - 執行加載和錯誤
   let isExecuting = $state(false);
   let executionError = $state(null);
   let executionResult = $state(null);
   let showRetryButton = $state(false);
   let retryCount = $state(0);
+  let showExecutionDetail = $state(false); // 控制執行結果詳細區的展開/收起
 
   // Canvas for mini chart
   let chartCanvas;
@@ -315,42 +333,50 @@
 </script>
 
 <div
-  class="agent-card rounded-2xl border border-gray-700 bg-gray-800 p-6 shadow-lg transition-all duration-300 hover:shadow-2xl hover:scale-[1.02] cursor-pointer {selected
-    ? 'ring-2 ring-primary-500'
-    : ''}"
-  style="border-color: rgba({agentColor}, 0.3);"
+  class="agent-card rounded-3xl border border-gray-800 bg-gray-900/80 p-6 shadow-2xl transition-all duration-300 cursor-pointer hover:-translate-y-1 hover:shadow-[0_40px_55px_rgba(0,0,0,0.55)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 focus-visible:ring-offset-gray-900"
+  class:selected
+  style={`border-color: rgba(${agentColor}, 0.35); --agent-color-rgb: ${agentColor};`}
   onclick={handleClick}
   onkeydown={(e) => e.key === 'Enter' && handleClick()}
   role="button"
   tabindex="0"
 >
-  <!-- Header: Agent 名稱、狀態和操作按鈕 -->
-  <div class="mb-4 flex items-center justify-between">
-    <div class="flex-1">
-      <h3 class="text-xl font-bold" style="color: rgb({agentColor});">
-        {agent.name}
-      </h3>
-      <div class="text-base text-gray-500 my-3" style="color: rgb({agentColor});">
-        {agent.ai_model || '未知模型'}
+  <div
+    class="agent-card-header mb-6 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between"
+  >
+    <div class="flex-1 min-w-0">
+      <div class="flex flex-wrap items-center gap-3">
+        <h3 class="text-2xl font-semibold leading-tight" style="color: rgb({agentColor});">
+          {agent.name}
+        </h3>
+        <span class={`status-badge ${statusBadgeClass}`}>
+          {statusLabel}
+        </span>
       </div>
-      <div class="flex items-center gap-2 mt-1">
-        {#if agent.status === 'running'}
-          <span class="status-dot status-running"></span>
-          <span class="text-sm text-green-400">運行中</span>
-        {:else}
-          <span class="status-dot status-stopped"></span>
-          <span class="text-sm text-gray-400">已停止</span>
-        {/if}
+      <p class="agent-model text-base text-gray-300 mt-1">
+        {agent.ai_model || '未知模型'}
+      </p>
+      <div class="agent-meta mt-3 flex flex-wrap items-center gap-3 text-sm text-gray-400">
+        <div class="flex items-center gap-2">
+          <span
+            class={`status-dot ${agent.status === 'running' ? 'status-running' : 'status-stopped'}`}
+          ></span>
+          <span>{statusLabel}</span>
+        </div>
+        <span class="hidden text-gray-600 sm:inline">•</span>
+        <span>模式 {agent.current_mode || '—'}</span>
+        <span class="hidden text-gray-600 sm:inline">•</span>
+        <span>最新現金 {formatCurrency(currentCash)}</span>
       </div>
     </div>
-
-    <!-- 操作按鈕 -->
-    <div class="flex items-center gap-1 opacity-70 hover:opacity-100 transition-opacity">
+    <div class="flex items-center gap-1 self-start opacity-80 transition-opacity hover:opacity-100">
       {#if onedit}
         <button
+          type="button"
           onclick={handleEdit}
-          class="rounded-lg p-2 text-gray-400 hover:bg-gray-700 hover:text-white transition-colors"
+          class="icon-button"
           title="編輯 Agent"
+          aria-label={`編輯 ${agent.name}`}
         >
           <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path
@@ -365,9 +391,11 @@
 
       {#if ondelete}
         <button
+          type="button"
           onclick={handleDelete}
-          class="rounded-lg p-2 text-gray-400 hover:bg-red-600 hover:text-white transition-colors"
+          class="icon-button"
           title="刪除 Agent"
+          aria-label={`刪除 ${agent.name}`}
           disabled={!isEditable}
         >
           <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -383,31 +411,31 @@
     </div>
   </div>
 
-  <!-- 資產概覽 -->
-  <div class="mb-6 grid grid-cols-2 gap-4">
-    <div>
-      <p class="text-xs text-gray-400 mb-1">總資產</p>
-      <p class="text-2xl font-bold" style="color: rgb({agentColor});">
+  <div class="metric-grid mb-6">
+    <div class="metric-card">
+      <p class="metric-caption">總資產</p>
+      <p class="metric-value" style="color: rgb({agentColor});">
         {formatCurrency(totalAssets)}
       </p>
+      <p class="metric-caption">初始資金 {formatCurrency(agent.initial_funds)}</p>
     </div>
-    <div>
-      <p class="text-xs text-gray-400 mb-1">總損益</p>
-      <p class="text-2xl font-bold" class:text-gain={isProfit} class:text-loss={!isProfit}>
+    <div class="metric-card">
+      <p class="metric-caption">總損益</p>
+      <p class={`metric-value ${isProfit ? 'text-gain' : 'text-loss'}`}>
         {isProfit ? '+' : ''}{formatCurrency(pnl)}
       </p>
+      <p class="metric-caption">{pnlPercent.toFixed(2)}%</p>
     </div>
   </div>
 
-  <!-- 現金餘額 -->
-  <div class="mb-6 grid grid-cols-2 gap-4">
-    <div>
+  <div class="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2">
+    <div class="info-card">
       <p class="text-xs text-gray-400 mb-1">持有現金</p>
       <p class="text-lg font-semibold" style="color: rgb({agentColor});">
         {formatCurrency(currentCash)}
       </p>
     </div>
-    <div>
+    <div class="info-card">
       <p class="text-xs text-gray-400 mb-1">股票現值</p>
       <p class="text-lg font-semibold" style="color: rgb({agentColor});">
         {formatCurrency(holdingsTotalValue)}
@@ -415,51 +443,50 @@
     </div>
   </div>
 
-  <!-- 迷你績效圖表 -->
-  <div class="mb-6 h-48 w-full">
+  <div class="chart-shell mb-6 h-48 w-full">
     <canvas bind:this={chartCanvas}></canvas>
   </div>
 
-  <!-- 持有股數簡介 -->
   <div class="mb-6">
-    <p class="text-xs text-gray-400 mb-3 font-semibold">持有股數</p>
+    <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
+      <p class="section-title">持有股數</p>
+      <p class="section-subtitle">{holdings?.length ?? 0} 檔</p>
+    </div>
     {#if holdings && holdings.length > 0}
-      <div class="space-y-2 max-h-32 overflow-y-auto custom-scrollbar">
+      <div class="holdings-list space-y-2 max-h-32 overflow-y-auto custom-scrollbar">
         {#each holdings.slice(0, 10) as holding}
-          <div class="flex justify-between items-center text-sm bg-gray-700/50 p-2 rounded-md">
+          <div class="holding-row">
             <div>
-              <div class="font-bold text-white">{holding.ticker}</div>
-              <div class="text-xs text-gray-400">{holding.company_name || holding.name || ''}</div>
+              <p class="holding-ticker">{holding.ticker}</p>
+              <p class="holding-name">{holding.company_name || holding.name || '—'}</p>
             </div>
             <div class="text-right">
-              <div class="font-mono text-white">{formatNumber(holding.shares || 0)} 股</div>
-              <div class="text-xs text-gray-400">@ {formatCurrency(holding.avg_price || 0)}</div>
+              <p class="holding-shares">{formatNumber(holding.shares || 0)} 股</p>
+              <p class="holding-price">均價 {formatCurrency(holding.avg_price || 0)}</p>
             </div>
           </div>
         {/each}
         {#if holdings.length > 10}
-          <p class="text-xs text-gray-500 text-center">
-            還有 {holdings.length - 3} 檔股票...
+          <p class="section-subtitle text-center">
+            還有 {holdings.length - 10} 檔股票...
           </p>
         {/if}
       </div>
     {:else}
-      <p class="text-sm text-gray-500 text-center py-4">尚無持股</p>
+      <p class="empty-state">尚無持股</p>
     {/if}
   </div>
 
-  <!-- 操作按鈕 -->
-  <div class="flex gap-2 flex-col">
-    <!-- 模式選擇按鈕 -->
+  <div class="flex flex-col gap-3" data-role="actions">
     {#if canStart}
-      <div class="grid grid-cols-2 gap-3">
-        <!-- 交易按鈕 -->
+      <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <button
           onclick={handleTrade}
           disabled={!$isOpen || isExecuting}
           class="mode-button group"
-          style="--btn-base-color: rgb({agentColor}); --btn-light-color: rgba({agentColor}, 0.8);"
+          style="--btn-base-color: rgb({agentColor}); --btn-light-color: rgba({agentColor}, 0.75);"
           title="交易模式：執行交易決策"
+          aria-label="啟動交易模式"
         >
           <div class="button-wrapper">
             <svg
@@ -475,17 +502,17 @@
                 d="M13 10V3L4 14h7v7l9-11h-7z"
               />
             </svg>
-            <span class="hidden sm:inline text-sm font-semibold">交易</span>
+            <span class="text-sm font-semibold">交易</span>
           </div>
         </button>
 
-        <!-- 平衡按鈕 -->
         <button
           onclick={handleRebalance}
           disabled={!$isOpen || isExecuting}
           class="mode-button group"
-          style="--btn-base-color: rgb({agentColor}); --btn-light-color: rgba({agentColor}, 0.8);"
+          style="--btn-base-color: rgb({agentColor}); --btn-light-color: rgba({agentColor}, 0.75);"
           title="再平衡模式：調整投資組合"
+          aria-label="啟動再平衡模式"
         >
           <div class="button-wrapper">
             <svg
@@ -501,105 +528,190 @@
                 d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"
               />
             </svg>
-            <span class="hidden sm:inline text-sm font-semibold">平衡</span>
+            <span class="text-sm font-semibold">再平衡</span>
           </div>
         </button>
       </div>
     {/if}
 
-    <!-- 停止按鈕（總是顯示當 Agent 運行中） -->
     {#if canStop}
-      <Button
-        variant="danger"
-        size="md"
-        fullWidth
+      <button
         onclick={handleStop}
         disabled={!$isOpen || isExecuting}
-        loading={isExecuting}
+        class="stop-button group"
+        style="--btn-base-color: rgba(239, 68, 68, 0.9); --btn-light-color: rgba(248, 113, 113, 0.9);"
         title="停止執行"
+        aria-label="停止 Agent"
       >
-        <svg class="mr-2 h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            stroke-width="2"
-            d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-          />
-          <path
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            stroke-width="2"
-            d="M9 10a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1h-4a1 1 0 01-1-1v-4z"
-          />
-        </svg>
-        停止
-      </Button>
+        <div class="button-wrapper">
+          {#if isExecuting}
+            <svg
+              class="animate-spin h-5 w-5"
+              xmlns="http://www.w3.org/2000/svg"
+              fill="none"
+              viewBox="0 0 24 24"
+            >
+              <circle
+                class="opacity-25"
+                cx="12"
+                cy="12"
+                r="10"
+                stroke="currentColor"
+                stroke-width="4"
+              />
+              <path
+                class="opacity-75"
+                fill="currentColor"
+                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+              />
+            </svg>
+          {:else}
+            <svg
+              class="h-5 w-5 transition-transform duration-300 group-hover:scale-110"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                d="M21 12a9 9 0 11-18 0 9 0 0118 0z"
+              />
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                d="M9 10a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1h-4a1 1 0 01-1-1v-4z"
+              />
+            </svg>
+          {/if}
+          <span class="text-sm font-semibold">停止</span>
+        </div>
+      </button>
     {/if}
 
-    <!-- 執行狀態提示 -->
     {#if isExecuting}
-      <div class="mt-2 p-2 bg-blue-50 border border-blue-200 rounded text-sm text-blue-800">
+      <div class="alert-card alert-info">
         <div class="flex items-center gap-2">
-          <div
-            class="animate-spin h-4 w-4 border-2 border-blue-500 border-t-transparent rounded-full"
-          ></div>
+          <div class="spinner"></div>
           <span>執行中...</span>
         </div>
       </div>
     {/if}
 
     {#if executionError}
-      <div class="mt-2 p-2 bg-red-50 border border-red-200 rounded text-sm text-red-800">
+      <div class="alert-card alert-error">
         <div class="font-semibold">
           執行失敗{retryCount > 0
             ? ` (重試 ${retryCount}/${executionRetryManager.maxRetries})`
             : ''}
         </div>
-        <div class="text-xs mt-1">{executionError}</div>
+        <p class="text-xs leading-relaxed">{executionError}</p>
         {#if showRetryButton}
-          <button
-            type="button"
-            onclick={handleRetry}
-            class="mt-2 px-2 py-1 bg-red-600 text-white text-xs rounded hover:bg-red-700 transition-colors"
-          >
-            重試
-          </button>
+          <button type="button" onclick={handleRetry} class="retry-button"> 重試 </button>
         {/if}
       </div>
     {/if}
 
     {#if executionResult && executionResult.success}
-      <div class="mt-2 p-2 bg-green-50 border border-green-200 rounded text-sm text-green-800">
-        <div class="font-semibold">✓ 執行完成</div>
-        <div class="text-xs mt-1">
-          {executionResult.mode} 模式 (耗時 {executionResult.time_ms}ms)
+      <div class="result-summary animation-fade-in mt-3">
+        <div>
+          <h4 class="font-semibold text-white text-lg">執行完成</h4>
+          <p class="text-sm text-gray-300 mt-1">
+            {executionResult.mode || '未知模式'} 模式 • 耗時 {executionResult.time_ms ?? '--'}ms
+          </p>
+          {#if executionResult.sessionId}
+            <p class="text-xs text-gray-400 mt-1">Session: {executionResult.sessionId}</p>
+          {/if}
         </div>
+        <button
+          type="button"
+          class="expand-button"
+          onclick={() => (showExecutionDetail = !showExecutionDetail)}
+        >
+          {showExecutionDetail ? '隱藏詳細結果 ▲' : '查看詳細結果 ▼'}
+        </button>
       </div>
+
+      {#if showExecutionDetail}
+        <div class="result-detail-container animation-slide-in">
+          <h5 class="font-semibold text-white mb-3">執行詳細結果</h5>
+          {#if executionResult.detail}
+            <pre class="detail-json">{JSON.stringify(executionResult.detail, null, 2)}</pre>
+          {:else}
+            <p class="text-sm text-gray-400">目前沒有可顯示的詳細資料。</p>
+          {/if}
+        </div>
+      {/if}
     {/if}
   </div>
 </div>
 
 <style>
+  .agent-card {
+    position: relative;
+    overflow: hidden;
+    background:
+      linear-gradient(
+        160deg,
+        rgba(var(--agent-color-rgb, 59, 130, 246), 0.4),
+        rgba(15, 23, 42, 0.92)
+      ),
+      rgba(15, 23, 42, 0.9);
+    border-radius: 1.5rem;
+    border: 1px solid rgba(148, 163, 184, 0.2);
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.45);
+  }
+
+  .agent-card::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background: radial-gradient(
+      circle at top right,
+      rgba(var(--agent-color-rgb, 59, 130, 246), 0.45),
+      transparent 55%
+    );
+  }
+
+  .agent-card.selected {
+    box-shadow:
+      0 0 0 2px rgba(59, 130, 246, 0.55),
+      0 40px 55px rgba(0, 0, 0, 0.55);
+  }
+
+  .agent-card-header {
+    position: relative;
+    z-index: 1;
+  }
+
   .text-gain {
-    color: #4ade80; /* green-400 */
+    color: #4ade80;
   }
+
   .text-loss {
-    color: #f87171; /* red-400 */
+    color: #f87171;
   }
+
   .status-dot {
-    width: 8px;
-    height: 8px;
-    border-radius: 50%;
+    width: 10px;
+    height: 10px;
+    border-radius: 9999px;
     display: inline-block;
   }
+
   .status-running {
     background-color: #22c55e;
-    box-shadow: 0 0 8px #22c55e;
+    box-shadow: 0 0 10px rgba(34, 197, 94, 0.8);
     animation: pulse 2s infinite;
   }
+
   .status-stopped {
     background-color: #6b7280;
   }
+
   @keyframes pulse {
     0%,
     100% {
@@ -610,73 +722,191 @@
     }
   }
 
-  /* 模式按鈕美化樣式 - 使用動態agentColor */
-  .mode-button {
+  .metric-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 1rem;
+  }
+
+  .metric-card {
     position: relative;
-    padding: 0.75rem 1rem;
-    border-radius: 0.75rem;
-    font-weight: 600;
-    color: white;
-    border: none;
-    cursor: pointer;
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-    /* 使用動態顏色變數，base色到深色的漸層 */
-    background: linear-gradient(135deg, var(--btn-light-color) 0%, var(--btn-base-color) 100%);
-    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
-    overflow: hidden;
-    font-size: 0.875rem;
-  }
-
-  .mode-button:not(:disabled) {
-    transform-origin: center;
-  }
-
-  .mode-button:not(:disabled):hover {
-    transform: scale(1.05);
-    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.5);
-  }
-
-  .mode-button:not(:disabled):active {
-    transform: scale(0.95);
-    animation: buttonPulse 0.4s ease-out;
-  }
-
-  .mode-button:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-  }
-
-  .mode-button:focus {
-    outline: none;
-    /* 使用 --btn-base-color 進行focus ring */
-    box-shadow: 0 0 0 3px rgba(0, 0, 0, 0.2);
-  }
-
-  /* 光澤效果 - hover時增加 */
-  .mode-button::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: -100%;
-    width: 100%;
-    height: 100%;
-    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
-    transition: left 0.5s ease;
+    background: rgba(15, 23, 42, 0.85);
+    border-radius: 1rem;
+    border: 1px solid rgba(148, 163, 184, 0.25);
+    padding: 1rem 1.25rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    min-height: 120px;
     z-index: 1;
   }
 
-  .mode-button:not(:disabled):hover::before {
-    left: 100%;
+  .metric-card::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    pointer-events: none;
+    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.04);
   }
 
-  /* 按鈕內容包裝 */
+  .metric-value {
+    font-size: 1.9rem;
+    font-weight: 700;
+    line-height: 1.2;
+  }
+
+  .metric-caption {
+    font-size: 0.8rem;
+    color: #94a3b8;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+  }
+
+  .info-card {
+    background: rgba(15, 23, 42, 0.75);
+    border: 1px solid rgba(148, 163, 184, 0.2);
+    border-radius: 1rem;
+    padding: 1rem;
+    min-height: 110px;
+  }
+
+  .chart-shell {
+    background: rgba(15, 23, 42, 0.6);
+    border: 1px solid rgba(148, 163, 184, 0.2);
+    border-radius: 1rem;
+    padding: 1rem;
+  }
+
+  .section-title {
+    font-size: 0.85rem;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: #e5e7eb;
+  }
+
+  .section-subtitle {
+    font-size: 0.8rem;
+    color: #94a3b8;
+  }
+
+  .empty-state {
+    text-align: center;
+    padding: 1rem;
+    border-radius: 0.85rem;
+    border: 1px dashed rgba(148, 163, 184, 0.4);
+    color: #6b7280;
+    background: rgba(15, 23, 42, 0.5);
+  }
+
+  .holding-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.65rem 0.75rem;
+    border-radius: 0.75rem;
+    background: rgba(30, 41, 59, 0.8);
+    border: 1px solid rgba(75, 85, 99, 0.35);
+  }
+
+  .holding-ticker {
+    font-weight: 600;
+    color: #e5e7eb;
+  }
+
+  .holding-name {
+    font-size: 0.75rem;
+    color: #94a3b8;
+  }
+
+  .holding-shares {
+    font-family: 'JetBrains Mono', 'SFMono-Regular', ui-monospace, monospace;
+    color: #f8fafc;
+  }
+
+  .holding-price {
+    font-size: 0.75rem;
+    color: #94a3b8;
+  }
+
+  .icon-button {
+    border: none;
+    background: transparent;
+    border-radius: 0.5rem;
+    padding: 0.4rem;
+    color: #9ca3af;
+    transition: all 0.2s ease;
+  }
+
+  .icon-button:hover:not(:disabled) {
+    background-color: rgba(107, 114, 128, 0.3);
+    color: #fff;
+  }
+
+  .icon-button:disabled {
+    opacity: 0.35;
+    cursor: not-allowed;
+  }
+
+  .custom-scrollbar::-webkit-scrollbar {
+    width: 6px;
+  }
+
+  .custom-scrollbar::-webkit-scrollbar-track {
+    background: #1f2937;
+  }
+
+  .custom-scrollbar::-webkit-scrollbar-thumb {
+    background-color: #4b5563;
+    border-radius: 9999px;
+  }
+
+  .mode-button {
+    position: relative;
+    padding: 0.75rem 1rem;
+    border-radius: 0.85rem;
+    font-weight: 600;
+    color: #fff;
+    border: none;
+    cursor: pointer;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    background: linear-gradient(135deg, var(--btn-light-color), var(--btn-base-color));
+    box-shadow: 0 10px 20px rgba(0, 0, 0, 0.35);
+    overflow: hidden;
+    font-size: 0.9rem;
+  }
+
+  .mode-button:not(:disabled):hover {
+    transform: translateY(-2px);
+    box-shadow: 0 18px 35px rgba(0, 0, 0, 0.5);
+  }
+
+  .mode-button:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+  }
+
+  .mode-button::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(110deg, transparent, rgba(255, 255, 255, 0.25), transparent);
+    transform: translateX(-100%);
+    transition: transform 0.6s ease;
+  }
+
+  .mode-button:not(:disabled):hover::before {
+    transform: translateX(100%);
+  }
+
   .button-wrapper {
+    position: relative;
     display: flex;
     align-items: center;
     justify-content: center;
-    gap: 0.375rem;
-    position: relative;
-    z-index: 10;
+    gap: 0.4rem;
+    z-index: 1;
   }
 
   .button-wrapper svg {
@@ -684,23 +914,269 @@
   }
 
   .mode-button:not(:disabled):hover .button-wrapper svg {
-    transform: scale(1.1) rotate(5deg);
+    transform: scale(1.1);
   }
 
-  .mode-button:not(:disabled):active .button-wrapper svg {
-    transform: scale(0.95);
+  .stop-button {
+    position: relative;
+    width: 100%;
+    padding: 0.85rem 1rem;
+    border-radius: 0.85rem;
+    font-weight: 600;
+    color: #fff;
+    border: none;
+    cursor: pointer;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    background: linear-gradient(135deg, var(--btn-base-color), rgba(185, 28, 28, 0.85));
+    box-shadow: 0 12px 24px rgba(239, 68, 68, 0.35);
+    overflow: hidden;
   }
 
-  /* 執行中的脈衝動畫 */
-  @keyframes buttonPulse {
-    0% {
-      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+  .stop-button:disabled {
+    opacity: 0.35;
+    cursor: not-allowed;
+  }
+
+  .stop-button::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(110deg, transparent, rgba(255, 255, 255, 0.3), transparent);
+    transform: translateX(-100%);
+    transition: transform 0.6s ease;
+  }
+
+  .stop-button:not(:disabled):hover::before {
+    transform: translateX(100%);
+  }
+
+  .alert-card {
+    padding: 0.75rem 1rem;
+    border-radius: 0.75rem;
+    border: 1px solid transparent;
+    font-size: 0.85rem;
+  }
+
+  .alert-info {
+    background: rgba(59, 130, 246, 0.12);
+    border-color: rgba(59, 130, 246, 0.4);
+    color: #bfdbfe;
+  }
+
+  .alert-error {
+    background: rgba(239, 68, 68, 0.12);
+    border-color: rgba(239, 68, 68, 0.4);
+    color: #fecaca;
+  }
+
+  .retry-button {
+    margin-top: 0.5rem;
+    padding: 0.35rem 0.75rem;
+    border-radius: 0.5rem;
+    background: #ef4444;
+    color: #fff;
+    border: none;
+    font-size: 0.75rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.2s ease;
+  }
+
+  .retry-button:hover {
+    background: #dc2626;
+  }
+
+  .spinner {
+    width: 1rem;
+    height: 1rem;
+    border: 2px solid rgba(147, 197, 253, 0.4);
+    border-top-color: #60a5fa;
+    border-radius: 9999px;
+    animation: spin 1s linear infinite;
+  }
+
+  @keyframes spin {
+    to {
+      transform: rotate(360deg);
     }
-    50% {
-      box-shadow: 0 8px 30px rgba(0, 0, 0, 0.6);
+  }
+
+  .result-summary {
+    background: linear-gradient(135deg, rgba(34, 197, 94, 0.1), rgba(34, 197, 94, 0.05));
+    border-left: 4px solid #22c55e;
+    border-radius: 0.85rem;
+    padding: 1rem;
+    transition: all 0.3s ease;
+  }
+
+  .result-summary.failed {
+    border-left-color: #ef4444;
+    background: linear-gradient(135deg, rgba(239, 68, 68, 0.1), rgba(239, 68, 68, 0.05));
+  }
+
+  .result-summary.partial {
+    border-left-color: #eab308;
+    background: linear-gradient(135deg, rgba(234, 179, 8, 0.1), rgba(234, 179, 8, 0.05));
+  }
+
+  .trade-item,
+  .rebalance-item {
+    background: rgba(30, 41, 59, 0.9);
+    border: 1px solid rgba(75, 85, 99, 0.35);
+    border-radius: 0.75rem;
+    padding: 0.75rem;
+    margin-bottom: 0.75rem;
+  }
+
+  .trade-action-buy {
+    background: rgba(34, 197, 94, 0.2);
+    color: #4ade80;
+    padding: 0.25rem 0.75rem;
+    border-radius: 9999px;
+    font-size: 0.75rem;
+    font-weight: 600;
+  }
+
+  .trade-action-sell {
+    background: rgba(239, 68, 68, 0.2);
+    color: #f87171;
+    padding: 0.25rem 0.75rem;
+    border-radius: 9999px;
+    font-size: 0.75rem;
+    font-weight: 600;
+  }
+
+  .value-positive {
+    color: #4ade80;
+  }
+
+  .value-negative {
+    color: #f87171;
+  }
+
+  .progress-bar {
+    background: rgba(75, 85, 99, 0.3);
+    border-radius: 0.25rem;
+    height: 0.5rem;
+    overflow: hidden;
+    margin: 0.5rem 0;
+  }
+
+  .progress-fill {
+    background: linear-gradient(90deg, #22c55e, #16a34a);
+    height: 100%;
+    transition: width 0.5s ease;
+  }
+
+  .stat-card {
+    background: rgba(30, 41, 59, 0.8);
+    border: 1px solid rgba(75, 85, 99, 0.2);
+    border-radius: 0.5rem;
+    padding: 1rem;
+    text-align: center;
+  }
+
+  .animation-fade-in {
+    animation: fadeIn 0.5s ease;
+  }
+
+  @keyframes fadeIn {
+    from {
+      opacity: 0;
+      transform: translateY(10px);
     }
-    100% {
-      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+    to {
+      opacity: 1;
+      transform: translateY(0);
     }
+  }
+
+  .animation-slide-in {
+    animation: slideIn 0.3s ease;
+  }
+
+  @keyframes slideIn {
+    from {
+      max-height: 0;
+      opacity: 0;
+    }
+    to {
+      max-height: 1000px;
+      opacity: 1;
+    }
+  }
+
+  .status-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.25rem 0.75rem;
+    border-radius: 9999px;
+    font-size: 0.75rem;
+    font-weight: 600;
+  }
+
+  .status-badge-success {
+    background: rgba(34, 197, 94, 0.2);
+    color: #4ade80;
+  }
+
+  .status-badge-failed {
+    background: rgba(239, 68, 68, 0.2);
+    color: #f87171;
+  }
+
+  .status-badge-partial {
+    background: rgba(234, 179, 8, 0.2);
+    color: #facc15;
+  }
+
+  .status-badge-running {
+    background: rgba(34, 197, 94, 0.15);
+    color: #4ade80;
+  }
+
+  .status-badge-stopped {
+    background: rgba(156, 163, 175, 0.15);
+    color: #d1d5db;
+  }
+
+  .result-detail-container {
+    background: rgba(17, 24, 39, 0.85);
+    border: 1px solid rgba(75, 85, 99, 0.4);
+    border-radius: 0.85rem;
+    padding: 1rem;
+    margin-top: 1rem;
+    backdrop-filter: blur(12px);
+  }
+
+  .expand-button {
+    width: 100%;
+    padding: 0.5rem 0.75rem;
+    background: rgba(75, 85, 99, 0.3);
+    border: 1px solid rgba(75, 85, 99, 0.4);
+    border-radius: 0.65rem;
+    color: #d1d5db;
+    font-weight: 600;
+    margin-top: 0.75rem;
+    transition: all 0.2s ease;
+  }
+
+  .expand-button:hover {
+    background: rgba(75, 85, 99, 0.5);
+  }
+
+  .expand-button:active {
+    transform: scale(0.98);
+  }
+
+  .detail-json {
+    background: rgba(15, 23, 42, 0.9);
+    border: 1px solid rgba(148, 163, 184, 0.2);
+    border-radius: 0.5rem;
+    padding: 0.75rem;
+    font-size: 0.8rem;
+    overflow-x: auto;
+    color: #e5e7eb;
   }
 </style>

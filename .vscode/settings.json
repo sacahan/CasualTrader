@@ -22,7 +22,7 @@
   "window.commandCenter": true,
   "chat.commandCenter.enabled": true,
   // 目前 gpt-4o-copilot 已經是預設值，但明確設定可確保一致性
-  "github.copilot.selectedCompletionModel": "gpt-4o-copilot",
+  // "github.copilot.selectedCompletionModel": "gpt-4o-copilot",
   "github.copilot.editor.enableCodeActions": true,
   "github.copilot.renameSuggestions.triggerAutomatically": true,
   "workbench.commandPalette.experimental.askChatLocation": "chatView",
@@ -31,9 +31,15 @@
   "editor.inlineSuggest.edits.showCollapsed": true,
   "editor.tabSize": 2,
   "editor.insertSpaces": true,
+    "editor.codeActionsOnSave": {
+      "source.fixAll.eslint": "always"
+    },
   "[javascript]": {
     "editor.defaultFormatter": "esbenp.prettier-vscode"
   },
+  "eslint.workingDirectories": [
+    "frontend"
+  ],
   // GitHub Copilot Chat
   "github.copilot.chat.followUps": "always",
   "github.copilot.chat.localeOverride": "zh-TW",
