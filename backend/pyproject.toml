@@ -23,7 +23,7 @@ dependencies = [
     "pytest>=8.4.2",
     "mcp>=1.16.0",
     "graphviz>=0.21",
-    "psycopg2>=2.9.11",
+    "psycopg2-binary>=2.9.11",
 ]
 
 [project.optional-dependencies]

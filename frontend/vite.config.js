@@ -1,5 +1,6 @@
 import { defineConfig, loadEnv } from 'vite';
 import { svelte } from '@sveltejs/vite-plugin-svelte';
+import tailwindcss from '@tailwindcss/vite';
 
 export default defineConfig(({ mode }) => {
   // 載入環境變數
@@ -13,7 +14,7 @@ export default defineConfig(({ mode }) => {
   const wsTarget = wsUrl.replace('/ws', '');
 
   return {
-    plugins: [svelte()],
+    plugins: [tailwindcss(), svelte()],
     server: {
       port,
       host: true,

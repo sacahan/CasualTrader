@@ -10,7 +10,7 @@ from __future__ import annotations
 import json
 from typing import Any
 from decimal import Decimal
-from datetime import datetime, date, timezone
+from datetime import date
 import uuid
 
 from sqlalchemy import select
@@ -33,6 +33,7 @@ from common.enums import (
     validate_agent_status,
 )
 from common.logger import logger
+from common.time_utils import utc_now
 
 
 # ==========================================
@@ -362,8 +363,8 @@ class AgentsService:
                 status=AgentStatus.INACTIVE,
                 current_mode=AgentMode.TRADING,
                 investment_preferences=preferences_json,
-                created_at=datetime.now(timezone.utc),
-                updated_at=datetime.now(timezone.utc),
+                created_at=utc_now(),
+                updated_at=utc_now(),
             )
 
             self.session.add(agent)
@@ -428,9 +429,9 @@ class AgentsService:
                 )
 
             # 更新時間戳記
-            agent.updated_at = datetime.now(timezone.utc)
+            agent.updated_at = utc_now()
             if status is not None:
-                agent.last_active_at = datetime.now(timezone.utc)
+                agent.last_active_at = utc_now()
 
             await self.session.commit()
 
@@ -525,11 +526,7 @@ class AgentsService:
                 commission=Decimal(str(commission)),
                 status=status_enum,
                 session_id=session_id,
-                execution_time=(
-                    datetime.now(timezone.utc)
-                    if status_enum == TransactionStatus.EXECUTED
-                    else None
-                ),
+                execution_time=(utc_now() if status_enum == TransactionStatus.EXECUTED else None),
                 decision_reason=decision_reason,
             )
 
@@ -618,7 +615,7 @@ class AgentsService:
                     holding.quantity = new_quantity
                     holding.total_cost = new_total_cost
                     holding.average_cost = new_average_cost
-                    holding.updated_at = datetime.now(timezone.utc)
+                    holding.updated_at = utc_now()
                 else:
                     # 創建新持股
                     total_cost = Decimal(str(quantity * price))
@@ -649,7 +646,7 @@ class AgentsService:
                 else:
                     # 部分賣出，更新成本
                     holding.total_cost = holding.average_cost * holding.quantity
-                    holding.updated_at = datetime.now(timezone.utc)
+                    holding.updated_at = utc_now()
 
             await self.session.commit()
             logger.info(
@@ -1449,7 +1446,7 @@ class AgentsService:
                 performance.total_trades = total_trades
                 performance.sell_trades_count = completed_trades  # 賣出交易數
                 performance.winning_trades_correct = winning_pairs  # 真實獲利交易數
-                performance.updated_at = datetime.now(timezone.utc)
+                performance.updated_at = utc_now()
             else:
                 # 創建新記錄
                 performance = AgentPerformance(
@@ -1548,8 +1545,8 @@ class AgentsService:
             agent.current_funds = Decimal(str(new_funds))
 
             # 更新時間戳記
-            agent.updated_at = datetime.now(timezone.utc)
-            agent.last_active_at = datetime.now(timezone.utc)
+            agent.updated_at = utc_now()
+            agent.last_active_at = utc_now()
 
             await self.session.commit()
 

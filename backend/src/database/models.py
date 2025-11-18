@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import uuid
 from dataclasses import dataclass
-from datetime import date, datetime, timezone
+from datetime import date, datetime
 from decimal import Decimal
 from typing import Any
 
@@ -37,6 +37,7 @@ from common.enums import (
     TransactionAction,
     TransactionStatus,
 )
+from common.time_utils import utc_now
 
 
 class Base(AsyncAttrs, DeclarativeBase):
@@ -98,10 +99,8 @@ class Agent(Base):
     investment_preferences: Mapped[str | None] = mapped_column(Text)
 
     # 時間戳記
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now())
-    updated_at: Mapped[datetime] = mapped_column(
-        DateTime, default=lambda: datetime.now(), onupdate=lambda: datetime.now()
-    )
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now, onupdate=utc_now)
     last_active_at: Mapped[datetime | None] = mapped_column(DateTime)
 
     # 關聯關係
@@ -138,9 +137,7 @@ class AgentSession(Base):
 
     # 執行狀態
     status: Mapped[SessionStatus] = mapped_column(String(20), default=SessionStatus.PENDING)
-    start_time: Mapped[datetime] = mapped_column(
-        DateTime, default=lambda: datetime.now(timezone.utc)
-    )
+    start_time: Mapped[datetime] = mapped_column(DateTime, default=utc_now)
     end_time: Mapped[datetime | None] = mapped_column(DateTime)
     execution_time_ms: Mapped[int | None] = mapped_column(Integer)
 
@@ -155,14 +152,14 @@ class AgentSession(Base):
     # 審計時間戳記 (遵循 timestamp.instructions.md 標準)
     created_at: Mapped[datetime] = mapped_column(
         DateTime,
-        default=lambda: datetime.now(timezone.utc),
+        default=utc_now,
         nullable=False,
         doc="Record creation timestamp (UTC)",
     )
     updated_at: Mapped[datetime] = mapped_column(
         DateTime,
-        default=lambda: datetime.now(timezone.utc),
-        onupdate=lambda: datetime.now(timezone.utc),
+        default=utc_now,
+        onupdate=utc_now,
         nullable=False,
         doc="Last record update timestamp (UTC)",
     )
@@ -197,13 +194,11 @@ class AgentHolding(Base):
     total_cost: Mapped[Decimal] = mapped_column(Numeric(15, 2), nullable=False)
 
     # 時間戳記
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime, default=lambda: datetime.now(timezone.utc)
-    )
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime,
-        default=lambda: datetime.now(timezone.utc),
-        onupdate=lambda: datetime.now(timezone.utc),
+        default=utc_now,
+        onupdate=utc_now,
     )
 
     # 關聯關係
@@ -246,9 +241,7 @@ class Transaction(Base):
     market_data: Mapped[dict[str, Any] | None] = mapped_column(JSON)
 
     # 時間戳記
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime, default=lambda: datetime.now(timezone.utc)
-    )
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now)
 
     # 關聯關係
     agent: Mapped[Agent] = relationship("Agent", back_populates="transactions")
@@ -315,13 +308,11 @@ class AgentPerformance(Base):
     winning_trades_correct: Mapped[int] = mapped_column(Integer, default=0, doc="真實獲利交易數")
 
     # 時間戳記
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime, default=lambda: datetime.now(timezone.utc)
-    )
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime,
-        default=lambda: datetime.now(timezone.utc),
-        onupdate=lambda: datetime.now(timezone.utc),
+        default=utc_now,
+        onupdate=utc_now,
     )
 
     # 關聯關係
@@ -355,13 +346,11 @@ class AIModelConfig(Base):
     display_order: Mapped[int] = mapped_column(Integer, default=999)
 
     # 時間戳記
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime, default=lambda: datetime.now(timezone.utc)
-    )
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime,
-        default=lambda: datetime.now(timezone.utc),
-        onupdate=lambda: datetime.now(timezone.utc),
+        default=utc_now,
+        onupdate=utc_now,
     )
 
     # 表約束

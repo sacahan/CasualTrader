@@ -7,7 +7,6 @@ TradingService - 交易服務層
 from __future__ import annotations
 
 import asyncio
-from datetime import datetime, timezone
 from typing import Any
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -16,6 +15,7 @@ from trading.trading_agent import TradingAgent
 from service.agents_service import AgentsService, AgentNotFoundError
 from common.enums import AgentMode, AgentStatus, SessionStatus, TransactionStatus
 from common.logger import logger
+from common.time_utils import utc_now
 from service.session_service import AgentSessionService
 
 
@@ -123,7 +123,7 @@ class TradingService:
             AgentBusyError: Agent 正在執行中
             TradingServiceError: 執行失敗
         """
-        start_time = datetime.now(timezone.utc)
+        start_time = utc_now()
         agent = None
 
         try:
@@ -187,9 +187,7 @@ class TradingService:
             await self.agents_service.update_agent_status(agent_id, status=AgentStatus.INACTIVE)
             logger.info(f"Agent {agent_id} status updated to INACTIVE")
 
-            execution_time_ms = int(
-                (datetime.now(timezone.utc) - start_time).total_seconds() * 1000
-            )
+            execution_time_ms = int((utc_now() - start_time).total_seconds() * 1000)
             logger.info(
                 f"✅ Completed {mode.value} for agent {agent_id} in {execution_time_ms}ms 🚀"
             )
@@ -222,9 +220,7 @@ class TradingService:
             await self.agents_service.update_agent_status(agent_id, status=AgentStatus.INACTIVE)
             logger.info(f"Agent {agent_id} status updated to INACTIVE (after error)")
 
-            execution_time_ms = int(
-                (datetime.now(timezone.utc) - start_time).total_seconds() * 1000
-            )
+            execution_time_ms = int((utc_now() - start_time).total_seconds() * 1000)
             raise TradingServiceError(f"Failed to execute {mode.value}: {str(e)}") from e
 
         finally:
@@ -573,7 +569,7 @@ class TradingService:
             status=status_enum,
             session_id=session_id,
             execution_time=(
-                datetime.now(timezone.utc) if status_enum == TransactionStatus.EXECUTED else None
+                utc_now() if status_enum == TransactionStatus.EXECUTED else None
             ),
             decision_reason=decision_reason,
         )
@@ -616,7 +612,7 @@ class TradingService:
                 holding.quantity = new_quantity
                 holding.total_cost = new_total_cost
                 holding.average_cost = new_average_cost
-                holding.updated_at = datetime.now(timezone.utc)
+                holding.updated_at = utc_now()
             else:
                 # 創建新持股
                 total_cost = Decimal(str(quantity * price))
@@ -648,7 +644,7 @@ class TradingService:
             else:
                 # 部分賣出，更新成本
                 holding.total_cost = holding.average_cost * holding.quantity
-                holding.updated_at = datetime.now(timezone.utc)
+                holding.updated_at = utc_now()
 
     async def _update_agent_funds_internal(
         self,
@@ -683,8 +679,8 @@ class TradingService:
         agent.current_funds = Decimal(str(new_funds))
 
         # 更新時間戳記
-        agent.updated_at = datetime.now(timezone.utc)
-        agent.last_active_at = datetime.now(timezone.utc)
+        agent.updated_at = utc_now()
+        agent.last_active_at = utc_now()
 
         logger.info(
             f"Updated funds for agent {agent_id}: {current_funds} -> {new_funds} ({transaction_type})"
@@ -767,7 +763,7 @@ class TradingService:
             performance.total_trades = total_trades
             performance.sell_trades_count = completed_trades  # 修正: 賣出交易數
             performance.winning_trades_correct = 0  # TODO: 實現真實獲利交易數計算
-            performance.updated_at = datetime.now(timezone.utc)
+            performance.updated_at = utc_now()
         else:
             # 創建新記錄
             performance = AgentPerformance(

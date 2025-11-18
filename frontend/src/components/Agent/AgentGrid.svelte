@@ -58,7 +58,7 @@
   }
 </script>
 
-<div class="agent-grid">
+<div class="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
   {#if loading}
     <!-- 載入狀態 -->
     <div class="col-span-full flex items-center justify-center py-12">
@@ -124,8 +124,4 @@
   {/if}
 </div>
 
-<style lang="postcss">
-  .agent-grid {
-    @apply grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3;
-  }
-</style>
+

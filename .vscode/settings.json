@@ -21,6 +21,7 @@
   // ***************************************************
   "window.commandCenter": true,
   "chat.commandCenter.enabled": true,
+  "chat.tools.autoApprove": true,
   // 目前 gpt-4o-copilot 已經是預設值，但明確設定可確保一致性
   // "github.copilot.selectedCompletionModel": "gpt-4o-copilot",
   "github.copilot.editor.enableCodeActions": true,

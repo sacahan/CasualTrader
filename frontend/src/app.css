@@ -1,6 +1,23 @@
-@import 'tailwindcss/base';
-@import 'tailwindcss/components';
-@import 'tailwindcss/utilities';
+@import 'tailwindcss';
+
+@theme {
+  --color-primary-50: #eff6ff;
+  --color-primary-400: #60a5fa;
+  --color-primary-500: #3b82f6;
+  --color-primary-600: #2563eb;
+  --color-primary-700: #1d4ed8;
+  --color-success-400: #4ade80;
+  --color-success-500: #22c55e;
+  --color-success-600: #16a34a;
+  --color-warning-400: #fbbf24;
+  --color-warning-500: #f59e0b;
+  --color-warning-600: #d97706;
+  --color-danger-400: #f87171;
+  --color-danger-500: #ef4444;
+  --color-danger-600: #dc2626;
+  
+  --animate-pulse-slow: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
 
 @layer base {
   html {
@@ -8,56 +25,117 @@
   }
 
   body {
-    @apply bg-gray-50 text-gray-900;
+    background-color: var(--color-gray-50);
+    color: var(--color-gray-900);
     margin: 0;
     padding: 0;
   }
 
   /* 深色模式 */
   .dark body {
-    @apply bg-gray-900 text-gray-100;
+    background-color: var(--color-gray-900);
+    color: var(--color-gray-100);
   }
 }
 
 @layer components {
   .btn-primary {
-    @apply bg-primary-500 hover:bg-primary-600 text-white font-medium py-2 px-4 rounded-lg transition-colors;
+    background-color: var(--color-primary-500);
+    color: white;
+    font-weight: 500;
+    padding: 0.5rem 1rem;
+    border-radius: 0.5rem;
+    transition: background-color 0.2s;
+  }
+
+  .btn-primary:hover {
+    background-color: var(--color-primary-600);
   }
 
   .btn-secondary {
-    @apply bg-gray-500 hover:bg-gray-600 text-white font-medium py-2 px-4 rounded-lg transition-colors;
+    background-color: var(--color-gray-500);
+    color: white;
+    font-weight: 500;
+    padding: 0.5rem 1rem;
+    border-radius: 0.5rem;
+    transition: background-color 0.2s;
+  }
+
+  .btn-secondary:hover {
+    background-color: var(--color-gray-600);
   }
 
   .btn-ghost {
-    @apply text-gray-500 hover:text-gray-700 hover:bg-gray-100 p-2 rounded-lg transition-colors;
+    color: var(--color-gray-500);
+    padding: 0.5rem;
+    border-radius: 0.5rem;
+    transition: all 0.2s;
+  }
+
+  .btn-ghost:hover {
+    color: var(--color-gray-700);
+    background-color: var(--color-gray-100);
   }
 
   .status-indicator {
-    @apply inline-block w-2 h-2 rounded-full mr-2;
+    display: inline-block;
+    width: 0.5rem;
+    height: 0.5rem;
+    border-radius: 9999px;
+    margin-right: 0.5rem;
   }
 
   .status-running {
-    @apply bg-success-500 animate-pulse-slow;
+    background-color: var(--color-success-500);
+    animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
   }
 
   .status-stopped {
-    @apply bg-danger-500;
+    background-color: var(--color-danger-500);
   }
 
   .status-paused {
-    @apply bg-warning-500;
+    background-color: var(--color-warning-500);
   }
 
   .form-input {
-    @apply w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all;
+    width: 100%;
+    padding: 0.5rem 1rem;
+    border: 1px solid var(--color-gray-300);
+    border-radius: 0.5rem;
+    transition: all 0.2s;
+  }
+
+  .form-input:focus {
+    box-shadow: 0 0 0 2px var(--color-primary-500);
+    border-color: transparent;
   }
 
   .form-textarea {
-    @apply w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all resize-vertical;
+    width: 100%;
+    padding: 0.5rem 1rem;
+    border: 1px solid var(--color-gray-300);
+    border-radius: 0.5rem;
+    transition: all 0.2s;
+    resize: vertical;
+  }
+
+  .form-textarea:focus {
+    box-shadow: 0 0 0 2px var(--color-primary-500);
+    border-color: transparent;
   }
 
   .form-select {
-    @apply w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all;
+    width: 100%;
+    padding: 0.5rem 1rem;
+    border: 1px solid var(--color-gray-300);
+    border-radius: 0.5rem;
+    transition: all 0.2s;
+  }
+
+  .form-select:focus {
+    box-shadow: 0 0 0 2px var(--color-primary-500);
+    border-color: transparent;
   }
 }
 
@@ -68,16 +146,16 @@
 }
 
 .custom-scrollbar::-webkit-scrollbar-track {
-  background: #1f2937; /* gray-800 */
+  background: var(--color-gray-800);
 }
 
 .custom-scrollbar::-webkit-scrollbar-thumb {
-  background-color: #4b5563; /* gray-600 */
+  background-color: var(--color-gray-600);
   border-radius: 10px;
 }
 
 .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-  background: #6b7280; /* gray-500 */
+  background: var(--color-gray-500);
 }
 
 /* Status dots for agents */
@@ -88,14 +166,14 @@
   display: inline-block;
 }
 
-.status-running {
-  background-color: #22c55e; /* green-500 */
-  box-shadow: 0 0 8px #22c55e;
+.status-dot.running {
+  background-color: var(--color-success-500);
+  box-shadow: 0 0 8px var(--color-success-500);
 }
 
-.status-stopped {
-  background-color: #ef4444; /* red-500 */
-  box-shadow: 0 0 8px #ef4444;
+.status-dot.stopped {
+  background-color: var(--color-danger-500);
+  box-shadow: 0 0 8px var(--color-danger-500);
 }
 
 .blinking {
@@ -110,9 +188,9 @@
 
 /* Text colors for gain/loss */
 .text-gain {
-  color: #4ade80; /* green-400 */
+  color: var(--color-success-400);
 }
 
 .text-loss {
-  color: #f87171; /* red-400 */
+  color: var(--color-danger-400);
 }
