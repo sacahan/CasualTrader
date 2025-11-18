@@ -210,12 +210,27 @@ def create_app() -> FastAPI:
 
     # CORS middleware
     logger.info("🔐 Configuring CORS middleware...")
+    
+    # Security: 即使在開發環境也應限制 CORS 來源
+    # 避免在生產環境使用 ["*"] 以防止 CSRF 攻擊
+    if settings.debug and not settings.cors_origins:
+        # 開發環境預設允許的本地來源
+        allowed_origins = [
+            "http://localhost:3000",
+            "http://localhost:5173",
+            "http://localhost:8000",
+        ]
+        logger.warning("   ⚠ DEBUG mode: Using default local origins for CORS")
+    else:
+        # 使用配置的來源列表
+        allowed_origins = settings.cors_origins
+        
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=settings.cors_origins if not settings.debug else ["*"],
+        allow_origins=allowed_origins,
         allow_credentials=settings.cors_allow_credentials,
-        allow_methods=["*"],
-        allow_headers=["*"],
+        allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+        allow_headers=["Content-Type", "Authorization", "X-Requested-With"],
     )
     logger.success("   ✓ CORS middleware configured")
 

@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import os
 from typing import Any
 
 from agents.mcp import MCPServerStdio
@@ -36,14 +37,29 @@ class MCPMarketClient:
             timeout: 超時時間（秒）
         """
         self.timeout = timeout
-        self.server_params = {
-            "command": "uvx",
-            "args": [
-                "--from",
-                "/Users/sacahan/Documents/workspace/CasualMarket",
-                "casual-market-mcp",
-            ],
-        }
+        
+        # Security: 從環境變數讀取 MCP 路徑，避免硬編碼
+        casual_market_path = os.getenv("CASUAL_MARKET_PATH", "")
+        
+        if casual_market_path and os.path.isabs(casual_market_path):
+            # 使用絕對路徑（本地開發）
+            self.server_params = {
+                "command": "uvx",
+                "args": [
+                    "--from",
+                    casual_market_path,
+                    "casual-market-mcp",
+                ],
+            }
+            logger.info(f"MCP Market Client 使用本地路徑: {casual_market_path}")
+        else:
+            # 使用已安裝的包（生產環境）
+            self.server_params = {
+                "command": "uvx",
+                "args": ["casual-market-mcp"],
+            }
+            logger.info("MCP Market Client 使用已安裝的 casual-market-mcp 包")
+        
         self._server: MCPServerStdio | None = None
         logger.info("MCP Market Client 已初始化")
 
