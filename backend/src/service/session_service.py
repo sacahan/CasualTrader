@@ -6,7 +6,7 @@ AgentSessionService - AgentSession 資料庫服務層
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any
 
 from sqlalchemy import desc, select
@@ -91,7 +91,7 @@ class AgentSessionService:
                 mode=mode,
                 status=SessionStatus.PENDING,
                 initial_input=initial_input or {},
-                start_time=datetime.now(),
+                start_time=datetime.now(timezone.utc),
             )
 
             self.db_session.add(session)
@@ -144,7 +144,7 @@ class AgentSessionService:
                 session.final_output = final_output
 
             # 明確設置 updated_at（遵循 timestamp.instructions.md）
-            now = datetime.now()
+            now = datetime.now(timezone.utc)
             session.updated_at = now
 
             # 如果是終止狀態，必須設置 end_time
@@ -208,7 +208,7 @@ class AgentSessionService:
                 session.tools_called = tools_called
 
             # 明確設置 updated_at（遵循 timestamp.instructions.md）
-            now = datetime.now()
+            now = datetime.now(timezone.utc)
             session.updated_at = now
 
             # 如果還沒設置 end_time，現在設置
@@ -364,7 +364,7 @@ class AgentSessionService:
 
             aborted_ids = []
             for session in running_sessions:
-                duration = (datetime.now() - session.start_time).total_seconds()
+                duration = (datetime.now(timezone.utc) - session.start_time).total_seconds()
                 logger.warning(
                     f"Aborting running session {session.id} "
                     f"(was running for {duration:.0f}s) - Reason: {reason}"
@@ -372,7 +372,7 @@ class AgentSessionService:
 
                 # 標記為 FAILED
                 session.status = SessionStatus.FAILED
-                session.end_time = datetime.now()
+                session.end_time = datetime.now(timezone.utc)
                 session.execution_time_ms = int(duration * 1000)
                 session.error_message = f"Aborted: {reason}"
 
@@ -413,7 +413,7 @@ class AgentSessionService:
             from datetime import timedelta
 
             # 計算超時時間點
-            timeout_threshold = datetime.now() - timedelta(minutes=timeout_minutes)
+            timeout_threshold = datetime.now(timezone.utc) - timedelta(minutes=timeout_minutes)
 
             # 查詢所有 RUNNING 狀態的 session
             stmt = (
@@ -428,7 +428,7 @@ class AgentSessionService:
 
             cleaned_ids = []
             for session in stuck_sessions:
-                duration = (datetime.now() - session.start_time).total_seconds()
+                duration = (datetime.now(timezone.utc) - session.start_time).total_seconds()
                 logger.warning(
                     f"Cleaning up stuck session {session.id} "
                     f"(running for {duration:.0f}s, timeout: {timeout_minutes * 60}s)"
@@ -436,7 +436,7 @@ class AgentSessionService:
 
                 # 標記為 FAILED
                 session.status = SessionStatus.FAILED
-                session.end_time = datetime.now()
+                session.end_time = datetime.now(timezone.utc)
                 session.execution_time_ms = int(duration * 1000)
                 session.error_message = f"Session timeout after {timeout_minutes} minutes"
 

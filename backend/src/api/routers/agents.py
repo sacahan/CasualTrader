@@ -58,12 +58,13 @@ def get_agents_service(db_session: AsyncSession = Depends(get_db_session)) -> Ag
 )
 async def list_agents(
     agents_service: AgentsService = Depends(get_agents_service),
+    db_session: AsyncSession = Depends(get_db_session),
 ):
     """
     列出所有 Agents
 
     Returns:
-        Agent 列表
+        Agent 列表（包含執行狀態）
 
     Raises:
         500: 查詢失敗
@@ -74,6 +75,15 @@ async def list_agents(
         # 獲取所有活躍的 agents
         agents = await agents_service.list_agents()
         logger.debug(f"Queried agents from database: {len(agents)} agents found")
+
+        # 獲取所有 running sessions（用於動態狀態）
+        from sqlalchemy import select
+        from database.models import AgentSession
+
+        running_sessions_result = await db_session.execute(
+            select(AgentSession.agent_id).where(AgentSession.status == "running")
+        )
+        running_agent_ids = set(row[0] for row in running_sessions_result.fetchall())
 
         # 轉換為字典格式
         result = []
@@ -91,14 +101,24 @@ async def list_agents(
                         )
                         investment_prefs = []
 
+                # 動態決定執行狀態
+                agent_status = (
+                    agent.status.value if hasattr(agent.status, "value") else agent.status
+                )
+                if agent.id in running_agent_ids:
+                    agent_status = "running"
+                elif agent_status == "active" and agent.id not in running_agent_ids:
+                    # 活躍但沒有 running session → 映射為 idle
+                    agent_status = "idle"
+                elif agent_status == "inactive":
+                    agent_status = "inactive"
+
                 agent_dict = {
                     "id": agent.id,
                     "name": agent.name,
                     "description": agent.description,
                     "ai_model": agent.ai_model,
-                    "status": agent.status.value
-                    if hasattr(agent.status, "value")
-                    else agent.status,
+                    "status": agent_status,
                     "current_mode": (
                         agent.current_mode.value
                         if hasattr(agent.current_mode, "value")

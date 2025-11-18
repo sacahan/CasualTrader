@@ -1,17 +1,23 @@
 #!/usr/bin/env python3
 """
-快速驗證腳本：測試 Bug 修復
+Bug Fix Verification Script
 
-驗證 'str' object has no attribute 'value' 錯誤已修復
+驗證 'str' object has no attribute 'value' 錯誤已修復。
+
+功能：
+1. 測試狀態值提取邏輯（Enum vs String）
+2. 測試成交數計算邏輯
+3. 測試動作值提取邏輯
 """
 
 import sys
-import os
+from pathlib import Path
+from common.enums import TransactionStatus, TransactionAction
 
 # 添加 src 到 Python 路徑
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "src"))
-
-from common.enums import TransactionStatus, TransactionAction
+src_path = Path(__file__).parent.parent / "src"
+if str(src_path) not in sys.path:
+    sys.path.insert(0, str(src_path))
 
 
 def test_status_value_extraction():

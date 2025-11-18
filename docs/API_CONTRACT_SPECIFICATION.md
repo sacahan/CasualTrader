@@ -398,7 +398,7 @@ DELETE /api/agents/agent_123
 
 **查詢參數**:
 
-- `mode` (string, required): 新模式 (OBSERVATION | TRADING | REBALANCING)
+- `mode` (string, required): 新模式 (TRADING | REBALANCING)
 
 **回應** (200):
 
@@ -448,7 +448,8 @@ POST /api/agents/agent_123/reset
 
 ```json
 {
-  "mode": "OBSERVATION",
+  "mode": "TRADING",
+  "max_turns": 10
 }
 ```
 
@@ -458,7 +459,7 @@ POST /api/agents/agent_123/reset
 
 **請求欄位**:
 
-- `mode` (string, required): 執行模式 (OBSERVATION | TRADING | REBALANCING)
+- `mode` (string, required): 執行模式 (TRADING | REBALANCING)
 - `max_turns` (number, optional): 最大輪數 (1-50)
 
 **回應** (202 Accepted):

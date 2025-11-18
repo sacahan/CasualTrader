@@ -10,7 +10,7 @@ from __future__ import annotations
 import json
 from typing import Any
 from decimal import Decimal
-from datetime import datetime, date
+from datetime import datetime, date, timezone
 import uuid
 
 from sqlalchemy import select
@@ -153,17 +153,17 @@ class AgentsService:
 
     async def list_agents(self) -> list[Agent]:
         """
-        取得所有的 Agents
+        取得所有的 Agents (依照建立時間排序)
 
         Returns:
-            Agent 列表
+            Agent 列表 (按 created_at 遞減排序，最新建立的在前)
 
         Raises:
             AgentDatabaseError: 資料庫操作失敗
         """
         try:
             logger.debug("Executing list_agents query")
-            stmt = select(Agent)
+            stmt = select(Agent).order_by(Agent.created_at.asc())
             result = await self.session.execute(stmt)
             agents = list(result.scalars().all())
 
@@ -362,8 +362,8 @@ class AgentsService:
                 status=AgentStatus.INACTIVE,
                 current_mode=AgentMode.TRADING,
                 investment_preferences=preferences_json,
-                created_at=datetime.now(),
-                updated_at=datetime.now(),
+                created_at=datetime.now(timezone.utc),
+                updated_at=datetime.now(timezone.utc),
             )
 
             self.session.add(agent)
@@ -428,9 +428,9 @@ class AgentsService:
                 )
 
             # 更新時間戳記
-            agent.updated_at = datetime.now()
+            agent.updated_at = datetime.now(timezone.utc)
             if status is not None:
-                agent.last_active_at = datetime.now()
+                agent.last_active_at = datetime.now(timezone.utc)
 
             await self.session.commit()
 
@@ -526,7 +526,9 @@ class AgentsService:
                 status=status_enum,
                 session_id=session_id,
                 execution_time=(
-                    datetime.now() if status_enum == TransactionStatus.EXECUTED else None
+                    datetime.now(timezone.utc)
+                    if status_enum == TransactionStatus.EXECUTED
+                    else None
                 ),
                 decision_reason=decision_reason,
             )
@@ -616,7 +618,7 @@ class AgentsService:
                     holding.quantity = new_quantity
                     holding.total_cost = new_total_cost
                     holding.average_cost = new_average_cost
-                    holding.updated_at = datetime.now()
+                    holding.updated_at = datetime.now(timezone.utc)
                 else:
                     # 創建新持股
                     total_cost = Decimal(str(quantity * price))
@@ -647,7 +649,7 @@ class AgentsService:
                 else:
                     # 部分賣出，更新成本
                     holding.total_cost = holding.average_cost * holding.quantity
-                    holding.updated_at = datetime.now()
+                    holding.updated_at = datetime.now(timezone.utc)
 
             await self.session.commit()
             logger.info(
@@ -1447,7 +1449,7 @@ class AgentsService:
                 performance.total_trades = total_trades
                 performance.sell_trades_count = completed_trades  # 賣出交易數
                 performance.winning_trades_correct = winning_pairs  # 真實獲利交易數
-                performance.updated_at = datetime.now()
+                performance.updated_at = datetime.now(timezone.utc)
             else:
                 # 創建新記錄
                 performance = AgentPerformance(
@@ -1546,8 +1548,8 @@ class AgentsService:
             agent.current_funds = Decimal(str(new_funds))
 
             # 更新時間戳記
-            agent.updated_at = datetime.now()
-            agent.last_active_at = datetime.now()
+            agent.updated_at = datetime.now(timezone.utc)
+            agent.last_active_at = datetime.now(timezone.utc)
 
             await self.session.commit()
 
@@ -1677,7 +1679,8 @@ class AgentsService:
                 history.append(
                     {
                         "date": record.date.isoformat(),
-                        "total_value": float(record.total_value),
+                        "portfolio_value": float(record.total_value),  # 欄位重新命名
+                        "total_value": float(record.total_value),  # 別名
                         "cash_balance": float(record.cash_balance),
                         "unrealized_pnl": float(record.unrealized_pnl or 0),
                         "realized_pnl": float(record.realized_pnl or 0),
@@ -1691,8 +1694,8 @@ class AgentsService:
                         else None,
                         "calmar_ratio": float(record.calmar_ratio) if record.calmar_ratio else None,
                         "total_trades": record.total_trades,
-                        "sell_trades_count": record.sell_trades_count,  # 修正: 賣出交易數
-                        "winning_trades_correct": record.winning_trades_correct,  # 真實獲利交易數
+                        "sell_trades_count": record.sell_trades_count,
+                        "winning_trades_correct": record.winning_trades_correct,
                     }
                 )
 

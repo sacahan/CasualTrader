@@ -69,9 +69,10 @@
 - `suspended`: 暫停，可能因風控或其他原因
 
 **current_mode** (交易模式):
-- `TRADING`: 一般交易模式，可執行買賣
-- `REBALANCING`: 再平衡模式，調整持倉比例
-- `OBSERVATION`: 觀察模式，僅分析不交易
+- `TRADING`: 完整工具集，執行買賣交易
+- `REBALANCING`: 簡化工具集，調整持倉比例
+
+*注意：OBSERVATION 模式已在 Phase 4 移除*
 
 **investment_preferences**:
 - 儲存格式: JSON 字串 `'["2330", "2454", "0050"]'`
@@ -83,7 +84,39 @@
 ```sql
 PRIMARY KEY (id)
 CHECK (status IN ('active', 'inactive', 'error', 'suspended'))
-CHECK (current_mode IN ('TRADING', 'REBALANCING', 'OBSERVATION'))
+CHECK (current_mode IN ('TRADING', 'REBALANCING'))
+```
+
+#### API 層狀態映射
+
+**重要**: `/api/agents` 端點會動態轉換 `status` 欄位，將資料庫的持久化狀態映射到前端期望的執行狀態：
+
+| 數據庫狀態 | 執行會話狀態 | API 回應狀態 | 前端顯示 |
+|-----------|-----------|-----------|---------|
+| `active` | 有 running session | `running` | 運行中 🟢 |
+| `active` | 無 running session | `idle` | 待命 ⚪ |
+| `inactive` | - | `inactive` | 未啟動 ⚫ |
+| `error` | - | `error` | 錯誤 ❌ |
+| `suspended` | - | `suspended` | 暫停 ⏸️ |
+
+**代碼實現位置**: `/backend/src/api/routers/agents.py` → `list_agents()` 函數（第 82-114 行）
+
+**查詢邏輯**:
+```python
+# 1. 查詢所有有 running sessions 的 agent IDs
+running_sessions_result = await db_session.execute(
+    select(AgentSession.agent_id).where(AgentSession.status == "running")
+)
+running_agent_ids = set(row[0] for row in running_sessions_result.fetchall())
+
+# 2. 對每個 agent 進行狀態映射
+for agent in agents:
+    agent_status = agent.status.value  # 從 DB 取得: 'active', 'inactive', etc.
+    if agent.id in running_agent_ids:
+        agent_status = "running"  # 有執行會話 → "running"
+    elif agent_status == "active":
+        agent_status = "idle"  # 活躍但無執行 → "idle"
+    # 其他狀態保持不變
 ```
 
 #### 索引

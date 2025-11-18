@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import uuid
 from dataclasses import dataclass
-from datetime import date, datetime
+from datetime import date, datetime, timezone
 from decimal import Decimal
 from typing import Any
 
@@ -138,7 +138,9 @@ class AgentSession(Base):
 
     # 執行狀態
     status: Mapped[SessionStatus] = mapped_column(String(20), default=SessionStatus.PENDING)
-    start_time: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now())
+    start_time: Mapped[datetime] = mapped_column(
+        DateTime, default=lambda: datetime.now(timezone.utc)
+    )
     end_time: Mapped[datetime | None] = mapped_column(DateTime)
     execution_time_ms: Mapped[int | None] = mapped_column(Integer)
 
@@ -153,14 +155,14 @@ class AgentSession(Base):
     # 審計時間戳記 (遵循 timestamp.instructions.md 標準)
     created_at: Mapped[datetime] = mapped_column(
         DateTime,
-        default=lambda: datetime.now(),
+        default=lambda: datetime.now(timezone.utc),
         nullable=False,
         doc="Record creation timestamp (UTC)",
     )
     updated_at: Mapped[datetime] = mapped_column(
         DateTime,
-        default=lambda: datetime.now(),
-        onupdate=lambda: datetime.now(),
+        default=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(timezone.utc),
         nullable=False,
         doc="Last record update timestamp (UTC)",
     )
@@ -195,9 +197,13 @@ class AgentHolding(Base):
     total_cost: Mapped[Decimal] = mapped_column(Numeric(15, 2), nullable=False)
 
     # 時間戳記
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now())
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, default=lambda: datetime.now(timezone.utc)
+    )
     updated_at: Mapped[datetime] = mapped_column(
-        DateTime, default=lambda: datetime.now(), onupdate=lambda: datetime.now()
+        DateTime,
+        default=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(timezone.utc),
     )
 
     # 關聯關係
@@ -240,7 +246,9 @@ class Transaction(Base):
     market_data: Mapped[dict[str, Any] | None] = mapped_column(JSON)
 
     # 時間戳記
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now())
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, default=lambda: datetime.now(timezone.utc)
+    )
 
     # 關聯關係
     agent: Mapped[Agent] = relationship("Agent", back_populates="transactions")
@@ -266,7 +274,7 @@ class Transaction(Base):
 
 
 class AgentPerformance(Base):
-    """Agent 績效指標模型"""
+    """Agent 績效追蹤模型"""
 
     __tablename__ = "agent_performance"
 
@@ -274,51 +282,50 @@ class AgentPerformance(Base):
     agent_id: Mapped[str] = mapped_column(String(50), ForeignKey("agents.id"), nullable=False)
     date: Mapped[date] = mapped_column(Date, nullable=False)
 
-    # 投資組合指標
-    total_value: Mapped[Decimal] = mapped_column(Numeric(15, 2), nullable=False)
-    cash_balance: Mapped[Decimal] = mapped_column(Numeric(15, 2), nullable=False)
+    # 價值追蹤
+    total_value: Mapped[Decimal] = mapped_column(Numeric(15, 2), default=Decimal("0"))
+    cash_balance: Mapped[Decimal] = mapped_column(Numeric(15, 2), default=Decimal("0"))
     unrealized_pnl: Mapped[Decimal] = mapped_column(Numeric(15, 2), default=Decimal("0"))
     realized_pnl: Mapped[Decimal] = mapped_column(Numeric(15, 2), default=Decimal("0"))
 
-    # 績效指標
-    daily_return: Mapped[Decimal | None] = mapped_column(Numeric(8, 4))
-    total_return: Mapped[Decimal | None] = mapped_column(Numeric(8, 4))
-    win_rate: Mapped[Decimal | None] = mapped_column(Numeric(5, 2))
-    max_drawdown: Mapped[Decimal | None] = mapped_column(Numeric(8, 4))
+    # 報酬和風險指標
+    daily_return: Mapped[Decimal | None] = mapped_column(
+        Numeric(10, 4), default=None, doc="日報酬率"
+    )
+    total_return: Mapped[Decimal | None] = mapped_column(
+        Numeric(10, 4), default=None, doc="累計報酬率"
+    )
+    win_rate: Mapped[Decimal | None] = mapped_column(Numeric(10, 4), default=None, doc="勝率")
+    max_drawdown: Mapped[Decimal | None] = mapped_column(
+        Numeric(10, 4), default=None, doc="最大回撤"
+    )
     sharpe_ratio: Mapped[Decimal | None] = mapped_column(
-        Numeric(8, 4), doc="風險調整後的報酬 (Sharpe Ratio)"
+        Numeric(10, 4), default=None, doc="夏普比率"
     )
     sortino_ratio: Mapped[Decimal | None] = mapped_column(
-        Numeric(8, 4), doc="只考慮下行風險的比率 (Sortino Ratio)"
+        Numeric(10, 4), default=None, doc="索提諾比率"
     )
     calmar_ratio: Mapped[Decimal | None] = mapped_column(
-        Numeric(8, 4), doc="年化報酬與最大回撤的比值 (Calmar Ratio)"
+        Numeric(10, 4), default=None, doc="Calmar比率"
     )
 
-    # 交易統計
-    total_trades: Mapped[int] = mapped_column(Integer, default=0)
-    sell_trades_count: Mapped[int] = mapped_column(
-        Integer, default=0, doc="賣出交易數 (原 winning_trades，語義已修正)"
-    )
-    winning_trades_correct: Mapped[int] = mapped_column(
-        Integer, default=0, doc="真實獲利交易數 (待實現買賣配對邏輯)"
-    )
+    # 交易計數
+    total_trades: Mapped[int] = mapped_column(Integer, default=0, doc="交易總數")
+    sell_trades_count: Mapped[int] = mapped_column(Integer, default=0, doc="賣出交易數")
+    winning_trades_correct: Mapped[int] = mapped_column(Integer, default=0, doc="真實獲利交易數")
 
     # 時間戳記
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now())
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, default=lambda: datetime.now(timezone.utc)
+    )
     updated_at: Mapped[datetime] = mapped_column(
-        DateTime, default=lambda: datetime.now(), onupdate=lambda: datetime.now()
+        DateTime,
+        default=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(timezone.utc),
     )
 
     # 關聯關係
     agent: Mapped[Agent] = relationship("Agent", back_populates="performance_records")
-
-    # 表約束
-    __table_args__ = (
-        UniqueConstraint("agent_id", "date", name="uq_agent_date"),
-        Index("idx_performance_agent_id", "agent_id"),
-        Index("idx_performance_date", "date"),
-    )
 
 
 class AIModelConfig(Base):
@@ -348,9 +355,13 @@ class AIModelConfig(Base):
     display_order: Mapped[int] = mapped_column(Integer, default=999)
 
     # 時間戳記
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now())
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, default=lambda: datetime.now(timezone.utc)
+    )
     updated_at: Mapped[datetime] = mapped_column(
-        DateTime, default=lambda: datetime.now(), onupdate=lambda: datetime.now()
+        DateTime,
+        default=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(timezone.utc),
     )
 
     # 表約束

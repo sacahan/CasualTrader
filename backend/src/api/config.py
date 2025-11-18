@@ -46,10 +46,16 @@ class Settings(BaseSettings):
 
     # Database Settings
     database_url: str = Field(
-        default="",  # Will be set by @field_validator
+        default="postgresql+asyncpg://cstrader_user:2Ts9zM2%@sacahan-ubunto:5432/cstrader",
         description="Database connection URL",
     )
     database_echo: bool = Field(default=False, description="Echo SQL queries")
+    database_pool_size: int = Field(default=5, description="Database connection pool size")
+    database_max_overflow: int = Field(default=10, description="Database max overflow connections")
+    database_pool_timeout: int = Field(default=30, description="Database pool timeout (seconds)")
+    database_pool_recycle: int = Field(
+        default=3600, description="Database pool recycle time (seconds)"
+    )
 
     # Agent Settings
     max_agents: int = Field(default=10, description="Maximum concurrent agent executions")
@@ -86,13 +92,11 @@ class Settings(BaseSettings):
     @field_validator("database_url", mode="before")
     @classmethod
     def set_database_url(cls, v: Any) -> str:
-        """Set database URL to absolute path in backend directory."""
+        """Validate database URL."""
         if v:  # If explicitly set via env var
             return v
-        # Use absolute path to backend directory
-        backend_dir = Path(__file__).parent.parent.parent
-        db_path = backend_dir / "casualtrader.db"
-        return f"sqlite+aiosqlite:///{db_path}"
+        # Default PostgreSQL connection
+        return "postgresql+asyncpg://cstrader_user:2Ts9zM2%@sacahan-ubunto:5432/cstrader"
 
     @field_validator("cors_origins", mode="before")
     @classmethod
@@ -198,7 +202,10 @@ def get_engine():
             settings.database_url,
             echo=settings.database_echo,
             pool_pre_ping=True,
-            pool_recycle=3600,
+            pool_size=settings.database_pool_size,
+            max_overflow=settings.database_max_overflow,
+            pool_timeout=settings.database_pool_timeout,
+            pool_recycle=settings.database_pool_recycle,
         )
     return _engine
 

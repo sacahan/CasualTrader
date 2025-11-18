@@ -6,12 +6,13 @@ CasualTrader AI 股票交易模擬器的前端應用程式，使用 Vite + Svelt
 
 ## 功能特性
 
-- **2 種 Agent 執行模式** (Phase 4 新增):
+- **2 種 Agent 執行模式** (Phase 4 完成):
   - **TRADING 模式**: 完整工具集（所有 MCP 伺服器、買賣工具、4 個 Sub-agents）
   - **REBALANCING 模式**: 簡化工具集（核心 MCP 伺服器、2 個 Sub-agents）
-  - *OBSERVATION 模式已移除*
-- **Prompt-Driven Agent 創建**: 使用自然語言描述投資偏好，無需複雜參數配置
 - **即時狀態監控**: WebSocket 連接提供即時 Agent 狀態更新
+  - 運行中 🟢 (running) / 待命 ⚪ (idle) / 已停止 ⚫ (inactive)
+  - 狀態由後端 API 動態映射（三層狀態管理）
+- **Prompt-Driven Agent 創建**: 使用自然語言描述投資偏好，無需複雜參數配置
 - **策略演進追蹤**: 完整的策略變更歷史與視覺化時間軸
 - **配置鎖定機制**: 執行中的 Agent 無法修改配置，確保策略一致性
 - **績效圖表**: 使用 Chart.js 展示投資組合價值與總報酬率走勢

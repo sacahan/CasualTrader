@@ -50,7 +50,7 @@ CREATE TABLE public.agents (
   updated_at              TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
   last_active_at          TIMESTAMPTZ,
   CONSTRAINT check_agent_status CHECK (status IN ('active','inactive','error','suspended')),
-  CONSTRAINT check_agent_mode   CHECK (current_mode IN ('TRADING','REBALANCING','OBSERVATION'))
+  CONSTRAINT check_agent_mode   CHECK (current_mode IN ('TRADING','REBALANCING'))
 );
 CREATE INDEX idx_agents_status     ON public.agents (status);
 CREATE INDEX idx_agents_created_at ON public.agents (created_at);

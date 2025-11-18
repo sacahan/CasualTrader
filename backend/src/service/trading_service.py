@@ -7,14 +7,14 @@ TradingService - 交易服務層
 from __future__ import annotations
 
 import asyncio
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from trading.trading_agent import TradingAgent
 from service.agents_service import AgentsService, AgentNotFoundError
-from common.enums import AgentMode, AgentStatus, SessionStatus
+from common.enums import AgentMode, AgentStatus, SessionStatus, TransactionStatus
 from common.logger import logger
 from service.session_service import AgentSessionService
 
@@ -123,7 +123,7 @@ class TradingService:
             AgentBusyError: Agent 正在執行中
             TradingServiceError: 執行失敗
         """
-        start_time = datetime.now()
+        start_time = datetime.now(timezone.utc)
         agent = None
 
         try:
@@ -187,7 +187,9 @@ class TradingService:
             await self.agents_service.update_agent_status(agent_id, status=AgentStatus.INACTIVE)
             logger.info(f"Agent {agent_id} status updated to INACTIVE")
 
-            execution_time_ms = int((datetime.now() - start_time).total_seconds() * 1000)
+            execution_time_ms = int(
+                (datetime.now(timezone.utc) - start_time).total_seconds() * 1000
+            )
             logger.info(
                 f"✅ Completed {mode.value} for agent {agent_id} in {execution_time_ms}ms 🚀"
             )
@@ -220,7 +222,9 @@ class TradingService:
             await self.agents_service.update_agent_status(agent_id, status=AgentStatus.INACTIVE)
             logger.info(f"Agent {agent_id} status updated to INACTIVE (after error)")
 
-            execution_time_ms = int((datetime.now() - start_time).total_seconds() * 1000)
+            execution_time_ms = int(
+                (datetime.now(timezone.utc) - start_time).total_seconds() * 1000
+            )
             raise TradingServiceError(f"Failed to execute {mode.value}: {str(e)}") from e
 
         finally:
@@ -548,7 +552,7 @@ class TradingService:
         """
         from decimal import Decimal
         from database.models import Transaction
-        from common.enums import TransactionAction, TransactionStatus
+        from common.enums import TransactionAction
         import uuid
 
         action_enum = TransactionAction.BUY if action.upper() == "BUY" else TransactionAction.SELL
@@ -568,7 +572,9 @@ class TradingService:
             commission=Decimal(str(commission)),
             status=status_enum,
             session_id=session_id,
-            execution_time=(datetime.now() if status_enum == TransactionStatus.EXECUTED else None),
+            execution_time=(
+                datetime.now(timezone.utc) if status_enum == TransactionStatus.EXECUTED else None
+            ),
             decision_reason=decision_reason,
         )
 
@@ -610,7 +616,7 @@ class TradingService:
                 holding.quantity = new_quantity
                 holding.total_cost = new_total_cost
                 holding.average_cost = new_average_cost
-                holding.updated_at = datetime.now()
+                holding.updated_at = datetime.now(timezone.utc)
             else:
                 # 創建新持股
                 total_cost = Decimal(str(quantity * price))
@@ -642,7 +648,7 @@ class TradingService:
             else:
                 # 部分賣出，更新成本
                 holding.total_cost = holding.average_cost * holding.quantity
-                holding.updated_at = datetime.now()
+                holding.updated_at = datetime.now(timezone.utc)
 
     async def _update_agent_funds_internal(
         self,
@@ -677,8 +683,8 @@ class TradingService:
         agent.current_funds = Decimal(str(new_funds))
 
         # 更新時間戳記
-        agent.updated_at = datetime.now()
-        agent.last_active_at = datetime.now()
+        agent.updated_at = datetime.now(timezone.utc)
+        agent.last_active_at = datetime.now(timezone.utc)
 
         logger.info(
             f"Updated funds for agent {agent_id}: {current_funds} -> {new_funds} ({transaction_type})"
@@ -692,7 +698,7 @@ class TradingService:
         """
         from decimal import Decimal
         from database.models import AgentPerformance, Transaction
-        from common.enums import TransactionAction, TransactionStatus
+        from common.enums import TransactionAction
         from sqlalchemy import select, func, case
         from datetime import date
 
@@ -761,7 +767,7 @@ class TradingService:
             performance.total_trades = total_trades
             performance.sell_trades_count = completed_trades  # 修正: 賣出交易數
             performance.winning_trades_correct = 0  # TODO: 實現真實獲利交易數計算
-            performance.updated_at = datetime.now()
+            performance.updated_at = datetime.now(timezone.utc)
         else:
             # 創建新記錄
             performance = AgentPerformance(

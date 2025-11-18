@@ -50,6 +50,7 @@ CasualTrader 支援 2 種 Agent 執行模式，可根據場景動態配置所需
 - ✅ **即時性保證**: 所有數據來自 MCP 即時查詢
 - ✅ **易於測試**: Mock MCP 回應進行單元測試
 - ✅ **動態工具配置**: 根據執行模式智能加載工具，提升性能
+- ✅ **三層狀態管理**: 確保數據庫完整性與 API 靈活性的平衡
 
 ---
 
@@ -67,7 +68,7 @@ CasualTrader 支援 2 種 Agent 執行模式，可根據場景動態配置所需
 
 - **Web 框架**: FastAPI 0.115+ (異步 API)
 - **AI SDK**: OpenAI Agent SDK 0.3.3+ (支援 LiteLLM)
-- **資料庫**: SQLite + SQLAlchemy 2.0 (異步支援)
+- **資料庫**: PostgreSQL + SQLAlchemy 2.0 (異步支援)
 - **即時通信**: WebSocket (狀態推送)
 - **日誌系統**: Loguru
 

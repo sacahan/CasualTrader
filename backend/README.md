@@ -5,6 +5,7 @@
 - Python 3.12+
 - FastAPI 0.115+
 - SQLAlchemy 2.0+ (Async)
+- PostgreSQL (異步驅動)
 - OpenAI Agent SDK
 - UV 包管理器
 
@@ -15,6 +16,7 @@
 後端現已支援 **2 種動態 Agent 執行模式**：
 
 ### 🎯 TRADING 模式 (完整工具集)
+
 - **用途**: 完整的股票交易決策和執行
 - **工具配置**:
   - ✅ 所有 MCP 伺服器（Memory、Market、Tavily）
@@ -23,6 +25,7 @@
   - ✅ 全部 4 個 Sub-agents（基本面、技術面、風險、情緒）
 
 ### ⚖️ REBALANCING 模式 (簡化工具集)
+
 - **用途**: 投資組合再平衡和微調
 - **工具配置**:
   - ✅ 核心 MCP 伺服器（Memory、Market）
@@ -30,9 +33,36 @@
   - ✅ 投資組合管理工具
   - ✅ 2 個 Sub-agents（技術面、風險）
 
+### 狀態管理架構
+
+系統採用三層狀態管理確保資料庫完整性與 API 靈活性：
+
+| 層級 | 儲存位置 | 可能值 | 用途 |
+|------|--------|--------|------|
+| **DB 層** | `agents.status` | `active`, `inactive`, `error`, `suspended` | 代理人持久化狀態（受 CHECK 約束保護） |
+| **執行層** | `agent_sessions.status` | `pending`, `running`, `completed`, `failed`, `cancelled` | 實時執行狀態追蹤 |
+| **API 層** | `/api/agents` 回應 | `running`, `idle`, `inactive`, `error`, `suspended` | 前端期望的狀態值 |
+
+**狀態轉換邏輯** (在 `/backend/src/api/routers/agents.py` 中實現):
+
+```python
+# 查詢有執行會話的 agent
+running_agent_ids = {agent.id for agent in db.query(AgentSession).filter(status="running")}
+
+# 映射狀態
+for agent in agents:
+    if agent.id in running_agent_ids:
+        api_status = "running"      # 有執行中的會話
+    elif agent.status == "active":
+        api_status = "idle"         # 活躍但未執行
+    else:
+        api_status = agent.status   # 其他狀態保持不變
+```
+
 **相關文檔**:
 - [完整模式說明](../docs/MIGRATION_GUIDE_OBSERVATION_TO_2MODES.md)
-- [主項目文檔](../README.md)
+- [API 契約規範](../docs/API_CONTRACT_SPECIFICATION.md)
+- [數據庫架構規範](../docs/DATABASE_SCHEMA_SPECIFICATION.md)
 
 ---
 

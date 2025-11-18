@@ -35,12 +35,12 @@ def _filter_noisy_loggers(record):
     Returns:
         bool: True 表示保留日誌，False 表示過濾掉
     """
-    # 過濾掉 aiosqlite 的 DEBUG 日誌
-    if record["name"].startswith("aiosqlite") and record["level"].name == "DEBUG":
+    # 過濾掉 asyncpg 的 DEBUG 日誌
+    if record["name"].startswith("asyncpg") and record["level"].name == "DEBUG":
         return False
 
-    # 過濾掉 sqlite3 相關的 DEBUG 日誌
-    if "sqlite" in record["name"].lower() and record["level"].name == "DEBUG":
+    # 過濾掉 aiosqlite 的 DEBUG 日誌 (for test environments)
+    if record["name"].startswith("aiosqlite") and record["level"].name == "DEBUG":
         return False
 
     # 過濾掉 httpcore._trace 的 DEBUG 日誌
@@ -158,7 +158,8 @@ def intercept_standard_logging() -> None:
         logging.getLogger(name).handlers = [InterceptHandler()]
 
     # 提高第三方套件的日誌級別，避免過多的 DEBUG 訊息
-    logging.getLogger("aiosqlite").setLevel(logging.WARNING)
+    logging.getLogger("asyncpg").setLevel(logging.WARNING)
+    logging.getLogger("aiosqlite").setLevel(logging.WARNING)  # for test environments
     logging.getLogger("openai").setLevel(logging.WARNING)
     logging.getLogger("httpx").setLevel(logging.WARNING)
     logging.getLogger("httpcore").setLevel(logging.WARNING)
