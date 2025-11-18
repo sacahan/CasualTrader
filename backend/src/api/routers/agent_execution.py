@@ -310,13 +310,25 @@ async def stop_agent(
         # 停止正在執行的任務，並等待完成
         result = await trading_service.stop_agent(agent_id)
 
-        # 推送停止事件
+        # 推送停止事件和狀態更新事件
+        # 1. 執行停止事件（包含會話信息）
         await websocket_manager.broadcast(
             {
                 "type": "execution_stopped",
                 "agent_id": agent_id,
                 "status": result["status"],
                 "sessions_aborted": result.get("sessions_aborted", 0),
+            }
+        )
+
+        # 2. Agent 狀態更新事件（讓前端知道 Agent 已停止）
+        # 將後端的 "stopped"/"not_running" 狀態對應到前端的 "stopped"/"idle"
+        frontend_status = "idle" if result["status"] == "not_running" else "stopped"
+        await websocket_manager.broadcast(
+            {
+                "type": "agent_status",
+                "agent_id": agent_id,
+                "status": frontend_status,
             }
         )
 

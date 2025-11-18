@@ -230,9 +230,13 @@ export async function stopAgent(agentId) {
   try {
     const result = await apiClient.stopAgent(agentId);
 
-    // 更新 agent 狀態為 idle
+    // 根據後端返回的狀態更新 agent
+    // 後端返回 status: "stopped" 或 "not_running"
+    // 前端需要正規化為 "stopped" 或 "idle"
+    const normalizedStatus = result.status === 'not_running' ? 'idle' : 'stopped';
+
     agents.update((list) =>
-      list.map((a) => (a.agent_id === agentId ? { ...a, status: 'idle' } : a))
+      list.map((a) => (a.agent_id === agentId ? { ...a, status: normalizedStatus } : a))
     );
 
     return result;

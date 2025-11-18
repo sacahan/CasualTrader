@@ -60,6 +60,9 @@ DEFAULT_MAX_TURNS = int(os.getenv("DEFAULT_MAX_TURNS", "30"))
 DEFAULT_AGENT_TIMEOUT = int(os.getenv("DEFAULT_AGENT_TIMEOUT", "300"))  # 秒
 DEFAULT_TEMPERATURE = float(os.getenv("DEFAULT_MODEL_TEMPERATURE", 0.7))
 
+# MCP 配置
+CASUAL_MARKET_PATH = os.getenv("CASUAL_MARKET_PATH")
+
 # 設置追蹤 API 金鑰（用於監控和日誌）
 set_tracing_export_api_key(os.getenv("OPENAI_API_KEY"))
 TAVILY_API_KEY = os.getenv("TAVILY_API_KEY")
@@ -258,7 +261,7 @@ class TradingAgent:
                             "command": "uvx",
                             "args": [
                                 "--from",
-                                "/Users/sacahan/Documents/workspace/CasualMarket",
+                                CASUAL_MARKET_PATH,
                                 "casual-market-mcp",
                             ],
                             "env": {"MARKET_MCP_RATE_LIMITING_ENABLED": "false"},
@@ -968,6 +971,25 @@ class TradingAgent:
         except Exception:
             return "執行結果"
 
+    async def cancel(self) -> None:
+        """
+        取消 Agent 正在執行的任務
+
+        這個方法被 TradingService.stop_agent() 呼叫，
+        用於中斷正在進行的 Agent 執行。
+
+        Note:
+            OpenAI Agents SDK 不提供直接的任務取消機制。
+            此實現通過觸發清理流程來停止 Agent。
+
+        Timestamps Updated:
+            - Agent.updated_at: 設置為當前時間
+        """
+        logger.info(f"Cancelling agent execution: {self.agent_id}")
+        # 清理資源（會關閉 MCP servers）
+        await self.cleanup()
+        logger.info(f"Agent execution cancelled: {self.agent_id}")
+
     async def stop(self) -> None:
         """
         停止 Agent 執行
@@ -987,7 +1009,20 @@ class TradingAgent:
     async def cleanup(self) -> None:
         """
         清理 Agent 資源，包括關閉 MCP servers
+
+        遵循 timestamp.instructions.md：
+        - 明確設置 Agent 狀態為 INACTIVE
+        - 完整清理所有資源
         """
+        try:
+            # 更新 Agent 狀態為 INACTIVE（遵循 timestamp.instructions.md)
+            if self.agent_service:
+                await self.agent_service.update_agent_status(self.agent_id, AgentStatus.INACTIVE)
+                logger.debug(f"Updated agent {self.agent_id} status to INACTIVE during cleanup")
+        except Exception as e:
+            logger.error(f"Failed to update agent status during cleanup: {e}")
+
+        # 關閉 MCP servers
         try:
             if self._exit_stack:
                 await self._exit_stack.aclose()

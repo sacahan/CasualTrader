@@ -37,10 +37,10 @@ class MCPMarketClient:
             timeout: 超時時間（秒）
         """
         self.timeout = timeout
-        
-        # Security: 從環境變數讀取 MCP 路徑，避免硬編碼
-        casual_market_path = os.getenv("CASUAL_MARKET_PATH", "")
-        
+
+        # 優先使用環境變數路徑，若無則使用硬編碼的本地開發路徑
+        casual_market_path = os.getenv("CASUAL_MARKET_PATH")
+
         if casual_market_path and os.path.isabs(casual_market_path):
             # 使用絕對路徑（本地開發）
             self.server_params = {
@@ -59,7 +59,7 @@ class MCPMarketClient:
                 "args": ["casual-market-mcp"],
             }
             logger.info("MCP Market Client 使用已安裝的 casual-market-mcp 包")
-        
+
         self._server: MCPServerStdio | None = None
         logger.info("MCP Market Client 已初始化")
 

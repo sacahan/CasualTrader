@@ -88,7 +88,7 @@
     inactive: '未啟動',
   };
 
-  let statusLabel = $derived(statusLabelMap[agent.status] ?? '未知狀態');
+  let statusLabel = $derived(statusLabelMap[agent.status] ?? agent.status ?? '未知狀態');
   let statusBadgeClass = $derived(
     agent.status === 'running' ? 'status-badge-running' : 'status-badge-stopped'
   );
