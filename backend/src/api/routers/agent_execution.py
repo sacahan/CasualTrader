@@ -397,11 +397,35 @@ async def get_execution_history(
             status=status_enum,
         )
 
-        # 為歷史列表構建回應（包含基本交易統計，但不含詳細交易記錄）
+        # 為歷史列表構建回應（包含基本交易統計和詳細交易記錄）
         result = []
         for session in sessions:
-            # 獲取該 session 的交易統計
+            # 獲取該 session 的所有交易記錄
             transactions = await trading_service.get_transactions_by_session(session.id)
+
+            # 構建交易記錄列表（與 get_session_detail 相同格式）
+            trades = [
+                {
+                    "id": tx.id,
+                    "ticker": tx.ticker,
+                    "symbol": tx.ticker,  # 別名，前端可能使用
+                    "company_name": tx.company_name,
+                    "action": tx.action.value if hasattr(tx.action, "value") else tx.action,
+                    "type": tx.action.value if hasattr(tx.action, "value") else tx.action,  # 別名
+                    "quantity": tx.quantity,
+                    "shares": tx.quantity,  # 別名
+                    "price": float(tx.price),
+                    "amount": float(tx.total_amount),
+                    "total_amount": float(tx.total_amount),  # 別名
+                    "commission": float(tx.commission),
+                    "status": tx.status.value if hasattr(tx.status, "value") else tx.status,
+                    "execution_time": tx.execution_time.isoformat() if tx.execution_time else None,
+                    "decision_reason": tx.decision_reason,
+                    "created_at": tx.created_at.isoformat() if tx.created_at else None,
+                }
+                for tx in transactions
+            ]
+
             # 安全地獲取狀態值（處理 Enum 或字符串）
             filled_count = len(
                 [
@@ -425,10 +449,12 @@ async def get_execution_history(
                     "completed_at": session.end_time,  # 別名，前端可能使用
                     "error_message": session.error_message,
                     "created_at": session.created_at,
-                    # 新增：基本統計資料（不含完整交易列表）
+                    # 新增：統計資料
                     "trade_count": len(transactions),
                     "filled_count": filled_count,
                     "total_notional": total_notional,
+                    # 新增：詳細交易記錄列表
+                    "trades": trades,
                 }
             )
 

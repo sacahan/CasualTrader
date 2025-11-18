@@ -7,7 +7,14 @@
 
 import sqlite3
 from datetime import datetime, date, timedelta
-from collections import defaultdict
+
+
+def _to_float(value: float | int | None) -> float:
+    """Convert possible SQLite numeric values to float safely."""
+
+    if value is None:
+        return 0.0
+    return float(value)
 
 
 def get_connection():
@@ -80,8 +87,9 @@ def create_initial_records(cursor, agents):
     print("✅ 初始記錄建立完成")
 
 
-def get_trades_by_date(cursor, agent_id):
-    """取得 Agent 按日期排序的所有交易"""
+def get_agent_transactions(cursor, agent_id):
+    """取得 Agent 全部交易（依時間排序）。"""
+
     cursor.execute(
         """
         SELECT
@@ -89,8 +97,8 @@ def get_trades_by_date(cursor, agent_id):
             ticker,
             action,
             quantity,
-            price,
-            total_amount
+            total_amount,
+            commission
         FROM transactions
         WHERE agent_id = ?
         ORDER BY created_at
@@ -98,126 +106,101 @@ def get_trades_by_date(cursor, agent_id):
         (agent_id,),
     )
 
-    # 按日期分組
-    trades_by_date = defaultdict(list)
+    transactions = []
     for row in cursor.fetchall():
-        trade_date = row[0]
-        trades_by_date[trade_date].append(
+        transactions.append(
             {
+                "trade_date": row[0],
                 "ticker": row[1],
                 "action": row[2],
-                "quantity": row[3],
-                "price": row[4],
-                "amount": row[5],
+                "quantity": int(row[3]),
+                "total_amount": _to_float(row[4]),
+                "commission": _to_float(row[5]),
             }
         )
 
-    return trades_by_date
+    return transactions
 
 
-def get_holdings_on_date(cursor, agent_id, target_date):
-    """取得 Agent 在特定日期的持倉"""
-    cursor.execute(
-        """
-        SELECT ticker, quantity, average_cost
-        FROM agent_holdings
-        WHERE agent_id = ?
-    """,
-        (agent_id,),
-    )
+def calculate_daily_snapshots(transactions, initial_funds):
+    """根據交易歷史計算每日績效快照。"""
 
-    holdings = {}
-    for row in cursor.fetchall():
-        holdings[row[0]] = {"quantity": row[1], "average_cost": float(row[2])}
+    if not transactions:
+        return {}
 
-    return holdings
+    holdings: dict[str, dict[str, float]] = {}
+    cash_balance = _to_float(initial_funds)
+    total_trades = 0
+    sell_trades_count = 0
+    snapshots: dict[str, dict[str, float]] = {}
 
+    def holdings_value() -> float:
+        value = 0.0
+        for state in holdings.values():
+            qty = state.get("quantity", 0.0)
+            avg_cost = state.get("average_cost", 0.0)
+            if qty > 0:
+                value += qty * avg_cost
+        return value
 
-def calculate_holdings_after_trades(holdings, trades):
-    """根據交易計算持倉"""
-    for trade in trades:
+    for trade in transactions:
         ticker = trade["ticker"]
-        action = trade["action"]
-        quantity = trade["quantity"]
-        price = float(trade["price"])
+        action = trade["action"].upper()
+        quantity = float(trade["quantity"])
+        total_amount = trade["total_amount"]
+        commission = trade["commission"]
 
-        if ticker not in holdings:
-            holdings[ticker] = {"quantity": 0, "average_cost": 0.0}
-
-        holding = holdings[ticker]
+        holding = holdings.setdefault(
+            ticker,
+            {"quantity": 0.0, "average_cost": 0.0},
+        )
 
         if action == "BUY":
-            old_qty = holding["quantity"]
-            old_cost = holding["average_cost"]
-            new_qty = old_qty + quantity
+            total_cost = total_amount + commission
+            cash_balance -= total_cost
 
-            # 計算新的平均成本
+            prev_qty = holding["quantity"]
+            prev_cost = holding["average_cost"]
+            new_qty = prev_qty + quantity
+
             if new_qty > 0:
-                holding["average_cost"] = (old_qty * old_cost + quantity * price) / new_qty
+                holding["average_cost"] = (prev_qty * prev_cost + total_amount) / new_qty
 
             holding["quantity"] = new_qty
 
         elif action == "SELL":
-            holding["quantity"] -= quantity
-            # 賣出不改變平均成本
+            net_proceeds = total_amount - commission
+            cash_balance += net_proceeds
 
-    return holdings
+            prev_qty = holding["quantity"]
+            new_qty = prev_qty - quantity
 
+            holding["quantity"] = max(new_qty, 0.0)
 
-def calculate_daily_performance(cursor, agent_id, target_date, initial_funds):
-    """計算特定日期的績效"""
-    # 取得該日期前的所有交易
-    cursor.execute(
-        """
-        SELECT
-            SUM(CASE WHEN action='BUY' THEN total_amount ELSE 0 END) as total_bought,
-            SUM(CASE WHEN action='SELL' THEN total_amount ELSE 0 END) as total_sold,
-            COUNT(CASE WHEN action='BUY' THEN 1 END) as buy_count,
-            COUNT(CASE WHEN action='SELL' THEN 1 END) as sell_count
-        FROM transactions
-        WHERE agent_id = ? AND DATE(created_at) <= ?
-    """,
-        (agent_id, target_date),
-    )
+            if holding["quantity"] == 0:
+                holding["average_cost"] = 0.0
 
-    result = cursor.fetchone()
-    total_bought = float(result[0]) if result[0] else 0.0
-    total_sold = float(result[1]) if result[1] else 0.0
-    total_buy_count = result[2] or 0
-    total_sell_count = result[3] or 0
+            sell_trades_count += 1
+        else:
+            raise ValueError(f"Unsupported action: {action}")
 
-    # 取得當前持倉
-    holdings = get_holdings_on_date(cursor, agent_id, target_date)
+        total_trades += 1
 
-    # 計算持倉市值（以平均成本作為市場價格的估計）
-    # 實際應該用當日的收盤價，但這裡用平均成本作為基準
-    holding_value = 0.0
-    for ticker, holding in holdings.items():
-        if holding["quantity"] > 0:
-            holding_value += holding["quantity"] * holding["average_cost"]
+        day_key = trade["trade_date"]
+        portfolio_value = cash_balance + holdings_value()
+        # 保持與服務層一致：total_return 儲存為小數比例（例如 0.012 表示 1.2%）
+        total_return = ((portfolio_value - initial_funds) / initial_funds) if initial_funds else 0.0
 
-    # 計算現金餘額
-    cash_balance = initial_funds - total_bought + total_sold
+        snapshots[day_key] = {
+            "total_value": portfolio_value,
+            "cash_balance": cash_balance,
+            "unrealized_pnl": 0.0,
+            "total_trades": total_trades,
+            "sell_trades_count": sell_trades_count,
+            "total_return": total_return,
+        }
 
-    # 計算總資產
-    total_value = cash_balance + holding_value
-
-    # 計算未實現損益（這個需要實際市場價格，這裡無法精確計算）
-    unrealized_pnl = 0.0  # 暫時設為 0
-
-    # 計算累計報酬率
-    total_return = (
-        ((total_value - initial_funds) / initial_funds * 100) if initial_funds > 0 else 0.0
-    )
-
-    return {
-        "total_value": total_value,
-        "cash_balance": cash_balance,
-        "unrealized_pnl": unrealized_pnl,
-        "total_trades": total_buy_count + total_sell_count,
-        "sell_trades_count": total_sell_count,
-        "total_return": total_return,
-    }
+    return snapshots
 
 
 def rebuild_performance_records(cursor, agents):
@@ -227,21 +210,15 @@ def rebuild_performance_records(cursor, agents):
     for agent_id, agent_name, initial_funds in agents:
         print(f"\n  處理 {agent_name} ({agent_id})...")
 
-        # 取得該 Agent 的所有交易日期
-        cursor.execute(
-            """
-            SELECT DISTINCT DATE(created_at) as trade_date
-            FROM transactions
-            WHERE agent_id = ?
-            ORDER BY trade_date
-        """,
-            (agent_id,),
-        )
+        transactions = get_agent_transactions(cursor, agent_id)
+        snapshots = calculate_daily_snapshots(transactions, float(initial_funds))
 
-        trade_dates = [row[0] for row in cursor.fetchall()]
+        if not snapshots:
+            print("    ⚠️ 沒有交易記錄，保留初始資料")
+            continue
 
-        for trade_date in trade_dates:
-            perf = calculate_daily_performance(cursor, agent_id, trade_date, float(initial_funds))
+        for trade_date in sorted(snapshots.keys()):
+            perf = snapshots[trade_date]
 
             cursor.execute(
                 """
@@ -273,7 +250,7 @@ def rebuild_performance_records(cursor, agents):
             )
 
             print(
-                f"    ✓ {trade_date}: 總資產 {float(perf['total_value']):,.0f}, 現金 {float(perf['cash_balance']):,.0f}"
+                f"    ✓ {trade_date}: 總資產 {perf['total_value']:,.0f}, 現金 {perf['cash_balance']:,.0f}"
             )
 
     print("\n✅ 績效記錄重建完成")

@@ -10,43 +10,49 @@
 
   import { formatDateTime, formatNumber, formatCurrency } from '../../shared/utils.js';
 
-  /**
-   * @typedef {Object} ExecutionResult
-   * @property {boolean} success
-   * @property {string} [mode]
-   * @property {number} [time_ms]
-   * @property {string} [sessionId]
-   * @property {any} [output]
-   */
-
-  /**
-   * @typedef {Object} ExecutionDetail
-   * @property {string} id
-   * @property {string} [status]
-   * @property {string} [start_time]
-   * @property {string} [end_time]
-   * @property {any} [error_message]
-   * @property {any} [tools_called]
-   */
-
   /** @type {any} */
   let {
     isOpen = false,
     agent = null,
     executionResult = null,
     executionDetail = null,
-    executionSummaryText = '',
-    executionTrades = [],
-    executionToolsUsed = [],
-    executionRebalancePlan = null,
-    executionStatsData = {},
-    executionDetailText = '',
-    isLoading = false,
     error = null,
     onClose = undefined,
     onRetryLoadDetail = undefined,
-    buildStatCards = undefined,
+    agentColor = '34, 197, 94', // RGB 色系：預設綠色
   } = $props();
+
+  let executionTrades = $state([]);
+  let statCards = $state([]);
+  let isLoading = $state(true);
+
+  $effect(() => {
+    if (!isOpen) {
+      executionTrades = [];
+      statCards = [];
+      isLoading = false;
+      return;
+    }
+
+    const modeValue = executionDetail?.mode || executionResult?.mode || '--';
+    const consumeValue =
+      executionDetail?.execution_time_ms != null
+        ? `${(executionDetail.execution_time_ms / 1000).toFixed(2)} 秒`
+        : '--';
+    const stats = executionDetail?.stats || {};
+    const filledValue = stats.filled != null ? formatNumber(stats.filled) : '--';
+    const notionalValue = stats.notional != null ? formatCurrency(stats.notional) : '--';
+
+    statCards = [
+      { label: '模式', value: modeValue },
+      { label: '耗時', value: consumeValue },
+      { label: '成交筆數', value: filledValue },
+      { label: '名目金額', value: notionalValue },
+    ];
+
+    executionTrades = executionDetail?.trades || [];
+    isLoading = !executionDetail && !error;
+  });
 
   function handleEscapeKey(event) {
     if (event.key === 'Escape') {
@@ -85,9 +91,8 @@
     if (status === 'stopped' || status === 'timeout') {
       return { label: '已停止', className: 'status-badge-stopped' };
     }
-    return executionResult?.success
-      ? { label: '執行成功', className: 'status-badge-success' }
-      : { label: '執行狀態', className: 'status-badge-stopped' };
+
+    return { label: '未知狀態', className: 'status-badge-unknown' };
   }
 </script>
 
@@ -103,24 +108,28 @@
       onclick={handleOverlayClick}
       onkeydown={handleOverlayKeydown}
     >
-      <div class="modal-panel" role="dialog" aria-modal="true" aria-label="執行結果詳情">
+      <div
+        class="modal-panel"
+        role="dialog"
+        aria-modal="true"
+        aria-label="執行結果詳情"
+        style={`--agent-color-rgb: ${agentColor};`}
+      >
         <div class="modal-header">
           <div>
             {#if executionResult}
               {@const statusMeta = getExecutionStatusMeta()}
               <div class="modal-title-row">
                 <h4 class="modal-title">
-                  {agent?.name || 'Agent'} · {executionResult.mode || '執行結果'}
+                  {agent?.name || 'Agent'}
                 </h4>
                 <span class={`status-badge ${statusMeta.className}`}>{statusMeta.label}</span>
               </div>
-            {:else}
-              <h4 class="modal-title">{agent?.name || 'Agent'} · 執行結果</h4>
             {/if}
-            <p class="modal-subtitle">
-              Session {executionResult?.sessionId ?? '—'}
-              {#if executionDetail?.end_time}
-                · 完成於 {formatDateTime(executionDetail.end_time)}
+            <p class="modal-subtitle pt-1">
+              {executionResult?.sessionId ?? '—'}
+              {#if executionResult?.completedAt}
+                - {formatDateTime(executionResult.completedAt)}
               {/if}
             </p>
           </div>
@@ -161,15 +170,17 @@
               </button>
             {/if}
           {:else}
-            {#if executionSummaryText}
-              <div class="modal-summary-block">
-                <h4>摘要</h4>
-                <p>{executionSummaryText}</p>
-              </div>
-            {/if}
+            <div class="modal-summary-block">
+              <h4>
+                {executionResult?.mode && executionResult.mode === 'REBALANCING'
+                  ? 'AI 再平衡建議'
+                  : 'AI 交易總結'}
+              </h4>
+              <code>{executionDetail?.final_output || '--'}</code>
+            </div>
             <div class="stat-grid">
-              {#if buildStatCards}
-                {#each buildStatCards() as stat (stat.label)}
+              {#if statCards.length > 0}
+                {#each statCards as stat (stat.label)}
                   <div class="stat-card">
                     <p class="detail-section-title">{stat.label}</p>
                     <p class="text-lg font-semibold text-white mt-1">{stat.value}</p>
@@ -178,17 +189,6 @@
               {/if}
             </div>
 
-            {#if executionToolsUsed.length > 0}
-              <div class="detail-section">
-                <h5 class="detail-section-title">使用的工具</h5>
-                <div class="tool-chips">
-                  {#each executionToolsUsed as tool (tool)}
-                    <span class="tool-chip">{tool}</span>
-                  {/each}
-                </div>
-              </div>
-            {/if}
-
             {#if executionTrades.length > 0}
               <div class="detail-section">
                 <h5 class="detail-section-title">交易紀錄</h5>
@@ -196,34 +196,47 @@
                   {#each executionTrades as trade, index (trade.id || `${trade.ticker || trade.symbol || 'trade'}-${index}`)}
                     <div class="trade-item">
                       <div class="trade-item-header">
-                        <div class="trade-item-title">
-                          <span class="holding-ticker">{trade.ticker || trade.symbol || '—'}</span>
-                          <span
-                            class={`trade-action-${
-                              (trade.action || trade.type || 'BUY').toString().toLowerCase() ===
-                              'sell'
-                                ? 'sell'
-                                : 'buy'
-                            }`}
-                          >
-                            {(trade.action || trade.type || 'BUY') === 'SELL' ? '賣出' : '買入'}
-                          </span>
+                        <div class="trade-item-overview">
+                          <div class="trade-item-title">
+                            <span class="holding-ticker">{trade.ticker || trade.symbol || '—'}</span
+                            >
+                            <span
+                              class={`trade-action-${
+                                (trade.action || trade.type || 'BUY').toString().toLowerCase() ===
+                                'sell'
+                                  ? 'sell'
+                                  : 'buy'
+                              }`}
+                            >
+                              {(trade.action || trade.type || 'BUY') === 'SELL' ? '賣出' : '買入'}
+                            </span>
+                          </div>
+                          <p class="trade-company-name">
+                            {trade.company_name || trade.companyName || '—'}
+                          </p>
                         </div>
-                        {#if trade.status}
-                          <span class="trade-status-badge">{trade.status}</span>
-                        {/if}
                       </div>
                       <div class="trade-item-body">
-                        <p>數量 {formatNumber(trade.quantity ?? trade.shares ?? 0)}</p>
-                        <p>價格 {formatCurrency(trade.price ?? 0)}</p>
-                        <p>
-                          金額
-                          {formatCurrency(
-                            trade.amount ??
-                              trade.total_amount ??
-                              (trade.price ?? 0) * (trade.quantity ?? trade.shares ?? 0)
-                          )}
-                        </p>
+                        <div class="trade-stat">
+                          <span class="trade-stat-label">數量</span>
+                          <span class="trade-stat-value">
+                            {formatNumber(trade.quantity ?? trade.shares ?? 0)}
+                          </span>
+                        </div>
+                        <div class="trade-stat">
+                          <span class="trade-stat-label">價格</span>
+                          <span class="trade-stat-value">{formatCurrency(trade.price ?? 0)}</span>
+                        </div>
+                        <div class="trade-stat">
+                          <span class="trade-stat-label">金額</span>
+                          <span class="trade-stat-value">
+                            {formatCurrency(
+                              trade.amount ??
+                                trade.total_amount ??
+                                (trade.price ?? 0) * (trade.quantity ?? trade.shares ?? 0)
+                            )}
+                          </span>
+                        </div>
                       </div>
                     </div>
                   {/each}
@@ -231,22 +244,10 @@
               </div>
             {/if}
 
-            {#if executionRebalancePlan}
-              <div class="detail-section">
-                <h5 class="detail-section-title">再平衡建議</h5>
-                <pre class="detail-json">{JSON.stringify(executionRebalancePlan, null, 2)}</pre>
-              </div>
-            {/if}
-
-            <div class="detail-section">
-              <h5 class="detail-section-title">原始輸出</h5>
-              <pre class="detail-json">{executionDetailText || '目前沒有可顯示的輸出。'}</pre>
-            </div>
-
-            {#if executionDetail?.error_message}
+            {#if executionResult?.error_message}
               <div class="alert-card alert-error mt-3">
                 <div class="font-semibold">伺服器訊息</div>
-                <p class="text-xs leading-relaxed mt-1">{executionDetail.error_message}</p>
+                <p class="text-xs leading-relaxed mt-1">{executionResult.error_message}</p>
               </div>
             {/if}
           {/if}
@@ -339,8 +340,12 @@
   }
 
   .modal-summary-block {
-    background: rgba(34, 197, 94, 0.08);
-    border-left: 4px solid #22c55e;
+    background: linear-gradient(
+      135deg,
+      rgba(var(--agent-color-rgb, 34, 197, 94), 0.1),
+      rgba(var(--agent-color-rgb, 34, 197, 94), 0.05)
+    );
+    border-left: 4px solid rgb(var(--agent-color-rgb, 34, 197, 94));
     border-radius: 0.5rem;
     padding: 1rem;
     margin-bottom: 1.5rem;
@@ -349,7 +354,7 @@
   .modal-summary-block h4 {
     font-size: 0.95rem;
     font-weight: 600;
-    color: #22c55e;
+    color: rgb(var(--agent-color-rgb, 34, 197, 94));
     margin: 0 0 0.5rem 0;
   }
 
@@ -398,10 +403,21 @@
   }
 
   .trade-item {
-    background: rgba(51, 65, 85, 0.3);
-    border: 1px solid rgba(71, 85, 105, 0.2);
-    border-radius: 0.5rem;
-    padding: 1rem;
+    position: relative;
+    background: linear-gradient(135deg, rgba(30, 41, 59, 0.9), rgba(15, 23, 42, 0.85));
+    border: 1px solid rgba(148, 163, 184, 0.12);
+    border-left: 3px solid rgba(var(--agent-color-rgb, 34, 197, 94), 0.6);
+    border-radius: 0.75rem;
+    padding: 1.1rem 1.25rem;
+    box-shadow: 0 16px 30px rgba(8, 15, 34, 0.35);
+    transition:
+      transform 0.2s ease,
+      border-color 0.2s ease;
+  }
+
+  .trade-item:hover {
+    transform: translateY(-2px);
+    border-left-color: rgba(var(--agent-color-rgb, 34, 197, 94), 0.85);
   }
 
   .trade-item-header {
@@ -411,10 +427,23 @@
     margin-bottom: 0.5rem;
   }
 
+  .trade-item-overview {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+  }
+
   .trade-item-title {
     display: flex;
     align-items: center;
     gap: 0.75rem;
+  }
+
+  .trade-company-name {
+    font-size: 0.75rem;
+    color: #94a3b8;
+    margin: 0;
+    letter-spacing: 0.01em;
   }
 
   .holding-ticker {
@@ -451,14 +480,31 @@
 
   .trade-item-body {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(80px, 1fr));
-    gap: 0.5rem;
-    font-size: 0.85rem;
-    color: #cbd5e1;
+    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+    gap: 0.75rem;
   }
 
-  .trade-item-body p {
-    margin: 0;
+  .trade-stat {
+    background: rgba(51, 65, 85, 0.35);
+    border: 1px solid rgba(100, 116, 139, 0.2);
+    border-radius: 0.55rem;
+    padding: 0.6rem 0.75rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+  }
+
+  .trade-stat-label {
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: #94a3b8;
+  }
+
+  .trade-stat-value {
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: #f8fafc;
   }
 
   .tool-chips {

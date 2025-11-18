@@ -110,6 +110,7 @@ class AgentSessionService:
         self,
         session_id: str,
         status: SessionStatus,
+        final_output: str | None = None,
         end_time: datetime | None = None,
         execution_time_ms: int | None = None,
         error_message: str | None = None,
@@ -120,6 +121,7 @@ class AgentSessionService:
         Args:
             session_id: Session ID
             status: 新狀態
+            final_output: 最終輸出資料（可選，應為字串）
             end_time: 結束時間（可選）
             execution_time_ms: 執行時間（毫秒）
             error_message: 錯誤訊息（如果失敗）
@@ -130,11 +132,16 @@ class AgentSessionService:
         Raises:
             SessionNotFoundError: Session 不存在
             SessionError: 更新失敗
+
+        Timestamps Updated:
+            - updated_at: Set to current time
         """
         try:
             session = await self.get_session(session_id)
 
             session.status = status
+            if final_output is not None:
+                session.final_output = final_output
 
             # 明確設置 updated_at（遵循 timestamp.instructions.md）
             now = datetime.now()

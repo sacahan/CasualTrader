@@ -248,21 +248,6 @@ export function handleEvent(data) {
     case WS_EVENT_TYPES.AGENT_STATUS:
       handleAgentStatusUpdate(payload);
       break;
-    case WS_EVENT_TYPES.TRADE_EXECUTION:
-      handleTradeExecution(payload);
-      break;
-    case WS_EVENT_TYPES.STRATEGY_CHANGE:
-      handleStrategyChange(payload);
-      break;
-    case WS_EVENT_TYPES.PORTFOLIO_UPDATE:
-      handlePortfolioUpdate(payload);
-      break;
-    case WS_EVENT_TYPES.PERFORMANCE_UPDATE:
-      handlePerformanceUpdate(payload);
-      break;
-    case WS_EVENT_TYPES.ERROR:
-      handleErrorEvent(payload);
-      break;
     default:
       console.warn(`Unhandled event type: ${eventType}`, payload);
   }
@@ -441,6 +426,7 @@ function handleExecutionStopped(payload) {
 }
 
 /**
+ * 處理代理狀態更新事件
  */
 function handleAgentStatusUpdate(payload) {
   const { agent_id, status, current_mode } = payload;
@@ -453,68 +439,6 @@ function handleAgentStatusUpdate(payload) {
     type: 'info',
     message: `Agent ${agent_id} 狀態更新: ${status}`,
   });
-}
-
-/**
- * 處理交易執行事件
- */
-function handleTradeExecution(payload) {
-  const { agent_id, action, ticker, quantity, price } = payload;
-
-  addNotification({
-    type: 'success',
-    message: `Agent ${agent_id} ${action === 'buy' ? '買入' : '賣出'} ${ticker} ${quantity} 股 @ ${price}`,
-  });
-
-  // 可以觸發投資組合刷新等後續操作
-}
-
-/**
- * 處理策略變更事件
- */
-function handleStrategyChange(payload) {
-  const { agent_id, change_type, reason } = payload;
-
-  addNotification({
-    type: 'info',
-    message: `Agent ${agent_id} 策略已調整 (${change_type}): ${reason}`,
-  });
-}
-
-/**
- * 處理投資組合更新事件
- */
-function handlePortfolioUpdate(payload) {
-  const { agent_id, total_value, cash } = payload;
-
-  // 可以觸發投資組合資料刷新
-  console.warn(`Portfolio update for ${agent_id}:`, { total_value, cash });
-}
-
-/**
- * 處理績效更新事件
- */
-function handlePerformanceUpdate(payload) {
-  const { agent_id, total_return, sharpe_ratio } = payload;
-
-  console.warn(`Performance update for ${agent_id}:`, {
-    total_return,
-    sharpe_ratio,
-  });
-}
-
-/**
- * 處理錯誤事件
- */
-function handleErrorEvent(payload) {
-  const { message, details } = payload;
-
-  addNotification({
-    type: 'error',
-    message: `錯誤: ${message}`,
-  });
-
-  console.error('WebSocket error event:', details);
 }
 
 /**

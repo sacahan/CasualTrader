@@ -11,7 +11,8 @@ from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy.orm import sessionmaker
 
 from service.trading_service import TradingService
-from database.models import Base, Agent
+from database.models import Base, Agent, AgentSession
+from common.enums import AgentMode, SessionStatus
 import uuid
 
 
@@ -60,10 +61,28 @@ async def sample_agent(db_session: AsyncSession):
     return agent
 
 
+@pytest.fixture
+async def running_session(db_session: AsyncSession, sample_agent: Agent):
+    """Create a running session for the agent"""
+
+    session = AgentSession(
+        agent_id=sample_agent.id,
+        mode=AgentMode.TRADING,
+        status=SessionStatus.RUNNING,
+    )
+
+    db_session.add(session)
+    await db_session.commit()
+    await db_session.refresh(session)
+
+    return session
+
+
 @pytest.mark.asyncio
 async def test_execute_trade_atomic_no_transaction_conflict(
     db_session: AsyncSession,
     sample_agent: Agent,
+    running_session: AgentSession,
 ):
     """
     測試: execute_trade_atomic 不會拋出 transaction conflict 錯誤
@@ -75,6 +94,7 @@ async def test_execute_trade_atomic_no_transaction_conflict(
     agent_id = sample_agent.id
     ticker = "2330"
     initial_funds = sample_agent.current_funds or sample_agent.initial_funds
+    trading_service.session_id = running_session.id
 
     # Act - 執行原子交易
     result = await trading_service.execute_trade_atomic(
@@ -90,6 +110,7 @@ async def test_execute_trade_atomic_no_transaction_conflict(
     # Assert - 交易應該成功
     assert result["success"] is True, f"交易失敗: {result.get('error')}"
     assert result["transaction_id"] is not None
+    assert result["session_id"] == running_session.id
     assert "交易執行成功" in result["message"]
 
     # Verify - 檢查資料庫狀態
@@ -117,6 +138,7 @@ async def test_execute_trade_atomic_no_transaction_conflict(
 async def test_execute_trade_atomic_multiple_trades(
     db_session: AsyncSession,
     sample_agent: Agent,
+    running_session: AgentSession,
 ):
     """
     測試: 連續執行多個交易，確保沒有 transaction state 衝突
@@ -124,6 +146,7 @@ async def test_execute_trade_atomic_multiple_trades(
     # Arrange
     trading_service = TradingService(db_session)
     agent_id = sample_agent.id
+    trading_service.session_id = running_session.id
 
     # Act - 執行多個交易
     tickers = ["2330", "2454", "3008"]
@@ -154,6 +177,7 @@ async def test_execute_trade_atomic_multiple_trades(
 async def test_execute_trade_atomic_sell_transaction(
     db_session: AsyncSession,
     sample_agent: Agent,
+    running_session: AgentSession,
 ):
     """
     測試: 賣出交易的原子性
@@ -162,6 +186,7 @@ async def test_execute_trade_atomic_sell_transaction(
     trading_service = TradingService(db_session)
     agent_id = sample_agent.id
     ticker = "2330"
+    trading_service.session_id = running_session.id
 
     # 先買進（使用較低的價格以確保資金充足）
     buy_result = await trading_service.execute_trade_atomic(
@@ -188,6 +213,7 @@ async def test_execute_trade_atomic_sell_transaction(
 
     # Assert
     assert sell_result["success"] is True
+    assert sell_result["session_id"] == running_session.id
 
     # Verify - 持股應該被更新
     holdings = await trading_service.agents_service.get_agent_holdings(agent_id)
@@ -196,5 +222,54 @@ async def test_execute_trade_atomic_sell_transaction(
     assert holding.quantity == 1000  # 2000 - 1000
 
 
-if __name__ == "__main__":
-    pytest.main([__file__, "-v", "-s"])
+@pytest.mark.asyncio
+async def test_execute_trade_atomic_fetches_running_session(
+    db_session: AsyncSession,
+    sample_agent: Agent,
+    running_session: AgentSession,
+):
+    """Verify execute_trade_atomic auto-resolves active session when not preset"""
+
+    trading_service = TradingService(db_session)
+    trading_service.session_id = None
+
+    result = await trading_service.execute_trade_atomic(
+        agent_id=sample_agent.id,
+        ticker="2303",
+        action="BUY",
+        quantity=1000,
+        price=Decimal("50"),
+        company_name="聯電",
+        decision_reason="Auto resolve session",
+    )
+
+    assert result["success"] is True
+    assert result["session_id"] == running_session.id
+    assert trading_service.session_id == running_session.id
+
+
+@pytest.mark.asyncio
+async def test_execute_trade_atomic_fails_without_session(
+    db_session: AsyncSession,
+    sample_agent: Agent,
+):
+    """Verify trade rolls back when no session is available"""
+
+    trading_service = TradingService(db_session)
+    trading_service.session_id = None
+
+    result = await trading_service.execute_trade_atomic(
+        agent_id=sample_agent.id,
+        ticker="2317",
+        action="SELL",
+        quantity=1000,
+        price=Decimal("100"),
+        company_name="鴻海",
+        decision_reason="No session available",
+    )
+
+    assert result["success"] is False
+    assert "會話" in result["error"] or "session" in result["error"].lower()
+
+    transactions = await trading_service.agents_service.get_agent_transactions(sample_agent.id)
+    assert len(transactions) == 0

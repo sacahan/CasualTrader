@@ -18,7 +18,6 @@
   } from '../../shared/utils.js';
   import { isOpen } from '../../stores/market.js';
   import { addEventListener } from '../../stores/websocket.js';
-  import { executionRetryManager } from '../../shared/retry.js';
   import { apiClient } from '../../shared/api.js';
   import ExecutionResultModal from './ExecutionResultModal.svelte';
 
@@ -104,40 +103,11 @@
   let isExecuting = $state(false); // 標記 Agent 是否正在執行交易
   let executionError = $state(null); // 儲存執行錯誤訊息
   let executionResult = $state(null); // 儲存執行結果摘要（包含 success, time_ms, mode, sessionId 等）
-  let showRetryButton = $state(false); // 控制是否顯示重試按鈕
-  let retryCount = $state(0); // 記錄當前重試次數
   let executionDetail = $state(null); // 儲存執行詳細資訊（從 API 載入的完整 session 資料）
   let executionDetailError = $state(null); // 儲存載入執行詳情時的錯誤
   let isExecutionDetailLoading = $state(false); // 標記是否正在載入執行詳情
   let showExecutionModal = $state(false); // 控制執行結果 Modal 的顯示狀態
   let latestSessionId = $state(null); // 儲存最新的 session ID（用於重新開啟時載入歷史紀錄）
-  let hasHistoricalSessions = $state(false); // 標記是否有歷史執行紀錄（completed 或 failed）
-
-  let executionOutputData = $derived.by(() =>
-    normalizeExecutionOutput(executionDetail?.final_output ?? executionResult?.output)
-  );
-  let executionSummaryText = $derived(executionOutputData.summary);
-
-  // 優先使用 API 直接提供的交易記錄（從資料庫 JOIN），如果沒有則使用從 final_output 解析的
-  let executionTrades = $derived(
-    executionDetail?.trades &&
-      Array.isArray(executionDetail.trades) &&
-      executionDetail.trades.length > 0
-      ? executionDetail.trades
-      : executionOutputData.trades
-  );
-
-  let executionRebalancePlan = $derived(executionOutputData.rebalance);
-
-  // 優先使用 API 直接提供的統計資料（從資料庫計算），如果沒有則使用從 final_output 解析的
-  let executionStatsData = $derived(
-    executionDetail?.stats && Object.keys(executionDetail.stats).length > 0
-      ? executionDetail.stats
-      : executionOutputData.stats
-  );
-
-  let executionDetailText = $derived(executionOutputData.detailText);
-  let executionToolsUsed = $derived.by(() => normalizeToolsCalled(executionDetail?.tools_called));
 
   // Canvas for mini chart
   let chartCanvas;
@@ -187,17 +157,11 @@
           // 更新最新 session ID，標記有歷史紀錄可查看
           // 這讓用戶在刷新頁面後仍能查看最近的執行結果
           latestSessionId = payload.session_id;
-          hasHistoricalSessions = true;
 
           // 自動載入執行詳細資訊（包含交易明細、工具使用等）
           if (payload.session_id) {
             await loadExecutionDetail(payload.session_id);
           }
-
-          // 成功時重置重試計數和狀態（清除之前的錯誤記錄）
-          executionRetryManager.reset(agent.agent_id);
-          showRetryButton = false;
-          retryCount = 0;
         }
       }
     );
@@ -212,27 +176,11 @@
         clearExecutionDetailState();
         showExecutionModal = false;
 
-        // 更新重試計數（用於顯示「已重試 X 次」）
-        const failureCount = executionRetryManager.getRetryCount(agent.agent_id) + 1;
-        retryCount = failureCount;
-
         // 即使失敗也嘗試載入最新 session 資料
         // 失敗的 session 可能包含部分執行資訊，對除錯有幫助
         if (payload.session_id) {
           latestSessionId = payload.session_id;
-          hasHistoricalSessions = true;
           await loadExecutionDetail(payload.session_id);
-        }
-
-        // 檢查是否可以重試（是否已達最大重試次數）
-        if (executionRetryManager.canRetry(agent.agent_id)) {
-          // 記錄本次重試，顯示重試按鈕
-          executionRetryManager.recordRetry(agent.agent_id, payload.error);
-          showRetryButton = true;
-        } else {
-          // 已達最大重試次數，隱藏重試按鈕並更新錯誤訊息
-          showRetryButton = false;
-          executionError = `執行失敗 (已重試 ${failureCount} 次): ${payload.error}`;
         }
       }
     });
@@ -376,7 +324,6 @@
 
   function handleTrade(e) {
     e.stopPropagation();
-    showRetryButton = false;
     executionResult = null;
     clearExecutionDetailState();
     showExecutionModal = false;
@@ -385,24 +332,10 @@
 
   function handleRebalance(e) {
     e.stopPropagation();
-    showRetryButton = false;
     executionResult = null;
     clearExecutionDetailState();
     showExecutionModal = false;
     onrebalance?.(agent, 'REBALANCING');
-  }
-
-  function handleRetry(e) {
-    e.stopPropagation();
-    // 根據最後失敗的模式重試（暫時使用 TRADING 作為預設）
-    // 實際實現需要記住上一次的模式
-    const lastMode = agent.current_mode || 'TRADING';
-    showRetryButton = false;
-    executionError = null;
-    executionResult = null;
-    clearExecutionDetailState();
-    showExecutionModal = false;
-    ontrade?.(agent, lastMode);
   }
 
   function handleStop(e) {
@@ -450,7 +383,6 @@
         if (latest.status === 'completed' || latest.status === 'failed') {
           // 儲存最新 session ID，用於後續查看詳情
           latestSessionId = latest.id;
-          hasHistoricalSessions = true;
 
           // 自動載入完整的執行詳細資訊（包含交易明細、工具使用等）
           await loadExecutionDetail(latest.id);
@@ -553,172 +485,23 @@
     }
   }
 
+  // 關閉執行結果 Modal 彈窗
   function closeExecutionModal() {
     showExecutionModal = false;
   }
 
+  // 處理全域鍵盤事件（ESC 鍵關閉 Modal）
   function handleWindowKeydown(event) {
     if (event.key === 'Escape' && showExecutionModal) {
       closeExecutionModal();
     }
   }
 
+  // 清除執行詳情狀態
   function clearExecutionDetailState() {
     executionDetail = null;
     executionDetailError = null;
     isExecutionDetailLoading = false;
-  }
-
-  function buildExecutionStatCards() {
-    const stats = executionStatsData || {};
-    const filledValue =
-      stats.filled ?? (Array.isArray(executionTrades) ? executionTrades.length : null);
-    const notionalValue = stats.notional != null ? formatCurrency(stats.notional) : '--';
-    const pnlValue = stats.pnl != null ? formatCurrency(stats.pnl) : '--';
-    const startTime = executionDetail?.start_time
-      ? formatDateTime(executionDetail.start_time)
-      : '--';
-    const endTime = executionDetail?.end_time ? formatDateTime(executionDetail.end_time) : '--';
-    const toolsValue = executionToolsUsed.length ? executionToolsUsed.join('、') : '--';
-
-    return [
-      { label: '模式', value: executionResult?.mode || agent.current_mode || '--' },
-      {
-        label: '耗時',
-        value: executionResult?.time_ms ? `${executionResult.time_ms} ms` : '--',
-      },
-      { label: '成交筆數', value: filledValue ?? '--' },
-      { label: '名目金額', value: notionalValue },
-      { label: '預估損益', value: pnlValue },
-      { label: '使用工具', value: toolsValue },
-      { label: '開始時間', value: startTime },
-      { label: '結束時間', value: endTime },
-    ];
-  }
-
-  function normalizeExecutionOutput(rawOutput) {
-    const base = {
-      summary: '',
-      detailText: '',
-      trades: [],
-      rebalance: null,
-      stats: {},
-    };
-
-    if (!rawOutput) {
-      return base;
-    }
-
-    if (typeof rawOutput === 'string') {
-      const trimmed = rawOutput.trim();
-      if (!trimmed) {
-        return base;
-      }
-      const parsed = tryParseJson(trimmed);
-      if (parsed) {
-        return normalizeExecutionOutput(parsed);
-      }
-      return {
-        ...base,
-        summary: trimmed,
-        detailText: trimmed,
-      };
-    }
-
-    if (Array.isArray(rawOutput)) {
-      const detailText = JSON.stringify(rawOutput, null, 2);
-      return {
-        ...base,
-        summary: detailText,
-        detailText,
-        trades: rawOutput,
-      };
-    }
-
-    const summaryCandidates = [
-      rawOutput.summary?.description,
-      rawOutput.summary?.text,
-      typeof rawOutput.summary === 'string' ? rawOutput.summary : null,
-      rawOutput.description,
-      rawOutput.notes,
-      rawOutput.message,
-      rawOutput.result,
-    ].filter((text) => typeof text === 'string' && text.trim().length > 0);
-
-    const trades =
-      (Array.isArray(rawOutput.trades) && rawOutput.trades) ||
-      (Array.isArray(rawOutput.executed_trades) && rawOutput.executed_trades) ||
-      (Array.isArray(rawOutput.detail?.trades) && rawOutput.detail.trades) ||
-      [];
-
-    const detailText = JSON.stringify(rawOutput, null, 2);
-
-    const rebalancePlan =
-      rawOutput.rebalance || rawOutput.rebalance_plan || rawOutput.detail?.rebalance || null;
-
-    const stats = {
-      filled:
-        rawOutput.summary?.filled ??
-        rawOutput.trade_count ??
-        (Array.isArray(trades) ? trades.length : undefined),
-      notional: rawOutput.summary?.notional ?? rawOutput.notional,
-      pnl: rawOutput.summary?.pnl ?? rawOutput.pnl,
-    };
-
-    return {
-      summary: summaryCandidates[0] ?? detailText,
-      detailText,
-      trades: Array.isArray(trades) ? trades : [],
-      rebalance: rebalancePlan,
-      stats,
-    };
-  }
-
-  function normalizeToolsCalled(tools) {
-    if (!tools) {
-      return [];
-    }
-    if (Array.isArray(tools)) {
-      return tools.filter(Boolean);
-    }
-    if (typeof tools === 'string') {
-      const parsed = tryParseJson(tools);
-      if (Array.isArray(parsed)) {
-        return parsed.filter(Boolean);
-      }
-      return tools
-        .split(',')
-        .map((item) => item.trim())
-        .filter(Boolean);
-    }
-    return [];
-  }
-
-  function tryParseJson(value) {
-    try {
-      return JSON.parse(value);
-    } catch {
-      return null;
-    }
-  }
-
-  function getExecutionStatusMeta() {
-    const status = executionDetail?.status?.toLowerCase();
-    if (status === 'completed') {
-      return { label: '執行成功', className: 'status-badge-success' };
-    }
-    if (status === 'failed') {
-      return { label: '執行失敗', className: 'status-badge-failed' };
-    }
-    if (status === 'running' || status === 'pending') {
-      return { label: '執行中', className: 'status-badge-running' };
-    }
-    if (status === 'stopped' || status === 'timeout') {
-      return { label: '已停止', className: 'status-badge-stopped' };
-    }
-    return executionResult?.success
-      ? { label: '執行成功', className: 'status-badge-success' }
-      : { label: '執行狀態', className: 'status-badge-stopped' };
   }
 </script>
 
@@ -992,49 +775,34 @@
 
     {#if executionError}
       <div class="alert-card alert-error">
-        <div class="font-semibold">
-          執行失敗{retryCount > 0
-            ? ` (重試 ${retryCount}/${executionRetryManager.maxRetries})`
-            : ''}
-        </div>
+        <div class="font-semibold">執行失敗</div>
         <p class="text-xs leading-relaxed">{executionError}</p>
-        {#if showRetryButton}
-          <button type="button" onclick={handleRetry} class="retry-button"> 重試 </button>
-        {/if}
+        <button type="button" class="expand-button mt-2" onclick={openExecutionModal}>
+          查看詳情
+        </button>
       </div>
     {/if}
 
-    {#if executionResult && executionResult.success}
+    {#if executionResult && !executionError}
       <div class="result-summary animation-fade-in mt-3">
         <div class="result-summary-content">
           <div class="result-summary-header">
-            <h4 class="font-semibold text-white text-lg">執行完成</h4>
+            <h4 class="font-semibold text-white text-lg">
+              {executionResult.success ? '執行完成' : '執行失敗'}
+            </h4>
             <span class="result-pill">{executionResult.mode || '—'}</span>
           </div>
           <p class="text-sm text-gray-300 mt-1">
-            {executionResult.mode || '未知模式'} 模式 • 耗時 {executionResult.time_ms ?? '--'}ms
+            {formatDateTime(executionResult.completedAt)} (耗時 {executionResult.time_ms != null
+              ? (executionResult.time_ms / 1000).toFixed(2) + ' 秒'
+              : '--'})
           </p>
-          {#if executionResult.sessionId}
-            <p class="text-xs text-gray-500 mt-1">Session: {executionResult.sessionId}</p>
-          {/if}
-          {#if executionSummaryText}
-            <p class="result-summary-text mt-3">{executionSummaryText}</p>
-          {/if}
         </div>
         <div class="result-actions">
           <button type="button" class="expand-button" onclick={openExecutionModal}>
-            查看執行結果
+            查看詳情
           </button>
         </div>
-      </div>
-    {/if}
-
-    <!-- 新增：即使沒有當前執行結果，只要有歷史紀錄就顯示按鈕 -->
-    {#if hasHistoricalSessions && !executionResult && !isExecuting && !executionError}
-      <div class="mt-3">
-        <button type="button" class="expand-button w-full" onclick={openExecutionModal}>
-          查看最近執行結果
-        </button>
       </div>
     {/if}
   </div>
@@ -1045,17 +813,9 @@
   {agent}
   {executionResult}
   {executionDetail}
-  {executionSummaryText}
-  {executionTrades}
-  {executionToolsUsed}
-  {executionRebalancePlan}
-  {executionStatsData}
-  {executionDetailText}
-  isLoading={isExecutionDetailLoading}
   error={executionDetailError}
   onClose={closeExecutionModal}
-  onRetryLoadDetail={loadExecutionDetail}
-  buildStatCards={buildExecutionStatCards}
+  {agentColor}
 />
 
 <style>
@@ -1379,23 +1139,6 @@
     color: #fecaca;
   }
 
-  .retry-button {
-    margin-top: 0.5rem;
-    padding: 0.35rem 0.75rem;
-    border-radius: 0.5rem;
-    background: #ef4444;
-    color: #fff;
-    border: none;
-    font-size: 0.75rem;
-    font-weight: 600;
-    cursor: pointer;
-    transition: background 0.2s ease;
-  }
-
-  .retry-button:hover {
-    background: #dc2626;
-  }
-
   .spinner {
     width: 1rem;
     height: 1rem;
@@ -1412,8 +1155,12 @@
   }
 
   .result-summary {
-    background: linear-gradient(135deg, rgba(34, 197, 94, 0.1), rgba(34, 197, 94, 0.05));
-    border-left: 4px solid #22c55e;
+    background: linear-gradient(
+      135deg,
+      rgba(var(--agent-color-rgb, 34, 197, 94), 0.1),
+      rgba(var(--agent-color-rgb, 34, 197, 94), 0.05)
+    );
+    border-left: 4px solid rgb(var(--agent-color-rgb, 34, 197, 94));
     border-radius: 0.85rem;
     padding: 1rem;
     transition: all 0.3s ease;

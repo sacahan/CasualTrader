@@ -852,7 +852,9 @@ class AgentsService:
                     # 賣出: 使用 FIFO 配對並計算損益
                     remaining_qty = tx.quantity
                     sell_price = tx.price
-                    sell_commission_per_share = tx.commission / tx.quantity
+                    sell_commission_per_share = (
+                        tx.commission / Decimal(tx.quantity) if tx.quantity else Decimal("0")
+                    )
 
                     while remaining_qty > 0 and ticker in cost_basis and cost_basis[ticker]:
                         # 取得最早的買入記錄 (FIFO)
@@ -862,11 +864,14 @@ class AgentsService:
                         matched_qty = min(remaining_qty, buy_qty)
 
                         # 計算毛損益
-                        gross_pnl = (sell_price - buy_price) * matched_qty
+                        gross_pnl = (sell_price - buy_price) * Decimal(matched_qty)
 
                         # 扣除手續費（按比例分攤）
-                        buy_commission_portion = buy_commission * (matched_qty / buy_qty)
-                        sell_commission_portion = sell_commission_per_share * matched_qty
+                        allocation_ratio = (
+                            Decimal(matched_qty) / Decimal(buy_qty) if buy_qty else Decimal("0")
+                        )
+                        buy_commission_portion = buy_commission * allocation_ratio
+                        sell_commission_portion = sell_commission_per_share * Decimal(matched_qty)
 
                         # 計算淨損益
                         net_pnl = gross_pnl - buy_commission_portion - sell_commission_portion

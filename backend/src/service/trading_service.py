@@ -176,10 +176,11 @@ class TradingService:
             # 9. 執行指定模式
             logger.info(f"Executing {mode.value} for agent {agent_id}")
             result = await agent.run(mode=mode)
+            output = result.get("output") if result else None
 
             # 10. 更新會話狀態為 COMPLETED
             await self.session_service.update_session_status(
-                self.session_id, SessionStatus.COMPLETED
+                self.session_id, SessionStatus.COMPLETED, final_output=output
             )
 
             # 11. 更新 Agent 狀態為 INACTIVE（執行完成）
@@ -196,7 +197,7 @@ class TradingService:
                 "session_id": self.session_id,
                 "mode": mode.value,
                 "execution_time_ms": execution_time_ms,
-                "output": result.get("output") if result else None,
+                "output": output,
             }
 
         except AgentNotFoundError:
@@ -430,6 +431,20 @@ class TradingService:
                 if not agent_config:
                     raise ValueError(f"Agent {agent_id} 不存在")
 
+                current_session_id = self.session_id
+                if not current_session_id:
+                    running_session = await self.session_service.get_latest_session(
+                        agent_id, status=SessionStatus.RUNNING
+                    )
+                    if running_session:
+                        current_session_id = running_session.id
+                        self.session_id = current_session_id
+
+                if not current_session_id:
+                    raise TradingServiceError(
+                        f"Agent {agent_id} 沒有活躍的執行會話，無法執行原子交易"
+                    )
+
                 # ⭐ 開始事務 - 使用 savepoint() 支援嵌套事務
                 # 如果已有活躍事務，savepoint() 會建立 nested transaction (savepoint)
                 # 如果沒有，它會建立新的事務
@@ -449,7 +464,7 @@ class TradingService:
                         decision_reason=decision_reason or "原子交易",
                         company_name=company_name,
                         status="EXECUTED",
-                        session_id=self.session_id if self.session_id else None,
+                        session_id=current_session_id,
                     )
                     logger.info(f"交易已記錄: {transaction.id}")
 
@@ -487,7 +502,7 @@ class TradingService:
                 return {
                     "success": True,
                     "transaction_id": transaction.id,
-                    "session_id": self.session_id,
+                    "session_id": current_session_id,
                     "message": f"✅ 交易執行成功\n"
                     f"• 股票: {ticker} ({company_name or '未知'})\n"
                     f"• 類型: {action_upper}\n"

@@ -144,7 +144,7 @@ class AgentSession(Base):
 
     # 執行內容
     initial_input: Mapped[dict[str, Any] | None] = mapped_column(JSON)
-    final_output: Mapped[dict[str, Any] | None] = mapped_column(JSON)
+    final_output: Mapped[str | None] = mapped_column(Text)
     tools_called: Mapped[str | None] = mapped_column(
         Text, doc='呼叫的工具列表 (JSON 字串格式)，例如: \'["get_stock_price", "analyze_trend"]\''
     )

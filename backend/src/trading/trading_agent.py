@@ -702,7 +702,7 @@ class TradingAgent:
         if self.agent_config.investment_preferences:
             instructions_parts.extend(
                 [
-                    f"你可以參考 {self.agent_config.investment_preferences} 中的股票清單，但不應限制於這些股票。",
+                    f"你最近對清單中的 {self.agent_config.investment_preferences} 股票感到興趣，希望進一步研究是否值得投資，但同時也不限於這些股票，你會廣泛探索其他潛在機會。",
                 ]
             )
 

@@ -48,6 +48,7 @@ async def test_trading_service_execute_trade_atomic_buy_success():
     # Create TradingService
     trading_service = TradingService(db_session=mock_db_session)
     trading_service.agents_service = mock_agents_service
+    trading_service.session_id = "session_buy_success"
 
     # Mock the private internal methods
     trading_service._create_transaction_internal = AsyncMock(return_value=MagicMock(id="txn_123"))
@@ -107,6 +108,7 @@ async def test_trading_service_execute_trade_atomic_sell_success():
 
     trading_service = TradingService(db_session=mock_db_session)
     trading_service.agents_service = mock_agents_service
+    trading_service.session_id = "session_sell_success"
 
     trading_service._create_transaction_internal = AsyncMock(return_value=MagicMock(id="txn_456"))
     trading_service._update_agent_holdings_internal = AsyncMock()
@@ -228,6 +230,55 @@ async def test_trading_service_execute_trade_atomic_agent_not_found():
 
 
 @pytest.mark.asyncio
+async def test_trading_service_execute_trade_atomic_missing_session():
+    """Verify trades fail when no active session is available"""
+
+    agent_id = "test_agent_no_session"
+    ticker = "2330"
+    quantity = 1000
+    price = 520.0
+
+    mock_db_session = AsyncMock()
+    mock_session_begin = AsyncMock()
+    mock_session_begin.__aenter__ = AsyncMock(return_value=None)
+    mock_session_begin.__aexit__ = AsyncMock(return_value=None)
+    mock_db_session.begin_nested = MagicMock(return_value=mock_session_begin)
+
+    mock_agents_service = AsyncMock()
+    mock_agents_service.get_agent_config = AsyncMock(
+        return_value=MagicMock(
+            id=agent_id,
+            initial_funds=Decimal("1000000"),
+            current_funds=Decimal("1000000"),
+        )
+    )
+
+    trading_service = TradingService(db_session=mock_db_session)
+    trading_service.agents_service = mock_agents_service
+    trading_service.session_service = AsyncMock()
+    trading_service.session_service.get_latest_session = AsyncMock(return_value=None)
+
+    trading_service._create_transaction_internal = AsyncMock()
+    trading_service._update_agent_holdings_internal = AsyncMock()
+    trading_service._update_agent_funds_internal = AsyncMock()
+    trading_service._calculate_and_update_performance_internal = AsyncMock()
+
+    result = await trading_service.execute_trade_atomic(
+        agent_id=agent_id,
+        ticker=ticker,
+        action="BUY",
+        quantity=quantity,
+        price=price,
+        decision_reason="缺少 session 測試",
+        company_name="TSMC",
+    )
+
+    assert result["success"] is False
+    assert "會話" in result["error"] or "session" in result["error"].lower()
+    trading_service._create_transaction_internal.assert_not_called()
+
+
+@pytest.mark.asyncio
 async def test_trading_service_execute_trade_atomic_no_skip_commit_parameter():
     """Verify that skip_commit parameter is not needed
 
@@ -283,6 +334,7 @@ async def test_trading_service_execute_trade_atomic_atomicity():
 
     trading_service = TradingService(db_session=mock_db_session)
     trading_service.agents_service = mock_agents_service
+    trading_service.session_id = "session_atomicity"
 
     # Mock: Step 1 succeeds, Step 3 fails
     trading_service._create_transaction_internal = AsyncMock(return_value=MagicMock(id="txn_123"))
