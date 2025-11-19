@@ -5,7 +5,6 @@ import tailwindcss from '@tailwindcss/vite';
 export default defineConfig(({ mode }) => {
   // 載入環境變數
   const env = loadEnv(mode, '.', '');
-  const port = parseInt(env.VITE_PORT) || 3000;
   const apiBaseUrl = env.VITE_API_BASE_URL || 'http://localhost:8000';
   const wsUrl = env.VITE_WS_URL || 'ws://localhost:8000/ws';
 
@@ -16,7 +15,7 @@ export default defineConfig(({ mode }) => {
   return {
     plugins: [tailwindcss(), svelte()],
     server: {
-      port,
+      port: 3000,
       host: true,
       proxy: {
         '/api': {

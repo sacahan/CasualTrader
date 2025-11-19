@@ -1,15 +1,4 @@
 -- Schema DDL for PostgreSQL (CasualTrader)
--- \c cstrader
-
--- Drop tables in reverse dependency order (optional for re-run)
-DO $$ BEGIN
-  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'agent_sessions') THEN DROP TABLE public.agent_sessions CASCADE; END IF;
-  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'transactions') THEN DROP TABLE public.transactions CASCADE; END IF;
-  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'agent_holdings') THEN DROP TABLE public.agent_holdings CASCADE; END IF;
-  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'agent_performance') THEN DROP TABLE public.agent_performance CASCADE; END IF;
-  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'agents') THEN DROP TABLE public.agents CASCADE; END IF;
-  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'ai_model_configs') THEN DROP TABLE public.ai_model_configs CASCADE; END IF;
-END $$;
 
 -- ai_model_configs
 CREATE TABLE public.ai_model_configs (

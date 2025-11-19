@@ -179,6 +179,32 @@ def create_app() -> FastAPI:
         },
     )
 
+    # ⚠️ CORS middleware 必須最後添加，以便最先執行
+    # Security: 即使在開發環境也應限制 CORS 來源
+    # 避免在生產環境使用 ["*"] 以防止 CSRF 攻擊
+    logger.info("🔐 Configuring CORS middleware...")
+    
+    if settings.debug and not settings.cors_origins:
+        # 開發環境預設允許的本地來源
+        allowed_origins = [
+            "http://localhost:3000",
+            "http://localhost:5173",
+            "http://localhost:8000",
+        ]
+        logger.warning("   ⚠ DEBUG mode: Using default local origins for CORS")
+    else:
+        # 使用配置的來源列表
+        allowed_origins = settings.cors_origins
+
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=allowed_origins,
+        allow_credentials=settings.cors_allow_credentials,
+        allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+        allow_headers=["Content-Type", "Authorization", "X-Requested-With"],
+    )
+    logger.success("   ✓ CORS middleware configured")
+
     # Add request logging middleware
     @app.middleware("http")
     async def log_requests(request: Request, call_next):
@@ -207,32 +233,6 @@ def create_app() -> FastAPI:
                 "error": str(exc) if settings.debug else "An error occurred",
             },
         )
-
-    # CORS middleware
-    logger.info("🔐 Configuring CORS middleware...")
-
-    # Security: 即使在開發環境也應限制 CORS 來源
-    # 避免在生產環境使用 ["*"] 以防止 CSRF 攻擊
-    if settings.debug and not settings.cors_origins:
-        # 開發環境預設允許的本地來源
-        allowed_origins = [
-            "http://localhost:3000",
-            "http://localhost:5173",
-            "http://localhost:8000",
-        ]
-        logger.warning("   ⚠ DEBUG mode: Using default local origins for CORS")
-    else:
-        # 使用配置的來源列表
-        allowed_origins = settings.cors_origins
-
-    app.add_middleware(
-        CORSMiddleware,
-        allow_origins=allowed_origins,
-        allow_credentials=settings.cors_allow_credentials,
-        allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-        allow_headers=["Content-Type", "Authorization", "X-Requested-With"],
-    )
-    logger.success("   ✓ CORS middleware configured")
 
     # Include routers
     logger.info("📡 Registering API routes...")

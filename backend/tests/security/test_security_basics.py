@@ -24,6 +24,8 @@ class TestCORSSecurity:
     def test_cors_headers_present(self, client):
         """驗證 CORS headers 存在"""
         response = client.get("/api/health")
+        assert response.status_code == 200
+        assert response.headers.get("access-control-allow-origin") is not None
 
         # 檢查基本的 CORS header（OPTIONS 請求）
         options_response = client.options("/api/health")
@@ -34,7 +36,8 @@ class TestCORSSecurity:
         """驗證生產環境不使用 wildcard CORS"""
         # 模擬生產環境設置
         if settings.is_production:
-            assert "*" not in settings.cors_origins, "生產環境不應使用 wildcard CORS 設定"
+            error_message = " ".join(["生產環境不應使用 wildcard", "CORS 設定"])
+            assert "*" not in settings.cors_origins, error_message
 
 
 class TestAPIEndpointSecurity:
