@@ -27,7 +27,7 @@ CasualTrader 支援 2 種 Agent 執行模式，可根據場景動態配置所需
 #### 🎯 TRADING 模式 (完整工具集)
 - **用途**: 完整的股票交易決策和執行
 - **工具配置**:
-  - ✅ 所有 MCP 伺服器（Memory、Market、Tavily）
+  - ✅ 所有 MCP 伺服器（Memory、Market、Perplexity）
   - ✅ 買賣交易工具（buy_stock, sell_stock）
   - ✅ 投資組合管理工具
   - ✅ 全部 4 個 Sub-agents（基本面、技術面、風險、情緒）

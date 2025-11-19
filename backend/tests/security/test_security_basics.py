@@ -24,18 +24,17 @@ class TestCORSSecurity:
     def test_cors_headers_present(self, client):
         """驗證 CORS headers 存在"""
         response = client.get("/api/health")
-        
+
         # 檢查基本的 CORS header（OPTIONS 請求）
         options_response = client.options("/api/health")
-        
+
         assert options_response.status_code in [200, 204]
 
     def test_cors_not_wildcard_in_production(self):
         """驗證生產環境不使用 wildcard CORS"""
         # 模擬生產環境設置
         if settings.is_production:
-            assert "*" not in settings.cors_origins, \
-                "生產環境不應使用 wildcard CORS 設定"
+            assert "*" not in settings.cors_origins, "生產環境不應使用 wildcard CORS 設定"
 
 
 class TestAPIEndpointSecurity:
@@ -46,11 +45,11 @@ class TestAPIEndpointSecurity:
         response = client.get("/api/health")
         assert response.status_code == 200
         data = response.json()
-        
+
         # 驗證回應不包含敏感資訊
         assert "status" in data
         assert "version" in data
-        
+
         # 在生產環境不應洩露詳細資訊
         if not settings.debug:
             assert "internal" not in str(data).lower()
@@ -60,7 +59,7 @@ class TestAPIEndpointSecurity:
         # 訪問不存在的端點
         response = client.get("/api/nonexistent-endpoint")
         assert response.status_code == 404
-        
+
         # 驗證錯誤訊息不包含檔案路徑等敏感資訊
         if not settings.debug:
             error_text = response.text.lower()
@@ -81,9 +80,9 @@ class TestInputValidation:
             json={
                 "name": long_name,
                 "ai_model": "gpt-4o-mini",
-            }
+            },
         )
-        
+
         # 應該被拒絕（400 或 422）
         assert response.status_code in [400, 422]
 
@@ -96,9 +95,9 @@ class TestInputValidation:
                 "name": "Test Agent",
                 "ai_model": "gpt-4o-mini",
                 "color_theme": "invalid-rgb",
-            }
+            },
         )
-        
+
         # 應該被拒絕（400 或 422）
         assert response.status_code in [400, 422]
 
@@ -111,9 +110,9 @@ class TestInputValidation:
                 "name": "Test Agent",
                 "ai_model": "gpt-4o-mini",
                 "initial_funds": 1000,  # 低於最小值 100000
-            }
+            },
         )
-        
+
         # 應該被拒絕（400 或 422）
         assert response.status_code in [400, 422]
 
@@ -128,12 +127,12 @@ class TestSensitiveDataHandling:
             "/api/health",
             "/api/agents",
         ]
-        
+
         for endpoint in endpoints:
             response = client.get(endpoint)
             if response.status_code == 200:
                 response_text = response.text.lower()
-                
+
                 # 確認不包含常見的敏感關鍵字
                 sensitive_keywords = [
                     "api_key",
@@ -143,16 +142,18 @@ class TestSensitiveDataHandling:
                     "secret",
                     "token",
                 ]
-                
+
                 for keyword in sensitive_keywords:
                     # 如果回應中包含這些關鍵字，應該只是欄位名稱
                     # 不應該有實際的值（通常很長的字串）
                     if keyword in response_text:
                         # 簡單檢查：不應該有長字串跟在關鍵字後面
-                        assert not any([
-                            f'"{keyword}": "sk-' in response_text,
-                            f'"{keyword}": "ghp_' in response_text,
-                        ]), f"可能洩露 {keyword}"
+                        assert not any(
+                            [
+                                f'"{keyword}": "sk-' in response_text,
+                                f'"{keyword}": "ghp_' in response_text,
+                            ]
+                        ), f"可能洩露 {keyword}"
 
 
 class TestDatabaseSecurity:
@@ -163,11 +164,11 @@ class TestDatabaseSecurity:
         # 這是一個基本測試，確認我們使用 SQLAlchemy ORM
         from database.models import Agent
         from sqlalchemy import select
-        
+
         # 驗證使用 select() 而不是字串拼接
         stmt = select(Agent).where(Agent.id == "test")
         assert stmt is not None
-        
+
         # SQLAlchemy 會自動處理參數化，這裡只是確認使用了正確的模式
 
 

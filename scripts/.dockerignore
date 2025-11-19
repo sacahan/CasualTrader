@@ -1,0 +1,69 @@
+# Python
+**/__pycache__
+**/*.pyc
+**/*.pyo
+**/*.pyd
+**/.Python
+**/pip-log.txt
+**/pip-delete-this-directory.txt
+**/.pytest_cache
+**/.mypy_cache
+**/.ruff_cache
+**/.coverage
+**/htmlcov
+**/*.egg-info
+**/.venv
+**/venv
+**/*.db
+**/*.sqlite3
+
+# Node.js
+**/node_modules
+**/npm-debug.log
+**/yarn-error.log
+**/dist
+**/.next
+
+# IDE
+**/.vscode
+**/.idea
+**/.DS_Store
+**/*.swp
+**/*.swo
+*~
+
+# Git
+.git
+.gitignore
+.gitattributes
+
+# Logs
+**/logs
+**/custom_logs
+**/memory
+**/*.log
+
+# Testing
+**/test-results
+**/playwright-report
+**/tests
+
+# Documentation
+**/docs
+**/README.md
+**/CLAUDE.md
+**/GEMINI.md
+
+# Reference
+**/reference
+
+# Environment
+**/.env
+**/.env.*
+!**/.env.example
+
+# Scripts (don't include in image)
+**/scripts
+
+# Database
+casualtrader.db

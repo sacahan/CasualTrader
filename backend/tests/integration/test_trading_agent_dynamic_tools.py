@@ -66,7 +66,7 @@ class TestDynamicToolConfiguration:
         # 核心工具正常啟用
         assert trading_config.include_memory_mcp is True
         assert trading_config.include_casual_market_mcp is True
-        assert trading_config.include_tavily_mcp is True
+        assert trading_config.include_perplexity_mcp is True
         assert trading_config.include_buy_sell_tools is True
         assert trading_config.include_portfolio_tools is True
         assert trading_config.include_fundamental_agent is True
@@ -82,7 +82,7 @@ class TestDynamicToolConfiguration:
         # OpenAI Tools 已禁用 (LiteLLM 不支持)
         assert rebalancing_config.include_web_search is False
         assert rebalancing_config.include_code_interpreter is False
-        assert rebalancing_config.include_tavily_mcp is False
+        assert rebalancing_config.include_perplexity_mcp is True  # ✅ 保留新聞搜尋功能
         assert rebalancing_config.include_buy_sell_tools is False
         assert rebalancing_config.include_fundamental_agent is False
         assert rebalancing_config.include_sentiment_agent is False
@@ -96,9 +96,8 @@ class TestDynamicToolConfiguration:
         """驗證兩種模式間的配置差異"""
         differences = ToolConfig.compare_configurations(AgentMode.TRADING, AgentMode.REBALANCING)
 
-        # 應該有差異的配置項
+        # 應該有差異的配置項（perplexity_mcp 在兩個模式中都啟用）
         expected_differences = {
-            "include_tavily_mcp",
             "include_buy_sell_tools",
             "include_fundamental_agent",
             "include_sentiment_agent",
@@ -270,7 +269,7 @@ async def test_subagent_loading_with_tool_config():
     agent.extra_headers = None
     agent.memory_mcp = Mock()
     agent.casual_market_mcp = Mock()
-    agent.tavily_mcp = Mock()
+    agent.perplexity_mcp = Mock()
 
     with patch(
         "trading.tools.technical_agent.get_technical_agent",

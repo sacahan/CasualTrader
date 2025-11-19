@@ -210,7 +210,7 @@ def create_app() -> FastAPI:
 
     # CORS middleware
     logger.info("🔐 Configuring CORS middleware...")
-    
+
     # Security: 即使在開發環境也應限制 CORS 來源
     # 避免在生產環境使用 ["*"] 以防止 CSRF 攻擊
     if settings.debug and not settings.cors_origins:
@@ -224,7 +224,7 @@ def create_app() -> FastAPI:
     else:
         # 使用配置的來源列表
         allowed_origins = settings.cors_origins
-        
+
     app.add_middleware(
         CORSMiddleware,
         allow_origins=allowed_origins,
@@ -266,13 +266,25 @@ def create_app() -> FastAPI:
     # Static files (for frontend)
     # NOTE: Must be mounted AFTER all API routes to avoid catching API requests
     logger.info("📁 Setting up static files...")
-    frontend_dist = Path(__file__).parent.parent.parent.parent / "frontend" / "dist"
+
+    # Check for static directory from environment variable (Docker) or default path (development)
+    import os
+
+    static_dir = os.getenv("STATIC_DIR")
+    if static_dir:
+        frontend_dist = Path(static_dir)
+        logger.info(f"   Using STATIC_DIR from environment: {frontend_dist}")
+    else:
+        frontend_dist = Path(__file__).parent.parent.parent.parent / "frontend" / "dist"
+        logger.info(f"   Using default path: {frontend_dist}")
+
     if frontend_dist.exists():
         logger.info(f"   Mounting: {frontend_dist}")
         app.mount("/", StaticFiles(directory=str(frontend_dist), html=True), name="frontend")
         logger.success("   ✓ Frontend static files mounted")
     else:
         logger.warning(f"   ⚠ Frontend dist not found: {frontend_dist}")
+        logger.warning("   Frontend will not be served. API endpoints are still available.")
 
     logger.success("✅ FastAPI application created successfully!\n")
     return app

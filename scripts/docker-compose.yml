@@ -1,0 +1,73 @@
+version: '3.8'
+
+services:
+  casualtrader:
+    image: casualtrader:latest
+    container_name: casualtrader
+    build:
+      context: ..
+      dockerfile: scripts/Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      # Database configuration
+      - DATABASE_URL=sqlite:///app/data/casualtrader.db
+
+      # API configuration
+      - API_HOST=0.0.0.0
+      - API_PORT=8000
+      - ENVIRONMENT=production
+      - DEBUG=false
+
+      # Static files
+      - STATIC_DIR=/app/static
+
+      # CORS configuration (adjust for your domain)
+      - CORS_ORIGINS=http://localhost:8000,https://yourdomain.com
+      - CORS_ALLOW_CREDENTIALS=true
+
+      # OpenAI API (if needed)
+      # - OPENAI_API_KEY=${OPENAI_API_KEY}
+
+      # Agent configuration
+      - MAX_AGENTS=10
+
+    volumes:
+      # Persistent data storage
+      - casualtrader-data:/app/data
+      - casualtrader-logs:/app/logs
+      - casualtrader-memory:/app/memory
+      - casualtrader-custom-logs:/app/custom_logs
+
+    restart: unless-stopped
+
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+    # Optional: Resource limits
+    # deploy:
+    #   resources:
+    #     limits:
+    #       cpus: '2'
+    #       memory: 2G
+    #     reservations:
+    #       cpus: '1'
+    #       memory: 512M
+
+volumes:
+  casualtrader-data:
+    driver: local
+  casualtrader-logs:
+    driver: local
+  casualtrader-memory:
+    driver: local
+  casualtrader-custom-logs:
+    driver: local
+
+networks:
+  default:
+    name: casualtrader-network

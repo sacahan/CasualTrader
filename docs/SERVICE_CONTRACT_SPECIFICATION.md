@@ -253,7 +253,7 @@ def get_tool_config(mode: AgentMode | None = None) -> ToolRequirements:
         ToolRequirements: 工具需求規格
             - include_memory_mcp: 是否包含記憶體 MCP 伺服器
             - include_casual_market_mcp: 是否包含市場數據 MCP 伺服器
-            - include_tavily_mcp: 是否包含新聞/投資研究 MCP 伺服器
+            - include_perplexity_mcp: 是否包含新聞/投資研究 MCP 伺服器
             - include_buy_sell_tools: 是否包含買賣交易工具
             - include_portfolio_tools: 是否包含投資組合查詢工具
             - include_fundamental_agent: 是否包含基本面分析 Sub-agent

@@ -16,7 +16,7 @@
     "@tailwindcss/vite": "^4.1.17",
     "@testing-library/svelte": "^5.2.8",
     "autoprefixer": "^10.4.16",
-    "eslint": "^8.57.1",
+    "eslint": "^9.13.0",
     "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-prettier": "^5.5.4",
     "eslint-plugin-svelte": "^3.12.4",
@@ -27,7 +27,7 @@
     "svelte-check": "^4.0.0",
     "tailwindcss": "^4.1.17",
     "vite": "^7.2.2",
-    "vitest": "^4.0.8",
+    "vitest": "^4.0.10",
     "yaml": "^2.8.1"
   },
   "dependencies": {

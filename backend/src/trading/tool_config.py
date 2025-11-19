@@ -7,13 +7,13 @@
 
 #### TRADING 模式 (完整工具集)
 - OpenAI Tools: ~~WebSearch, CodeInterpreter~~ (LiteLLM 不支持，已禁用)
-- MCP Servers: memory-mcp, casual-market-mcp, tavily-mcp
+- MCP Servers: memory-mcp, casual-market-mcp, perplexity-mcp
 - 交易工具: buy_stock, sell_stock, get_portfolio, get_cash_balance
 - Sub-agents: 4 個 (Fundamental, Technical, Risk, Sentiment)
 
 #### REBALANCING 模式 (簡化工具集)
 - OpenAI Tools: ~~CodeInterpreter~~ (LiteLLM 不支持，已禁用)
-- MCP Servers: memory-mcp, casual-market-mcp (無 tavily-mcp)
+- MCP Servers: memory-mcp, casual-market-mcp, perplexity-mcp (新聞搜尋)
 - 交易工具: get_portfolio, get_cash_balance (無買賣工具)
 - Sub-agents: 2 個 (Technical, Risk)
 """
@@ -38,7 +38,7 @@ class ToolRequirements:
         include_code_interpreter: 是否包含程式碼執行工具
         include_memory_mcp: 是否包含記憶體 MCP 伺服器
         include_casual_market_mcp: 是否包含市場數據 MCP 伺服器
-        include_tavily_mcp: 是否包含新聞/投資研究 MCP 伺服器
+        include_perplexity_mcp: 是否包含新聞/投資研究 MCP 伺服器
         include_buy_sell_tools: 是否包含買賣交易工具
         include_portfolio_tools: 是否包含投資組合查詢工具
         include_fundamental_agent: 是否包含基本面分析 Sub-agent
@@ -51,7 +51,7 @@ class ToolRequirements:
     include_code_interpreter: bool
     include_memory_mcp: bool
     include_casual_market_mcp: bool
-    include_tavily_mcp: bool
+    include_perplexity_mcp: bool
     include_buy_sell_tools: bool
     include_portfolio_tools: bool
     include_fundamental_agent: bool
@@ -76,8 +76,8 @@ class ToolRequirements:
             mcps.append("memory")
         if self.include_casual_market_mcp:
             mcps.append("market")
-        if self.include_tavily_mcp:
-            mcps.append("tavily")
+        if self.include_perplexity_mcp:
+            mcps.append("perplexity")
 
         agents = []
         if self.include_fundamental_agent:
@@ -108,7 +108,7 @@ class ToolConfig:
         include_code_interpreter=False,  # ❌ LiteLLM 不支持 OpenAI Tools
         include_memory_mcp=True,
         include_casual_market_mcp=True,
-        include_tavily_mcp=True,
+        include_perplexity_mcp=True,
         include_buy_sell_tools=True,
         include_portfolio_tools=True,
         include_fundamental_agent=True,
@@ -123,7 +123,7 @@ class ToolConfig:
         include_code_interpreter=False,  # ❌ LiteLLM 不支持 OpenAI Tools
         include_memory_mcp=True,
         include_casual_market_mcp=True,
-        include_tavily_mcp=False,  # ❌ 不需要新聞資源
+        include_perplexity_mcp=True,  # ✅ 可用於新聞搜尋和信息檢索
         include_buy_sell_tools=False,  # ❌ 不執行買賣操作
         include_portfolio_tools=True,
         include_fundamental_agent=False,  # ❌ 不需要基本面分析

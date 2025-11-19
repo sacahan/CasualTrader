@@ -6,6 +6,7 @@ TradingAgent - 基於 OpenAI Agents SDK 的生產級實作
 """
 
 from __future__ import annotations
+import asyncio
 import os
 from typing import Any
 from contextlib import AsyncExitStack
@@ -60,12 +61,12 @@ DEFAULT_MAX_TURNS = int(os.getenv("DEFAULT_MAX_TURNS", "30"))
 DEFAULT_AGENT_TIMEOUT = int(os.getenv("DEFAULT_AGENT_TIMEOUT", "300"))  # 秒
 DEFAULT_TEMPERATURE = float(os.getenv("DEFAULT_MODEL_TEMPERATURE", 0.7))
 
-# MCP 配置
+# CASUAL_MARKET_PATH 指向 casual-trader-market 目錄
 CASUAL_MARKET_PATH = os.getenv("CASUAL_MARKET_PATH")
-
+# PERPLEXITY 用於網頁搜索的 MCP 伺服器 API 金鑰
+PERPLEXITY_API_KEY = os.getenv("PERPLEXITY_API_KEY")
 # 設置追蹤 API 金鑰（用於監控和日誌）
 set_tracing_export_api_key(os.getenv("OPENAI_API_KEY"))
-TAVILY_API_KEY = os.getenv("TAVILY_API_KEY")
 
 # ==========================================
 # Custom Exceptions
@@ -135,7 +136,7 @@ class TradingAgent:
         )  # 創建並保存 AsyncExitStack 實例以管理 MCP servers 生命週期
         self.casual_market_mcp = None
         self.memory_mcp = None
-        self.tavily_mcp = None
+        self.perplexity_mcp = None
 
         logger.info(f"TradingAgent created: {agent_id}")
 
@@ -293,20 +294,20 @@ class TradingAgent:
                 )
                 logger.info(f"memory_mcp server initialized (db: {memory_db_path})")
 
-            # Tavily MCP Server (僅 TRADING 模式)
-            if tool_requirements.include_tavily_mcp:
-                self.tavily_mcp = await self._exit_stack.enter_async_context(
+            # PERPLEXITY MCP Server
+            if tool_requirements.include_perplexity_mcp:
+                self.perplexity_mcp = await self._exit_stack.enter_async_context(
                     MCPServerStdio(
-                        name="tavily_mcp",
+                        name="perplexity_mcp",
                         params={
                             "command": "npx",
-                            "args": ["-y", "tavily-mcp@latest"],
-                            "env": {"TAVILY_API_KEY": f"{TAVILY_API_KEY}"},
+                            "args": ["-y", "@perplexity-ai/mcp-server"],
+                            "env": {"PERPLEXITY_API_KEY": f"{PERPLEXITY_API_KEY}"},
                         },
                         client_session_timeout_seconds=DEFAULT_AGENT_TIMEOUT,
                     )
                 )
-                logger.info("tavily_mcp server initialized")
+                logger.info("perplexity_mcp server initialized")
 
         except Exception as e:
             logger.warning(f"Failed to initialize MCP server: {e}")
@@ -400,7 +401,7 @@ class TradingAgent:
         """
         tools = []
 
-        # WebSearchTool: 搜尋功能 (TRADING 模式需要)
+        # WebSearchTool: OpenAI 提供搜尋功能 (LiteLLM 不支持 OpenAI Tools)
         if tool_requirements.include_web_search:
             web_search_tool = WebSearchTool(
                 user_location=None,
@@ -410,7 +411,7 @@ class TradingAgent:
             tools.append(web_search_tool)
             logger.debug("WebSearchTool included")
 
-        # CodeInterpreterTool: 程式碼執行功能 (兩種模式都需要)
+        # CodeInterpreterTool: OpenAI 提供程式碼執行功能 (LiteLLM 不支持 OpenAI Tools)
         if tool_requirements.include_code_interpreter:
             code_interpreter_tool = CodeInterpreterTool(
                 tool_config={
@@ -466,8 +467,8 @@ class TradingAgent:
                 mcp_servers.append(self.memory_mcp)
             if tool_requirements.include_casual_market_mcp and self.casual_market_mcp:
                 mcp_servers.append(self.casual_market_mcp)
-            if tool_requirements.include_tavily_mcp and self.tavily_mcp:
-                mcp_servers.append(self.tavily_mcp)
+            if tool_requirements.include_perplexity_mcp and self.perplexity_mcp:
+                mcp_servers.append(self.perplexity_mcp)
 
             subagent_config = {
                 "llm_model": self.llm_model,
@@ -669,6 +670,18 @@ class TradingAgent:
                     "trace_id": trace_id,
                     "mode": execution_mode.value if execution_mode else "unknown",
                 }
+
+        except asyncio.CancelledError:
+            logger.warning(f"Agent execution cancelled: {self.agent_id}")
+
+            # 當被取消時，更新狀態為 INACTIVE（已停止）
+            try:
+                await self.agent_service.update_agent_status(self.agent_id, AgentStatus.INACTIVE)
+            except Exception as status_error:
+                logger.error(f"Failed to update status on cancel: {status_error}")
+
+            # 重新拋出 CancelledError 以保持正確的異步行為
+            raise
 
         except Exception as e:
             logger.error(f"Agent execution failed: {self.agent_id}: {e}", exc_info=True)

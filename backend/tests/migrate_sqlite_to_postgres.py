@@ -102,9 +102,7 @@ def connect_postgres() -> psycopg2.extensions.connection:
             password=POSTGRES_PASSWORD,
             database=POSTGRES_DB,
         )
-        log_success(
-            f"Connected to PostgreSQL: {POSTGRES_HOST}:{POSTGRES_PORT}/{POSTGRES_DB}"
-        )
+        log_success(f"Connected to PostgreSQL: {POSTGRES_HOST}:{POSTGRES_PORT}/{POSTGRES_DB}")
         return conn
     except psycopg2.Error as e:
         log_error(f"Failed to connect to PostgreSQL: {e}")
@@ -210,9 +208,7 @@ def migrate_table(
             # Build INSERT statement
             placeholders = ", ".join(["%s"] * len(column_names))
             columns_str = ", ".join([f'"{col}"' for col in column_names])
-            insert_sql = (
-                f"INSERT INTO {table_name} ({columns_str}) VALUES ({placeholders})"
-            )
+            insert_sql = f"INSERT INTO {table_name} ({columns_str}) VALUES ({placeholders})"
 
             try:
                 psycopg2.extras.execute_batch(
@@ -332,9 +328,7 @@ def main() -> None:
         print(f"\nFound {len(tables)} tables to migrate: {', '.join(tables)}\n")
 
         # Ask for confirmation
-        response = input(
-            "Clear existing PostgreSQL data and proceed with migration? (yes/no): "
-        )
+        response = input("Clear existing PostgreSQL data and proceed with migration? (yes/no): ")
         if response.lower() not in ("yes", "y"):
             log_info("Migration cancelled by user")
             sqlite_conn.close()

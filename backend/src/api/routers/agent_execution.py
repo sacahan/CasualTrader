@@ -140,6 +140,20 @@ async def _execute_in_background(
             f"in {result['execution_time_ms']}ms"
         )
 
+    except asyncio.CancelledError:
+        logger.warning(f"[Background] Execution cancelled for agent {agent_id}")
+
+        # 推送停止事件
+        await websocket_manager.broadcast(
+            {
+                "type": "execution_stopped",
+                "agent_id": agent_id,
+                "mode": mode.value,
+                "success": True,
+                "reason": "User stopped the execution",
+            }
+        )
+
     except Exception as e:
         logger.error(f"[Background] Execution failed for agent {agent_id}: {e}", exc_info=True)
 
@@ -225,7 +239,7 @@ async def start_agent_mode(
         # 💡 核心改變：在後台啟動執行，立即返回 session_id
         # 使用 asyncio.create_task 在後台執行，不阻塞 HTTP 回應
         # 傳遞 session_id 給後台任務，避免重複創建
-        asyncio.create_task(
+        task = asyncio.create_task(
             _execute_in_background(
                 trading_service=trading_service,
                 agent_id=agent_id,
@@ -233,6 +247,8 @@ async def start_agent_mode(
                 session_id=session_id,
             )
         )
+        # ⭐ 保存任務以便後續停止
+        trading_service.execution_tasks[agent_id] = task
 
         # 🚀 立即返回 202 Accepted，包含 session_id
         await websocket_manager.broadcast(

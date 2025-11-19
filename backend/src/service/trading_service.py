@@ -77,6 +77,10 @@ class TradingService:
         # 每個 agent 有獨立的鎖，避免某個 agent 的交易鎖定所有其他 agents
         self.trade_locks: dict[str, asyncio.Lock] = {}
 
+        # ⭐ 執行任務追蹤 - 用於停止時取消任務
+        # agent_id -> asyncio.Task 實例
+        self.execution_tasks: dict[str, asyncio.Task] = {}
+
         logger.info("TradingService initialized")
 
     def _get_or_create_trade_lock(self, agent_id: str) -> asyncio.Lock:
@@ -235,15 +239,20 @@ class TradingService:
                 finally:
                     del self.active_agents[agent_id]
 
+            # ⭐ 清理執行任務記錄
+            if agent_id in self.execution_tasks:
+                del self.execution_tasks[agent_id]
+
     async def stop_agent(self, agent_id: str) -> dict[str, Any]:
         """
         停止 Agent 正在執行的任務
 
         此方法會：
-        1. 取消 Agent 正在執行的任務
-        2. 清理 Agent 資源
-        3. 中斷所有 RUNNING 狀態的會話
-        4. 更新 Agent 狀態為 INACTIVE
+        1. 取消執行中的 asyncio 任務（如果有）
+        2. 取消 Agent 正在執行的任務
+        3. 清理 Agent 資源
+        4. 中斷所有 RUNNING 狀態的會話
+        5. 更新 Agent 狀態為 INACTIVE
 
         Timestamps Updated:
             - Agent.updated_at: 設置為當前時間
@@ -271,6 +280,24 @@ class TradingService:
             await self.agents_service.get_agent_config(agent_id)
 
             sessions_aborted_count = 0
+
+            # ⭐ 優先取消執行中的任務（如果有）
+            if agent_id in self.execution_tasks:
+                task = self.execution_tasks[agent_id]
+                if not task.done():
+                    logger.info(f"Cancelling execution task for agent {agent_id}")
+                    task.cancel()
+                    # 等待任務被取消（最多等待 5 秒）
+                    try:
+                        await asyncio.wait_for(task, timeout=5.0)
+                    except (asyncio.TimeoutError, asyncio.CancelledError):
+                        logger.warning(
+                            f"Execution task for agent {agent_id} did not cancel gracefully, forcing cleanup"
+                        )
+                    except Exception as e:
+                        logger.error(f"Error waiting for cancelled task: {e}", exc_info=True)
+                # 移除任務記錄
+                del self.execution_tasks[agent_id]
 
             # 檢查是否有正在執行的 agent
             if agent_id not in self.active_agents:
@@ -568,9 +595,7 @@ class TradingService:
             commission=Decimal(str(commission)),
             status=status_enum,
             session_id=session_id,
-            execution_time=(
-                utc_now() if status_enum == TransactionStatus.EXECUTED else None
-            ),
+            execution_time=(utc_now() if status_enum == TransactionStatus.EXECUTED else None),
             decision_reason=decision_reason,
         )
 

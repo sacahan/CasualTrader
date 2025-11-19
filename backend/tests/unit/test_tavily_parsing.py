@@ -1,8 +1,8 @@
 """
-測試 Tavily 搜尋結果解析函數
+測試 Perplexity 搜尋結果解析函數
 
 這個模組測試 _parse_detailed_results 函數，確保它能正確解析
-Tavily 返回的 'Detailed Results' 格式。
+Perplexity 返回的 'Detailed Results' 格式。
 """
 
 import sys
@@ -32,7 +32,7 @@ Content: 標的：2881.TW 富邦金2. 分類：討論3. 分析/正文： 這幾�
         assert results[0]["title"] == "[標的] 2881富邦金說好的教訓呢QQ? - 看板Stock - PTT網頁版"
         assert results[0]["url"] == "https://www.pttweb.cc/bbs/Stock/M.1652840005.A.CB4"
         assert "2881.TW 富邦金2" in results[0]["content"]
-        assert results[0]["source"] == "tavily-search"
+        assert results[0]["source"] == "perplexity-search"
 
     def test_parse_multiple_results(self):
         """測試解析多筆搜尋結果"""
@@ -118,4 +118,4 @@ Content: 標的：2881.TW 富邦金2. 分類：討論3. 分析/正文： 這幾�
         assert result["title"] == "[標的] 2881富邦金說好的教訓呢QQ? - 看板Stock - PTT網頁版"
         assert result["url"] == "https://www.pttweb.cc/bbs/Stock/M.1652840005.A.CB4"
         assert "富邦金" in result["content"]
-        assert result["source"] == "tavily-search"
+        assert result["source"] == "perplexity-search"

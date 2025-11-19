@@ -15,7 +15,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from database.models import AgentSession
 from common.enums import SessionStatus
 from common.logger import logger
-from common.time_utils import utc_now
+from common.time_utils import ensure_utc, utc_now
 
 
 # ==========================================
@@ -148,18 +148,23 @@ class AgentSessionService:
             now = utc_now()
             session.updated_at = now
 
+            normalized_end_time = ensure_utc(end_time) if end_time else None
+            normalized_start_time = ensure_utc(session.start_time)
+
             # 如果是終止狀態，必須設置 end_time
             if status in [SessionStatus.COMPLETED, SessionStatus.FAILED, SessionStatus.TIMEOUT]:
-                if end_time is None:
-                    end_time = now
-                session.end_time = end_time
+                if normalized_end_time is None:
+                    normalized_end_time = now
+                session.end_time = normalized_end_time
 
                 # 自動計算執行時間
-                if execution_time_ms is None and session.start_time:
-                    execution_time_ms = int((end_time - session.start_time).total_seconds() * 1000)
+                if execution_time_ms is None and normalized_start_time:
+                    execution_time_ms = int(
+                        (normalized_end_time - normalized_start_time).total_seconds() * 1000
+                    )
                 session.execution_time_ms = execution_time_ms
-            elif end_time:
-                session.end_time = end_time
+            elif normalized_end_time:
+                session.end_time = normalized_end_time
 
             if execution_time_ms is not None:
                 session.execution_time_ms = execution_time_ms
@@ -212,15 +217,18 @@ class AgentSessionService:
             now = utc_now()
             session.updated_at = now
 
-            # 如果還沒設置 end_time，現在設置
+            # 如果還沒設置 end_time，現在設置，並確保為 UTC aware
             if session.end_time is None:
                 session.end_time = now
+            else:
+                session.end_time = ensure_utc(session.end_time)
+
+            normalized_start = ensure_utc(session.start_time)
+            normalized_end = ensure_utc(session.end_time)
 
             # 計算執行時間
-            if session.execution_time_ms is None and session.start_time:
-                execution_time_ms = int(
-                    (session.end_time - session.start_time).total_seconds() * 1000
-                )
+            if session.execution_time_ms is None and normalized_start and normalized_end:
+                execution_time_ms = int((normalized_end - normalized_start).total_seconds() * 1000)
                 session.execution_time_ms = execution_time_ms
 
             await self.db_session.commit()
@@ -365,7 +373,9 @@ class AgentSessionService:
 
             aborted_ids = []
             for session in running_sessions:
-                duration = (utc_now() - session.start_time).total_seconds()
+                start_time = ensure_utc(session.start_time)
+                now = utc_now()
+                duration = (now - start_time).total_seconds() if start_time else 0.0
                 logger.warning(
                     f"Aborting running session {session.id} "
                     f"(was running for {duration:.0f}s) - Reason: {reason}"
@@ -373,7 +383,7 @@ class AgentSessionService:
 
                 # 標記為 FAILED
                 session.status = SessionStatus.FAILED
-                session.end_time = utc_now()
+                session.end_time = now
                 session.execution_time_ms = int(duration * 1000)
                 session.error_message = f"Aborted: {reason}"
 
@@ -429,7 +439,9 @@ class AgentSessionService:
 
             cleaned_ids = []
             for session in stuck_sessions:
-                duration = (utc_now() - session.start_time).total_seconds()
+                start_time = ensure_utc(session.start_time)
+                now_dt = utc_now()
+                duration = (now_dt - start_time).total_seconds() if start_time else 0.0
                 logger.warning(
                     f"Cleaning up stuck session {session.id} "
                     f"(running for {duration:.0f}s, timeout: {timeout_minutes * 60}s)"
@@ -437,7 +449,7 @@ class AgentSessionService:
 
                 # 標記為 FAILED
                 session.status = SessionStatus.FAILED
-                session.end_time = utc_now()
+                session.end_time = now_dt
                 session.execution_time_ms = int(duration * 1000)
                 session.error_message = f"Session timeout after {timeout_minutes} minutes"
 

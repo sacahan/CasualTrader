@@ -358,18 +358,6 @@
     margin: 0 0 0.5rem 0;
   }
 
-  .modal-summary-block p {
-    font-size: 0.9rem;
-    color: #d1d5db;
-    line-height: 1.5;
-    margin: 0;
-    display: -webkit-box;
-    line-clamp: 3;
-    -webkit-line-clamp: 3;
-    -webkit-box-orient: vertical;
-    overflow: hidden;
-  }
-
   .stat-grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));

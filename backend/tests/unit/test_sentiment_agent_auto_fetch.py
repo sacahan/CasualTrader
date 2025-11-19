@@ -265,13 +265,13 @@ class TestSentimentAgentIntegration:
     def test_agent_with_mock_mcp(self):
         """測試帶有模擬 MCP 的 Agent"""
         mock_mcp = Mock()
-        mock_mcp.name = "tavily_mcp"
+        mock_mcp.name = "perplexity_mcp"
         mock_mcp.session = Mock()
 
         agent = get_sentiment_agent(mcp_servers=[mock_mcp])
         assert agent is not None
         # 驗證全局上下文已設置
-        assert _sentiment_agent_context.get("tavily_mcp") is not None
+        assert _sentiment_agent_context.get("perplexity_mcp") is not None
 
     def test_agent_without_mcp(self):
         """測試沒有 MCP 的 Agent"""

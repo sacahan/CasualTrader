@@ -24,7 +24,7 @@ class TestToolRequirements:
         # MCP 伺服器
         assert config.include_memory_mcp is True
         assert config.include_casual_market_mcp is True
-        assert config.include_tavily_mcp is True
+        assert config.include_perplexity_mcp is True
 
         # 交易工具
         assert config.include_buy_sell_tools is True
@@ -47,7 +47,7 @@ class TestToolRequirements:
         # MCP 伺服器
         assert config.include_memory_mcp is True
         assert config.include_casual_market_mcp is True
-        assert config.include_tavily_mcp is False  # ❌ 不需要
+        assert config.include_perplexity_mcp is True  # ✅ 新聞搜尋和信息檢索
 
         # 交易工具
         assert config.include_buy_sell_tools is False  # ❌ 不執行買賣
@@ -116,8 +116,8 @@ class TestToolConfig:
         # 應該有多項差異
         assert len(diff) > 0
 
-        # 檢查特定差異（OpenAI Tools 都禁用了，所以不再有差異）
-        assert diff.get("include_tavily_mcp") is True
+        # 檢查特定差異（perplexity_mcp 在兩個模式中都啟用，不是差異）
+        assert diff.get("include_perplexity_mcp") is None  # 兩個模式都使用
         assert diff.get("include_buy_sell_tools") is True
         assert diff.get("include_fundamental_agent") is True
         assert diff.get("include_sentiment_agent") is True
