@@ -92,7 +92,7 @@ async def get_trading_service(
     db_session: AsyncSession = Depends(get_db_session),
 ) -> TradingService:
     """獲取 TradingService 實例
-    
+
     NOTE: 此依賴返回的 session 僅用於 API 端點內的同步操作。
     後台任務必須創建自己的 session，以避免在 API 端點返回時
     關閉 session 而後台任務仍在使用的問題。
@@ -123,16 +123,16 @@ async def _execute_in_background(
     """
     # 為後台執行創建新的 session（獨立於 API 端點的 session）
     from api.config import get_session_maker
-    
+
     session_maker = get_session_maker()
     bg_session = session_maker()
-    
+
     try:
         logger.info(f"[Background] Starting execution for agent {agent_id} ({mode.value})")
 
         # 創建新的 TradingService 實例，使用獨立的 session
         bg_trading_service = TradingService(bg_session)
-        
+
         # 使用既存的 session_id，避免重複創建
         result = await bg_trading_service.execute_single_mode(
             agent_id=agent_id,
@@ -184,14 +184,16 @@ async def _execute_in_background(
                 "error": str(e),
             }
         )
-    
+
     finally:
         # 🔒 關鍵：確保後台 session 被正確關閉
         try:
             await bg_session.close()
             logger.debug(f"[Background] Session closed for agent {agent_id}")
         except Exception as cleanup_error:
-            logger.error(f"[Background] Failed to close session for agent {agent_id}: {cleanup_error}")
+            logger.error(
+                f"[Background] Failed to close session for agent {agent_id}: {cleanup_error}"
+            )
 
 
 # ==========================================

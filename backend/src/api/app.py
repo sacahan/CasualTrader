@@ -183,7 +183,7 @@ def create_app() -> FastAPI:
     # Security: 即使在開發環境也應限制 CORS 來源
     # 避免在生產環境使用 ["*"] 以防止 CSRF 攻擊
     logger.info("🔐 Configuring CORS middleware...")
-    
+
     if settings.debug and not settings.cors_origins:
         # 開發環境預設允許的本地來源
         allowed_origins = [
@@ -228,7 +228,7 @@ def create_app() -> FastAPI:
         """Handle uncaught exceptions."""
         error_msg = f"Unhandled exception: {type(exc).__name__}"
         logger.error(error_msg)
-        
+
         # 確保 CORS 頭被設置
         origin = request.headers.get("origin")
         cors_headers = {}
@@ -237,7 +237,7 @@ def create_app() -> FastAPI:
                 "Access-Control-Allow-Origin": origin,
                 "Access-Control-Allow-Credentials": "true",
             }
-        
+
         return JSONResponse(
             status_code=500,
             content={

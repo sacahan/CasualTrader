@@ -88,8 +88,8 @@ class AgentSessionService:
         """
         try:
             # Ensure mode is string value
-            mode_value = mode.value if hasattr(mode, 'value') else str(mode)
-            
+            mode_value = mode.value if hasattr(mode, "value") else str(mode)
+
             session = AgentSession(
                 agent_id=agent_id,
                 mode=mode_value,
@@ -186,9 +186,7 @@ class AgentSessionService:
             raise
         except Exception as e:
             await self.db_session.rollback()
-            logger.error(
-                f"Failed to update session {session_id}: {type(e).__name__}"
-            )
+            logger.error(f"Failed to update session {session_id}: {type(e).__name__}")
             raise SessionError(f"Failed to update session: {str(e)}")
 
     async def update_session_output(
@@ -247,10 +245,7 @@ class AgentSessionService:
             raise
         except Exception as e:
             await self.db_session.rollback()
-            logger.error(
-                f"Failed to update session output {session_id}: "
-                f"{type(e).__name__}"
-            )
+            logger.error(f"Failed to update session output {session_id}: " f"{type(e).__name__}")
             raise SessionError(f"Failed to update session output: {str(e)}")
 
     async def get_session(self, session_id: str) -> AgentSession:
@@ -279,9 +274,7 @@ class AgentSessionService:
         except SessionNotFoundError:
             raise
         except Exception as e:
-            logger.error(
-                f"Error retrieving session {session_id}: {type(e).__name__}"
-            )
+            logger.error(f"Error retrieving session {session_id}: {type(e).__name__}")
             raise SessionError(f"Failed to retrieve session: {str(e)}")
 
     async def list_agent_sessions(
@@ -319,10 +312,7 @@ class AgentSessionService:
             return sessions
 
         except Exception as e:
-            logger.error(
-                f"Failed to list sessions for agent {agent_id}: "
-                f"{type(e).__name__}"
-            )
+            logger.error(f"Failed to list sessions for agent {agent_id}: " f"{type(e).__name__}")
             raise SessionError(f"Failed to list sessions: {str(e)}")
 
     async def get_latest_session(
@@ -356,8 +346,7 @@ class AgentSessionService:
 
         except Exception as e:
             logger.error(
-                f"Failed to get latest session for agent {agent_id}: "
-                f"{type(e).__name__}"
+                f"Failed to get latest session for agent {agent_id}: " f"{type(e).__name__}"
             )
             raise SessionError(f"Failed to get latest session: {str(e)}")
 
@@ -419,8 +408,7 @@ class AgentSessionService:
         except Exception as e:
             await self.db_session.rollback()
             logger.error(
-                f"Failed to abort running sessions for agent {agent_id}: "
-                f"{type(e).__name__}"
+                f"Failed to abort running sessions for agent {agent_id}: " f"{type(e).__name__}"
             )
             raise SessionError(f"Failed to abort running sessions: {str(e)}")
 
@@ -486,12 +474,9 @@ class AgentSessionService:
         except Exception as e:
             await self.db_session.rollback()
             logger.error(
-                f"Failed to cleanup stuck sessions for agent {agent_id}: "
-                f"{type(e).__name__}"
+                f"Failed to cleanup stuck sessions for agent {agent_id}: " f"{type(e).__name__}"
             )
-            raise SessionError(
-                f"Failed to cleanup stuck sessions: {str(e)}"
-            )
+            raise SessionError(f"Failed to cleanup stuck sessions: {str(e)}")
 
     async def count_agent_sessions(self, agent_id: str, status: SessionStatus | None = None) -> int:
         """
@@ -520,10 +505,7 @@ class AgentSessionService:
             return count
 
         except Exception as e:
-            logger.error(
-                f"Failed to count sessions for agent {agent_id}: "
-                f"{type(e).__name__}"
-            )
+            logger.error(f"Failed to count sessions for agent {agent_id}: " f"{type(e).__name__}")
             raise SessionError(f"Failed to count sessions: {str(e)}")
 
     async def delete_session(self, session_id: str) -> None:
@@ -549,9 +531,7 @@ class AgentSessionService:
             raise
         except Exception as e:
             await self.db_session.rollback()
-            logger.error(
-                f"Failed to delete session {session_id}: {type(e).__name__}"
-            )
+            logger.error(f"Failed to delete session {session_id}: {type(e).__name__}")
             raise SessionError(f"Failed to delete session: {str(e)}")
 
     async def get_session_statistics(self, agent_id: str) -> dict[str, Any]:
@@ -599,8 +579,5 @@ class AgentSessionService:
             }
 
         except Exception as e:
-            logger.error(
-                f"Failed to get statistics for agent {agent_id}: "
-                f"{type(e).__name__}"
-            )
+            logger.error(f"Failed to get statistics for agent {agent_id}: " f"{type(e).__name__}")
             raise SessionError(f"Failed to get session statistics: {str(e)}")

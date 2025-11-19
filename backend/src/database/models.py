@@ -92,28 +92,20 @@ class Agent(Base):
     max_position_size: Mapped[Decimal] = mapped_column(Numeric(5, 2), default=Decimal("50.0"))
 
     # Agent 狀態 (使用統一的 Enum)
-    status: Mapped[str] = mapped_column(
-        String(20), default=AgentStatus.INACTIVE
-    )
-    current_mode: Mapped[str] = mapped_column(
-        String(30), default=AgentMode.TRADING
-    )
+    status: Mapped[str] = mapped_column(String(20), default=AgentStatus.INACTIVE)
+    current_mode: Mapped[str] = mapped_column(String(30), default=AgentMode.TRADING)
 
     # JSON 配置欄位
     investment_preferences: Mapped[str | None] = mapped_column(Text)
 
     # 時間戳記
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), default=utc_now
-    )
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         default=utc_now,
         onupdate=utc_now,
     )
-    last_active_at: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True)
-    )
+    last_active_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
     # 關聯關係
     sessions: Mapped[list[AgentSession]] = relationship(
@@ -148,15 +140,9 @@ class AgentSession(Base):
     mode: Mapped[str] = mapped_column(String(30), nullable=False)
 
     # 執行狀態
-    status: Mapped[str] = mapped_column(
-        String(20), default=SessionStatus.PENDING
-    )
-    start_time: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), default=utc_now
-    )
-    end_time: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True)
-    )
+    status: Mapped[str] = mapped_column(String(20), default=SessionStatus.PENDING)
+    start_time: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
+    end_time: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     execution_time_ms: Mapped[int | None] = mapped_column(Integer)
 
     # 執行內容
@@ -212,9 +198,7 @@ class AgentHolding(Base):
     total_cost: Mapped[Decimal] = mapped_column(Numeric(15, 2), nullable=False)
 
     # 審計時間戳記
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), default=utc_now
-    )
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         default=utc_now,
@@ -253,21 +237,15 @@ class Transaction(Base):
     commission: Mapped[Decimal] = mapped_column(Numeric(10, 2), default=Decimal("0"))
 
     # 交易狀態
-    status: Mapped[str] = mapped_column(
-        String(20), default=TransactionStatus.PENDING
-    )
-    execution_time: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True)
-    )
+    status: Mapped[str] = mapped_column(String(20), default=TransactionStatus.PENDING)
+    execution_time: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
     # 決策背景
     decision_reason: Mapped[str | None] = mapped_column(Text)
     market_data: Mapped[dict[str, Any] | None] = mapped_column(JSON)
 
     # 時間戳記
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), default=utc_now
-    )
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
 
     # 關聯關係
     agent: Mapped[Agent] = relationship("Agent", back_populates="transactions")
@@ -334,9 +312,7 @@ class AgentPerformance(Base):
     winning_trades_correct: Mapped[int] = mapped_column(Integer, default=0, doc="真實獲利交易數")
 
     # 時間戳記
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), default=utc_now
-    )
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         default=utc_now,
@@ -374,9 +350,7 @@ class AIModelConfig(Base):
     display_order: Mapped[int] = mapped_column(Integer, default=999)
 
     # 時間戳記
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), default=utc_now
-    )
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         default=utc_now,

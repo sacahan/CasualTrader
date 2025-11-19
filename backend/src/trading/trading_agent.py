@@ -289,9 +289,7 @@ class TradingAgent:
                     "args": ["-y", "mcp-memory-libsql"],
                     "env": {"LIBSQL_URL": f"file:{memory_db_path}"},
                 },
-                success_message=(
-                    f"memory_mcp server initialized (db: {memory_db_path})"
-                ),
+                success_message=(f"memory_mcp server initialized (db: {memory_db_path})"),
             )
 
         # PERPLEXITY MCP Server
