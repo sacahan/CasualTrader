@@ -215,13 +215,7 @@ class TradingAgent:
                 model_settings_dict["extra_headers"] = self.extra_headers
 
             # 構建 MCP servers 列表，排除 None 值
-            mcp_servers_list = []
-            if self.memory_mcp is not None:
-                mcp_servers_list.append(self.memory_mcp)
-            if self.casual_market_mcp is not None:
-                mcp_servers_list.append(self.casual_market_mcp)
-            if self.perplexity_mcp is not None:
-                mcp_servers_list.append(self.perplexity_mcp)
+            mcp_servers_list = [self.memory_mcp, self.casual_market_mcp]
 
             self.agent = Agent(
                 name=self.agent_id,
@@ -956,60 +950,6 @@ class TradingAgent:
         if self.agent_config:
             mode = self._mode_to_str(getattr(self.agent_config, "current_mode", None))
         await save_execution_memory(self.memory_mcp, self.agent_id, execution_result, mode=mode)
-
-    async def _plan_next_steps(self, execution_result: str) -> list[str]:
-        """
-        根據執行結果規劃下一步行動
-
-        Args:
-            execution_result: 本次執行的結果
-
-        Returns:
-            計劃的下一步行動列表
-        """
-        try:
-            next_steps = []
-
-            # 提取執行結果摘要
-            summary = self._extract_result_summary(execution_result)
-
-            # 根據結果分析下一步
-            if "成功" in summary.lower() or "success" in summary.lower():
-                next_steps.append("監視持股表現")
-                next_steps.append("準備下次定期評估")
-            elif "失敗" in summary.lower() or "error" in summary.lower():
-                next_steps.append("調查失敗原因")
-                next_steps.append("檢查市場條件")
-            else:
-                next_steps.append("繼續觀察市場")
-
-            next_steps.append("記錄本次執行到記憶體")
-
-            logger.info(f"Planned next steps: {', '.join(next_steps)}")
-            return next_steps
-
-        except Exception as e:
-            logger.error(f"Failed to plan next steps: {e}")
-            return ["重新評估市場狀況"]
-
-    def _extract_result_summary(self, result: str) -> str:
-        """
-        從執行結果中提取摘要（用於記憶體存儲）
-
-        Args:
-            result: 完整執行結果
-
-        Returns:
-            結果摘要
-        """
-        try:
-            # 簡單的摘要提取：取前 200 個字符
-            summary = result.strip()
-            if len(summary) > 200:
-                summary = summary[:200] + "..."
-            return summary
-        except Exception:
-            return "執行結果"
 
     async def cancel(self) -> None:
         """

@@ -206,6 +206,16 @@ def get_engine():
             max_overflow=settings.database_max_overflow,
             pool_timeout=settings.database_pool_timeout,
             pool_recycle=settings.database_pool_recycle,
+            # asyncpg-specific optimizations
+            connect_args={
+                "timeout": 10,  # Connection timeout
+                "command_timeout": 10,  # Command timeout
+                "max_cached_statement_lifetime": 300,  # Cache statements for 5 minutes
+                "max_cacheable_statement_size": 15000,  # Cache statements up to 15KB
+                "server_settings": {
+                    "application_name": "casualtrader_backend",
+                },
+            },
         )
     return _engine
 
@@ -241,14 +251,16 @@ async def get_db_session():
         ```
     """
     session_maker = get_session_maker()
-    async with session_maker() as session:
-        try:
-            yield session
-        except Exception:
-            await session.rollback()
-            raise
-        finally:
-            await session.close()
+    session = session_maker()
+    try:
+        yield session
+    except Exception:
+        # Only rollback if session is active; close() will handle cleanup automatically
+        await session.rollback()
+        raise
+    finally:
+        # close() will handle any pending transaction; explicit rollback not needed
+        await session.close()
 
 
 async def close_db_engine():

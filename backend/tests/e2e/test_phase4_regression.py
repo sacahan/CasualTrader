@@ -147,8 +147,6 @@ class TestMemoryWorkflowIntegration:
         # Verify all memory workflow methods exist
         assert hasattr(agent, "_load_execution_memory")
         assert hasattr(agent, "_save_execution_memory")
-        assert hasattr(agent, "_plan_next_steps")
-        assert hasattr(agent, "_extract_result_summary")
 
     @pytest.mark.asyncio
     async def test_memory_workflow_methods_callable(self):
@@ -165,8 +163,6 @@ class TestMemoryWorkflowIntegration:
         # Verify methods are callable (check method signatures)
         assert callable(getattr(agent, "_load_execution_memory"))
         assert callable(getattr(agent, "_save_execution_memory"))
-        assert callable(getattr(agent, "_plan_next_steps"))
-        assert callable(getattr(agent, "_extract_result_summary"))
 
 
 class TestNoObservationReferences:

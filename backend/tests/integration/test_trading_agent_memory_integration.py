@@ -99,71 +99,6 @@ class TestMemoryWorkflow:
             execution_memory={},
         )
 
-    @pytest.mark.asyncio
-    async def test_plan_next_steps_on_success(self, trading_agent):
-        """驗證成功執行後規劃下一步"""
-        execution_result = "成功執行: 買入 2330 100股"
-
-        next_steps = await trading_agent._plan_next_steps(execution_result)
-
-        assert isinstance(next_steps, list)
-        assert len(next_steps) > 0
-        # 應該包含成功相關的下一步
-        next_steps_str = " ".join(next_steps).lower()
-        assert any(keyword in next_steps_str for keyword in ["監視", "準備", "記錄"])
-
-    @pytest.mark.asyncio
-    async def test_plan_next_steps_on_failure(self, trading_agent):
-        """驗證失敗執行後規劃下一步"""
-        execution_result = "執行失敗: 網絡錯誤"
-
-        next_steps = await trading_agent._plan_next_steps(execution_result)
-
-        assert isinstance(next_steps, list)
-        assert len(next_steps) > 0
-        # 應該包含失敗相關的下一步
-        assert "記錄本次執行到記憶體" in next_steps
-
-    @pytest.mark.asyncio
-    async def test_extract_result_summary_truncates_long_results(self, trading_agent):
-        """驗證結果摘要提取會截斷長文本"""
-        long_result = "成功" * 100  # 創建很長的字符串
-
-        summary = trading_agent._extract_result_summary(long_result)
-
-        # 當結果長度超過 200 時會添加 "..."
-        assert len(summary) <= 203 or not summary.endswith("...")
-        if len(long_result) > 200:
-            assert summary.endswith("...") or len(summary) <= 200
-
-    @pytest.mark.asyncio
-    async def test_extract_result_summary_handles_short_results(self, trading_agent):
-        """驗證結果摘要提取可以處理短結果"""
-        short_result = "成功"
-
-        summary = trading_agent._extract_result_summary(short_result)
-
-        assert summary == "成功"
-        assert not summary.endswith("...")
-
-    @pytest.mark.asyncio
-    async def test_extract_result_summary_handles_empty_results(self, trading_agent):
-        """驗證結果摘要提取可以處理空結果"""
-        empty_result = ""
-
-        summary = trading_agent._extract_result_summary(empty_result)
-
-        assert isinstance(summary, str)
-
-    @pytest.mark.asyncio
-    async def test_extract_result_summary_handles_exceptions(self, trading_agent):
-        """驗證結果摘要提取可以處理異常"""
-        invalid_result = None  # type: ignore
-
-        summary = trading_agent._extract_result_summary(invalid_result)
-
-        assert summary == "執行結果"
-
 
 class TestBuildTaskPromptWithMemory:
     """測試帶記憶體的任務提示構建"""
@@ -268,14 +203,6 @@ class TestMemoryIntegrationEdgeCases:
     """測試記憶體集成的邊界情況"""
 
     @pytest.mark.asyncio
-    async def test_plan_next_steps_with_empty_result(self, trading_agent):
-        """驗證空結果時的下一步規劃"""
-        next_steps = await trading_agent._plan_next_steps("")
-
-        assert isinstance(next_steps, list)
-        assert len(next_steps) > 0
-
-    @pytest.mark.asyncio
     async def test_save_execution_memory_with_empty_result(self, trading_agent):
         """驗證空結果時的記憶體保存"""
         # 不應該拋出異常
@@ -306,25 +233,3 @@ class TestMemoryConsistency:
         for field in required_fields:
             assert field in memory, f"Memory must contain '{field}'"
             assert isinstance(memory[field], list), f"Memory['{field}'] must be a list"
-
-    @pytest.mark.asyncio
-    async def test_plan_next_steps_returns_list_of_strings(self, trading_agent):
-        """驗證下一步規劃返回字符串列表"""
-        next_steps = await trading_agent._plan_next_steps("測試結果")
-
-        assert isinstance(next_steps, list)
-        for step in next_steps:
-            assert isinstance(step, str), "Each next step must be a string"
-
-    @pytest.mark.asyncio
-    async def test_extract_result_summary_always_returns_string(self, trading_agent):
-        """驗證結果摘要提取總是返回字符串"""
-        test_cases = [
-            "正常結果",
-            "很長的結果" * 100,
-            "",
-        ]
-
-        for test_input in test_cases:
-            summary = trading_agent._extract_result_summary(test_input)
-            assert isinstance(summary, str), f"Summary for '{test_input}' should be string"
