@@ -92,16 +92,28 @@ class Agent(Base):
     max_position_size: Mapped[Decimal] = mapped_column(Numeric(5, 2), default=Decimal("50.0"))
 
     # Agent 狀態 (使用統一的 Enum)
-    status: Mapped[AgentStatus] = mapped_column(String(20), default=AgentStatus.INACTIVE)
-    current_mode: Mapped[AgentMode] = mapped_column(String(30), default=AgentMode.TRADING)
+    status: Mapped[str] = mapped_column(
+        String(20), default=AgentStatus.INACTIVE
+    )
+    current_mode: Mapped[str] = mapped_column(
+        String(30), default=AgentMode.TRADING
+    )
 
     # JSON 配置欄位
     investment_preferences: Mapped[str | None] = mapped_column(Text)
 
     # 時間戳記
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now)
-    updated_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now, onupdate=utc_now)
-    last_active_at: Mapped[datetime | None] = mapped_column(DateTime)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utc_now
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=utc_now,
+        onupdate=utc_now,
+    )
+    last_active_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True)
+    )
 
     # 關聯關係
     sessions: Mapped[list[AgentSession]] = relationship(
@@ -133,12 +145,18 @@ class AgentSession(Base):
 
     id: Mapped[str] = mapped_column(String(50), primary_key=True, default=lambda: str(uuid.uuid4()))
     agent_id: Mapped[str] = mapped_column(String(50), ForeignKey("agents.id"), nullable=False)
-    mode: Mapped[AgentMode] = mapped_column(String(30), nullable=False)
+    mode: Mapped[str] = mapped_column(String(30), nullable=False)
 
     # 執行狀態
-    status: Mapped[SessionStatus] = mapped_column(String(20), default=SessionStatus.PENDING)
-    start_time: Mapped[datetime] = mapped_column(DateTime, default=utc_now)
-    end_time: Mapped[datetime | None] = mapped_column(DateTime)
+    status: Mapped[str] = mapped_column(
+        String(20), default=SessionStatus.PENDING
+    )
+    start_time: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utc_now
+    )
+    end_time: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True)
+    )
     execution_time_ms: Mapped[int | None] = mapped_column(Integer)
 
     # 執行內容
@@ -151,13 +169,13 @@ class AgentSession(Base):
 
     # 審計時間戳記 (遵循 timestamp.instructions.md 標準)
     created_at: Mapped[datetime] = mapped_column(
-        DateTime,
+        DateTime(timezone=True),
         default=utc_now,
         nullable=False,
         doc="Record creation timestamp (UTC)",
     )
     updated_at: Mapped[datetime] = mapped_column(
-        DateTime,
+        DateTime(timezone=True),
         default=utc_now,
         onupdate=utc_now,
         nullable=False,
@@ -193,10 +211,12 @@ class AgentHolding(Base):
     average_cost: Mapped[Decimal] = mapped_column(Numeric(10, 2), nullable=False)
     total_cost: Mapped[Decimal] = mapped_column(Numeric(15, 2), nullable=False)
 
-    # 時間戳記
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now)
+    # 審計時間戳記
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utc_now
+    )
     updated_at: Mapped[datetime] = mapped_column(
-        DateTime,
+        DateTime(timezone=True),
         default=utc_now,
         onupdate=utc_now,
     )
@@ -224,7 +244,7 @@ class Transaction(Base):
     # 交易基本資訊
     ticker: Mapped[str] = mapped_column(String(10), nullable=False)
     company_name: Mapped[str | None] = mapped_column(String(200))
-    action: Mapped[TransactionAction] = mapped_column(String(10), nullable=False)
+    action: Mapped[str] = mapped_column(String(10), nullable=False)
 
     # 交易數量和價格
     quantity: Mapped[int] = mapped_column(Integer, nullable=False)
@@ -233,15 +253,21 @@ class Transaction(Base):
     commission: Mapped[Decimal] = mapped_column(Numeric(10, 2), default=Decimal("0"))
 
     # 交易狀態
-    status: Mapped[TransactionStatus] = mapped_column(String(20), default=TransactionStatus.PENDING)
-    execution_time: Mapped[datetime | None] = mapped_column(DateTime)
+    status: Mapped[str] = mapped_column(
+        String(20), default=TransactionStatus.PENDING
+    )
+    execution_time: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True)
+    )
 
     # 決策背景
     decision_reason: Mapped[str | None] = mapped_column(Text)
     market_data: Mapped[dict[str, Any] | None] = mapped_column(JSON)
 
     # 時間戳記
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utc_now
+    )
 
     # 關聯關係
     agent: Mapped[Agent] = relationship("Agent", back_populates="transactions")
@@ -308,9 +334,11 @@ class AgentPerformance(Base):
     winning_trades_correct: Mapped[int] = mapped_column(Integer, default=0, doc="真實獲利交易數")
 
     # 時間戳記
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utc_now
+    )
     updated_at: Mapped[datetime] = mapped_column(
-        DateTime,
+        DateTime(timezone=True),
         default=utc_now,
         onupdate=utc_now,
     )
@@ -334,7 +362,7 @@ class AIModelConfig(Base):
     group_name: Mapped[str] = mapped_column(String(50), nullable=False)
 
     # 模型類型和配置
-    model_type: Mapped[ModelType] = mapped_column(String(20), nullable=False)
+    model_type: Mapped[str] = mapped_column(String(20), nullable=False)
     litellm_prefix: Mapped[str | None] = mapped_column(String(100))
 
     # 啟用和權限
@@ -346,9 +374,11 @@ class AIModelConfig(Base):
     display_order: Mapped[int] = mapped_column(Integer, default=999)
 
     # 時間戳記
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utc_now
+    )
     updated_at: Mapped[datetime] = mapped_column(
-        DateTime,
+        DateTime(timezone=True),
         default=utc_now,
         onupdate=utc_now,
     )

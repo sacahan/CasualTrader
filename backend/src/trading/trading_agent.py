@@ -214,12 +214,21 @@ class TradingAgent:
             if self.extra_headers:
                 model_settings_dict["extra_headers"] = self.extra_headers
 
+            # 構建 MCP servers 列表，排除 None 值
+            mcp_servers_list = []
+            if self.memory_mcp is not None:
+                mcp_servers_list.append(self.memory_mcp)
+            if self.casual_market_mcp is not None:
+                mcp_servers_list.append(self.casual_market_mcp)
+            if self.perplexity_mcp is not None:
+                mcp_servers_list.append(self.perplexity_mcp)
+
             self.agent = Agent(
                 name=self.agent_id,
                 model=self.llm_model,
                 instructions=self._build_instructions(self.agent_config.description),
                 tools=all_tools,
-                mcp_servers=[self.memory_mcp],
+                mcp_servers=mcp_servers_list,
                 model_settings=ModelSettings(**model_settings_dict),
             )
 
@@ -248,72 +257,90 @@ class TradingAgent:
 
         Args:
             tool_requirements: 工具需求配置
-
-        Raises:
-            Exception: 初始化失敗
         """
+
+        # AsyncExitStack 可能在 cleanup 後被重設，因此需要確保存在
+        if self._exit_stack is None:
+            self._exit_stack = AsyncExitStack()
+
+        # Casual Market MCP Server (兩種模式都需要)
+        if tool_requirements.include_casual_market_mcp:
+            self.casual_market_mcp = await self._start_mcp_server(
+                name="casual_market_mcp",
+                params={
+                    "command": "uvx",
+                    "args": [
+                        "--from",
+                        CASUAL_MARKET_PATH,
+                        "casual-market-mcp",
+                    ],
+                    "env": {"MARKET_MCP_RATE_LIMITING_ENABLED": "false"},
+                },
+                success_message="casual_market_mcp server initialized",
+            )
+
+        # Memory MCP Server (兩種模式都需要)
+        if tool_requirements.include_memory_mcp:
+            memory_db_path = os.path.join(
+                os.path.dirname(os.path.dirname(os.path.dirname(__file__))),
+                "memory",
+                f"{self.agent_id}.db",
+            )
+            os.makedirs(os.path.dirname(memory_db_path), exist_ok=True)
+
+            self.memory_mcp = await self._start_mcp_server(
+                name="memory_mcp",
+                params={
+                    "command": "npx",
+                    "args": ["-y", "mcp-memory-libsql"],
+                    "env": {"LIBSQL_URL": f"file:{memory_db_path}"},
+                },
+                success_message=(
+                    f"memory_mcp server initialized (db: {memory_db_path})"
+                ),
+            )
+
+        # PERPLEXITY MCP Server
+        if tool_requirements.include_perplexity_mcp:
+            self.perplexity_mcp = await self._start_mcp_server(
+                name="perplexity_mcp",
+                params={
+                    "command": "npx",
+                    "args": ["-y", "@perplexity-ai/mcp-server"],
+                    "env": {"PERPLEXITY_API_KEY": f"{PERPLEXITY_API_KEY}"},
+                },
+                success_message="perplexity_mcp server initialized",
+            )
+
+    async def _start_mcp_server(
+        self,
+        *,
+        name: str,
+        params: dict[str, Any],
+        success_message: str,
+        timeout_seconds: int = DEFAULT_AGENT_TIMEOUT,
+    ):
+        """啟動單一 MCP server，若失敗則記錄並返回 None。"""
+
+        if self._exit_stack is None:
+            self._exit_stack = AsyncExitStack()
+
         try:
-            # Casual Market MCP Server (兩種模式都需要)
-            if tool_requirements.include_casual_market_mcp:
-                self.casual_market_mcp = await self._exit_stack.enter_async_context(
-                    MCPServerStdio(
-                        name="casual_market_mcp",
-                        params={
-                            "command": "uvx",
-                            "args": [
-                                "--from",
-                                CASUAL_MARKET_PATH,
-                                "casual-market-mcp",
-                            ],
-                            "env": {"MARKET_MCP_RATE_LIMITING_ENABLED": "false"},
-                        },
-                        client_session_timeout_seconds=DEFAULT_AGENT_TIMEOUT,
-                    )
+            server = await self._exit_stack.enter_async_context(
+                MCPServerStdio(
+                    name=name,
+                    params=params,
+                    client_session_timeout_seconds=timeout_seconds,
                 )
-                logger.info("casual_market_mcp server initialized")
-
-            # Memory MCP Server (兩種模式都需要)
-            if tool_requirements.include_memory_mcp:
-                memory_db_path = os.path.join(
-                    os.path.dirname(os.path.dirname(os.path.dirname(__file__))),
-                    "memory",
-                    f"{self.agent_id}.db",
-                )
-                os.makedirs(os.path.dirname(memory_db_path), exist_ok=True)
-
-                self.memory_mcp = await self._exit_stack.enter_async_context(
-                    MCPServerStdio(
-                        name="memory_mcp",
-                        params={
-                            "command": "npx",
-                            "args": ["-y", "mcp-memory-libsql"],
-                            "env": {"LIBSQL_URL": f"file:{memory_db_path}"},
-                        },
-                        client_session_timeout_seconds=DEFAULT_AGENT_TIMEOUT,
-                    )
-                )
-                logger.info(f"memory_mcp server initialized (db: {memory_db_path})")
-
-            # PERPLEXITY MCP Server
-            if tool_requirements.include_perplexity_mcp:
-                self.perplexity_mcp = await self._exit_stack.enter_async_context(
-                    MCPServerStdio(
-                        name="perplexity_mcp",
-                        params={
-                            "command": "npx",
-                            "args": ["-y", "@perplexity-ai/mcp-server"],
-                            "env": {"PERPLEXITY_API_KEY": f"{PERPLEXITY_API_KEY}"},
-                        },
-                        client_session_timeout_seconds=DEFAULT_AGENT_TIMEOUT,
-                    )
-                )
-                logger.info("perplexity_mcp server initialized")
-
-        except Exception as e:
-            logger.warning(f"Failed to initialize MCP server: {e}")
-            if self._exit_stack:
-                await self._exit_stack.aclose()
-                self._exit_stack = None
+            )
+            logger.info(success_message)
+            return server
+        except Exception as exc:
+            logger.warning(
+                f"Failed to initialize {name}: {exc}",
+                exc_info=True,
+            )
+            return None
 
     async def _create_llm_model(self) -> tuple[LitellmModel, dict[str, str] | None]:
         """

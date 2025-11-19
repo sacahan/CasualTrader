@@ -212,26 +212,39 @@ def create_app() -> FastAPI:
         logger.info(f"→ {request.method} {request.url.path}")
         try:
             response = await call_next(request)
-            logger.info(f"← {request.method} {request.url.path} - Status: {response.status_code}")
+            log_msg = f"← {request.method} {request.url.path}"
+            log_msg += f" - Status: {response.status_code}"
+            logger.info(log_msg)
             return response
-        except Exception:
-            # Use exc_info=True to avoid string formatting issues with exception messages
-            logger.error(
-                f"✗ {request.method} {request.url.path} - Exception occurred", exc_info=True
-            )
+        except Exception as e:
+            log_msg = f"✗ {request.method} {request.url.path}"
+            log_msg += f" - Exception: {type(e).__name__}"
+            logger.error(log_msg)
             raise
 
     # Global exception handler
     @app.exception_handler(Exception)
     async def global_exception_handler(request: Request, exc: Exception):
         """Handle uncaught exceptions."""
-        logger.exception(f"Unhandled exception on {request.method} {request.url.path}")
+        error_msg = f"Unhandled exception: {type(exc).__name__}"
+        logger.error(error_msg)
+        
+        # 確保 CORS 頭被設置
+        origin = request.headers.get("origin")
+        cors_headers = {}
+        if origin and origin in allowed_origins:
+            cors_headers = {
+                "Access-Control-Allow-Origin": origin,
+                "Access-Control-Allow-Credentials": "true",
+            }
+        
         return JSONResponse(
             status_code=500,
             content={
                 "detail": "Internal server error",
                 "error": str(exc) if settings.debug else "An error occurred",
             },
+            headers=cors_headers,
         )
 
     # Include routers
