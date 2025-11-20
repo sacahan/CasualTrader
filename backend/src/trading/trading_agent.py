@@ -61,7 +61,10 @@ DEFAULT_MAX_TURNS = int(os.getenv("DEFAULT_MAX_TURNS", "30"))
 DEFAULT_AGENT_TIMEOUT = int(os.getenv("DEFAULT_AGENT_TIMEOUT", "300"))  # 秒
 DEFAULT_TEMPERATURE = float(os.getenv("DEFAULT_MODEL_TEMPERATURE", 0.7))
 
-# CASUAL_MARKET_PATH 指向 casual-trader-market 目錄
+# CASUAL_MARKET_PATH 可以是本地路徑或 GitHub 倉庫 URL
+# 本地路徑: /path/to/casual-market-mcp
+# GitHub URL: git+https://github.com/sacahan/casual-market-mcp.git@main
+# 預設使用本地開發路徑
 CASUAL_MARKET_PATH = os.getenv("CASUAL_MARKET_PATH")
 # PERPLEXITY 用於網頁搜索的 MCP 伺服器 API 金鑰
 PERPLEXITY_API_KEY = os.getenv("PERPLEXITY_API_KEY")

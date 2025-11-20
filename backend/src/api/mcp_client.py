@@ -29,7 +29,7 @@ class MCPMarketClient:
     支援 21 個專業工具。
     """
 
-    def __init__(self, timeout: int = 30):
+    def __init__(self, timeout: int = 60):
         """
         初始化 MCP Market 客戶端
 
@@ -490,7 +490,7 @@ class MCPMarketClient:
 
 
 # 工廠函數
-def create_mcp_market_client(timeout: int = 30) -> MCPMarketClient:
+def create_mcp_market_client(timeout: int = 60) -> MCPMarketClient:
     """
     建立 MCP Market 客戶端實例
 

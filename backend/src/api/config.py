@@ -8,7 +8,7 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
-from pydantic import Field, field_validator
+from pydantic import Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -21,6 +21,27 @@ class Settings(BaseSettings):
         case_sensitive=False,
         extra="ignore",
     )
+
+    @staticmethod
+    def _strip_wrapping_quotes(value: Any) -> Any:
+        """Remove leading and trailing quotes from string values."""
+        if isinstance(value, str):
+            trimmed = value.strip()
+            if len(trimmed) >= 2 and (
+                (trimmed.startswith('"') and trimmed.endswith('"'))
+                or (trimmed.startswith("'") and trimmed.endswith("'"))
+            ):
+                return trimmed[1:-1]
+            return trimmed
+        return value
+
+    @model_validator(mode="before")
+    @classmethod
+    def sanitize_string_fields(cls, data: Any) -> Any:
+        """Normalize string values loaded from environment variables."""
+        if isinstance(data, dict):
+            return {key: cls._strip_wrapping_quotes(value) for key, value in data.items()}
+        return data
 
     # API Server Settings
     api_host: str = Field(default="0.0.0.0", description="API server host")
@@ -103,6 +124,10 @@ class Settings(BaseSettings):
     def parse_cors_origins(cls, v: Any) -> list[str]:
         """Parse CORS origins from string or list."""
         if isinstance(v, str):
+            # Handle empty string
+            if not v or v.strip() == "":
+                return ["http://localhost:3000", "http://localhost:5173"]
+
             # Handle JSON-like string format
             import json
 
@@ -110,8 +135,8 @@ class Settings(BaseSettings):
                 return json.loads(v)
             except json.JSONDecodeError:
                 # Fallback to comma-separated
-                return [origin.strip() for origin in v.split(",")]
-        return v
+                return [origin.strip() for origin in v.split(",") if origin.strip()]
+        return v if v else ["http://localhost:3000", "http://localhost:5173"]
 
     @field_validator("mcp_casual_market_args", mode="before")
     @classmethod

@@ -1,69 +1,52 @@
-# Python
-**/__pycache__
-**/*.pyc
-**/*.pyo
-**/*.pyd
-**/.Python
-**/pip-log.txt
-**/pip-delete-this-directory.txt
-**/.pytest_cache
-**/.mypy_cache
-**/.ruff_cache
-**/.coverage
-**/htmlcov
-**/*.egg-info
-**/.venv
-**/venv
-**/*.db
-**/*.sqlite3
+# Python 相關
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+dist/
+build/
+.venv/
+venv/
+env/
 
-# Node.js
-**/node_modules
-**/npm-debug.log
-**/yarn-error.log
-**/dist
-**/.next
+# 測試相關
+.pytest_cache/
+.coverage
+htmlcov/
+.mypy_cache/
 
 # IDE
-**/.vscode
-**/.idea
-**/.DS_Store
-**/*.swp
-**/*.swo
+.vscode/
+.idea/
+*.swp
+*.swo
 *~
 
-# Git
-.git
+# 項目相關
+.git/
 .gitignore
-.gitattributes
+.env
+.env.local
+logs/
+memory/
+custom_logs/
 
-# Logs
-**/logs
-**/custom_logs
-**/memory
-**/*.log
+# 其他
+.DS_Store
+*.log
+.cache/
+.ruff_cache/
+node_modules/
+.next/
+dist/
 
-# Testing
-**/test-results
-**/playwright-report
-**/tests
-
-# Documentation
-**/docs
-**/README.md
-**/CLAUDE.md
-**/GEMINI.md
-
-# Reference
-**/reference
-
-# Environment
-**/.env
-**/.env.*
-!**/.env.example
-
-# Scripts (don't include in image)
-**/scripts
-
-# Database
-casualtrader.db
+# 不需要的文件
+README.md
+CLAUDE.md
+GEMINI.md
+docs/
+reference/
+tests/
+frontend/
