@@ -52,6 +52,11 @@ asyncio_default_fixture_loop_scope = "function"
 [tool.ruff]
 line-length = 100
 target-version = "py312"
+ignore = ["E501"]  # 忽略行過長警告
+
+[tool.ruff.format]
+# Formatter 設定 - 使用 100 字符限制，不折行
+line-length = 100
 
 [tool.mypy]
 python_version = "3.12"

@@ -145,6 +145,15 @@
   "python.analysis.extraPaths": [
     "${workspaceFolder}/backend/src"
   ],
+  // Python Linter 設定 - 禁用行過長警告
+  "[python]": {
+    "editor.codeActionsOnSave": {
+      "source.fixAll": "explicit"
+    }
+  },
+  "python.linting.enabled": true,
+  "python.linting.flake8Enabled": false,
+  "pylint.enabled": false,
   // Multi-root workspace support
   "files.associations": {
     "**/backend/**/*.py": "python",
