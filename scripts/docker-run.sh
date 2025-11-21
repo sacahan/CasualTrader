@@ -27,15 +27,22 @@ BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
 # 專案根目錄
-PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # 預設環境文件
-ENV_FILE="${PROJECT_DIR}/scripts/.env.docker"
+ENV_FILE="${PROJECT_DIR}/.env.docker"
 
 # Docker 鏡像和容器名稱
 IMAGE_NAME="sacahan/casual-trader:latest"
 CONTAINER_NAME="casual-trader"
-NETWORK_NAME="trader-network"
+HOST_PORT="${HOST_PORT:-8877}"
+
+# Docker 網路配置 - 用於與 casual-market 容器通訊
+NETWORK_NAME="casual-network"
+
+# 主機 IP 地址 (Linux 上用於連接主機服務)
+# 可透過環境變數覆蓋: HOST_IP=192.168.1.100 ./docker-run.sh up
+HOST_IP="${HOST_IP:-127.0.0.1}"
 
 # 檢查 .env.docker 是否存在
 check_env_file() {
@@ -54,9 +61,18 @@ check_env_file() {
 	fi
 }
 
+# 確保 Docker 網路存在
+ensure_network() {
+	if ! docker network ls --format '{{.Name}}' | grep -q "^${NETWORK_NAME}$"; then
+		echo -e "${BLUE}📡 建立 Docker 網路: $NETWORK_NAME${NC}"
+		docker network create "$NETWORK_NAME"
+		echo -e "${GREEN}✓ Docker 網路已建立${NC}"
+	fi
+}
 
 # 啟動後端容器
 start_container() {
+	ensure_network
 	check_env_file
 
 	# 檢查是否已運行
@@ -77,8 +93,10 @@ start_container() {
 
 	docker run -d \
 		--name "$CONTAINER_NAME" \
+		--network "$NETWORK_NAME" \
+		--add-host host.docker.internal:host-gateway \
 		--env-file "$ENV_FILE" \
-		-p 8000:8000 \
+		-p "${HOST_PORT}:8000" \
 		--restart unless-stopped \
 		"$IMAGE_NAME"
 
@@ -171,9 +189,6 @@ clean_up() {
 		# 移除鏡像
 		docker rmi "$IMAGE_NAME" 2>/dev/null || true
 
-		# 移除卷
-		docker volume rm casualtrader-postgres-data 2>/dev/null || true
-
 		# 系統清理
 		docker system prune -f
 
@@ -217,8 +232,8 @@ CasualTrader Docker 執行腳本
 	 ./docker-run.sh down
 
 🔗 服務端點:
-  Backend:  http://localhost:8000
-  API 文檔:  http://localhost:8000/api/docs
+  Backend:  http://localhost:${HOST_PORT}
+  API 文檔:  http://localhost:${HOST_PORT}/api/docs
 
 📝 環境配置:
   配置文件: .env.docker
@@ -231,8 +246,8 @@ EOF
 # 顯示服務信息
 show_info() {
 	echo -e "${BLUE}📊 服務信息：${NC}"
-	echo -e "  Backend: http://localhost:8000"
-	echo -e "  API 文檔: http://localhost:8000/api/docs"
+	echo -e "  Backend: http://localhost:${HOST_PORT}"
+	echo -e "  API 文檔: http://localhost:${HOST_PORT}/api/docs"
 	echo -e "  PostgreSQL: localhost:5432"
 	echo ""
 	echo -e "${BLUE}常用命令：${NC}"

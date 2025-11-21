@@ -23,7 +23,9 @@ RUN rm -f package-lock.json && npm install
 # Copy frontend source
 COPY frontend/ ./
 
-# Build frontend static files
+# Build frontend static files with production API URL
+ENV VITE_API_BASE_URL=https://trader.brianhan.cc
+ENV VITE_WS_URL=wss://trader.brianhan.cc/ws
 RUN npm run build
 
 # ============================================
