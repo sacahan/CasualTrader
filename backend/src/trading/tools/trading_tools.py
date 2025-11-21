@@ -4,7 +4,7 @@ import json
 from typing import Any, TYPE_CHECKING
 
 from agents import function_tool, Tool
-from agents.mcp import MCPServerStdio
+from agents.mcp import MCPServerStdio, MCPServerSse
 
 from common.logger import logger
 from common.enums import TransactionStatus
@@ -293,7 +293,7 @@ async def execute_trade_atomic(
 def create_trading_tools(
     trading_service,
     agent_id: str,
-    casual_market_mcp: MCPServerStdio | None = None,
+    casual_market_mcp: MCPServerStdio | MCPServerSse | None = None,
     include_buy_sell: bool = True,
     include_portfolio: bool = True,
 ) -> list[Tool]:

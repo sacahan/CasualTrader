@@ -4,8 +4,8 @@ MCP Client 服務
 提供與 casual-market MCP Server 的集成，用於獲取市場數據。
 
 實作說明：
-- 使用 agents.mcp.MCPServerStdio 管理 MCP Server 連接
-- 透過 stdio 協議與 casual-market-mcp 通信
+- 使用 agents.mcp.MCPServerSse 管理 MCP Server 連接
+- 透過 SSE 協議與 casual-market-mcp 通信
 - 提供完整的錯誤處理和重試機制
 """
 
@@ -16,7 +16,7 @@ import json
 import os
 from typing import Any
 
-from agents.mcp import MCPServerStdio
+from agents.mcp import MCPServerSse
 
 from common.logger import logger
 
@@ -38,36 +38,20 @@ class MCPMarketClient:
         """
         self.timeout = timeout
 
-        # 優先使用環境變數路徑，若無則使用硬編碼的本地開發路徑
-        casual_market_path = os.getenv("CASUAL_MARKET_PATH")
+        # 使用 SSE URL
+        self.sse_url = os.getenv("CASUAL_MARKET_SSE_URL", "http://sacahan-ubunto:8066/sse")
+        logger.info(f"MCP Market Client 使用 SSE URL: {self.sse_url}")
 
-        if casual_market_path and os.path.isabs(casual_market_path):
-            # 使用絕對路徑（本地開發）
-            self.server_params = {
-                "command": "uvx",
-                "args": [
-                    "--from",
-                    casual_market_path,
-                    "casual-market-mcp",
-                ],
-            }
-            logger.info(f"MCP Market Client 使用本地路徑: {casual_market_path}")
-        else:
-            # 使用已安裝的包（生產環境）
-            self.server_params = {
-                "command": "uvx",
-                "args": ["casual-market-mcp"],
-            }
-            logger.info("MCP Market Client 使用已安裝的 casual-market-mcp 包")
-
-        self._server: MCPServerStdio | None = None
+        self._server: MCPServerSse | None = None
         logger.info("MCP Market Client 已初始化")
 
     async def __aenter__(self):
         """異步上下文管理器進入"""
         logger.debug("創建 MCP Server 連接")
-        self._server = await MCPServerStdio(
-            self.server_params, client_session_timeout_seconds=self.timeout
+        self._server = await MCPServerSse(
+            name="casual-market-mcp",
+            params={"url": self.sse_url},
+            client_session_timeout_seconds=self.timeout,
         ).__aenter__()
         logger.info("MCP Server 連接已建立")
         return self

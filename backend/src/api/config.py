@@ -47,6 +47,9 @@ class Settings(BaseSettings):
     api_host: str = Field(default="0.0.0.0", description="API server host")
     api_port: int = Field(default=8000, description="API server port")
 
+    # MCP Client Settings
+    casual_market_sse_url: str | None = Field(default=None, description="Casual Market MCP SSE URL")
+
     # CORS Settings
     cors_origins: list[str] = Field(
         default=["http://localhost:3000", "http://localhost:5173"],

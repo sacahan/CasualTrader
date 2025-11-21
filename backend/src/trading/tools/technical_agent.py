@@ -724,7 +724,7 @@ async def get_technical_agent(
     Args:
         llm_model: 使用的語言模型實例 (LitellmModel)，如果為 None，則使用預設模型
         extra_headers: 額外的 HTTP 標頭，用於模型 API 請求
-        mcp_servers: MCP servers 實例列表（MCPServerStdio 對象），從 TradingAgent 傳入
+        mcp_servers: MCP servers 實例列表（MCPServerStdio 或 MCPServerSse 對象），從 TradingAgent 傳入
 
     Returns:
         Agent: 配置好的技術分析 Agent

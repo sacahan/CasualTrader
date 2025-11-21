@@ -63,6 +63,10 @@ def _filter_noisy_loggers(record):
     if record["name"].startswith("litellm") and record["level"].name == "DEBUG":
         return False
 
+    # 過濾掉 mcp.client.sse 的 DEBUG 日誌
+    if record["name"].startswith("mcp.client.sse") and record["level"].name == "DEBUG":
+        return False
+
     return True
 
 

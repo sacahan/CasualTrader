@@ -1,12 +1,8 @@
 {
     "servers": {
-        "casual-market": {
-            "command": "uvx",
-            "args": [
-                "--from",
-                "../CasualMarket",
-                "casual-market-mcp"
-            ]
+        "casual-market-mcp": {
+            "type": "sse",
+            "url": "http://sacahan-ubunto:8066/sse"
         },
         "mcp-memory-libsql": {
             "command": "npx",

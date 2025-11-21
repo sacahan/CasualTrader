@@ -1,5 +1,5 @@
 """
-TradingAgent - 基於 OpenAI Agents SDK 的生產級實作
+TradingAgent - 基於 OpenAI Agents SDK 的 生產級實作
 
 整合 AgentDatabaseService，提供完整的生命週期管理、
 模式驅動執行、錯誤處理和日誌追蹤。
@@ -26,7 +26,7 @@ from agents import (
     CodeInterpreterTool,
     set_tracing_export_api_key,
 )
-from agents.mcp import MCPServerStdio
+from agents.mcp import MCPServerStdio, MCPServerSse
 
 # 導入所有 sub-agents
 from .tools.technical_agent import get_technical_agent
@@ -61,11 +61,9 @@ DEFAULT_MAX_TURNS = int(os.getenv("DEFAULT_MAX_TURNS", "30"))
 DEFAULT_AGENT_TIMEOUT = int(os.getenv("DEFAULT_AGENT_TIMEOUT", "300"))  # 秒
 DEFAULT_TEMPERATURE = float(os.getenv("DEFAULT_MODEL_TEMPERATURE", 0.7))
 
-# CASUAL_MARKET_PATH 可以是本地路徑或 GitHub 倉庫 URL
-# 本地路徑: /path/to/casual-market-mcp
-# GitHub URL: git+https://github.com/sacahan/casual-market-mcp.git@main
-# 預設使用本地開發路徑
-CASUAL_MARKET_PATH = os.getenv("CASUAL_MARKET_PATH")
+# CASUAL_MARKET_SSE_URL: casual-market-mcp 的 SSE 連接 URL
+# 預設使用本地開發 URL
+CASUAL_MARKET_SSE_URL = os.getenv("CASUAL_MARKET_SSE_URL", "http://sacahan-ubunto:8066/sse")
 # PERPLEXITY 用於網頁搜索的 MCP 伺服器 API 金鑰
 PERPLEXITY_API_KEY = os.getenv("PERPLEXITY_API_KEY")
 # 設置追蹤 API 金鑰（用於監控和日誌）
@@ -262,18 +260,10 @@ class TradingAgent:
 
         # Casual Market MCP Server (兩種模式都需要)
         if tool_requirements.include_casual_market_mcp:
-            self.casual_market_mcp = await self._start_mcp_server(
+            self.casual_market_mcp = await self._start_mcp_server_sse(
                 name="casual_market_mcp",
-                params={
-                    "command": "uvx",
-                    "args": [
-                        "--from",
-                        CASUAL_MARKET_PATH,
-                        "casual-market-mcp",
-                    ],
-                    "env": {"MARKET_MCP_RATE_LIMITING_ENABLED": "false"},
-                },
-                success_message="casual_market_mcp server initialized",
+                url=CASUAL_MARKET_SSE_URL,
+                success_message="casual_market_mcp server initialized (SSE)",
             )
 
         # Memory MCP Server (兩種模式都需要)
@@ -306,6 +296,36 @@ class TradingAgent:
                 },
                 success_message="perplexity_mcp server initialized",
             )
+
+    async def _start_mcp_server_sse(
+        self,
+        *,
+        name: str,
+        url: str,
+        success_message: str,
+        timeout_seconds: int = DEFAULT_AGENT_TIMEOUT,
+    ):
+        """啟動單一 MCP server (SSE)，若失敗則記錄並返回 None。"""
+
+        if self._exit_stack is None:
+            self._exit_stack = AsyncExitStack()
+
+        try:
+            server = await self._exit_stack.enter_async_context(
+                MCPServerSse(
+                    name=name,
+                    params={"url": url},
+                    client_session_timeout_seconds=timeout_seconds,
+                )
+            )
+            logger.info(success_message)
+            return server
+        except Exception as exc:
+            logger.warning(
+                f"Failed to initialize {name}: {exc}",
+                exc_info=True,
+            )
+            return None
 
     async def _start_mcp_server(
         self,
