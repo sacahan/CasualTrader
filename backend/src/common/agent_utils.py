@@ -53,11 +53,7 @@ def save_agent_graph(
         ...     print(f"Error: {result}")
 
         >>> # 自訂輸出目錄
-        >>> success, result = save_agent_graph(
-        ...     agent,
-        ...     "my_agent",
-        ...     output_dir="/custom/path"
-        ... )
+        >>> success, result = save_agent_graph(agent, "my_agent", output_dir="/custom/path")
 
     Raises:
         TypeError: Agent 不是 OpenAI Agents SDK 的 Agent 實例

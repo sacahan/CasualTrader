@@ -746,13 +746,37 @@ class AgentsService:
                 buys = trades["buys"].copy()
                 sells = trades["sells"].copy()
 
+                # 在修改之前保存每個交易的原始數量（使用 id 作為 key）
+                buy_original_quantities = {id(buy): buy.quantity for buy in buys}
+                sell_original_quantities = {id(sell): sell.quantity for sell in sells}
+
                 buy_idx = 0
 
                 for sell in sells:
                     remaining_qty = sell.quantity
+                    sell_original_qty = sell_original_quantities.get(id(sell), sell.quantity)
+
+                    # 避免除以零：跳過數量為零的賣出交易
+                    if sell_original_qty == 0:
+                        logger.warning(f"Skipping sell transaction with zero quantity for {ticker}")
+                        continue
 
                     while remaining_qty > 0 and buy_idx < len(buys):
                         buy = buys[buy_idx]
+                        buy_original_qty = buy_original_quantities.get(id(buy), buy.quantity)
+
+                        # 避免除以零：跳過數量為零的買入交易
+                        if buy_original_qty == 0:
+                            logger.warning(
+                                f"Skipping buy transaction with zero quantity for {ticker}"
+                            )
+                            buy_idx += 1
+                            continue
+
+                        # 如果買入交易已完全配對，移到下一個
+                        if buy.quantity <= 0:
+                            buy_idx += 1
+                            continue
 
                         # 計算此次配對的數量（取較小值）
                         matched_qty = min(remaining_qty, buy.quantity)
@@ -761,10 +785,10 @@ class AgentsService:
                         # 損益 = (賣出價 - 買入價) × 數量 - 雙邊手續費
                         gross_pnl = (sell.price - buy.price) * matched_qty
                         buy_commission_portion = buy.commission * Decimal(
-                            str(matched_qty / buy.quantity)
+                            str(matched_qty / buy_original_qty)
                         )  # 按比例分攤手續費
                         sell_commission_portion = sell.commission * Decimal(
-                            str(matched_qty / sell.quantity)
+                            str(matched_qty / sell_original_qty)
                         )
                         net_pnl = gross_pnl - buy_commission_portion - sell_commission_portion
 
@@ -779,7 +803,7 @@ class AgentsService:
                         buy.quantity -= matched_qty
 
                         # 如果買入交易完全配對，移到下一個買入交易
-                        if buy.quantity == 0:
+                        if buy.quantity <= 0:
                             buy_idx += 1
 
             # 計算勝率

@@ -379,6 +379,7 @@ test.describe('📊 E2E-003: RiskMetricsCard 完整測試', () => {
   test('場景 6: 效能測試 - 快速流暢加載', async ({ page }) => {
     await test.step('測量頁面加載性能', async () => {
       const navigationTiming = await page.evaluate(() => {
+        // eslint-disable-next-line no-undef
         const timing = performance.getEntriesByType('navigation')[0];
         if (!timing) return null;
 
@@ -422,6 +423,7 @@ test.describe('📊 E2E-003: RiskMetricsCard 完整測試', () => {
       if (isVisible) {
         // 測量組件可見性時間
         const renderMetrics = await page.evaluate(() => {
+          // eslint-disable-next-line no-undef
           const perfEntries = performance.getEntriesByType('paint');
           return {
             firstPaint: perfEntries.find((e) => e.name === 'first-paint')?.startTime,
@@ -443,18 +445,22 @@ test.describe('📊 E2E-003: RiskMetricsCard 完整測試', () => {
       const fps = await page.evaluate(() => {
         return new Promise((resolve) => {
           let frameCount = 0;
+          // eslint-disable-next-line no-undef
           let lastTime = performance.now();
 
           const countFrames = () => {
             frameCount++;
+            // eslint-disable-next-line no-undef
             const currentTime = performance.now();
             if (currentTime - lastTime >= 1000) {
               resolve(frameCount);
             } else {
+              // eslint-disable-next-line no-undef
               requestAnimationFrame(countFrames);
             }
           };
 
+          // eslint-disable-next-line no-undef
           requestAnimationFrame(countFrames);
         });
       });

@@ -105,9 +105,11 @@ async def list_agents(
                 agent_status = (
                     agent.status.value if hasattr(agent.status, "value") else agent.status
                 )
-                if agent.id in running_agent_ids:
+                is_executing = agent.id in running_agent_ids
+
+                if is_executing:
                     agent_status = "running"
-                elif agent_status == "active" and agent.id not in running_agent_ids:
+                elif agent_status == "active" and not is_executing:
                     # 活躍但沒有 running session → 映射為 idle
                     agent_status = "idle"
                 elif agent_status == "inactive":
@@ -124,6 +126,7 @@ async def list_agents(
                         if hasattr(agent.current_mode, "value")
                         else agent.current_mode
                     ),
+                    "is_executing": is_executing,
                     "initial_funds": float(agent.initial_funds),
                     "current_funds": float(agent.current_funds),
                     "max_position_size": float(agent.max_position_size)
@@ -190,6 +193,7 @@ async def list_agents(
 async def get_agent(
     agent_id: str,
     agents_service: AgentsService = Depends(get_agents_service),
+    db_session: AsyncSession = Depends(get_db_session),
 ):
     """
     取得單一 Agent 詳情
@@ -214,6 +218,17 @@ async def get_agent(
         # 獲取持股資訊
         holdings = await agents_service.get_agent_holdings(agent_id)
 
+        # 獲取執行狀態（是否有 running session）
+        from sqlalchemy import select
+        from database.models import AgentSession
+
+        running_session_result = await db_session.execute(
+            select(AgentSession.id).where(
+                (AgentSession.agent_id == agent_id) & (AgentSession.status == "running")
+            )
+        )
+        is_executing = running_session_result.first() is not None
+
         # 解析 investment_preferences JSON 字符串為列表
         investment_prefs = []
         if agent.investment_preferences:
@@ -234,6 +249,7 @@ async def get_agent(
                 if hasattr(agent.current_mode, "value")
                 else agent.current_mode
             ),
+            "is_executing": is_executing,
             "initial_funds": float(agent.initial_funds) if agent.initial_funds else None,
             "current_funds": float(agent.current_funds) if agent.current_funds else None,
             "max_position_size": float(agent.max_position_size)
@@ -347,6 +363,7 @@ async def create_agent(
                 if hasattr(agent.current_mode, "value")
                 else agent.current_mode
             ),
+            "is_executing": False,
             "initial_funds": float(agent.initial_funds),
             "max_position_size": float(agent.max_position_size)
             if agent.max_position_size
@@ -463,6 +480,7 @@ async def update_agent(
                 if hasattr(agent.current_mode, "value")
                 else agent.current_mode
             ),
+            "is_executing": False,
             "color_theme": agent.color_theme,
             "max_position_size": float(agent.max_position_size)
             if agent.max_position_size

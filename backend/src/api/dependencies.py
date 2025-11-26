@@ -35,10 +35,7 @@ def get_executor() -> AgentExecutor:
     Example:
         ```python
         @router.post("/start")
-        async def start_agent(
-            agent_id: str,
-            executor: AgentExecutor = Depends(get_executor)
-        ):
+        async def start_agent(agent_id: str, executor: AgentExecutor = Depends(get_executor)):
             await executor.start(agent_id)
         ```
     """

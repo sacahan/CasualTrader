@@ -41,8 +41,16 @@ HOST_PORT="${HOST_PORT:-8877}"
 NETWORK_NAME="casual-network"
 
 # 主機 IP 地址 (Linux 上用於連接主機服務)
-# 可透過環境變數覆蓋: HOST_IP=192.168.1.100 ./docker-run.sh up
 HOST_IP="${HOST_IP:-127.0.0.1}"
+
+# Memory MCP 資料庫存儲位置
+MEMORY_DB_HOST_PATH="${PROJECT_DIR}/memory"
+
+# GitHub Copilot 認證資料路徑
+GITHUB_COPILOT_AUTH_PATH="${PROJECT_DIR}/github_copilot"
+
+# 日誌存儲目錄
+LOGS_DIR="${PROJECT_DIR}/logs"
 
 # 檢查 .env.docker 是否存在
 check_env_file() {
@@ -91,12 +99,18 @@ start_container() {
 
 	echo -e "${BLUE}🚀 啟動容器...${NC}"
 
+	# 確保主機上的 memory 目錄存在
+	mkdir -p "$MEMORY_DB_HOST_PATH"
+
 	docker run -d \
 		--name "$CONTAINER_NAME" \
 		--network "$NETWORK_NAME" \
 		--add-host host.docker.internal:host-gateway \
 		--env-file "$ENV_FILE" \
 		-p "${HOST_PORT}:8000" \
+		-v "${MEMORY_DB_HOST_PATH}:/app/memory" \
+		-v "${GITHUB_COPILOT_AUTH_PATH}:/root/.config/litellm/github_copilot" \
+		-v "${LOGS_DIR}:/app/logs" \
 		--restart unless-stopped \
 		"$IMAGE_NAME"
 

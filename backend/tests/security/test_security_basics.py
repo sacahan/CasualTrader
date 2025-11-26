@@ -10,9 +10,13 @@ from api.app import create_app
 from api.config import settings
 
 
-@pytest.fixture
+@pytest.fixture(scope="module")
 def client():
-    """建立測試客戶端"""
+    """
+    建立測試客戶端
+
+    使用 module scope 來避免多次創建/銷毀導致的事件循環問題
+    """
     app = create_app()
     with TestClient(app) as test_client:
         yield test_client
@@ -23,14 +27,20 @@ class TestCORSSecurity:
 
     def test_cors_headers_present(self, client):
         """驗證 CORS headers 存在"""
-        response = client.get("/api/health")
+        # 需要包含 Origin header 才能觸發 CORS middleware
+        response = client.get("/api/health", headers={"Origin": "http://localhost:3000"})
         assert response.status_code == 200
         assert response.headers.get("access-control-allow-origin") is not None
 
         # 檢查基本的 CORS header（OPTIONS 請求）
-        options_response = client.options("/api/health")
+        # 注意: 即使端點返回 405，CORS middleware 仍會添加 CORS headers
+        options_response = client.options(
+            "/api/health", headers={"Origin": "http://localhost:3000"}
+        )
 
-        assert options_response.status_code in [200, 204]
+        # OPTIONS 可能返回 405 如果端點沒有定義 OPTIONS handler，
+        # 但 CORS headers 應該仍然存在
+        assert options_response.headers.get("access-control-allow-origin") is not None
 
     def test_cors_not_wildcard_in_production(self):
         """驗證生產環境不使用 wildcard CORS"""

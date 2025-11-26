@@ -274,6 +274,7 @@ class AgentPerformance(Base):
     """Agent 績效追蹤模型"""
 
     __tablename__ = "agent_performance"
+    __table_args__ = (UniqueConstraint("agent_id", "date", name="uq_agent_date"),)
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     agent_id: Mapped[str] = mapped_column(String(50), ForeignKey("agents.id"), nullable=False)

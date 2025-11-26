@@ -15,6 +15,7 @@
   /** @type {RiskMetricsProps} */
   let {
     metrics = { sharpe_ratio: 0, sortino_ratio: 0, calmar_ratio: 0 },
+    // eslint-disable-next-line no-unused-vars
     agentColor = '34, 197, 94',
   } = $props();
 

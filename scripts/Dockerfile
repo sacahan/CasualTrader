@@ -61,11 +61,13 @@ FROM python:3.12-slim
 
 WORKDIR /app
 
-# Install runtime dependencies
+# Install runtime dependencies including Node.js
 RUN apt-get update && apt-get install -y \
     libpq5 \
     curl \
     git \
+    nodejs \
+    npm \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy Python dependencies from builder

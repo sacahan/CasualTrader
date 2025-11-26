@@ -64,6 +64,12 @@ DEFAULT_TEMPERATURE = float(os.getenv("DEFAULT_MODEL_TEMPERATURE", 0.7))
 # CASUAL_MARKET_SSE_URL: casual-market-mcp 的 SSE 連接 URL
 # 預設使用本地開發 URL
 CASUAL_MARKET_SSE_URL = os.getenv("CASUAL_MARKET_SSE_URL", "http://sacahan-ubunto:8066/sse")
+# MEMORY_DB_PATH: Memory MCP 資料庫文件存儲位置
+# 預設使用 backend/memory 目錄
+MEMORY_DB_PATH = os.getenv(
+    "MEMORY_DB_PATH",
+    os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "memory"),
+)
 # PERPLEXITY 用於網頁搜索的 MCP 伺服器 API 金鑰
 PERPLEXITY_API_KEY = os.getenv("PERPLEXITY_API_KEY")
 # 設置追蹤 API 金鑰（用於監控和日誌）
@@ -269,11 +275,10 @@ class TradingAgent:
         # Memory MCP Server (兩種模式都需要)
         if tool_requirements.include_memory_mcp:
             memory_db_path = os.path.join(
-                os.path.dirname(os.path.dirname(os.path.dirname(__file__))),
-                "memory",
+                MEMORY_DB_PATH,
                 f"{self.agent_id}.db",
             )
-            os.makedirs(os.path.dirname(memory_db_path), exist_ok=True)
+            os.makedirs(MEMORY_DB_PATH, exist_ok=True)
 
             self.memory_mcp = await self._start_mcp_server(
                 name="memory_mcp",

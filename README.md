@@ -1,503 +1,203 @@
+---
+post_title: "CasualTrader AI 股票交易模擬器"
+author1: "sacahan"
+post_slug: "casualtrader-ai-trading-simulator"
+microsoft_alias: "sacahan"
+featured_image: "https://raw.githubusercontent.com/sacahan/CasualTrader/main/frontend/public/favicon-512x512.png"
+categories:
+  - ai
+  - trading
+tags:
+  - MCP
+  - FastAPI
+  - Svelte
+  - Agents
+  - OpenAI
+ai_note: "Human curated with GPT-5.1-Codex (Preview) assistance"
+summary: "CasualTrader 是結合 FastAPI、Svelte 與 MCP 工具鏈的 AI 股票交易模擬器，提供多代理決策、實時行情與完整文檔。"
+post_date: "2025-11-25"
+---
+
 # CasualTrader AI 股票交易模擬器
 
 **版本**: 1.0.0
-**日期**: 2025-11-06
+**日期**: 2025-11-25
 **專案類型**: AI Trading Simulator
 **架構**: Monorepo (Backend + Frontend)
 
----
+CasualTrader 是一個可即時觀戰的台股 AI 交易模擬平台。系統以 OpenAI
+Agent SDK 與 Model Context Protocol (MCP) 為核心，結合 21 個台股專用
+工具與多款大型語言模型，實現從研究、決策到交易執行的全流程自動化。
 
-## 📋 專案概述
+![CasualTrader 儀表板](docs/images/trader-dashboard.png)
 
-CasualTrader 是一個即時、可視化的 AI 股票交易模擬器，使用 OpenAI Agent SDK 構建智能交易代理人，支援多種 AI 模型同時進行股票交易，提供觀戰、分析和學習的平台。
+## 目錄
 
-### 核心特色
+- [CasualTrader AI 股票交易模擬器](#casualtrader-ai-股票交易模擬器)
+  - [目錄](#目錄)
+  - [創新價值](#創新價值)
+  - [核心使用情境](#核心使用情境)
+  - [快速開始](#快速開始)
+    - [使用 docker-run.sh 啟動服務](#使用-docker-runsh-啟動服務)
+    - [使用 build-docker.sh 建立映像](#使用-build-dockersh-建立映像)
+  - [系統架構](#系統架構)
+  - [Agent 執行模式](#agent-執行模式)
+  - [關鍵功能](#關鍵功能)
+  - [文檔資源](#文檔資源)
+  - [發布與支援](#發布與支援)
+  - [開發狀態與規劃](#開發狀態與規劃)
+  - [貢獻與授權](#貢獻與授權)
+  - [聯絡與致謝](#聯絡與致謝)
 
-- 🤖 **多 AI 模型競技**: 支援 GPT-4o, Claude Sonnet 4.5, Gemini 2.5 Pro 等主流 AI 模型
-- 📊 **即時市場數據**: 透過 MCP 協議獲取台灣股市即時資訊（21 個專業工具）
-- 🎯 **智能決策系統**: AI 代理人基於市場數據和研究分析進行自主交易
-- 📈 **策略追蹤**: 完整記錄投資策略和決策過程
-- 🔄 **即時觀戰**: WebSocket 實時推送 AI 決策和執行過程
-- 📚 **教育價值**: 通過觀察 AI 行為學習投資策略
+## 創新價值
 
-### Agent 執行模式
+- 🤖 **多模型代理競技**：透過 LiteLLM 串接 GPT-4o、Claude 3.5、Gemini
+  2.5、GPT-5-mini 等模型，並支援自訂組合。
+- 📡 **MCP 即時行情**：casual-market-mcp 提供 21 個台股工具，涵蓋股價、
+  財報、籌碼、指數與融資融券等資料。
+- ⚙️ **雙模式決策引擎**：TRADING 模式使用完整工具鏈，REBALANCING 模式
+  則專注部位微調，兩者皆由後端動態裝載。
+- 🧠 **三層狀態管理**：DB、執行層與 API 層各自維護狀態，確保前後端對
+  Agent 生命週期的共識。
+- 📈 **即時觀戰體驗**：WebSocket 推送 agent 決策、下單、績效與提醒，
+  前端以 Chart.js 呈現策略演進。
+- 🧩 **可測可控**：Mocks、Playwright、pytest 與錄製的 MCP fixture 讓
+  代理邏輯可重現、可驗證。
 
-CasualTrader 支援 2 種 Agent 執行模式，可根據場景動態配置所需工具：
+## 核心使用情境
 
-#### 🎯 TRADING 模式 (完整工具集)
-- **用途**: 完整的股票交易決策和執行
-- **工具配置**:
-  - ✅ 所有 MCP 伺服器（Memory、Market、Perplexity）
-  - ✅ 買賣交易工具（buy_stock, sell_stock）
-  - ✅ 投資組合管理工具
-  - ✅ 全部 4 個 Sub-agents（基本面、技術面、風險、情緒）
-- **適用場景**: 需要深度分析和多維度評估的交易決策
+- **投資研究工作坊**：以自然語言描述策略目標，系統即時組合多個子代理
+  分析台股，並將決策公開於儀表板，適合教育與研討場合。
+- **策略迭代沙盒**：透過 TRADING/REBALANCING 模式切換，同一個 agent 可
+  在「模擬實單」與「調整部位」間快速切換，觀察不同工具組合帶來的決策
+  差異。
+- **多模型 Benchmark**：同時啟動多個 agent，分別綁定不同 LLM 提供商，
+  以統一資料來源比較策略品質與成本。
+- **MCP 工具展示**：搭配 casual-market-mcp，可在展示場合說明 MCP 如何
+  將台股 21 種資料以協定方式提供給任意 agent。
 
-#### ⚖️ REBALANCING 模式 (簡化工具集)
-- **用途**: 投資組合再平衡和微調
-- **工具配置**:
-  - ✅ 核心 MCP 伺服器（Memory、Market）
-  - ❌ 無買賣工具（僅查詢組合）
-  - ✅ 投資組合管理工具
-  - ✅ 2 個 Sub-agents（技術面、風險）
-- **適用場景**: 快速的投資組合調整和風險控制
+## 快速開始
 
-### 技術架構優勢
+CasualTrader 以 Docker 為主要發佈方式。請先準備 Docker Engine（含
+buildx）、Docker Hub 帳號，以及 `.env.docker`（可由
+`.env.docker.example` 複製）。
 
-- ✅ **關注點分離**: 數據獲取 (MCP) vs AI 決策 (Agent)
-- ✅ **標準化協議**: MCP 協議確保擴展性和維護性
-- ✅ **成本最優化**: 無需維護複雜的爬蟲和數據處理邏輯
-- ✅ **即時性保證**: 所有數據來自 MCP 即時查詢
-- ✅ **易於測試**: Mock MCP 回應進行單元測試
-- ✅ **動態工具配置**: 根據執行模式智能加載工具，提升性能
-- ✅ **三層狀態管理**: 確保數據庫完整性與 API 靈活性的平衡
+### 使用 docker-run.sh 啟動服務
 
----
-
-## 🏗️ 技術堆疊
-
-### 前端技術
-
-- **核心框架**: Vite + Svelte 5.0
-- **構建工具**: Vite 5.4 (快速熱重載)
-- **圖表視覺化**: Chart.js 4.4
-- **即時通信**: WebSocket Client
-- **樣式設計**: Tailwind CSS 3.3 + PostCSS
-
-### 後端技術
-
-- **Web 框架**: FastAPI 0.115+ (異步 API)
-- **AI SDK**: OpenAI Agent SDK 0.3.3+ (支援 LiteLLM)
-- **資料庫**: PostgreSQL + SQLAlchemy 2.0 (異步支援)
-- **即時通信**: WebSocket (狀態推送)
-- **日誌系統**: Loguru
-
-### AI 與工具層
-
-- **LLM 提供商整合**: LiteLLM (支持 100+ 模型)
-  - **主流提供商**:
-    - OpenAI: GPT-4o, GPT-4o-mini, GPT-4-turbo ✅
-    - Google Gemini: Gemini-pro, Gemini-2-flash ✅
-    - GitHub Copilot: GPT-5-mini ✅
-    - Anthropic: Claude-3-opus, Claude-3-sonnet ✅
-    - Together: Llama-3-70b 及其他開源模型 ✅
-  - **功能**: 自動重試、成本跟蹤、故障轉移
-- **資料來源**: casual-market-mcp (21 個台灣股市專業工具)
-- **協議標準**: Model Context Protocol (MCP)
-
----
-
-## 📂 專案結構
-
-```text
-CasualTrader/
-├── backend/                    # 後端服務 (Python)
-│   ├── src/
-│   │   ├── agents/            # AI 代理人系統
-│   │   │   ├── core/          # Agent 核心邏輯
-│   │   │   ├── functions/     # 專業分析 Agent
-│   │   │   ├── integrations/  # MCP 整合
-│   │   │   ├── tools/         # Agent 工具
-│   │   │   ├── trading/       # 交易邏輯
-│   │   │   └── utils/         # 工具函數
-│   │   ├── api/               # FastAPI Web 服務
-│   │   │   ├── routers/       # API 路由
-│   │   │   ├── app.py         # 應用程式主檔
-│   │   │   ├── server.py      # 服務啟動
-│   │   │   ├── models.py      # API 模型
-│   │   │   └── websocket.py   # WebSocket 處理
-│   │   └── database/          # 資料庫層
-│   │       ├── models.py      # ORM 模型
-│   │       ├── migrations.py  # 資料庫遷移
-│   │       └── schema.sql     # 資料庫結構
-│   ├── tests/                 # 測試套件
-│   │   ├── agents/           # Agent 測試
-│   │   ├── api/              # API 測試
-│   │   └── database/         # 資料庫測試
-│   └── pyproject.toml        # Python 專案設定
-│
-├── frontend/                  # 前端應用 (Svelte)
-│   ├── src/
-│   │   ├── components/       # UI 元件
-│   │   │   ├── Agent/       # Agent 相關元件
-│   │   │   ├── Chart/       # 圖表元件
-│   │   │   ├── Layout/      # 版面元件
-│   │   │   ├── Market/      # 市場資訊元件
-│   │   │   └── UI/          # 通用 UI 元件
-│   │   ├── lib/             # 工具函數庫
-│   │   │   ├── api/         # API 客戶端
-│   │   │   ├── api.js       # API 通用函數
-│   │   │   ├── constants.js # 常數定義
-│   │   │   └── utils.js     # 工具函數
-│   │   ├── stores/          # Svelte Store 狀態管理
-│   │   ├── types/           # TypeScript 型別定義
-│   │   ├── App.svelte       # 應用程式主元件
-│   │   ├── main.js          # 應用程式進入點
-│   │   └── app.css          # 全域樣式
-│   ├── public/              # 靜態資源
-│   ├── package.json         # Node.js 專案設定
-│   └── vite.config.js       # Vite 構建設定
-│
-├── docs/                     # 技術文檔
-│   ├── SYSTEM_DESIGN.md     # 系統設計規範
-│   ├── AGENT_IMPLEMENTATION.md      # Agent 實作規格
-│   ├── API_IMPLEMENTATION.md        # API 實作規格
-│   ├── FRONTEND_IMPLEMENTATION.md   # 前端實作規格
-│   ├── DEPLOYMENT_GUIDE.md          # 部署指南
-│   ├── AGENTS_ARCHITECTURE.md       # Agent 架構說明
-│   ├── API_ARCHITECTURE.md          # API 架構說明
-│   ├── FRONTEND_ARCHITECTURE.md     # 前端架構說明
-│   └── PROJECT_STRUCTURE.md         # 專案結構規範
-│
-├── scripts/                  # 工具腳本
-│   ├── db_migrate.sh        # 資料庫遷移
-│   ├── run_tests.sh         # 測試執行
-│   └── start.sh             # 啟動腳本
-│
-├── examples/                 # 範例程式碼
-├── logs/                     # 日誌目錄
-└── README.md                 # 本文件
-```
-
----
-
-## 🚀 快速開始
-
-### 🎯 選擇使用方式
-
-**方式 A：使用 MCP Client（推薦，最簡單）** ⭐
-
-直接在 Claude Desktop 或其他 MCP Client 中使用 casual-market 獲取台灣股市數據。
-
-```bash
-# 一鍵配置
-./scripts/setup_mcp_client.sh
-```
-
-詳細指南：[快速開始 MCP Client](./docs/QUICKSTART_MCP.md)
-
----
-
-**方式 B：運行完整的 CasualTrader 應用**
-
-運行後端和前端，建立完整的 AI 交易模擬器。
-
-繼續以下步驟...
-
-### 系統需求
-
-- **Python**: >= 3.12
-- **Node.js**: >= 18.0
-- **作業系統**: macOS, Linux, Windows
-- **uv**: Python 套件管理器（用於 MCP）
-
-### 環境設定
-
-1. **複製專案**
+`scripts/docker-run.sh` 封裝了最常見的操作，預設鏡像為
+`sacahan/casual-trader:latest`。
 
 ```zsh
-git clone https://github.com/sacahan/CasualTrader.git
-cd CasualTrader
+# 1. 拉取官方映像
+./scripts/docker-run.sh pull
+
+# 2. 啟動服務（自動建立 casual-network、掛載記憶體與日誌）
+HOST_PORT=8877 ./scripts/docker-run.sh up
+
+# 3. 觀察日誌或進入容器
+./scripts/docker-run.sh logs
+./scripts/docker-run.sh shell
+
+# 4. 測試完成後關閉
+./scripts/docker-run.sh down
 ```
 
-2. **設定 MCP Client（可選但推薦）**
+- 服務啟動後，後端位於 `http://localhost:8877`，API 文件為
+  `http://localhost:8877/api/docs`。
+- `.env.docker` 控制 API keys、資料庫連線、CORS 等參數，變更後可透過
+  `./scripts/docker-run.sh down && ./scripts/docker-run.sh up` 重啟。
+- `clean` 指令會清除容器與映像，展示環境可用 `info` 檢視端點摘要。
+
+### 使用 build-docker.sh 建立映像
+
+若需要自訂映像（例如更改預設模型、加入企業內部工具），可使用
+`scripts/build-docker.sh`。
 
 ```zsh
-# 自動配置 Claude Desktop
-./scripts/setup_mcp_client.sh
-
-# 或手動配置，參考：docs/SETUP_MCP_CLIENT.md
+# 多平台建構並推送到個人 Docker Hub
+DOCKER_USERNAME=myorg \
+DOCKER_IMAGE_NAME=casual-trader \
+DOCKER_TAG=demo \
+./scripts/build-docker.sh --platform arm64 --action build-push
 ```
 
-3. **設定後端環境**
-
-```zsh
-cd backend
-
-# 建立虛擬環境
-python -m venv venv
-source venv/bin/activate  # macOS/Linux
-# 或 Windows: venv\Scripts\activate
-
-# 安裝依賴
-pip install -e ".[dev]"
-
-# 設定環境變數
-cp .env.example .env
-# 編輯 .env 填入 API Keys
-```
-
-4. **設定前端環境**
-
-```zsh
-cd frontend
-
-# 安裝依賴
-npm install
-```
-
-### 環境變數設定
-
-在 `backend/.env` 中設定以下變數：
-
-```bash
-# AI 模型 API Keys
-OPENAI_API_KEY=your_openai_api_key
-ANTHROPIC_API_KEY=your_anthropic_api_key
-GOOGLE_API_KEY=your_google_api_key
-
-# 資料庫設定
-DATABASE_URL=sqlite+aiosqlite:///casualtrader.db
-
-# API 設定
-API_HOST=0.0.0.0
-API_PORT=8000
-LOG_LEVEL=INFO
-
-# CORS 設定
-CORS_ORIGINS=http://localhost:5173,http://localhost:8000
-```
-
-### 啟動服務
-
-1. **啟動後端服務**
-
-```zsh
-cd backend
-python -m src.api.server
-
-# 或使用腳本
-./scripts/start.sh
-```
-
-服務啟動於: `http://localhost:8000`
-API 文件: `http://localhost:8000/docs`
-
-1. **啟動前端開發服務**
-
-```zsh
-cd frontend
-npm run dev
-```
-
-前端啟動於: `http://localhost:5173`
-
-### 執行測試
-
-```zsh
-# 後端測試
-cd backend
-pytest tests/
-
-# 或使用腳本
-./scripts/run_tests.sh
-
-# 測試覆蓋率
-pytest --cov=src tests/
-```
-
----
-
-## 📖 核心功能
-
-### 1. AI 代理人系統
-
-- **基礎分析 Agent**: 分析公司財報、營收、產業地位
-- **技術分析 Agent**: K 線、均線、技術指標分析
-- **風險評估 Agent**: 評估交易風險、部位管理
-- **情緒分析 Agent**: 分析市場情緒、新聞影響
-- **投資組合查詢**: 即時查詢持倉、績效、現金狀況
-- **策略追蹤**: 記錄策略變更、決策理由
-
-### 2. 交易功能
-
-- 台灣股票買賣（最小單位 1000 股）
-- 即時市場資訊查詢
-- 交易驗證與成本計算
-- 投資組合管理
-- 交易歷史記錄
-
-### 3. 市場資訊
-
-- 即時股價查詢（支援股票代號或公司名稱）
-- 公司基本資料、財報資訊
-- 月營收、股利分配資訊
-- 外資持股、融資融券數據
-- 市場指數、產業類股資訊
-
-### 4. 即時通信
-
-- WebSocket 推送交易事件
-- Agent 狀態變更通知
-- 市場資訊更新
-- 錯誤與警告訊息
-
----
-
-## 📚 文檔導覽
-
-### 依角色閱讀建議
-
-**系統架構師 / 技術主管**:
-
-1. 閱讀本文件了解專案全貌
-2. `docs/SYSTEM_DESIGN.md` - 系統設計規範與高層架構
-3. `docs/AGENTS_ARCHITECTURE.md` - Agent 模組架構
-4. `docs/API_ARCHITECTURE.md` - API 模組架構
-5. `docs/FRONTEND_ARCHITECTURE.md` - 前端模組架構
-
-**後端工程師**:
-
-1. `docs/SYSTEM_DESIGN.md` - 系統設計概覽
-2. `docs/AGENT_IMPLEMENTATION.md` - Agent 詳細實作規格
-3. `docs/API_IMPLEMENTATION.md` - API 詳細實作規格
-4. `docs/AGENTS_ARCHITECTURE.md` - Agent 架構深入了解
-
-**前端工程師**:
-
-1. `docs/SYSTEM_DESIGN.md` - 系統設計概覽
-2. `docs/FRONTEND_IMPLEMENTATION.md` - 前端詳細實作規格
-3. `docs/FRONTEND_ARCHITECTURE.md` - 前端架構深入了解
-4. `docs/API_IMPLEMENTATION.md` - API 介面規格
-
-**DevOps 工程師**:
-
-1. `docs/DEPLOYMENT_GUIDE.md` - 部署和配置詳細指南
-2. `docs/SYSTEM_DESIGN.md` - 系統架構了解
-3. `docs/PROJECT_STRUCTURE.md` - 專案結構規範
-
-### 文檔結構說明
-
-- **README.md** - 專案概覽、快速開始、文檔導覽（本文件）
-- **SYSTEM_DESIGN.md** - 系統設計規範與高層架構
-- **\*\_IMPLEMENTATION.md** - 各模組詳細實作規格
-- **\*\_ARCHITECTURE.md** - 各模組架構深入說明
-- **DEPLOYMENT_GUIDE.md** - 部署和配置詳細指南
-- **PROJECT_STRUCTURE.md** - 專案結構規範
-
----
-
-## 🔧 開發指南
-
-### 程式碼風格
-
-本專案遵循以下編碼規範：
-
-- **Python**: PEP 8, Ruff 格式化, Type Hints
-- **JavaScript**: ESLint, Prettier, JSDoc 註解
-- **Svelte**: Prettier + Svelte Plugin
-
-### 提交規範
-
-使用語義化提交訊息：
-
-```text
-feat: 新增功能
-fix: 修復錯誤
-docs: 文檔更新
-style: 程式碼格式調整
-refactor: 重構程式碼
-test: 測試相關
-chore: 建置或輔助工具變更
-```
-
-### 分支策略
-
-- `main`: 穩定版本
-- `develop`: 開發版本
-- `feature/*`: 功能開發
-- `bugfix/*`: 錯誤修復
-- `hotfix/*`: 緊急修復
-
-### 測試策略
-
-- **單元測試**: 測試個別元件功能
-- **整合測試**: 測試元件間互動
-- **端對端測試**: 測試完整流程
-- **測試覆蓋率目標**: >= 80%
-
----
-
-## 🚧 開發狀態
-
-### 已完成功能 (✅)
-
-- **Phase 1**: 資料層與基礎設施
-  - SQLite 資料庫結構
-  - MCP 整合與市場資料工具
-  - Agent 基礎架構
-- **Phase 2**: AI 代理人系統
-  - 專業分析 Agent（基礎、技術、風險、情緒）
-  - 投資組合查詢功能
-  - 策略追蹤系統
-- **Phase 3**: Web API 服務
-  - FastAPI REST API
-  - WebSocket 即時通信
-  - Agent 管理 API
-  - 交易 API
-
-- **Phase 4**: 前端介面 ✅ (已於 2025-10-31 完成)
-  - Svelte 元件開發
-  - Chart.js 圖表整合
-  - WebSocket 客戶端
-  - 響應式設計
-  - 2 種 Agent 執行模式 (TRADING / REBALANCING)
-  - Prompt-Driven Agent 創建系統
-
-### 未來規劃 (📋)
-
-- 更多 AI 模型支援
-- 進階技術指標分析
-- 回測系統
-- 績效報表與排行榜
-- 多用戶支援
-
----
-
-## 🤝 貢獻指南
-
-歡迎貢獻！請遵循以下步驟：
-
-1. Fork 本專案
-2. 建立功能分支 (`git checkout -b feature/amazing-feature`)
-3. 提交變更 (`git commit -m 'feat: add amazing feature'`)
-4. 推送到分支 (`git push origin feature/amazing-feature`)
-5. 開啟 Pull Request
-
-### 貢獻準則
-
-- 遵循專案編碼規範
-- 新增功能需包含測試
-- 更新相關文檔
-- 提交前執行測試確保通過
-
----
-
-## 📄 授權
-
-本專案採用 MIT 授權條款。詳見 [LICENSE](LICENSE) 檔案。
-
----
-
-## 📧 聯絡方式
-
-- **專案維護者**: sacahan
-- **專案網址**: [https://github.com/sacahan/CasualTrader](https://github.com/sacahan/CasualTrader)
-- **問題回報**: [GitHub Issues](https://github.com/sacahan/CasualTrader/issues)
-
----
-
-## 🙏 致謝
-
-感謝以下專案和服務：
-
-- [OpenAI Agent SDK](https://github.com/openai/openai-agents) - AI 代理人框架
-- [FastAPI](https://fastapi.tiangolo.com/) - 現代化 Web 框架
-- [Svelte](https://svelte.dev/) - 創新的前端框架
-- [casual-market-mcp](https://github.com/casualtrader/casual-market-mcp) - 台灣股市資料工具
-
----
-
-**最後更新**: 2025-11-06
-**版本**: 1.0.0
-**維護者**: sacahan
+- `--platform`：`arm64`、`amd64` 或 `all`，預設 `arm64`。
+- `--action`：`build`（僅建構）、`push`（僅推送）或 `build-push`。
+- 腳本會自動建立 buildx builder、註冊 QEMU 並載入 `scripts/Dockerfile`。
+- 建構完成後即可在任何主機上搭配 `docker-run.sh` 啟動自訂映像。
+
+## 系統架構
+
+整體架構維持前後端解耦：
+
+| 層級 | 技術 | 說明 |
+| --- | --- | --- |
+| Web UI | Svelte 5、Tailwind、Chart.js | 呈現代理清單、績效與即時事件 |
+| API 層 | FastAPI、WebSocket、SQLAlchemy | 提供 REST 與推播，含模式切換、交易與資料同步 |
+| AI 層 | OpenAI Agent SDK、LiteLLM | 拆解任務至子代理並呼叫 MCP 工具 |
+| 資料層 | PostgreSQL、SQLite (dev) | Agent、交易、持倉與 session 狀態 |
+| 工具層 | casual-market-mcp、記憶 MCP | 市場資料、公司基本面、交易模擬 |
+
+## Agent 執行模式
+
+- **TRADING**：啟用 Memory、Market、Perplexity MCP，開放 buy/sell 與 4
+  個分析子代理，適合全功能決策。
+- **REBALANCING**：僅載入關鍵 MCP 與 2 個子代理，鎖定投資組合管理與
+  風險控制，不執行實單交易。
+
+模式定義與狀態映射可在 `backend/src/api/routers/agents.py` 中找到。
+
+## 關鍵功能
+
+- **策略研究**：基本面、技術面、風險與情緒子代理並行分析，輸出可追蹤
+  的決策理由。
+- **交易執行**：buy/sell 工具自動計算手續費與稅費，遵守台股 1,000 股
+  單位。
+- **投資組合與績效**：持倉、現金、交易紀錄、績效曲線皆可透過 API 及
+  Web UI 取得。
+- **記憶體管理**：結合記憶 MCP，保存 agent 決策脈絡與觀察，提升長期
+  策略一致性。
+
+## 文檔資源
+
+- `docs/API_CONTRACT_SPECIFICATION.md`：前後端契約、欄位與錯誤規格。
+- `docs/DATABASE_SCHEMA_SPECIFICATION.md`：資料表、約束與遷移指南。
+- `docs/SERVICE_CONTRACT_SPECIFICATION.md`：Agent/交易服務責任與 SLA。
+- `docs/MEMORY_MCP_GUIDE.md`：記憶 MCP 的安裝、同步與資料模型。
+- `docs/PLAYWRIGHT_TEST_EXECUTION_GUIDE.md`：E2E 測試操作手冊。
+- `docs/GITHUB_COPILOT_GUIDE.md`：本 repo 使用 Copilot 的策略與守則。
+
+## 發布與支援
+
+- 官方映像每次由 `build-docker.sh` 建構，確保多平台一致。若自行建構，
+  建議在 CI 中重複使用同一 builder 以避免 QEMU 差異。
+- `docker-run.sh` 是建議的唯一啟動入口，內建 casual-network、記憶體掛
+  載與 GitHub Copilot 認證路徑設定，方便與 casual-market-mcp、記憶
+  MCP 容器互通。
+- 開發者仍可於 `backend/`、`frontend/` 中使用 `uv sync`、`npm install`
+  等指令，但文檔以 Docker 為優先，詳細開發/測試流程請參閱各自目錄
+  README 以及 `docs/PLAYWRIGHT_TEST_EXECUTION_GUIDE.md`。
+
+## 開發狀態與規劃
+
+- ✅ Phase 4 完成：移除 OBSERVATION 模式、雙模式代理、67 項核心測試
+  全數通過，18 項 Playwright 迴歸測試綠燈。
+- 📈 進行中：更多模型預設、回測模組與績效報表。
+- 🧭 待辦：多租戶、排行榜、成本儀表板與策略回放。
+
+## 貢獻與授權
+
+- 歡迎透過 Fork → feature 分支 → Pull Request 參與，請於描述中附上
+  `docker-run.sh test` 或等效測試結果摘要。
+- Commit 訊息採語義化（`feat:`, `fix:`, `docs:` 等）。
+- 本專案採用 [MIT](LICENSE) 授權，提交貢獻即表示同意以 MIT 發佈。
+
+## 聯絡與致謝
+
+- 維護者：[@sacahan](https://github.com/sacahan)
+- 問題回報：GitHub Issues
+- 感謝 OpenAI Agent SDK、FastAPI、Svelte 與
+  [casual-market-mcp](https://github.com/casualtrader/casual-market-mcp) 為專案
+  提供基礎能力。
+
+**最後更新**: 2025-11-25

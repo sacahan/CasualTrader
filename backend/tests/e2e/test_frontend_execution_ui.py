@@ -328,39 +328,40 @@ async def test_full_execution_flow_with_chrome_devtools():
     ```python
     from mcp_chrome_devtools import navigate, click, screenshot, wait_for_text
 
+
     async def test():
         # 1. 導航到頁面
-        await navigate('http://localhost:5173/agents/agent1')
+        await navigate("http://localhost:5173/agents/agent1")
 
         # 2. 等待頁面加載
-        await wait_for_text('Start Agent')
+        await wait_for_text("Start Agent")
 
         # 3. 截圖初始狀態
-        await screenshot('agent_initial.png')
+        await screenshot("agent_initial.png")
 
         # 4. 點擊開始按鈕
         await click('[data-testid="start-button"]')
 
         # 5. 等待執行開始
-        await wait_for_text('Executing...')
+        await wait_for_text("Executing...")
 
         # 6. 截圖執行狀態
-        await screenshot('agent_executing.png')
+        await screenshot("agent_executing.png")
 
         # 7. 監聽 WebSocket 事件
         events = await capture_websocket_events(timeout=10)
 
         # 8. 驗證執行完成
-        assert any(e['type'] == 'execution_completed' for e in events)
+        assert any(e["type"] == "execution_completed" for e in events)
 
         # 9. 點擊停止按鈕
         await click('[data-testid="stop-button"]')
 
         # 10. 等待停止完成
-        await wait_for_text('Stopped')
+        await wait_for_text("Stopped")
 
         # 11. 截圖最終狀態
-        await screenshot('agent_completed.png')
+        await screenshot("agent_completed.png")
     ```
     """
 

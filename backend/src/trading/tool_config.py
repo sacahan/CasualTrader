@@ -193,9 +193,7 @@ class ToolConfig:
             dict: 鍵為配置項名稱，值為是否存在差異
 
         Examples:
-            >>> diff = ToolConfig.compare_configurations(
-            ...     AgentMode.TRADING, AgentMode.REBALANCING
-            ... )
+            >>> diff = ToolConfig.compare_configurations(AgentMode.TRADING, AgentMode.REBALANCING)
             >>> diff["include_web_search"]
             True  # 表示兩個模式在此項上有差異
         """
