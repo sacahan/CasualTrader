@@ -504,6 +504,17 @@ class AgentsService:
             AgentDatabaseError: 資料庫操作失敗
         """
         try:
+            # 🔍 追蹤 quantity 值 - 調查 quantity=0 問題
+            logger.debug(
+                f"📝 [QUANTITY_TRACE] agents_service.create_transaction 接收參數:\n"
+                f"  agent_id={agent_id}\n"
+                f"  ticker={ticker}, action={action}\n"
+                f"  quantity={quantity} (type={type(quantity).__name__})\n"
+                f"  price={price} (type={type(price).__name__})\n"
+                f"  total_amount={total_amount}\n"
+                f"  session_id={session_id}"
+            )
+
             # 轉換 action 為 enum
             action_enum = (
                 TransactionAction.BUY if action.upper() == "BUY" else TransactionAction.SELL
@@ -512,6 +523,14 @@ class AgentsService:
                 TransactionStatus.EXECUTED
                 if status.upper() == "EXECUTED"
                 else TransactionStatus.PENDING
+            )
+
+            # 🔍 驗證 quantity 在創建 Transaction 物件前的值
+            logger.debug(
+                f"📝 [QUANTITY_TRACE] 準備創建 Transaction 物件:\n"
+                f"  quantity 參數值={quantity}\n"
+                f"  quantity 是否為 0={quantity == 0}\n"
+                f"  quantity 是否為 None={quantity is None}"
             )
 
             transaction = Transaction(
@@ -530,8 +549,23 @@ class AgentsService:
                 decision_reason=decision_reason,
             )
 
+            # 🔍 驗證 Transaction 物件創建後的 quantity 值
+            logger.debug(
+                f"📝 [QUANTITY_TRACE] Transaction 物件創建完成:\n"
+                f"  transaction.id={transaction.id}\n"
+                f"  transaction.quantity={transaction.quantity}\n"
+                f"  transaction.quantity type={type(transaction.quantity).__name__}"
+            )
+
             self.session.add(transaction)
             await self.session.commit()
+
+            # 🔍 驗證 commit 後的 quantity 值
+            logger.debug(
+                f"📝 [QUANTITY_TRACE] Transaction commit 完成:\n"
+                f"  transaction.id={transaction.id}\n"
+                f"  transaction.quantity (after commit)={transaction.quantity}"
+            )
 
             logger.info(
                 f"Created transaction: {action} {quantity}股 x ${price} @ {ticker} for agent {agent_id}",

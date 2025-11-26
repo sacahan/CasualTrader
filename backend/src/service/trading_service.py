@@ -447,9 +447,11 @@ class TradingService:
                     except (TypeError, ValueError) as e:
                         raise ValueError(f"交易價格無效: {price}，無法轉換為浮點數") from e
 
+                # 🔍 DEBUG: 記錄驗證後的參數類型和值
                 logger.info(
                     f"開始原子交易: agent_id={agent_id}, ticker={ticker}, "
-                    f"action={action_upper}, quantity={quantity}, price={price}"
+                    f"action={action_upper}, quantity={quantity} (type={type(quantity).__name__}), "
+                    f"price={price} (type={type(price).__name__})"
                 )
 
                 # 🔧 FIX: 在事務外先驗證 Agent 存在
@@ -479,6 +481,13 @@ class TradingService:
                     # Step 2: 記錄交易到資料庫
                     total_amount = float(quantity * price)
                     commission = total_amount * 0.001425  # 假設手續費 0.1425%
+
+                    # 🔍 DEBUG: 記錄傳遞給 _create_transaction_internal 的參數
+                    logger.debug(
+                        f"準備創建交易記錄: quantity={quantity} (type={type(quantity).__name__}), "
+                        f"price={price}, total_amount={total_amount}, "
+                        f"計算驗證: {quantity} * {price} = {quantity * price}"
+                    )
 
                     transaction = await self._create_transaction_internal(
                         agent_id=agent_id,
@@ -583,8 +592,29 @@ class TradingService:
             TransactionStatus.EXECUTED if status.upper() == "EXECUTED" else TransactionStatus.FAILED
         )
 
+        # 🔍 DEBUG: 記錄創建 Transaction 物件前的 quantity 值
+        tx_id = str(uuid.uuid4())
+        logger.debug(
+            f"創建 Transaction 物件: id={tx_id[:8]}..., "
+            f"quantity={quantity} (type={type(quantity).__name__}), "
+            f"price={price}, total_amount={total_amount}"
+        )
+
+        # 🔍 DEBUG: 驗證 quantity 的值
+        if quantity == 0:
+            logger.error(
+                f"⚠️ CRITICAL: quantity=0 detected before Transaction creation! "
+                f"agent_id={agent_id}, ticker={ticker}, action={action}, "
+                f"price={price}, total_amount={total_amount}"
+            )
+        elif not isinstance(quantity, int):
+            logger.warning(
+                f"⚠️ WARNING: quantity is not int! "
+                f"quantity={quantity} (type={type(quantity).__name__})"
+            )
+
         transaction = Transaction(
-            id=str(uuid.uuid4()),
+            id=tx_id,
             agent_id=agent_id,
             ticker=ticker,
             company_name=company_name,
@@ -599,7 +629,23 @@ class TradingService:
             decision_reason=decision_reason,
         )
 
+        # 🔍 DEBUG: 驗證 Transaction 物件創建後的 quantity 值
+        logger.debug(
+            f"Transaction 物件已創建: id={transaction.id[:8]}..., "
+            f"transaction.quantity={transaction.quantity} (type={type(transaction.quantity).__name__})"
+        )
+
+        if transaction.quantity != quantity:
+            logger.error(
+                f"⚠️ CRITICAL: quantity mismatch after Transaction creation! "
+                f"input={quantity}, transaction.quantity={transaction.quantity}"
+            )
+
         self.db_session.add(transaction)
+
+        # 🔍 DEBUG: 驗證添加到 session 後的 quantity 值
+        logger.debug(f"Transaction 已添加到 session: transaction.quantity={transaction.quantity}")
+
         return transaction
 
     async def _update_agent_holdings_internal(

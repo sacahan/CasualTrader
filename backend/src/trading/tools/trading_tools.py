@@ -726,7 +726,9 @@ def create_trading_tools(
 
     # 投資組合和查詢工具
     if include_portfolio:
-        tools.append(record_trade_tool)
+        # 注意: record_trade_tool 已棄用，不再暴露給 Agent
+        # record_trade_tool 不使用原子交易，也不傳遞 session_id，會導致數據不一致
+        # 所有交易記錄必須使用 execute_trade_atomic_tool
         tools.append(get_portfolio_status_tool)
         tools.append(get_stock_price_tool)
 
