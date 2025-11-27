@@ -223,8 +223,129 @@ async def get_portfolio_status(agent_service, agent_id: str) -> str:
 # ==========================================
 # 原子交易執行函數
 # ==========================================
+async def _execute_market_trade(
+    casual_market_mcp,
+    ticker: str,
+    action: str,
+    quantity: int,
+    price: float | None,
+) -> dict[str, Any]:
+    """
+    執行市場交易（透過 casual_market_mcp）
+
+    此函數負責呼叫 casual_market_mcp 的 buy_taiwan_stock 或 sell_taiwan_stock 工具，
+    驗證交易是否可行並取得實際成交結果。
+
+    Args:
+        casual_market_mcp: Casual Market MCP 實例
+        ticker: 股票代號
+        action: 交易動作 ("BUY" 或 "SELL")
+        quantity: 交易股數
+        price: 交易價格（可為 None 表示市價）
+
+    Returns:
+        交易結果字典:
+        {
+            "success": bool,
+            "executed_price": float (實際成交價格),
+            "total_amount": float (總金額),
+            "error": str (如果失敗)
+        }
+    """
+    if casual_market_mcp is None:
+        return {
+            "success": False,
+            "error": "casual_market_mcp 未配置，無法執行市場交易",
+        }
+
+    try:
+        # 決定呼叫哪個工具
+        tool_name = "buy_taiwan_stock" if action.upper() == "BUY" else "sell_taiwan_stock"
+
+        # 構建參數
+        params = {
+            "symbol": ticker,
+            "quantity": quantity,
+        }
+        if price is not None:
+            params["price"] = price
+
+        logger.info(f"🔄 呼叫 casual_market_mcp.{tool_name}: {params}")
+
+        # 呼叫 MCP 工具
+        result = await casual_market_mcp.session.call_tool(tool_name, params)
+
+        # 解析結果
+        if result and hasattr(result, "content") and result.content:
+            content_item = result.content[0]
+            text_content = content_item.text if hasattr(content_item, "text") else str(content_item)
+
+            try:
+                data = json.loads(text_content)
+            except json.JSONDecodeError:
+                logger.error(f"無法解析 MCP 回傳的 JSON: {text_content}")
+                return {
+                    "success": False,
+                    "error": f"無法解析市場交易回傳結果: {text_content[:100]}",
+                }
+
+            if data.get("success"):
+                trading_data = data.get("data", {})
+                executed_price = trading_data.get("price")
+                total_amount = trading_data.get("total_amount")
+                net_amount = trading_data.get("net_amount")
+                fee = trading_data.get("fee", 0)
+                tax = trading_data.get("tax", 0)
+
+                # 如果沒有回傳成交價格，使用傳入的價格
+                if executed_price is None:
+                    executed_price = price
+
+                # 如果仍然沒有價格，這是個問題
+                if executed_price is None:
+                    return {
+                        "success": False,
+                        "error": "市場交易未回傳成交價格，交易無效",
+                    }
+
+                logger.info(
+                    f"✅ 市場交易成功: {action.upper()} {quantity} 股 {ticker} @ {executed_price}"
+                )
+
+                return {
+                    "success": True,
+                    "executed_price": float(executed_price),
+                    "total_amount": float(total_amount)
+                    if total_amount
+                    else float(quantity * executed_price),
+                    "net_amount": float(net_amount) if net_amount else None,
+                    "fee": float(fee) if fee else 0,
+                    "tax": float(tax) if tax else 0,
+                }
+            else:
+                error = data.get("error", "未知錯誤")
+                logger.error(f"❌ 市場交易失敗: {error}")
+                return {
+                    "success": False,
+                    "error": error,
+                }
+
+        return {
+            "success": False,
+            "error": "MCP 回傳結果為空",
+        }
+
+    except Exception as e:
+        logger.error(f"市場交易異常: {e}", exc_info=True)
+        return {
+            "success": False,
+            "error": str(e),
+        }
+
+
 async def execute_trade_atomic(
     trading_service: "TradingService",
+    casual_market_mcp,
     agent_id: str,
     ticker: str,
     action: str,
@@ -236,14 +357,17 @@ async def execute_trade_atomic(
     """
     執行完整交易 - 原子操作
 
-    所有操作在單一事務中，保證:
+    此函數確保交易的完整性和一致性：
+    1. 首先透過 casual_market_mcp 執行市場交易（驗證交易可行性）
+    2. 只有在市場交易成功後，才進行資料庫的原子操作
+
+    所有資料庫操作在單一事務中，保證:
     - 全成功 → 提交所有變更
     - 任何失敗 → 回滾所有變更
 
-    委託給 TradingService 進行事務管理。
-
     Args:
         trading_service: Trading 服務實例
+        casual_market_mcp: Casual Market MCP 實例（必要，用於執行市場交易）
         agent_id: Agent ID
         ticker: 股票代號 (例如: "2330")
         action: 交易動作 ("BUY" 或 "SELL")
@@ -259,35 +383,68 @@ async def execute_trade_atomic(
         ValueError: 參數驗證失敗，包括 price 為 None 的情況
     """
     try:
+        # ⭐ Step 1: 先執行市場交易，驗證交易可行性
+        logger.info(f"📤 開始原子交易: {action} {quantity} 股 {ticker} @ {price}")
+
+        market_result = await _execute_market_trade(
+            casual_market_mcp=casual_market_mcp,
+            ticker=ticker,
+            action=action,
+            quantity=quantity,
+            price=price,
+        )
+
+        if not market_result["success"]:
+            # 市場交易失敗，不進行任何資料庫操作
+            error_msg = market_result.get("error", "市場交易失敗")
+            logger.error(f"❌ 市場交易失敗，中止原子操作: {error_msg}")
+            return (
+                f"❌ 交易執行失敗（市場交易未成功）\n\n"
+                f"❌ 錯誤: {error_msg}\n\n"
+                f"💡 未進行任何資料庫操作，系統狀態未變更"
+            )
+
+        # ⭐ 使用市場實際成交價格（而非傳入的價格）
+        executed_price = market_result["executed_price"]
+        logger.info(f"✅ 市場交易成功，實際成交價: {executed_price}")
+
+        # ⭐ Step 2: 市場交易成功後，執行資料庫原子操作
         result = await trading_service.execute_trade_atomic(
             agent_id=agent_id,
             ticker=ticker,
             action=action,
             quantity=quantity,
-            price=price,
+            price=executed_price,  # 使用實際成交價格
             decision_reason=decision_reason,
             company_name=company_name,
         )
 
         if result["success"]:
-            logger.info("✅ 原子交易成功完成")
+            logger.info("✅ 原子交易成功完成（市場交易 + 資料庫更新）")
             return (
                 f"✅ 交易執行成功 (原子操作)\n\n"
                 f"📊 交易詳情:\n"
                 f"{result['message']}\n\n"
-                f"✅ 所有操作已原子性完成 ✓"
+                f"✅ 市場交易已完成 ✓\n"
+                f"✅ 資料庫更新已完成 ✓"
             )
         else:
-            logger.error(f"原子交易失敗，已完全回滾: {result['error']}")
+            # ⚠️ 市場交易成功但資料庫操作失敗
+            # 這是一個嚴重的不一致狀態，需要記錄警告
+            logger.error(
+                f"⚠️ 市場交易成功但資料庫操作失敗！"
+                f"需要手動處理: {action} {quantity} 股 {ticker} @ {executed_price}"
+            )
             return (
-                f"❌ 交易執行失敗，已完全回滾\n\n"
-                f"❌ 錯誤: {result['error']}\n\n"
-                f"💡 系統狀態完全恢復，無任何痕跡"
+                f"⚠️ 交易執行部分成功\n\n"
+                f"✅ 市場交易已完成: {action} {quantity} 股 @ {executed_price}\n"
+                f"❌ 資料庫更新失敗: {result['error']}\n\n"
+                f"⚠️ 警告：市場交易已執行但系統記錄失敗，請聯繫管理員處理"
             )
 
     except Exception as e:
         logger.error(f"原子交易異常: {e}", exc_info=True)
-        return f"❌ 交易執行異常\n\n❌ 錯誤: {str(e)}\n\n💡 系統狀態完全恢復，無任何痕跡"
+        return f"❌ 交易執行異常\n\n❌ 錯誤: {str(e)}\n\n💡 請檢查交易狀態"
 
 
 def create_trading_tools(
@@ -678,6 +835,7 @@ def create_trading_tools(
         """
         執行完整交易 - 原子操作 (推薦優先使用)
 
+        此工具會先透過市場交易系統驗證交易可行性，成功後才記錄到資料庫。
         所有操作在單一事務中進行，保證原子性：
         - 全部成功 → 提交所有變更
         - 任何失敗 → 回滾所有變更
@@ -706,8 +864,17 @@ def create_trading_tools(
         Raises:
             返回錯誤訊息：股票代號不存在、action無效、股數不符規定、price 為空或系統異常
         """
+        # ⭐ 檢查 casual_market_mcp 是否可用
+        if casual_market_mcp is None:
+            return (
+                "❌ 交易執行失敗\n\n"
+                "❌ 錯誤: 市場交易系統 (casual_market_mcp) 未配置\n\n"
+                "💡 無法執行交易，請確認系統配置正確"
+            )
+
         return await execute_trade_atomic(
             trading_service=trading_service,
+            casual_market_mcp=casual_market_mcp,
             agent_id=agent_id,
             ticker=ticker,
             action=action,
