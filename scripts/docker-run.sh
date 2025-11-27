@@ -111,6 +111,7 @@ start_container() {
 		-v "${MEMORY_DB_HOST_PATH}:/app/memory" \
 		-v "${GITHUB_COPILOT_AUTH_PATH}:/root/.config/litellm/github_copilot" \
 		-v "${LOGS_DIR}:/app/logs" \
+		-e TZ=Asia/Taipei \
 		--restart unless-stopped \
 		"$IMAGE_NAME"
 
