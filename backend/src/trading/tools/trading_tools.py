@@ -343,6 +343,159 @@ async def _execute_market_trade(
         }
 
 
+def _validate_trade_params(
+    action: str,
+    quantity: int,
+    price: float | None,
+) -> tuple[str, int, float]:
+    """
+    驗證交易參數
+
+    Args:
+        action: 交易動作
+        quantity: 交易股數
+        price: 交易價格
+
+    Returns:
+        tuple[str, int, float]: (action_upper, validated_quantity, validated_price)
+
+    Raises:
+        ValueError: 參數驗證失敗
+    """
+    # 驗證交易動作
+    action_upper = action.upper()
+    if action_upper not in ["BUY", "SELL"]:
+        raise ValueError(f"無效的交易動作: {action}，必須是 'BUY' 或 'SELL'")
+
+    # 驗證股數
+    if not isinstance(quantity, int) or quantity <= 0:
+        raise ValueError(f"股數必須是正整數，收到: {quantity}")
+
+    if quantity % 1000 != 0:
+        raise ValueError(
+            f"股數必須是 1000 的倍數（台股最小交易單位為 1 張 = 1000 股），收到: {quantity}"
+        )
+
+    # 驗證價格
+    if price is None:
+        raise ValueError("交易價格 (price) 不能為 None，必須提供具體的交易價格")
+
+    validated_price = price
+    if not isinstance(price, (int, float)):
+        try:
+            validated_price = float(price)
+        except (TypeError, ValueError) as e:
+            raise ValueError(f"交易價格無效: {price}，無法轉換為浮點數") from e
+
+    if validated_price <= 0:
+        raise ValueError(f"交易價格必須是正數，收到: {validated_price}")
+
+    return action_upper, quantity, validated_price
+
+
+async def _validate_trade_feasibility(
+    agent_service,
+    agent_id: str,
+    ticker: str,
+    action: str,
+    quantity: int,
+    price: float,
+) -> dict[str, Any]:
+    """
+    驗證交易可行性（資金充足性 / 持股充足性）
+
+    在執行市場交易前，先驗證：
+    - BUY: 是否有足夠資金支付買入費用（含手續費）
+    - SELL: 是否有足夠持股可賣出
+
+    Args:
+        agent_service: Agent 服務實例
+        agent_id: Agent ID
+        ticker: 股票代號
+        action: 交易動作 ("BUY" 或 "SELL")
+        quantity: 交易股數
+        price: 交易價格
+
+    Returns:
+        dict: {
+            "valid": bool,
+            "agent_config": AgentConfig (如果成功),
+            "current_funds": float (如果成功),
+            "holding": AgentHolding | None (如果成功且為 SELL),
+            "error": str (如果失敗)
+        }
+    """
+    try:
+        # 取得 Agent 配置
+        agent_config = await agent_service.get_agent_config(agent_id)
+        if not agent_config:
+            return {
+                "valid": False,
+                "error": f"Agent {agent_id} 不存在",
+            }
+
+        current_funds = float(agent_config.current_funds or agent_config.initial_funds)
+
+        if action.upper() == "BUY":
+            # 計算買入所需資金（含手續費 0.1425%）
+            total_amount = quantity * price
+            commission = total_amount * 0.001425
+            required_funds = total_amount + commission
+
+            if current_funds < required_funds:
+                return {
+                    "valid": False,
+                    "error": f"資金不足: 現有 {current_funds:,.2f} 元，"
+                    f"買入 {quantity} 股 {ticker} @ {price} 需要 {required_funds:,.2f} 元"
+                    f"（含手續費 {commission:,.2f} 元）",
+                }
+
+            return {
+                "valid": True,
+                "agent_config": agent_config,
+                "current_funds": current_funds,
+                "required_funds": required_funds,
+            }
+
+        elif action.upper() == "SELL":
+            # 檢查持股是否足夠
+            holdings = await agent_service.get_agent_holdings(agent_id)
+            holding = next((h for h in holdings if h.ticker == ticker), None)
+
+            if not holding:
+                return {
+                    "valid": False,
+                    "error": f"無法賣出 {ticker}: 沒有該股票的持股記錄",
+                }
+
+            if holding.quantity < quantity:
+                return {
+                    "valid": False,
+                    "error": f"持股不足: 持有 {holding.quantity} 股 {ticker}，"
+                    f"無法賣出 {quantity} 股",
+                }
+
+            return {
+                "valid": True,
+                "agent_config": agent_config,
+                "current_funds": current_funds,
+                "holding": holding,
+            }
+
+        else:
+            return {
+                "valid": False,
+                "error": f"未知的交易動作: {action}",
+            }
+
+    except Exception as e:
+        logger.error(f"驗證交易可行性失敗: {e}", exc_info=True)
+        return {
+            "valid": False,
+            "error": f"驗證交易可行性時發生錯誤: {str(e)}",
+        }
+
+
 async def execute_trade_atomic(
     trading_service: "TradingService",
     casual_market_mcp,
@@ -358,7 +511,8 @@ async def execute_trade_atomic(
     執行完整交易 - 原子操作
 
     此函數確保交易的完整性和一致性：
-    1. 首先透過 casual_market_mcp 執行市場交易（驗證交易可行性）
+    0. 預先驗證所有參數和交易可行性（資金/持股充足性）
+    1. 透過 casual_market_mcp 執行市場交易
     2. 只有在市場交易成功後，才進行資料庫的原子操作
 
     所有資料庫操作在單一事務中，保證:
@@ -383,15 +537,58 @@ async def execute_trade_atomic(
         ValueError: 參數驗證失敗，包括 price 為 None 的情況
     """
     try:
-        # ⭐ Step 1: 先執行市場交易，驗證交易可行性
-        logger.info(f"📤 開始原子交易: {action} {quantity} 股 {ticker} @ {price}")
+        # ==========================================
+        # Step 0: 預先驗證（在市場交易前完成所有驗證）
+        # ==========================================
+
+        # 0.1 驗證基本參數
+        try:
+            action_upper, validated_quantity, validated_price = _validate_trade_params(
+                action=action,
+                quantity=quantity,
+                price=price,
+            )
+        except ValueError as e:
+            logger.warning(f"參數驗證失敗: {e}")
+            return f"❌ 交易參數驗證失敗\n\n❌ 錯誤: {str(e)}\n\n💡 請檢查交易參數後重試"
+
+        # 0.2 驗證交易可行性（資金/持股充足性）
+        agent_service = trading_service.agents_service
+        feasibility = await _validate_trade_feasibility(
+            agent_service=agent_service,
+            agent_id=agent_id,
+            ticker=ticker,
+            action=action_upper,
+            quantity=validated_quantity,
+            price=validated_price,
+        )
+
+        if not feasibility["valid"]:
+            error_msg = feasibility.get("error", "交易可行性驗證失敗")
+            logger.warning(f"交易可行性驗證失敗: {error_msg}")
+            return (
+                f"❌ 交易可行性驗證失敗\n\n"
+                f"❌ 錯誤: {error_msg}\n\n"
+                f"💡 未進行任何交易，系統狀態未變更"
+            )
+
+        logger.info(
+            f"✅ 預先驗證通過: {action_upper} {validated_quantity} 股 {ticker} @ {validated_price}"
+        )
+
+        # ==========================================
+        # Step 1: 執行市場交易
+        # ==========================================
+        logger.info(
+            f"📤 開始原子交易: {action_upper} {validated_quantity} 股 {ticker} @ {validated_price}"
+        )
 
         market_result = await _execute_market_trade(
             casual_market_mcp=casual_market_mcp,
             ticker=ticker,
-            action=action,
-            quantity=quantity,
-            price=price,
+            action=action_upper,
+            quantity=validated_quantity,
+            price=validated_price,
         )
 
         if not market_result["success"]:
@@ -404,16 +601,20 @@ async def execute_trade_atomic(
                 f"💡 未進行任何資料庫操作，系統狀態未變更"
             )
 
+        # ==========================================
+        # Step 2: 執行資料庫原子操作
+        # ==========================================
+
         # ⭐ 使用市場實際成交價格（而非傳入的價格）
         executed_price = market_result["executed_price"]
         logger.info(f"✅ 市場交易成功，實際成交價: {executed_price}")
 
-        # ⭐ Step 2: 市場交易成功後，執行資料庫原子操作
+        # 執行資料庫原子操作
         result = await trading_service.execute_trade_atomic(
             agent_id=agent_id,
             ticker=ticker,
-            action=action,
-            quantity=quantity,
+            action=action_upper,
+            quantity=validated_quantity,
             price=executed_price,  # 使用實際成交價格
             decision_reason=decision_reason,
             company_name=company_name,
